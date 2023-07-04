@@ -1,7 +1,6 @@
 ﻿using DevExpress.Data;
 using DevExpress.XtraGrid;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -57,12 +56,11 @@ public sealed class DepthViewModel : AbstractViewModel, IDisposable, IViewAwared
         depthDataService.DepthUpdated += OnDepthUpdated;
     }
 
-    private void OnDepthUpdated(string ticker, DepthItem item)
+    private void OnDepthUpdated(string ticker, DepthLevel item)
     {
         if (ticker != Ticker) return;
-        if (item.Depth >= DepthCount || item.Depth < 0) return; // invalid depth or excessive depth
 
-        var index = item.IsBid ? DepthCount + item.Depth : DepthCount - item.Depth - 1;
+        var index = item.BidAsk == BidAsk.Bid ? DepthCount + item.Depth : DepthCount - item.Depth - 1;
         Items[index].Price = item.Price;
     }
 

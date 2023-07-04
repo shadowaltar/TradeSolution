@@ -8,5 +8,5 @@ public interface IDepthDataService : IDisposable
     event AllDepthsUpdateDelegate AllDepthsUpdated;
 }
 
-public delegate void DepthUpdateDelegate(string ticker, DepthItem item);
-public delegate void AllDepthsUpdateDelegate(string ticker, DepthItem[] items);
+public delegate void DepthUpdateDelegate(string ticker, DepthLevel item);
+public delegate void AllDepthsUpdateDelegate(string ticker, DepthLevel[] items);

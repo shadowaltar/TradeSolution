@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TradeDataCore.Importing;
 
 namespace TradePort.Controllers;
 [ApiController]
@@ -15,6 +16,16 @@ public class TryController : ControllerBase
     public TryController(ILogger<TryController> logger)
     {
         _logger = logger;
+    }
+
+    [HttpGet("XLSX")]
+    public async Task<IActionResult> GetXlsx()
+    {
+        var downloader = new WebDownloader();
+        await downloader.Download(
+            "https://www.hkex.com.hk/eng/services/trading/securities/securitieslists/ListOfSecurities.xlsx",
+            @"C:\Temp\HKEX.xlsx");
+        return Ok(DateTimeOffset.Now);
     }
 
     [HttpGet("Time")]

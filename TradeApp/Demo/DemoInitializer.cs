@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using TradeApp.Essentials;
 using TradeApp.Services;
 using TradeApp.ViewModels.Widgets;
 
@@ -41,7 +42,7 @@ namespace TradeApp.Demo
             _timer?.Dispose();
         }
 
-        public double[] Initialize(int maxDepthCount)
+        public DepthLevel[] Initialize(int maxDepthCount)
         {
             _maxDepthCount = maxDepthCount;
             var prices = GeneratePrices();
@@ -49,32 +50,42 @@ namespace TradeApp.Demo
             return prices;
         }
 
-        private double[] GeneratePrices()
+        private DepthLevel[] GeneratePrices()
         {
+            int RandomVolume() => _r.Next(10000, 2000);
+
+            var count = _maxDepthCount;
             var mid = Convert.ToDouble(_r.Next(50, 100));
             var deviations = new List<double>();
-            var prices = new double[_maxDepthCount * 2];
-            var c = _maxDepthCount;
-            for (int i = 0; i < c; i++)
+            var prices = new DepthLevel[count * 2];
+            for (int i = 0; i < count; i++)
             {
                 deviations.Add(Math.Round((_r.NextDouble() + 0.2d) * 2d, 2));
             }
+            // asks
             var devSum = deviations.Sum();
-            prices[0] = mid + devSum;
-            for (int i = 1; i < c; i++)
+            prices[0] = new DepthLevel(count, mid + devSum, RandomVolume(), BidAsk.Ask);
+            for (int i = 1; i < count; i++)
             {
-                prices[i] = prices[i - 1] - deviations[i - 1];
+                var last = prices[i - 1];
+                prices[i] = new DepthLevel(last.Depth - 1,
+                    last.Price - deviations[i - 1],
+                    RandomVolume(), BidAsk.Ask);
             }
 
+            // bids
             deviations.Clear();
-            for (int i = 0; i < c; i++)
+            for (int i = 0; i < count; i++)
             {
                 deviations.Add(Math.Round((_r.NextDouble() + 0.2d) * 2d, 2));
             }
-            prices[c] = mid - deviations[0];
-            for (int i = 1; i < c; i++)
+            prices[count] = new DepthLevel(1, mid - deviations[0], RandomVolume(), BidAsk.Bid);
+            for (int i = 1; i < count; i++)
             {
-                prices[c + i] = prices[c] - deviations[i];
+                var last = prices[count + i - 1];
+                prices[count + i] = new DepthLevel(last.Depth + 1,
+                    last.Price - deviations[i],
+                    RandomVolume(), BidAsk.Bid);
             }
             return prices;
         }
@@ -87,7 +98,7 @@ namespace TradeApp.Demo
 
         private void YieldPriceChange(object? state)
         {
-            AllDepthsUpdated?.Invoke("",GeneratePrices());
+            AllDepthsUpdated?.Invoke("", GeneratePrices());
         }
     }
 }

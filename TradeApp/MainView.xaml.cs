@@ -1,6 +1,9 @@
 ﻿using Autofac;
 using DevExpress.Xpf.Core;
 using DevExpress.Xpf.Docking;
+using log4net.Config;
+using OfficeOpenXml;
+using System.Text;
 using TradeApp.UX;
 using TradeApp.ViewModels.Presets;
 using TradeApp.ViewModels.Widgets;
@@ -18,6 +21,10 @@ public partial class MainView : ThemedWindow
     public MainView()
     {
         InitializeComponent();
+
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        XmlConfigurator.Configure();
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
         var builder = new ContainerBuilder();
 
