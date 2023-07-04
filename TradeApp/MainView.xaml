@@ -1,0 +1,66 @@
+﻿<dx:ThemedWindow x:Class="TradeApp.MainView"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:dxb="http://schemas.devexpress.com/winfx/2008/xaml/bars"
+                 xmlns:dx="http://schemas.devexpress.com/winfx/2008/xaml/core"
+                 xmlns:dxdo="http://schemas.devexpress.com/winfx/2008/xaml/docking"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:local="clr-namespace:TradeApp"
+                 xmlns:ux="clr-namespace:TradeApp.UX"
+                 d:DataContext="{d:DesignInstance Type=local:MainViewModel}"
+                 mc:Ignorable="d"
+                 Title="{Binding Title}"
+                 TitleAlignment="Center"
+                 Height="450" Width="800">
+    <dx:ThemedWindow.ToolbarItems>
+        <dxb:MainMenuControl VerticalAlignment="Center" ShowBackground="False">
+            <dxb:BarSubItem Content="File">
+                <dxb:BarButtonItem Content="New Empty Workspace" />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="Open Workspace From File..." />
+                <dxb:BarButtonItem Content="Save Workspace" />
+                <dxb:BarButtonItem Content="Save Workspace As..." />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="Undo All Workspace Changes..." />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="Preferences..." />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="Sign Off..." />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="Exit" />
+            </dxb:BarSubItem>
+            <dxb:BarSubItem Content="View">
+                <dxb:BarStaticItem Content="-- Presets --" />
+                <dxb:BarButtonItem Content="Standard Trading View" />
+                <dxb:BarButtonItem Content="Standard Exchange Market View" />
+                <dxb:BarButtonItem Content="Standard Portfolio Breakdown View" />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="New Candlestick Chart" />
+                <dxb:BarButtonItem Content="New Tick Chart" />
+                <dxb:BarButtonItem Content="New Simple Price Chart" />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="New Depth Book View" Command="{Binding NewPanelCommand}" CommandParameter="{x:Static ux:PresetPanelType.Depth}" />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="New Open Order Grid" />
+                <dxb:BarButtonItem Content="New History Order Grid" />
+                <dxb:BarButtonItem Content="New History Position Grid" />
+                <dxb:BarItemLinkSeparator />
+                <dxb:BarItemLinkSeparator />
+            </dxb:BarSubItem>
+            <dxb:BarSubItem Content="Security">
+                <dxb:BarButtonItem Content="Exchange Viewer..." />
+                <dxb:BarButtonItem Content="Security Viewer..." />
+            </dxb:BarSubItem>
+            <dxb:BarSubItem Content="Trade">
+                <dxb:BarButtonItem Content="Place Stock Order..." />
+                <dxb:BarButtonItem Content="Place Future/Forward Order..." />
+                <dxb:BarButtonItem Content="Place Option Order..." />
+            </dxb:BarSubItem>
+            <dxb:BarButtonItem Content="Start Demo" Command="{Binding StartDemoCommand}" />
+            <dxb:BarButtonItem Content="Help" />
+        </dxb:MainMenuControl>
+    </dx:ThemedWindow.ToolbarItems>
+    <dxdo:DockLayoutManager x:Name="MainArea">
+    </dxdo:DockLayoutManager>
+</dx:ThemedWindow>
