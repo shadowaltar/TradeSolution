@@ -21,13 +21,13 @@ public enum IntervalType
 
 public static class IntervalTypeConverter
 {
-    public static IntervalType Parse(string strInterval)
+    public static IntervalType Parse(string intervalStr)
     {
-        if (strInterval == null)
+        if (intervalStr == null)
             return IntervalType.Unknown;
 
-        strInterval = strInterval.Trim().ToUpperInvariant();
-        return strInterval switch
+        intervalStr = intervalStr.Trim().ToUpperInvariant();
+        return intervalStr switch
         {
             "1D" => IntervalType.OneDay,
             "1S" => IntervalType.OneSecond,
@@ -65,6 +65,28 @@ public static class IntervalTypeConverter
             IntervalType.OneMonth => "1mo",
             IntervalType.ThreeMonths => "3mo",
             IntervalType.OneYear => "",
+            _ => ""
+        };
+    }
+
+    public static string ToIntervalString(IntervalType interval)
+    {
+        return interval switch
+        {
+            IntervalType.OneDay => "1d",
+            IntervalType.OneSecond => "1s",
+            IntervalType.OneMinute => "1m",
+            IntervalType.TwoMinutes => "2m",
+            IntervalType.FiveMinutes => "5m",
+            IntervalType.FifteenMinutes => "15m",
+            IntervalType.ThirtyMinutes => "30m",
+            IntervalType.OneHour => "1h",
+            IntervalType.NintyMinutes => "90m",
+            IntervalType.FourHours => "4h",
+            IntervalType.OneWeek => "1w",
+            IntervalType.OneMonth => "1mo",
+            IntervalType.ThreeMonths => "3mo",
+            IntervalType.OneYear => "1y",
             _ => ""
         };
     }

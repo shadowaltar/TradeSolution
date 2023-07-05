@@ -12,8 +12,20 @@ public static class StringExtensions
     /// <returns></returns>
     public static bool IsBlank([NotNullWhen(false)][AllowNull] this string value) => string.IsNullOrWhiteSpace(value);
 
-    public static DateTime ParseDate(this string value, string? format = "yyyyMMdd", DateTime defaultValue = default) =>
-        DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : defaultValue;
+    public static DateTime ParseDate(this string? value, string? format = "yyyyMMdd", DateTime defaultValue = default)
+    {
+        if (value.IsBlank())
+        {
+            return defaultValue;
+        }
+        return DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : defaultValue;
+    }
+
+    public static string ParseString(this object? obj, string defaultValue = "", bool shouldTrim = true)
+    {
+        var v = obj?.ToString() ?? defaultValue;
+        return shouldTrim ? v.Trim() : v;
+    }
 
     public static long ParseLong(this string? value, long defaultValue = default, string cultureInfoName = "")
     {

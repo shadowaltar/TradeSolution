@@ -2,6 +2,7 @@
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.Importing;
+using TradeDataCore.Utils;
 
 namespace TradeDataCore.StaticData;
 public class SecurityDefinitionImporter
@@ -20,17 +21,21 @@ public class SecurityDefinitionImporter
             new ExcelImportSetting
             {
                 HeaderSkipLineCount = 2,
-                HardcodedValues = new() { { "Exchange", "HKEX" } }
+                HardcodedValues = new()
+                {
+                    { nameof(Security.Exchange), "HKEX" },
+                    { nameof(Security.Currency), "HKD" },
+                }
             });
         if (securities == null)
         {
             Log.Warn($"No securities are downloaded or parsed for HKEX from {url}");
             return new List<Security>();
         }
-
+        securities = securities.Where(s => !s.Code.IsBlank()).ToList();
 
         Log.Info($"Downloaded and parsed {securities.Count} securities for HKEX from {url}");
-        await Storage.SaveStaticData("Securities", securities);
+        await Storage.InsertSecurities(securities);
         return securities;
     }
 }
