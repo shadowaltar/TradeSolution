@@ -16,7 +16,7 @@ public class PriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<string, List<OhlcPrice>>> ReadYahooPrices(List<string> tickers, IntervalType interval,
+    public async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
          DateTime startTime, DateTime endTime)
     {
         return await ReadYahooPrices(tickers, interval, startTime, endTime, TimeRangeType.Unknown);
@@ -28,16 +28,16 @@ public class PriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<string, List<OhlcPrice>>> ReadYahooPrices(List<string> tickers, IntervalType interval,
+    public async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
          TimeRangeType range)
     {
         return await ReadYahooPrices(tickers, interval, null, null, range);
     }
 
-    private async Task<IDictionary<string, List<OhlcPrice>>> ReadYahooPrices(List<string> tickers, IntervalType interval,
+    private static async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
         DateTime? start, DateTime? end, TimeRangeType range)
     {
-        var results = new ConcurrentDictionary<string, List<OhlcPrice>>();
+        var results = new ConcurrentDictionary<string, PricesAndCorporateActions>();
         if (range == TimeRangeType.Unknown && (start == null || end == null))
         {
             throw new InvalidOperationException("Range must be set, or provide both start and end time.");
@@ -54,7 +54,7 @@ public class PriceReader
                 var formattedTicker = Uri.EscapeDataString(ticker);
                 var intervalStr = IntervalTypeConverter.ToYahooIntervalString(interval);
 
-                List<OhlcPrice>? prices = null;
+                PricesAndCorporateActions? tuple = null;
                 if (range == TimeRangeType.Unknown && start != null && end != null)
                 {
                     const string urlTemplate = "https://query1.finance.yahoo.com/v8/finance/chart/{0}?interval={1}&period1={2}&period2={3}&events=div%7Csplit";
@@ -63,7 +63,7 @@ public class PriceReader
                     var endTs = end.Value.ToUnixSec();
                     var url = string.Format(urlTemplate, formattedTicker, intervalStr, startTs, endTs);
                     _log.Info($"Downloading prices for {ticker} [{intervalStr}] {start:yyMMdd}->{end:yyMMdd}; URL: {url}");
-                    prices = await InternalReadYahooPrices(httpClient, ticker, interval, url);
+                    tuple = await InternalReadYahooPrices(httpClient, ticker, interval, url);
                 }
                 else if (range != TimeRangeType.Unknown)
                 {
@@ -72,11 +72,12 @@ public class PriceReader
                     var rangeStr = TimeRangeTypeConverter.ToYahooIntervalString(range);
                     var url = string.Format(urlTemplate, formattedTicker, intervalStr, rangeStr);
                     _log.Info($"Downloading prices for {ticker} [{intervalStr}] {rangeStr}->Now; URL: {url}");
-                    prices = await InternalReadYahooPrices(httpClient, ticker, interval, url);
+                    tuple = await InternalReadYahooPrices(httpClient, ticker, interval, url);
                 }
-                if (prices != null)
+
+                if (tuple != null)
                 {
-                    results[ticker] = prices;
+                    results[ticker] = tuple!;
                 }
             });
             Thread.Sleep(1000);
@@ -84,7 +85,8 @@ public class PriceReader
         return results;
     }
 
-    private static async Task<List<OhlcPrice>?> InternalReadYahooPrices(HttpClient httpClient, string ticker, IntervalType interval, string url)
+    private static async Task<PricesAndCorporateActions?> InternalReadYahooPrices(HttpClient httpClient,
+        string ticker, IntervalType interval, string url)
     {
         string json;
         try
@@ -106,6 +108,7 @@ public class PriceReader
             var rootObj = jo["chart"]!["result"]!.AsArray()[0]!;
             var priceRootObj = rootObj["indicators"]!;
             var timeRootObj = rootObj["timestamp"]!;
+            var corporateActions = new List<IStockCorporateAction>();
             if (interval == IntervalType.OneDay)
             {
                 // TODO useless for now
@@ -116,8 +119,45 @@ public class PriceReader
                 var corporateActionsObj = rootObj["events"];
                 if (corporateActionsObj != null)
                 {
-                    var splitsObj = corporateActionsObj["splits"];
-                    var dividendsObj = corporateActionsObj["dividends"];
+                    var splitsObj = corporateActionsObj["splits"]?.AsObject();
+                    var dividendsObj = corporateActionsObj["dividends"]?.AsObject();
+                    if (splitsObj != null)
+                    {
+                        foreach (var splitObj in splitsObj)
+                        {
+                            var payableDate = splitObj.Key?.ParseLocalUnixDate() ?? default;
+                            var contentObj = splitObj.Value;
+                            var numerator = contentObj.GetDecimal("numerator");
+                            var denominator = contentObj.GetDecimal("denominator");
+                            var exDate = contentObj.GetLocalUnixDateTime("date");
+                            if (payableDate == default || numerator == default || denominator == default || exDate == default)
+                            {
+                                _log.Warn($"Invalid stock split entry. Payable:{payableDate:yyyyMMdd},Ex:{exDate:yyyyMMdd},N/D:{numerator}/{denominator}");
+                                continue;
+                            }
+
+                            corporateActions ??= new List<IStockCorporateAction>();
+                            corporateActions.Add(new StockSplitEvent(payableDate, exDate, (int)numerator, (int)denominator));
+                        }
+                    }
+                    if (dividendsObj != null)
+                    {
+                        foreach (var dividendObj in dividendsObj)
+                        {
+                            var exDate = dividendObj.Key?.ParseLocalUnixDate() ?? default;
+                            var contentObj = dividendObj.Value;
+                            var amount = contentObj.GetDecimal("amount");
+                            var paymentDate = contentObj.GetLocalUnixDateTime("date");
+                            if (exDate == default || amount == default || paymentDate == default)
+                            {
+                                _log.Warn($"Invalid dividend entry. Ex:{exDate:yyyyMMdd},Payment:{paymentDate:yyyyMMdd},Amt:{amount}");
+                                continue;
+                            }
+
+                            corporateActions ??= new List<IStockCorporateAction>();
+                            corporateActions.Add(new StockDividendEvent(exDate, paymentDate, amount));
+                        }
+                    }
                 }
             }
             var quoteRootObj = priceRootObj["quote"]![0]!;
@@ -126,14 +166,18 @@ public class PriceReader
                 _log.Info($"Ticker {ticker} has no market price data at all.");
                 return null;
             }
-            var localStartTimes = timeRootObj!.AsArray().Select(n =>
-                DateTimeOffset.FromUnixTimeSeconds((int)n!.AsValue())
-                .ToLocalTime().DateTime).ToArray();
-            var highs = quoteRootObj["high"]!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
-            var lows = quoteRootObj["low"]!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
-            var opens = quoteRootObj["open"]!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
-            var closes = quoteRootObj["close"]!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
-            var volumes = quoteRootObj["volume"]!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
+            var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalUnixDateTime()).ToArray();
+            var highs = ToDecimalValues(quoteRootObj, "high");
+            var lows = ToDecimalValues(quoteRootObj, "low");
+            var opens = ToDecimalValues(quoteRootObj, "open");
+            var closes = ToDecimalValues(quoteRootObj, "close");
+            var volumes = ToDecimalValues(quoteRootObj, "volume");
+
+            static decimal[]? ToDecimalValues(JsonNode? parentNode, string key)
+            {
+                return parentNode?[key]?.AsArray().Select(n => n.GetDecimal()).ToArray();
+            }
+
             var prices = new List<OhlcPrice>();
             for (var i = 0; i < localStartTimes.Length; i++)
             {
@@ -146,7 +190,7 @@ public class PriceReader
                 var price = new OhlcPrice(opens[i], highs[i], lows[i], closes[i], volumes[i], localStartTimes[i]);
                 prices.Add(price);
             }
-            return prices;
+            return new PricesAndCorporateActions(prices, corporateActions);
         }
         catch (Exception ex)
         {

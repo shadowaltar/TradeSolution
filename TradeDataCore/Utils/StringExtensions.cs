@@ -21,6 +21,19 @@ public static class StringExtensions
         return DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : defaultValue;
     }
 
+    public static DateTime ParseLocalUnixDate(this string? value, DateTime defaultValue = default)
+    {
+        if (value.IsBlank())
+        {
+            return defaultValue;
+        }
+        if (int.TryParse(value, CultureInfo.InvariantCulture, out var seconds))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime().DateTime;
+        }
+        return defaultValue;
+    }
+
     public static string ParseString(this object? obj, string defaultValue = "", bool shouldTrim = true)
     {
         var v = obj?.ToString() ?? defaultValue;

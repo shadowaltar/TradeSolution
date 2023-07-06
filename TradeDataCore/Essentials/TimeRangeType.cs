@@ -7,6 +7,7 @@ public enum TimeRangeType
     OneMonth,
     SixMonths,
     OneYear,
+    TenYears,
     YearToDay,
     Max,
 }
@@ -26,6 +27,7 @@ public static class TimeRangeTypeConverter
             "1MO" or "1MONTH" => TimeRangeType.OneMonth,
             "6MO" or "6MONTH" => TimeRangeType.SixMonths,
             "1Y" => TimeRangeType.OneYear,
+            "10Y" => TimeRangeType.TenYears,
             "YTD" => TimeRangeType.YearToDay,
             "MAX" => TimeRangeType.Max,
             _ => TimeRangeType.Unknown,
@@ -40,6 +42,7 @@ public static class TimeRangeTypeConverter
             TimeRangeType.OneMonth => "1mo",
             TimeRangeType.SixMonths => "6mo",
             TimeRangeType.OneYear => "1y",
+            TimeRangeType.TenYears => "10y",
             TimeRangeType.YearToDay => "ytd",
             TimeRangeType.Max => "max",
             _ => ""

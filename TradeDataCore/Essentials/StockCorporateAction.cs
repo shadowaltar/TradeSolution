@@ -1,26 +1,27 @@
-﻿namespace TradeDataCore.Essentials;
+﻿using System.Diagnostics;
 
-public class StockCorporateAction
+namespace TradeDataCore.Essentials;
+
+public interface IStockCorporateAction
 {
-    public DateTime EventDate { get; set; }
+    DateTime SettlementDate { get; }
 }
 
 /// <summary>
 /// A CorporateAction which a payment to shareholders
 /// that is made in additional shares.
 /// </summary>
-public class StockDividendEvent : StockCorporateAction
+public record StockDividendEvent(DateTime ExDate, DateTime PaymentDate, decimal Amount) : IStockCorporateAction
 {
-    public decimal DividendAmount { get; set; }
+    public DateTime SettlementDate => PaymentDate;
 }
 
 /// <summary>
 /// A CorporateAction which stands for one or more shares
-/// to be split (or reverse split) into one or more shares.
+/// to be split (or reverse split / merge) into one or more shares.
 /// </summary>
-public class StockSplitEvent : StockCorporateAction
+public record StockSplitEvent(DateTime PayableDate, DateTime ExDate, int Numerator, int Denominator) : IStockCorporateAction
 {
-    public int Numerator { get; set; }
-    public int Denominator { get; set; }
+    public DateTime SettlementDate => ExDate;
     public double Ratio => Numerator / (double)Denominator;
 }
