@@ -10,12 +10,12 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-//await Storage.CreateSecurityTable();
-//await Storage.CreatePriceTable();
-//var importer = new SecurityDefinitionImporter();
-//var securities = await importer.DownloadAndParseHongKongSecurityDefinitions();
+await Storage.CreateSecurityTable();
+await Storage.CreatePriceTable();
+var importer = new SecurityDefinitionImporter();
+var securities = await importer.DownloadAndParseHongKongSecurityDefinitions();
 
-var securities = await Storage.ReadSecurities("HKEX");
+securities = await Storage.ReadSecurities("HKEX");
 var tickers = new Dictionary<string, int>();
 foreach (var security in securities.Where(s => s.Code == "00001"))
 {
@@ -38,8 +38,8 @@ foreach (var (ticker, id) in tickers)
         Debug.WriteLine(count);
     }
 }
-foreach (var (ticker, id) in tickers)
-{
-    var prices = await Storage.ReadPrices(id, intervalStr, new DateTime(2005, 1, 1));
-    Debug.WriteLine(prices.Count);
-}
+//foreach (var (ticker, id) in tickers)
+//{
+//    var prices = await Storage.ReadPrices(id, intervalStr, new DateTime(2005, 1, 1));
+//    Debug.WriteLine(prices.Count);
+//}

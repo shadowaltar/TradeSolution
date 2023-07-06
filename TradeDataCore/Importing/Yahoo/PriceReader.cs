@@ -93,6 +93,11 @@ public class PriceReader
         {
             json = await httpClient.GetStringAsync(url);
         }
+        catch (HttpRequestException e)
+        {
+            _log.Error($"Yahoo price does not exist for ticker {ticker}. StatusCode: {e.StatusCode}. Message: {e.Message}. Url: {url}", e);
+            return null;
+        }
         catch (Exception e)
         {
             _log.Error($"Yahoo price does not exist for ticker {ticker}. Url: {url}", e);
@@ -112,9 +117,11 @@ public class PriceReader
             if (interval == IntervalType.OneDay)
             {
                 // TODO useless for now
-                var adjustedCloses = priceRootObj!["adjclose"]!.AsArray()[0]!["adjclose"]!
-                    .AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
-
+                var adjustedClosesObj = priceRootObj!["adjclose"]?.AsArray()?[0]?["adjclose"];
+                if (adjustedClosesObj != null)
+                {
+                    var adjustedCloses = adjustedClosesObj!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
+                }
                 // TODO
                 var corporateActionsObj = rootObj["events"];
                 if (corporateActionsObj != null)

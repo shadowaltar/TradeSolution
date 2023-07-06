@@ -10,6 +10,8 @@ namespace TradeDataCore.Database
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(Storage));
 
+        public static readonly string DatabaseFolder = @"c:\temp";
+
         public static async Task InsertSecurities(List<Security> entries)
         {
             const string sql =
@@ -22,7 +24,7 @@ ON CONFLICT (Code, Exchange)
 DO UPDATE SET LocalEndDate = excluded.LocalEndDate;
 ";
 
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.StaticData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
             await connection.OpenAsync();
             using var transaction = connection.BeginTransaction();
 
@@ -67,6 +69,11 @@ DO UPDATE SET LocalEndDate = excluded.LocalEndDate;
             await connection.CloseAsync();
         }
 
+        private static string? GetConnectionString(string databaseName)
+        {
+            return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
+        }
+
         public static async Task InsertPrices(int securityId, string intervalStr, List<OhlcPrice> prices)
         {
             const string sql =
@@ -84,7 +91,7 @@ DO UPDATE SET
     Volume = excluded.Volume;
 ";
 
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.MarketData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
             await connection.OpenAsync();
             using var transaction = connection.BeginTransaction();
 
@@ -152,7 +159,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.SecurityTable} (
 CREATE UNIQUE INDEX idx_code_exchange
     ON {DatabaseNames.SecurityTable} (Code, Exchange);
 ";
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.StaticData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
             await connection.OpenAsync();
 
             using var dropCommand = connection.CreateCommand();
@@ -187,7 +194,7 @@ DROP INDEX IF EXISTS idx_sec_start_interval;
 CREATE UNIQUE INDEX idx_sec_start_interval
 ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
 ";
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.MarketData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
             await connection.OpenAsync();
 
             using var dropCommand = connection.CreateCommand();
@@ -199,6 +206,48 @@ ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
             await createCommand.ExecuteNonQueryAsync();
 
             Log.Info($"Created {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
+        }
+
+        public static async Task<Security> ReadSecurity(string exchange, string code)
+        {
+            string sql =
+@$"
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,IsShortable
+FROM {DatabaseNames.SecurityTable}
+WHERE
+    Code = $Code AND
+    Exchange = $Exchange
+";
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("$Code", code);
+            command.Parameters.AddWithValue("$Exchange", exchange);
+
+            using var r = await command.ExecuteReaderAsync();
+            var results = new List<Security>();
+            while (await r.ReadAsync())
+            {
+                var security = new Security
+                {
+                    Id = r["Id"].ToString().ParseInt(),
+                    Code = r["Code"].ParseString(),
+                    Name = r["Name"].ParseString(),
+                    Exchange = r["Exchange"].ParseString(),
+                    Type = r["Type"].ParseString(),
+                    SubType = r["SubType"].ParseString(),
+                    LotSize = r["LotSize"].ToString().ParseInt(),
+                    Currency = r["Currency"].ParseString(),
+                    Cusip = r["Cusip"].ParseString(null),
+                    Isin = r["Isin"].ParseString(null),
+                    IsShortable = r["IsShortable"].ToString().ParseBool(),
+                };
+                Log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.SecurityTable} table in {DatabaseNames.StaticData}.");
+                return security;
+            }
+            return null;
         }
 
         public static async Task<List<Security>> ReadSecurities(string exchange, string? type = "")
@@ -216,7 +265,7 @@ WHERE
             if (!type.IsBlank())
                 sql += $" AND Type = $Type";
 
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.StaticData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();
@@ -264,7 +313,7 @@ WHERE
             if (end != null)
                 sql += $" AND StartTime <= $EndTime";
 
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.MarketData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();
@@ -298,7 +347,7 @@ WHERE
         {
             var entries = new DataTable();
 
-            using var connection = new SqliteConnection("Data Source=" + DatabaseNames.MarketData + ".db");
+            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
             await connection.OpenAsync();
             using var command = connection.CreateCommand();
             command.CommandText = sql;
