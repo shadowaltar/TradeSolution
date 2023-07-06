@@ -17,22 +17,23 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
 var securities = await Storage.ReadSecurities("HKEX");
 var tickers = new Dictionary<string, int>();
-foreach (var security in securities.Take(2))
+foreach (var security in securities.Where(s => s.Code == "00001"))
 {
     tickers[Identifiers.ToYahooSymbol(security.Code, security.Exchange)] = security.Id;
 }
 
 var interval = IntervalType.OneDay;
 var priceReader = new TradeDataCore.Importing.Yahoo.PriceReader();
-var allPrices = await priceReader.ReadYahooPrices(tickers.Select(p => p.Key).ToList(),
-    interval, TimeRangeType.YearToDay);
+var allData = await priceReader.ReadYahooPrices(tickers.Select(p => p.Key).ToList(),
+    interval, TimeRangeType.TenYears);
 
+return;
 var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
 foreach (var (ticker, id) in tickers)
 {
-    if (allPrices.TryGetValue(ticker, out var prices))
+    if (allData.TryGetValue(ticker, out var data))
     {
-        await Storage.InsertPrices(id, intervalStr, prices);
+        await Storage.InsertPrices(id, intervalStr, data.Prices);
         var count = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
         Debug.WriteLine(count);
     }
