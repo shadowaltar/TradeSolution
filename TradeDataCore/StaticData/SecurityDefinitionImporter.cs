@@ -35,7 +35,6 @@ public class SecurityDefinitionImporter
         securities = securities.Where(s => !s.Code.IsBlank()).ToList();
 
         Log.Info($"Downloaded and parsed {securities.Count} securities for HKEX from {url}");
-        await Storage.InsertSecurities(securities);
         return securities;
     }
 }

@@ -12,6 +12,55 @@ namespace TradeDataCore.Database
 
         public static readonly string DatabaseFolder = @"c:\temp";
 
+        public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<SecurityStatType, decimal>> stats)
+        {
+            var count = 0;
+            const string sql =
+@$"
+INSERT INTO {DatabaseNames.FinancialStatsTable}
+    (SecurityId, MarketCap)
+VALUES
+    ($SecurityId, $MarketCap)
+ON CONFLICT (SecurityId)
+DO UPDATE SET MarketCap = excluded.MarketCap;
+";
+            using var connection = await Connect(DatabaseNames.StaticData);
+            using var transaction = connection.BeginTransaction();
+
+            SqliteCommand? command = null;
+            try
+            {
+                command = connection.CreateCommand();
+                command.CommandText = sql;
+                foreach (var (id, map) in stats)
+                {
+                    if (!map.TryGetValue(SecurityStatType.MarketCap, out var marketCap))
+                    {
+                        continue;
+                    }
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("$SecurityId", id);
+                    command.Parameters.AddWithValue("$MarketCap", marketCap);
+                    count++;
+                    await command.ExecuteNonQueryAsync();
+                }
+                transaction.Commit();
+                Log.Info($"Upserted {count} entries into financial stats table.");
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Failed to upsert into financial stats table.", e);
+                transaction.Rollback();
+            }
+            finally
+            {
+                command?.Dispose();
+            }
+
+            await connection.CloseAsync();
+            return count;
+        }
+
         public static async Task InsertSecurities(List<Security> entries)
         {
             const string sql =
@@ -24,8 +73,7 @@ ON CONFLICT (Code, Exchange)
 DO UPDATE SET LocalEndDate = excluded.LocalEndDate;
 ";
 
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.StaticData);
             using var transaction = connection.BeginTransaction();
 
             SqliteCommand? command = null;
@@ -91,8 +139,7 @@ DO UPDATE SET
     Volume = excluded.Volume;
 ";
 
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.MarketData);
             using var transaction = connection.BeginTransaction();
 
             SqliteCommand? command = null;
@@ -159,8 +206,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.SecurityTable} (
 CREATE UNIQUE INDEX idx_code_exchange
     ON {DatabaseNames.SecurityTable} (Code, Exchange);
 ";
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.StaticData);
 
             using var dropCommand = connection.CreateCommand();
             dropCommand.CommandText = dropSql;
@@ -194,8 +240,7 @@ DROP INDEX IF EXISTS idx_sec_start_interval;
 CREATE UNIQUE INDEX idx_sec_start_interval
 ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
 ";
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.MarketData);
 
             using var dropCommand = connection.CreateCommand();
             dropCommand.CommandText = dropSql;
@@ -208,6 +253,34 @@ ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
             Log.Info($"Created {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
         }
 
+        public static async Task CreateFinancialStatsTable()
+        {
+            const string dropSql =
+@$"
+DROP TABLE IF EXISTS {DatabaseNames.FinancialStatsTable};
+DROP INDEX IF EXISTS idx_sec;
+";
+            const string createSql =
+@$"CREATE TABLE IF NOT EXISTS {DatabaseNames.FinancialStatsTable} (
+    SecurityId INT NOT NULL,
+    MarketCap REAL NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX idx_sec
+ON {DatabaseNames.FinancialStatsTable} (SecurityId);
+";
+            using var connection = await Connect(DatabaseNames.StaticData);
+
+            using var dropCommand = connection.CreateCommand();
+            dropCommand.CommandText = dropSql;
+            await dropCommand.ExecuteNonQueryAsync();
+
+            using var createCommand = connection.CreateCommand();
+            createCommand.CommandText = createSql;
+            await createCommand.ExecuteNonQueryAsync();
+
+            Log.Info($"Created {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        }
+
         public static async Task<Security> ReadSecurity(string exchange, string code)
         {
             string sql =
@@ -218,8 +291,7 @@ WHERE
     Code = $Code AND
     Exchange = $Exchange
 ";
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.StaticData);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -265,8 +337,7 @@ WHERE
             if (!type.IsBlank())
                 sql += $" AND Type = $Type";
 
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.StaticData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.StaticData);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -313,8 +384,7 @@ WHERE
             if (end != null)
                 sql += $" AND StartTime <= $EndTime";
 
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
-            await connection.OpenAsync();
+            using var connection = await Connect(DatabaseNames.MarketData);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -347,8 +417,7 @@ WHERE
         {
             var entries = new DataTable();
 
-            using var connection = new SqliteConnection(GetConnectionString(DatabaseNames.MarketData));
-            await connection.OpenAsync();
+            using var connection = await Connect(database);
             using var command = connection.CreateCommand();
             command.CommandText = sql;
 
@@ -378,6 +447,19 @@ WHERE
             return entries;
         }
 
+        public static async Task<bool> CheckTableExists(string tableName, string database)
+        {
+            if (tableName.IsBlank()) return false;
+            if (database.IsBlank()) return false;
+            const string sql = $"SELECT name FROM sqlite_master WHERE type='table' AND name=@Name;";
+            using var conn = await Connect(database);
+            using var command = conn.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("@Name", tableName);
+            object? r = await command.ExecuteScalarAsync();
+            return r != null;
+        }
+
         public static void Purge()
         {
             try
@@ -392,6 +474,13 @@ WHERE
                 Log.Error($"Failed to purge Sqlite database files.", e);
                 throw;
             }
+        }
+
+        private static async Task<SqliteConnection> Connect(string database)
+        {
+            var conn = new SqliteConnection(GetConnectionString(database));
+            await conn.OpenAsync();
+            return conn;
         }
     }
 }

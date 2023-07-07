@@ -7,5 +7,6 @@
 
         public const string SecurityTable = "securities";
         public const string PriceTable = "prices";
+        public const string FinancialStatsTable = "financial_stats";
     }
 }
