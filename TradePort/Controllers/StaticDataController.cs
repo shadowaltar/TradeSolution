@@ -2,7 +2,6 @@
 using System.Xml.Linq;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
-using TradeDataCore.Importing;
 using TradeDataCore.Importing.Yahoo;
 using TradeDataCore.StaticData;
 
@@ -79,6 +78,23 @@ public class StaticDataController : Controller
     }
 
     /// <summary>
+    /// Gets all security definitions in Binance and save to database.
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("securities/binance/get-and-save-all")]
+    public async Task<IActionResult> GetAndSaveBinanceSecurityDefinition(
+        [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
+    {
+        var secType = SecurityTypeConverter.Parse(secTypeStr);
+        if (secType == SecurityType.Unknown)
+            return BadRequest("Invalid sec-type string.");
+
+        var reader = new TradeDataCore.Importing.Binance.DefinitionReader();
+        var securities = await reader.ReadAndSave(secType);
+        return Ok(securities?.Count);
+    }
+
+    /// <summary>
     /// Gets all security definitions in HKEX and save to database.
     /// </summary>
     /// <returns></returns>
@@ -90,20 +106,9 @@ public class StaticDataController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var downloader = new WebDownloader();
-        await downloader.Download(
-            "https://www.hkex.com.hk/eng/services/trading/securities/securitieslists/ListOfSecurities.xlsx",
-            @"C:\Temp\HKEX.xlsx");
-        var importer = new SecurityDefinitionImporter();
-        var securities = await importer.DownloadAndParseHongKongSecurityDefinitions();
-        if (securities == null)
-            return BadRequest("Failed to download or parse HK security definitions.");
-        else
-        {
-            securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, secType)).ToList();
-            await Storage.InsertStockDefinitions(securities);
-        }
-        return Ok(securities.Count);
+        var reader = new TradeDataCore.Importing.Hkex.DefinitionReader();
+        var securities = await reader.ReadAndSave(secType);
+        return Ok(securities?.Count);
     }
 
     /// <summary>

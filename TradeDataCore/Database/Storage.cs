@@ -130,6 +130,69 @@ DO UPDATE SET
             await connection.CloseAsync();
         }
 
+        public static async Task InsertFxDefinitions(List<Security> entries)
+        {
+            const string sql =
+@$"
+INSERT INTO {DatabaseNames.FxDefinitionTable}
+    (Code, Name, Exchange, Type, SubType, LotSize, Currency, BaseCurrency, QuoteCurrency, IsEnabled, LocalStartDate, LocalEndDate)
+VALUES
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$BaseCurrency,$QuoteCurrency,$IsEnabled,$LocalStartDate,$LocalEndDate)
+ON CONFLICT (Code, BaseCurrency, QuoteCurrency, Exchange)
+DO UPDATE SET
+    Name = excluded.Name,
+    Type = excluded.Type,
+    SubType = excluded.SubType,
+    LotSize = excluded.LotSize,
+    Currency = excluded.Currency,
+    IsEnabled = excluded.IsEnabled,
+    LocalEndDate = excluded.LocalEndDate
+;
+";
+
+            using var connection = await Connect(DatabaseNames.StaticData);
+            using var transaction = connection.BeginTransaction();
+
+            SqliteCommand? command = null;
+            try
+            {
+                command = connection.CreateCommand();
+                command.CommandText = sql;
+
+                foreach (var entry in entries)
+                {
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("$Code", entry.Code);
+                    command.Parameters.AddWithValue("$Name", entry.Name);
+                    command.Parameters.AddWithValue("$Exchange", entry.Exchange);
+                    command.Parameters.AddWithValue("$Type", entry.Type.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$LotSize", entry.LotSize);
+                    command.Parameters.AddWithValue("$Currency", entry.Currency.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$BaseCurrency", entry.FxSetting!.BaseCurrency.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$QuoteCurrency", entry.FxSetting!.QuoteCurrency.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$IsEnabled", true);
+                    command.Parameters.AddWithValue("$LocalStartDate", 0);
+                    command.Parameters.AddWithValue("$LocalEndDate", DateTime.MaxValue.ToString("yyyy-MM-dd HH:mm:ss"));
+
+                    await command.ExecuteNonQueryAsync();
+                }
+                transaction.Commit();
+                Log.Info($"Upserted {entries.Count} entries into securities table.");
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Failed to upsert into securities table.", e);
+                transaction.Rollback();
+            }
+            finally
+            {
+                command?.Dispose();
+            }
+
+            await connection.CloseAsync();
+        }
+
         private static string? GetConnectionString(string databaseName)
         {
             return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
