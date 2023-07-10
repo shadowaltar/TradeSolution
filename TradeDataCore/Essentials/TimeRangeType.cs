@@ -54,4 +54,88 @@ public static class TimeRangeTypeConverter
             _ => ""
         };
     }
+
+    public static Func<DateTime, DateTime> ConvertTimeSpan(TimeRangeType range, OperatorType op)
+    {
+        switch (range)
+        {
+            case TimeRangeType.OneDay:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddDays(1),
+                        OperatorType.Minus => input.AddDays(-1),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.OneMonth:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddMonths(1),
+                        OperatorType.Minus => input.AddMonths(-1),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.SixMonths:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddMonths(6),
+                        OperatorType.Minus => input.AddMonths(-6),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.OneYear:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddYears(1),
+                        OperatorType.Minus => input.AddYears(-1),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.TwoYears:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddYears(2),
+                        OperatorType.Minus => input.AddYears(-2),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.ThreeYears:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddYears(3),
+                        OperatorType.Minus => input.AddYears(-3),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.TenYears:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddYears(10),
+                        OperatorType.Minus => input.AddYears(-10),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.YearToDay:
+                return new Func<DateTime, DateTime>(input => new DateTime(input.Year, 1, 1));
+            case TimeRangeType.Max:
+                return new Func<DateTime, DateTime>(_ => new DateTime(1970, 1, 1));
+            case TimeRangeType.Unknown:
+            default:
+                return new Func<DateTime, DateTime>(_ => DateTime.MaxValue);
+        };
+    }
 }

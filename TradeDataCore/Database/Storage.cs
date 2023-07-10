@@ -239,6 +239,7 @@ CREATE UNIQUE INDEX idx_code_exchange
 @$"
 DROP TABLE IF EXISTS {DatabaseNames.PriceTable};
 DROP INDEX IF EXISTS idx_sec_start_interval;
+DROP INDEX IF EXISTS idx_sec;
 ";
             const string createSql =
 @$"CREATE TABLE IF NOT EXISTS {DatabaseNames.PriceTable} (
@@ -253,6 +254,8 @@ DROP INDEX IF EXISTS idx_sec_start_interval;
 );
 CREATE UNIQUE INDEX idx_sec_start_interval
 ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
+CREATE INDEX idx_sec
+ON {DatabaseNames.PriceTable} (SecurityId);
 ";
             using var connection = await Connect(DatabaseNames.MarketData);
 
@@ -523,6 +526,58 @@ WHERE
             var conn = new SqliteConnection(GetConnectionString(database));
             await conn.OpenAsync();
             return conn;
+        }
+
+        public static async Task<Dictionary<int, List<OhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, TimeRangeType range)
+        {
+            var now = DateTime.Today;
+            var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
+            var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(now);
+            string sql =
+@$"
+SELECT SecurityId, Open, High, Low, Close, Volume, StartTime, Interval
+FROM {DatabaseNames.PriceTable}
+WHERE
+    Interval = $Interval AND
+    StartTime > $StartTime AND
+    SecurityId IN 
+";
+            var ids = securities.Select((s, i) => (id: s.Id, param: $"$Id{i}")).ToArray();
+            var securityMap = securities.ToDictionary(s => s.Id, s => s);
+            sql = sql + "(" + string.Join(",", ids.Select(p => p.param)) + ")";
+            using var connection = await Connect(DatabaseNames.MarketData);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("$Interval", intervalStr);
+            command.Parameters.AddWithValue("$StartTime", start);
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                command.Parameters.AddWithValue(ids[i].param, ids[i].id);
+            }
+            using var r = await command.ExecuteReaderAsync();
+
+            var results = new Dictionary<int, List<OhlcPrice>>();
+            while (await r.ReadAsync())
+            {
+                var secId = r.GetInt32("SecurityId");
+                if (!securityMap.TryGetValue(secId, out var sec))
+                    continue;
+                var list = results.GetOrCreate(secId);
+                var price = new OhlcPrice
+                (
+                    Open: r.GetDecimal("Open"),
+                    High: r.GetDecimal("High"),
+                    Low: r.GetDecimal("Low"),
+                    Close: r.GetDecimal("Close"),
+                    Volume: r.GetDecimal("Volume"),
+                    Start: r.GetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
+                );
+                list.Add(price);
+            }
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
+            return results;
         }
     }
 }

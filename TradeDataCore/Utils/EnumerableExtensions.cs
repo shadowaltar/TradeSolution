@@ -27,4 +27,16 @@ public static class EnumerableExtensions
             yield return currentBucket;
         }
     }
+
+    public static TV GetOrCreate<T, TV>(this IDictionary<T, TV> dictionary, T key) where TV : new() where T : notnull
+    {
+        if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
+
+        if (!dictionary.TryGetValue(key, out var value))
+        {
+            value = new TV();
+            dictionary[key] = value;
+        }
+        return value;
+    }
 }

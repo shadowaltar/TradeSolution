@@ -90,4 +90,26 @@ public static class IntervalTypeConverter
             _ => ""
         };
     }
+
+    public static TimeSpan ToTimeSpan(IntervalType interval)
+    {
+        return interval switch
+        {
+            IntervalType.OneDay => new TimeSpan(1, 0, 0, 0),
+            IntervalType.OneSecond => new TimeSpan(0, 0, 1),
+            IntervalType.OneMinute => new TimeSpan(0, 1, 0),
+            IntervalType.TwoMinutes => new TimeSpan(0, 2, 0),
+            IntervalType.FiveMinutes => new TimeSpan(0, 5, 0),
+            IntervalType.FifteenMinutes => new TimeSpan(0, 15, 0),
+            IntervalType.ThirtyMinutes => new TimeSpan(0, 30, 0),
+            IntervalType.OneHour => new TimeSpan(1, 0, 0),
+            IntervalType.NintyMinutes => new TimeSpan(1, 30, 0),
+            IntervalType.FourHours => new TimeSpan(4, 0, 0),
+            IntervalType.OneWeek => new TimeSpan(7, 0, 0, 0),
+            IntervalType.OneMonth => new TimeSpan(30, 0, 0, 0),
+            IntervalType.ThreeMonths => new TimeSpan(90, 0, 0, 0),
+            IntervalType.OneYear => new TimeSpan(365, 0, 0, 0),
+            _ => TimeSpan.Zero,
+        };
+    }
 }

@@ -13,6 +13,16 @@ public static class DateUtils
         return (long)value.Subtract(DateTime.UnixEpoch).TotalMilliseconds;
     }
 
+    public static DateTime FromLocalUnixSec(int unixSec)
+    {
+        return DateTimeOffset.FromUnixTimeSeconds(unixSec).ToLocalTime().DateTime;
+    }
+
+    public static DateTime FromLocalUnixMs(long unixMs)
+    {
+        return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToLocalTime().DateTime;
+    }
+
     public static DateTime? NullIfMin(this DateTime value)
     {
         return value == DateTime.MinValue ? null : value;

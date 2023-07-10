@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Data;
+using System.IO;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
+using TradeDataCore.Exporting;
 using TradeDataCore.Importing.Yahoo;
 using TradeDataCore.StaticData;
 using TradeDataCore.Utils;
+using System.Linq;
 
 namespace TradePort.Controllers;
 
@@ -15,7 +18,6 @@ namespace TradePort.Controllers;
 [Route("prices")]
 public class PriceController : Controller
 {
-
     /// <summary>
     /// Get prices given exchange, code, interval and start time.
     /// </summary>
@@ -122,9 +124,10 @@ public class PriceController : Controller
     }
 
     /// <summary>
-    /// Gets all security price data from Yahoo in this exchange and save to database.
+    /// Gets one security price data from Yahoo in this exchange and save to database.
     /// </summary>
     /// <param name="exchange"></param>
+    /// <param name="code"></param>
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
     /// <returns></returns>
@@ -149,6 +152,52 @@ public class PriceController : Controller
             Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
+    }
+
+    /// <summary>
+    /// Gets one security price data from Yahoo in this exchange and save to database.
+    /// </summary>
+    /// <param name="exchange"></param>
+    /// <param name="code"></param>
+    /// <param name="intervalStr"></param>
+    /// <param name="rangeStr"></param>
+    /// <returns></returns>
+    [HttpGet("{exchange}/download-json")]
+    public async Task<ActionResult> DownloadAll(
+        string exchange = "HKEX",
+        [FromQuery(Name = "interval")] string intervalStr = "1h",
+        [FromQuery(Name = "range")] string rangeStr = "2y")
+    {
+        var securities = await Storage.ReadSecurities(exchange);
+        var idTable = await Storage.Execute("SELECT DISTINCT SecurityId FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
+
+        var ids = (from DataRow dr in idTable.Rows
+                   select dr["SecurityId"].ToString().ParseInt()).Distinct().ToList();
+        securities = securities.Where(s => ids.Contains(s.Id)).ToList();
+
+        var interval = IntervalTypeConverter.Parse(intervalStr);
+        var range = TimeRangeTypeConverter.Parse(rangeStr);
+        var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
+        var allPrices = await Storage.ReadAllPrices(securities, interval, range);
+
+        var secMap = securities.ToDictionary(s => s.Id, s => s);
+        var extendedResults = new List<ExtendedOhlcPrice>();
+        foreach (var (secId, prices) in allPrices)
+        {
+            if (!secMap.TryGetValue(secId, out var sec)) continue;
+
+            foreach (var p in prices)
+            {
+                extendedResults.Add(new ExtendedOhlcPrice(sec.Code, sec.Exchange, p.Open, p.High, p.Low, p.Close, p.Volume, intervalStr, start));
+            }
+        }
+        var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start:yyyyMMdd}_{exchange}.json");
+        if (System.IO.File.Exists(filePath))
+        {
+            return File(System.IO.File.OpenRead(filePath), "application/octet-stream", Path.GetFileName(filePath));
+        }
+
+        return NotFound();
     }
 
     /// <summary>
@@ -178,16 +227,16 @@ public class PriceController : Controller
         if (dt1 != null && dt2 != null)
         {
             var result = from table1 in dt1.AsEnumerable()
-            join table2 in dt2.AsEnumerable() on (string)table1["SecurityId"] equals (string)table2["Id"]
-            select new
-            {
-                SecurityId = (string)table1["SecurityId"],
-                Count = (string)table1["Count"],
-                Interval = (string)table1["Interval"],
-                Code = (string)table2["Code"],
-                Exchange = (string)table2["Exchange"],
-                Name = (string)table2["Name"],
-            };
+                         join table2 in dt2.AsEnumerable() on (string)table1["SecurityId"] equals (string)table2["Id"]
+                         select new
+                         {
+                             SecurityId = (string)table1["SecurityId"],
+                             Count = (string)table1["Count"],
+                             Interval = (string)table1["Interval"],
+                             Code = (string)table2["Code"],
+                             Exchange = (string)table2["Exchange"],
+                             Name = (string)table2["Name"],
+                         };
             return Ok(result);
         }
         return BadRequest();

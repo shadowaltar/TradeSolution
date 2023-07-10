@@ -22,6 +22,6 @@ public static class JsonExtensions
         if (fieldName == null)
             return node?.AsValue().ToString()?.ParseLocalUnixDate() ?? defaultValue;
         var seconds = node?[fieldName]?.AsValue().GetValue<int>() ?? 0;
-        return DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime().DateTime;
+        return DateUtils.FromLocalUnixSec(seconds);
     }
 }
