@@ -14,8 +14,8 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 var exchange = "HKEX";
 var intervalStr = "1d";
 var rangeStr = "2y";
-var securities = await Storage.ReadSecurities(exchange);
-var idTable = await Storage.Execute("SELECT DISTINCT SecurityId FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
+var securities = await Storage.ReadSecurities(exchange, SecurityType.Equity);
+var idTable = await Storage.Execute("SELECT DISTINCT SecurityId FROM " + DatabaseNames.StockPrice1hTable, DatabaseNames.MarketData);
 
 IEnumerable<int> GetSecIdFromTable()
 {
@@ -33,16 +33,7 @@ var range = TimeRangeTypeConverter.Parse(rangeStr);
 var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
 var allPrices = await Storage.ReadAllPrices(securities, interval, range);
 
-var secMap = securities.ToDictionary(s => s.Id, s => s);
-var extendedResults = new List<ExtendedOhlcPrice>();
-foreach (var (secId, prices) in allPrices)
-{
-    if (secMap.TryGetValue(secId, out var sec))
-    {
-        foreach (var p in prices)
-        {
-            extendedResults.Add(new ExtendedOhlcPrice(sec.Code, sec.Exchange, p.Open, p.High, p.Low, p.Close, p.Volume, intervalStr, start));
-        }
-    }
-}
+var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
+    .OrderBy(i => i.Exchange).ThenBy(i => i.Code).ThenBy(i => i.Interval).ThenBy(i => i.Start)
+    .ToList();
 var filePath = await JsonWriter.ToJsonFile(extendedResults);

@@ -13,10 +13,17 @@ public class Security
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }
     public bool IsShortable { get; set; }
+    public FxSetting? FxSetting { get; set; }
     public StockSetting? StockSetting { get; set; }
     public DerivativeSetting? DerivativeSetting { get; set; }
 }
 
+
+public class FxSetting
+{
+    public string BaseCurrency { get; set; }
+    public string QuoteCurrency { get; set; }
+}
 
 public class StockSetting
 {

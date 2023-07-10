@@ -61,11 +61,11 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             return count;
         }
 
-        public static async Task InsertSecurities(List<Security> entries)
+        public static async Task InsertStockDefinitions(List<Security> entries)
         {
             const string sql =
 @$"
-INSERT INTO {DatabaseNames.SecurityTable}
+INSERT INTO {DatabaseNames.StockDefinitionTable}
     (Code, Name, Exchange, Type, SubType, LotSize, Currency, Cusip, Isin, YahooTicker, IsShortable, IsEnabled, LocalStartDate, LocalEndDate)
 VALUES
     ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$Cusip,$Isin,$YahooTicker,$IsShortable,$IsEnabled,$LocalStartDate,$LocalEndDate)
@@ -100,13 +100,13 @@ DO UPDATE SET
                     command.Parameters.AddWithValue("$Code", entry.Code);
                     command.Parameters.AddWithValue("$Name", entry.Name);
                     command.Parameters.AddWithValue("$Exchange", entry.Exchange);
-                    command.Parameters.AddWithValue("$Type", entry.Type);
-                    command.Parameters.AddWithValue("$SubType", entry.SubType ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$Type", entry.Type.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
                     command.Parameters.AddWithValue("$LotSize", entry.LotSize);
-                    command.Parameters.AddWithValue("$Currency", entry.Currency);
-                    command.Parameters.AddWithValue("$Cusip", entry.Cusip ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("$Isin", entry.Isin ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("$YahooTicker", entry.YahooTicker ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$Currency", entry.Currency.ToUpperInvariant());
+                    command.Parameters.AddWithValue("$Cusip", entry.Cusip?.ToUpperInvariant() ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$Isin", entry.Isin?.ToUpperInvariant() ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$YahooTicker", entry.YahooTicker?.ToUpperInvariant() ?? (object)DBNull.Value);
                     command.Parameters.AddWithValue("$IsShortable", entry.IsShortable);
                     command.Parameters.AddWithValue("$IsEnabled", true);
                     command.Parameters.AddWithValue("$LocalStartDate", 0);
@@ -135,15 +135,16 @@ DO UPDATE SET
             return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
         }
 
-        public static async Task InsertPrices(int securityId, string intervalStr, List<OhlcPrice> prices)
+        public static async Task InsertPrices(int securityId, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
         {
-            const string sql =
+            var tableName = DatabaseNames.GetPriceTableName(interval, secType);
+            string sql =
 @$"
-INSERT INTO {DatabaseNames.PriceTable}
-    (SecurityId, Open, High, Low, Close, Volume, StartTime, Interval)
+INSERT INTO {tableName}
+    (SecurityId, Open, High, Low, Close, Volume, StartTime)
 VALUES
-    ($SecurityId, $Open, $High, $Low, $Close, $Volume, $StartTime, $Interval)
-ON CONFLICT (SecurityId, StartTime, Interval)
+    ($SecurityId, $Open, $High, $Low, $Close, $Volume, $StartTime)
+ON CONFLICT (SecurityId, StartTime)
 DO UPDATE SET
     Open = excluded.Open AND
     High = excluded.High AND
@@ -171,7 +172,6 @@ DO UPDATE SET
                     command.Parameters.AddWithValue("$Close", price.Close);
                     command.Parameters.AddWithValue("$Volume", price.Volume);
                     command.Parameters.AddWithValue("$StartTime", price.Start);
-                    command.Parameters.AddWithValue("$Interval", intervalStr);
 
                     await command.ExecuteNonQueryAsync();
                 }
@@ -191,16 +191,32 @@ DO UPDATE SET
             await connection.CloseAsync();
         }
 
-        public static async Task CreateSecurityTable()
+        public static async Task CreateSecurityTable(SecurityType type)
+        {
+            if (type == SecurityType.Equity)
+            {
+                await CreateStockDefinitionTable();
+            }
+            else if (type == SecurityType.Fx)
+            {
+                await CreateFxDefinitionTable();
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        private static async Task CreateStockDefinitionTable()
         {
             const string dropSql =
 @$"
-DROP TABLE IF EXISTS {DatabaseNames.SecurityTable};
+DROP TABLE IF EXISTS {DatabaseNames.StockDefinitionTable};
 DROP INDEX IF EXISTS idx_code_exchange;
 ";
             const string createSql =
 @$"
-CREATE TABLE IF NOT EXISTS {DatabaseNames.SecurityTable} (
+CREATE TABLE IF NOT EXISTS {DatabaseNames.StockDefinitionTable} (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     Code VARCHAR(100) NOT NULL,
     Name VARCHAR(400),
@@ -215,10 +231,11 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.SecurityTable} (
     IsShortable BOOLEAN DEFAULT FALSE,
     IsEnabled BOOLEAN DEFAULT TRUE,
     LocalStartDate DATE NOT NULL DEFAULT 0, 
-    LocalEndDate DATE NOT NULL
+    LocalEndDate DATE NOT NULL,
+    UNIQUE(Code, Exchange)
 );
 CREATE UNIQUE INDEX idx_code_exchange
-    ON {DatabaseNames.SecurityTable} (Code, Exchange);
+    ON {DatabaseNames.StockDefinitionTable} (Code, Exchange);
 ";
             using var connection = await Connect(DatabaseNames.StaticData);
 
@@ -230,19 +247,62 @@ CREATE UNIQUE INDEX idx_code_exchange
             createCommand.CommandText = createSql;
             await createCommand.ExecuteNonQueryAsync();
 
-            Log.Info($"Created {DatabaseNames.SecurityTable} table in {DatabaseNames.StaticData}.");
+            Log.Info($"Created {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
         }
 
-        public static async Task CreatePriceTable()
+        private static async Task CreateFxDefinitionTable()
         {
             const string dropSql =
 @$"
-DROP TABLE IF EXISTS {DatabaseNames.PriceTable};
-DROP INDEX IF EXISTS idx_sec_start_interval;
-DROP INDEX IF EXISTS idx_sec;
+DROP TABLE IF EXISTS {DatabaseNames.FxDefinitionTable};
+DROP INDEX IF EXISTS idx_code_exchange;
 ";
             const string createSql =
-@$"CREATE TABLE IF NOT EXISTS {DatabaseNames.PriceTable} (
+@$"
+CREATE TABLE IF NOT EXISTS {DatabaseNames.FxDefinitionTable} (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Code VARCHAR(100) NOT NULL,
+    Name VARCHAR(400),
+    Exchange VARCHAR(100) NOT NULL,
+    Type VARCHAR(100) NOT NULL,
+    SubType VARCHAR(200),
+    LotSize DOUBLE DEFAULT 1 NOT NULL,
+    Currency VARCHAR(20) NOT NULL,
+    BaseCurrency VARCHAR(10) NOT NULL,
+    QuoteCurrency VARCHAR(10) NOT NULL,
+    IsEnabled BOOLEAN DEFAULT TRUE,
+    LocalStartDate DATE NOT NULL DEFAULT 0, 
+    LocalEndDate DATE NOT NULL,
+    UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
+);
+CREATE UNIQUE INDEX idx_code_exchange
+    ON {DatabaseNames.FxDefinitionTable} (Code, Exchange);
+";
+            using var connection = await Connect(DatabaseNames.StaticData);
+
+            using var dropCommand = connection.CreateCommand();
+            dropCommand.CommandText = dropSql;
+            await dropCommand.ExecuteNonQueryAsync();
+
+            using var createCommand = connection.CreateCommand();
+            createCommand.CommandText = createSql;
+            await createCommand.ExecuteNonQueryAsync();
+
+            Log.Info($"Created {DatabaseNames.FxDefinitionTable} table in {DatabaseNames.StaticData}.");
+        }
+
+        public static async Task CreatePriceTable(IntervalType interval, SecurityType securityType)
+        {
+            var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+            string dropSql =
+@$"
+DROP TABLE IF EXISTS {tableName};
+DROP INDEX IF EXISTS idx_sec_start;
+DROP INDEX IF EXISTS idx_sec;
+";
+            string createSql =
+@$"
+CREATE TABLE IF NOT EXISTS {tableName} (
     SecurityId INT NOT NULL,
     Open REAL NOT NULL,
     High REAL NOT NULL,
@@ -250,12 +310,12 @@ DROP INDEX IF EXISTS idx_sec;
     Close REAL NOT NULL,
     Volume REAL NOT NULL,
     StartTime INT NOT NULL,
-    Interval VARCHAR(5) NOT NULL
+    UNIQUE(SecurityId, StartTime)
 );
-CREATE UNIQUE INDEX idx_sec_start_interval
-ON {DatabaseNames.PriceTable} (SecurityId, StartTime, Interval);
+CREATE UNIQUE INDEX idx_sec_start
+ON {tableName} (SecurityId, StartTime);
 CREATE INDEX idx_sec
-ON {DatabaseNames.PriceTable} (SecurityId);
+ON {tableName} (SecurityId);
 ";
             using var connection = await Connect(DatabaseNames.MarketData);
 
@@ -267,7 +327,7 @@ ON {DatabaseNames.PriceTable} (SecurityId);
             createCommand.CommandText = createSql;
             await createCommand.ExecuteNonQueryAsync();
 
-            Log.Info($"Created {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
+            Log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
         }
 
         public static async Task CreateFinancialStatsTable()
@@ -298,16 +358,39 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
             Log.Info($"Created {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
         }
 
-        public static async Task<Security> ReadSecurity(string exchange, string code)
+        public static async Task<Security> ReadSecurity(string exchange, string code, SecurityType type)
         {
-            string sql =
+            var tableName = DatabaseNames.GetDefinitionTableName(type);
+            string sql;
+            if (type == SecurityType.Equity)
+            {
+                sql =
 @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,IsShortable
-FROM {DatabaseNames.SecurityTable}
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,YahooTicker,IsShortable
+FROM {tableName}
 WHERE
     Code = $Code AND
     Exchange = $Exchange
 ";
+                if (type == SecurityType.Equity)
+                    sql += $" AND Type IN ('{string.Join("','", SecurityTypeConverter.StockTypes)}')";
+            }
+            else if (type == SecurityType.Fx)
+            {
+                sql =
+@$"
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency,IsShortable
+FROM {tableName}
+WHERE
+    Code = $Code AND
+    Exchange = $Exchange
+";
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+
             using var connection = await Connect(DatabaseNames.StaticData);
 
             using var command = connection.CreateCommand();
@@ -333,26 +416,57 @@ WHERE
                     Isin = r["Isin"].ParseString(null),
                     IsShortable = r["IsShortable"].ToString().ParseBool(),
                 };
-                Log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.SecurityTable} table in {DatabaseNames.StaticData}.");
+                var baseCcy = r["BaseCurrency"]?.ParseString();
+                var quoteCcy = r["QuoteCurrency"]?.ParseString();
+                if (baseCcy != null && quoteCcy!=null)
+                {
+                    security.FxSetting = new FxSetting
+                    {
+                        BaseCurrency = baseCcy,
+                        QuoteCurrency = quoteCcy,
+                    };
+                }
+                Log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
                 return security;
             }
             return null;
         }
 
-        public static async Task<List<Security>> ReadSecurities(string exchange, string? type = "")
+        public static async Task<List<Security>> ReadSecurities(string exchange, SecurityType type)
         {
+            var tableName = DatabaseNames.GetDefinitionTableName(type);
             var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string sql =
+            string sql;
+            if (type == SecurityType.Equity)
+            {
+                sql =
 @$"
 SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,YahooTicker,IsShortable
-FROM {DatabaseNames.SecurityTable}
+FROM {tableName}
 WHERE
     IsEnabled = true AND
     LocalEndDate > $LocalEndDate AND
     Exchange = $Exchange
 ";
-            if (!type.IsBlank())
-                sql += $" AND Type = $Type";
+                if (type == SecurityType.Equity)
+                    sql += $" AND Type IN ('{string.Join("','", SecurityTypeConverter.StockTypes)}')";
+            }
+            else if (type == SecurityType.Fx)
+            {
+                sql =
+@$"
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency,IsShortable
+FROM {tableName}
+WHERE
+    IsEnabled = true AND
+    LocalEndDate > $LocalEndDate AND
+    Exchange = $Exchange
+";
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
 
             using var connection = await Connect(DatabaseNames.StaticData);
 
@@ -373,7 +487,7 @@ WHERE
                     Code = r["Code"].ParseString(),
                     Name = r["Name"].ParseString(),
                     Exchange = r["Exchange"].ParseString(),
-                    Type = r["Type"].ParseString(),
+                    Type = r["Type"].ParseString().ToUpperInvariant(),
                     SubType = r["SubType"].ParseString(),
                     LotSize = r["LotSize"].ToString().ParseInt(),
                     Currency = r["Currency"].ParseString(),
@@ -384,7 +498,7 @@ WHERE
                 };
                 results.Add(security);
             }
-            Log.Info($"Read {results.Count} entries from {DatabaseNames.SecurityTable} table in {DatabaseNames.StaticData}.");
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
             return results;
         }
 
@@ -420,7 +534,7 @@ FROM {DatabaseNames.FinancialStatsTable}
             string sql =
 @$"
 SELECT SecurityId, Open, High, Low, Close, Volume, StartTime, Interval
-FROM {DatabaseNames.PriceTable}
+FROM {DatabaseNames.StockPrice1hTable}
 WHERE
     Interval = $Interval AND
     SecurityId = $SecurityId AND
@@ -454,7 +568,7 @@ WHERE
                 );
                 results.Add(price);
             }
-            Log.Info($"Read {results.Count} entries from {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.StockPrice1hTable} table in {DatabaseNames.MarketData}.");
             return results;
         }
 
@@ -528,17 +642,16 @@ WHERE
             return conn;
         }
 
-        public static async Task<Dictionary<int, List<OhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, TimeRangeType range)
+        public static async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, TimeRangeType range)
         {
             var now = DateTime.Today;
             var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
             var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(now);
             string sql =
 @$"
-SELECT SecurityId, Open, High, Low, Close, Volume, StartTime, Interval
-FROM {DatabaseNames.PriceTable}
+SELECT SecurityId, Open, High, Low, Close, Volume, StartTime
+FROM {DatabaseNames.StockPrice1hTable}
 WHERE
-    Interval = $Interval AND
     StartTime > $StartTime AND
     SecurityId IN 
 ";
@@ -549,7 +662,6 @@ WHERE
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
-            command.Parameters.AddWithValue("$Interval", intervalStr);
             command.Parameters.AddWithValue("$StartTime", start);
 
             for (int i = 0; i < ids.Length; i++)
@@ -558,25 +670,28 @@ WHERE
             }
             using var r = await command.ExecuteReaderAsync();
 
-            var results = new Dictionary<int, List<OhlcPrice>>();
+            var results = new Dictionary<int, List<ExtendedOhlcPrice>>();
             while (await r.ReadAsync())
             {
                 var secId = r.GetInt32("SecurityId");
                 if (!securityMap.TryGetValue(secId, out var sec))
                     continue;
                 var list = results.GetOrCreate(secId);
-                var price = new OhlcPrice
+                var price = new ExtendedOhlcPrice
                 (
+                    Code: sec.Code,
+                    Exchange: sec.Exchange,
                     Open: r.GetDecimal("Open"),
                     High: r.GetDecimal("High"),
                     Low: r.GetDecimal("Low"),
                     Close: r.GetDecimal("Close"),
                     Volume: r.GetDecimal("Volume"),
+                    Interval: intervalStr,
                     Start: r.GetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
                 );
                 list.Add(price);
             }
-            Log.Info($"Read {results.Count} entries from {DatabaseNames.PriceTable} table in {DatabaseNames.MarketData}.");
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.StockPrice1hTable} table in {DatabaseNames.MarketData}.");
             return results;
         }
     }

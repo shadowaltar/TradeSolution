@@ -231,7 +231,7 @@ public class PriceReader
                 highs[i] = Math.Round(highs[i], 2, MidpointRounding.ToEven);
                 lows[i] = Math.Round(lows[i], 2, MidpointRounding.ToEven);
                 closes[i] = Math.Round(closes[i], 2, MidpointRounding.ToEven);
-                volumes[i] = Math.Round(closes[i], MidpointRounding.ToEven);
+                volumes[i] = Math.Round(volumes[i], MidpointRounding.ToEven);
                 var price = new OhlcPrice(opens[i], highs[i], lows[i], closes[i], volumes[i], localStartTimes[i]);
                 prices.Add(price);
             }

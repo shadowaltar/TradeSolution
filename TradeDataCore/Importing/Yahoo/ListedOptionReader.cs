@@ -15,7 +15,7 @@ namespace TradeDataCore.Importing.Yahoo
         {
             const string url = @"https://query1.finance.yahoo.com/v7/finance/options/{0}";
 
-            var tickers = securities.Where(s => s.Type == "Equity")
+            var tickers = securities.Where(s => SecurityTypeConverter.IsEquity(s.Type))
                 .ToDictionary(s => Identifiers.ToYahooSymbol(s.Code, s.Exchange), s => s);
 
             _log.Info($"Retrieving {tickers.Count} tickers financial stats from Yahoo.");
