@@ -1,5 +1,5 @@
 ﻿namespace TradeDataCore.Essentials;
-public enum SecurityStatType
+public enum FinancialStatType
 {
     Unknown,
     MarketCap,

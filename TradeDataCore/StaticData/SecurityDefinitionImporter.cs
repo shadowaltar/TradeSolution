@@ -25,6 +25,7 @@ public class SecurityDefinitionImporter
                 {
                     { nameof(Security.Exchange), "HKEX" },
                     { nameof(Security.Currency), "HKD" },
+                    { nameof(Security.YahooTicker), new ComplexMapping(code => Identifiers.ToYahooSymbol((string)code, "HKEX"), nameof(Security.Code)) },
                 }
             });
         if (securities == null)

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Data;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.Importing.Yahoo;
@@ -14,20 +15,6 @@ namespace TradePort.Controllers;
 [Route("prices")]
 public class PriceController : Controller
 {
-    /// <summary>
-    /// Get the count of price entries in database.
-    /// </summary>
-    /// <returns></returns>
-    [HttpGet("count")]
-    public async Task<ActionResult> Count()
-    {
-        var resultSet = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
-        if (resultSet != null)
-        {
-            return Ok(resultSet.Rows[0][0]);
-        }
-        return BadRequest();
-    }
 
     /// <summary>
     /// Get prices given exchange, code, interval and start time.
@@ -93,8 +80,8 @@ public class PriceController : Controller
         if (range == TimeRangeType.Unknown)
             return BadRequest("Invalid range string.");
 
-        var symbol = Identifiers.ToYahooSymbol(exchange, code);
-        var prices = new PriceReader().ReadYahooPrices(new List<string> { symbol }, interval, range);
+        var security = await Storage.ReadSecurity(exchange, code);
+        var prices = new PriceReader().ReadYahooPrices(new List<Security> { security }, interval, range);
         return Ok(prices);
     }
 
@@ -105,40 +92,36 @@ public class PriceController : Controller
     /// <param name="exchange"></param>
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
+    /// <param name="minMarketCapStr"></param>
     /// <returns></returns>
     [HttpGet("{exchange}/get-and-save-all")]
     public async Task<ActionResult> GetAndSaveHongKong(
         string exchange = "HKEX",
         [FromQuery(Name = "interval")] string intervalStr = "1d",
-        [FromQuery(Name = "range")] string rangeStr = "10y")
+        [FromQuery(Name = "range")] string rangeStr = "10y",
+        [FromQuery(Name = "f-market-cap-min")] string minMarketCapStr = "10g")
     {
-        var securities = await Storage.ReadSecurities(exchange);
-        var tickers = new Dictionary<string, Security>();
-        foreach (var security in securities)
-        {
-            tickers[Identifiers.ToYahooSymbol(security.Code, security.Exchange)] = security;
-        }
+        var minMarketCap = minMarketCapStr.ParseLong();
+        if (minMarketCap < 0)
+            return BadRequest("Invalid market cap min as filter. Either == 0 (no filter) or larger than 0.");
 
+        var securities = await Storage.ReadSecurities(exchange);
         var interval = IntervalTypeConverter.Parse(intervalStr);
         var range = TimeRangeTypeConverter.Parse(rangeStr);
-        var priceReader = new TradeDataCore.Importing.Yahoo.PriceReader();
-        var allPrices = await priceReader.ReadYahooPrices(tickers.Select(p => p.Key).ToList(),
-            interval, range);
+        var priceReader = new PriceReader();
+        var allPrices = await priceReader.ReadYahooPrices(securities, interval, range, (FinancialStatType.MarketCap, minMarketCap));
 
-        foreach (var (ticker, security) in tickers)
+        foreach (var security in securities)
         {
-            if (allPrices.TryGetValue(ticker, out var tuple))
+            if (allPrices.TryGetValue(security.Id, out var tuple))
             {
                 await Storage.InsertPrices(security.Id, intervalStr, tuple.Prices);
-                var count = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
-                Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {ticker}) price count: {tuple.Prices.Count}/{count}");
             }
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
     }
 
     /// <summary>
-    /// VERY HEAVY CALL!
     /// Gets all security price data from Yahoo in this exchange and save to database.
     /// </summary>
     /// <param name="exchange"></param>
@@ -150,27 +133,63 @@ public class PriceController : Controller
         string exchange = "HKEX",
         string code = "00001",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
-        [FromQuery(Name = "range")] string rangeStr = "10y")
+        [FromQuery(Name = "range")] string rangeStr = "2y")
     {
         var security = await Storage.ReadSecurity(exchange, code);
-        var tickers = new Dictionary<string, Security>();
-        tickers[Identifiers.ToYahooSymbol(security.Code, security.Exchange)] = security;
 
         var interval = IntervalTypeConverter.Parse(intervalStr);
         var range = TimeRangeTypeConverter.Parse(rangeStr);
         var priceReader = new PriceReader();
-        var allPrices = await priceReader.ReadYahooPrices(tickers.Select(p => p.Key).ToList(),
-            interval, range);
+        var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
 
-        foreach (var (ticker, sec) in tickers)
+        if (allPrices.TryGetValue(security.Id, out var tuple))
         {
-            if (allPrices.TryGetValue(ticker, out var tuple))
-            {
-                await Storage.InsertPrices(sec.Id, intervalStr, tuple.Prices);
-                var count = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
-                Console.WriteLine($"Code {sec.Code} exchange {sec.Exchange} (Yahoo {ticker}) price count: {tuple.Prices.Count}/{count}");
-            }
+            await Storage.InsertPrices(security.Id, intervalStr, tuple.Prices);
+            var count = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
+            Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
+    }
+
+    /// <summary>
+    /// Get the count of price entries in database.
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("metrics/count")]
+    public async Task<ActionResult> Count()
+    {
+        var resultSet = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.PriceTable, DatabaseNames.MarketData);
+        if (resultSet != null)
+        {
+            return Ok(resultSet.Rows[0][0]);
+        }
+        return BadRequest();
+    }
+
+    /// <summary>
+    /// Get the count of price entries for each ticker in database.
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("metrics/report-price/count")]
+    public async Task<ActionResult> ReportPriceCount()
+    {
+        var dt1 = await Storage.Execute($"select count(Close) as Count, SecurityId, Interval from {DatabaseNames.PriceTable} group by SecurityId, Interval", DatabaseNames.MarketData);
+        var dt2 = await Storage.Execute($"select Id, Code, Exchange, Name from {DatabaseNames.SecurityTable}", DatabaseNames.StaticData);
+        if (dt1 != null && dt2 != null)
+        {
+            var result = from table1 in dt1.AsEnumerable()
+            join table2 in dt2.AsEnumerable() on (string)table1["SecurityId"] equals (string)table2["Id"]
+            select new
+            {
+                SecurityId = (string)table1["SecurityId"],
+                Count = (string)table1["Count"],
+                Interval = (string)table1["Interval"],
+                Code = (string)table2["Code"],
+                Exchange = (string)table2["Exchange"],
+                Name = (string)table2["Name"],
+            };
+            return Ok(result);
+        }
+        return BadRequest();
     }
 }

@@ -1,6 +1,4 @@
-﻿using System.Globalization;
-
-namespace TradeDataCore.Utils;
+﻿namespace TradeDataCore.Utils;
 public static class NumericExtensions
 {
     public static decimal? NullIfZero(this decimal value)

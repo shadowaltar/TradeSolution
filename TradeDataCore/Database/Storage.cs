@@ -12,7 +12,7 @@ namespace TradeDataCore.Database
 
         public static readonly string DatabaseFolder = @"c:\temp";
 
-        public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<SecurityStatType, decimal>> stats)
+        public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<FinancialStatType, decimal>> stats)
         {
             var count = 0;
             const string sql =
@@ -34,7 +34,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
                 command.CommandText = sql;
                 foreach (var (id, map) in stats)
                 {
-                    if (!map.TryGetValue(SecurityStatType.MarketCap, out var marketCap))
+                    if (!map.TryGetValue(FinancialStatType.MarketCap, out var marketCap))
                     {
                         continue;
                     }
@@ -66,11 +66,23 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             const string sql =
 @$"
 INSERT INTO {DatabaseNames.SecurityTable}
-    (Code, Name, Exchange, Type, SubType, LotSize, Currency, Cusip, Isin, IsShortable, IsEnabled, LocalStartDate, LocalEndDate)
+    (Code, Name, Exchange, Type, SubType, LotSize, Currency, Cusip, Isin, YahooTicker, IsShortable, IsEnabled, LocalStartDate, LocalEndDate)
 VALUES
-    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$Cusip,$Isin,$IsShortable,$IsEnabled,$LocalStartDate,$LocalEndDate)
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$Cusip,$Isin,$YahooTicker,$IsShortable,$IsEnabled,$LocalStartDate,$LocalEndDate)
 ON CONFLICT (Code, Exchange)
-DO UPDATE SET LocalEndDate = excluded.LocalEndDate;
+DO UPDATE SET
+    Name = excluded.Name,
+    Type = excluded.Type,
+    SubType = excluded.SubType,
+    LotSize = excluded.LotSize,
+    Currency = excluded.Currency,
+    Cusip = excluded.Cusip,
+    YahooTicker = excluded.YahooTicker,
+    Isin = excluded.Isin,
+    IsShortable = excluded.IsShortable,
+    IsEnabled = excluded.IsEnabled,
+    LocalEndDate = excluded.LocalEndDate
+;
 ";
 
             using var connection = await Connect(DatabaseNames.StaticData);
@@ -94,6 +106,7 @@ DO UPDATE SET LocalEndDate = excluded.LocalEndDate;
                     command.Parameters.AddWithValue("$Currency", entry.Currency);
                     command.Parameters.AddWithValue("$Cusip", entry.Cusip ?? (object)DBNull.Value);
                     command.Parameters.AddWithValue("$Isin", entry.Isin ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("$YahooTicker", entry.YahooTicker ?? (object)DBNull.Value);
                     command.Parameters.AddWithValue("$IsShortable", entry.IsShortable);
                     command.Parameters.AddWithValue("$IsEnabled", true);
                     command.Parameters.AddWithValue("$LocalStartDate", 0);
@@ -198,6 +211,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.SecurityTable} (
     Currency CHAR(3) NOT NULL,
     Cusip VARCHAR(100),
     Isin VARCHAR(100),
+    YahooTicker VARCHAR(100),
     IsShortable BOOLEAN DEFAULT FALSE,
     IsEnabled BOOLEAN DEFAULT TRUE,
     LocalStartDate DATE NOT NULL DEFAULT 0, 
@@ -327,7 +341,7 @@ WHERE
             var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             string sql =
 @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,IsShortable
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,YahooTicker,IsShortable
 FROM {DatabaseNames.SecurityTable}
 WHERE
     IsEnabled = true AND
@@ -362,11 +376,39 @@ WHERE
                     Currency = r["Currency"].ParseString(),
                     Cusip = r["Cusip"].ParseString(null),
                     Isin = r["Isin"].ParseString(null),
+                    YahooTicker = r["YahooTicker"].ParseString(null),
                     IsShortable = r["IsShortable"].ToString().ParseBool(),
                 };
                 results.Add(security);
             }
             Log.Info($"Read {results.Count} entries from {DatabaseNames.SecurityTable} table in {DatabaseNames.StaticData}.");
+            return results;
+        }
+
+        public static async Task<List<FinancialStats>> ReadFinancialStats()
+        {
+            string sql =
+@$"
+SELECT SecurityId,MarketCap
+FROM {DatabaseNames.FinancialStatsTable}
+";
+            using var connection = await Connect(DatabaseNames.StaticData);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            using var r = await command.ExecuteReaderAsync();
+
+            var results = new List<FinancialStats>();
+            while (await r.ReadAsync())
+            {
+                var security = new FinancialStats
+                {
+                    SecurityId = r["SecurityId"].ToString().ParseInt(),
+                    MarketCap = r.GetDecimal("MarketCap"),
+                };
+                results.Add(security);
+            }
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
             return results;
         }
 

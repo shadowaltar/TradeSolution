@@ -85,13 +85,13 @@ public class StaticDataController : Controller
     /// Gets all security stats in HKEX and save to database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("security-stats/HKEX/get-and-save-all")]
+    [HttpGet("financial-stats/HKEX/get-and-save-all")]
     public async Task<IActionResult> GetAndSaveHongKongSecurityStats(
         string exchange = "HKEX")
     {
         var securities = await Storage.ReadSecurities(exchange);
         var reader = new ListedOptionReader();
-        var stats = await reader.ReadUnderlyingStats(securities.Take(5));
+        var stats = await reader.ReadUnderlyingStats(securities);
         if (stats == null)
             return BadRequest("Failed to download or parse HK security stats.");
 

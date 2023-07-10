@@ -24,6 +24,12 @@ public static class ReflectionUtils
         prop?.SetValue(target, value);
     }
 
+    public static object? GetPropertyValue(this object target, Type type, string propertyName)
+    {
+        var prop = type.GetProperty(propertyName);
+        return prop?.GetValue(target);
+    }
+
     public static Func<T, TReturn>? BuildTypedGetter<T, TReturn>(PropertyInfo propertyInfo)
     {
         var getMethod = propertyInfo.GetGetMethod();

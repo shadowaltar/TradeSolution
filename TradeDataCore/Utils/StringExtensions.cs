@@ -47,6 +47,30 @@ public static class StringExtensions
             string.IsNullOrEmpty(cultureInfoName) ? CultureInfo.InvariantCulture :
             CultureInfo.GetCultureInfo(cultureInfoName), out long result))
             return result;
+
+        value = value.ToUpperInvariant();
+        if (value.EndsWith("M"))
+        {
+            if (long.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000_000L;
+            }
+        }
+        if (value.EndsWith("K"))
+        {
+            if (long.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000L;
+            }
+        }
+        if (value.EndsWith("G") || value.EndsWith("B"))
+        {
+            if (long.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000_000_000L;
+            }
+        }
+
         return defaultValue;
     }
 
@@ -93,6 +117,30 @@ public static class StringExtensions
             string.IsNullOrEmpty(cultureInfoName) ? CultureInfo.InvariantCulture :
             CultureInfo.GetCultureInfo(cultureInfoName), out int result))
             return result;
+
+        value = value.ToUpperInvariant();
+        if (value.EndsWith("M"))
+        {
+            if (int.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000_000;
+            }
+        }
+        if (value.EndsWith("K"))
+        {
+            if (int.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000;
+            }
+        }
+        if (value.EndsWith("G") || value.EndsWith("B"))
+        {
+            if (int.TryParse(value[..(value.Length - 1)], out var result2))
+            {
+                return result2 * 1_000_000_000;
+            }
+        }
+
         return defaultValue;
     }
 

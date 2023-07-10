@@ -1,10 +1,13 @@
-﻿using OfficeOpenXml;
+﻿using log4net;
+using OfficeOpenXml;
 using TradeDataCore.Reporting;
+using TradeDataCore.StaticData;
 using TradeDataCore.Utils;
 
 namespace TradeDataCore.Importing;
-internal class ExcelReader
+public class ExcelReader
 {
+    private static readonly ILog Log = LogManager.GetLogger(typeof(ExcelReader));
     public List<T>? ReadSheet<T>(string filePath, string columnDefinitionResourcePath, ExcelImportSetting? setting = null)
         where T : class, new()
     {
@@ -62,26 +65,59 @@ internal class ExcelReader
 
                         var firstLevelType = inner.innerObject.GetType();
                         var value = ParseCell(cellValue, column);
+                        if (value is string strObj && !column.IsNullable && strObj.IsBlank())
+                        {
+                            Log.Warn($"Skipping this value since the column {column.FieldName} has a null/empty string value. Row id: {i}");
+                            entry = null;
+                            break;
+                        }
                         inner.innerObject.SetPropertyValue(firstLevelType, actualFieldName, value);
                     }
                     else
                     {
                         var setter = setters[actualFieldName];
                         var value = ParseCell(cellValue, column);
+                        if (value is string strObj && !column.IsNullable && strObj.IsBlank())
+                        {
+                            Log.Warn($"Skipping this value since the column {column.FieldName} has a null/empty string value. Row id: {i}");
+                            entry = null;
+                            break;
+                        }
                         setter(entry, value);
                     }
                 }
             }
             // some values are directly hardcoded
-            if (hardcodedColumns != null)
+            if (entry != null && hardcodedColumns != null)
             {
                 foreach (var (col, hardcodedValue) in hardcodedColumns)
                 {
                     var setter = setters[col.FieldName];
-                    setter(entry, hardcodedValue);
+                    if (hardcodedValue is ComplexMapping cm)
+                    {
+                        try
+                        {
+                            var f = cm.Function;
+                            var paramName = cm.ParameterFieldName;
+                            var paramValue = entry.GetPropertyValue(typeof(T), paramName);
+                            setter(entry, f(paramValue));
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error("Failed to map a computed value.", e);
+                        }
+                    }
+                    else
+                    {
+                        setter(entry, hardcodedValue);
+                    }
                 }
             }
-            results.Add(entry);
+
+            if (entry != null)
+            {
+                results.Add(entry);
+            }
         }
         return results;
     }

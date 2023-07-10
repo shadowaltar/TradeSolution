@@ -35,6 +35,6 @@ public class AdminController : Controller
             var r = await Storage.CheckTableExists(table, db);
             return (table, r);
         }));
-        return Ok(results);
+        return Ok(results.ToDictionary(p => p.table, p => p.r));
     }
 }

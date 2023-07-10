@@ -1,6 +1,7 @@
 ﻿using log4net;
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
+using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.Utils;
 
@@ -16,10 +17,10 @@ public class PriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
-         DateTime startTime, DateTime endTime)
+    public async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+         DateTime startTime, DateTime endTime, params (FinancialStatType type, decimal value)[] filters)
     {
-        return await ReadYahooPrices(tickers, interval, startTime, endTime, TimeRangeType.Unknown);
+        return await ReadYahooPrices(securities, interval, startTime, endTime, TimeRangeType.Unknown, filters);
     }
 
     /// <summary>
@@ -28,30 +29,41 @@ public class PriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
-         TimeRangeType range)
+    public async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+         TimeRangeType range, params (FinancialStatType type, decimal value)[] filters)
     {
-        return await ReadYahooPrices(tickers, interval, null, null, range);
+        return await ReadYahooPrices(securities, interval, null, null, range, filters);
     }
 
-    private static async Task<IDictionary<string, PricesAndCorporateActions>> ReadYahooPrices(List<string> tickers, IntervalType interval,
-        DateTime? start, DateTime? end, TimeRangeType range)
+    private static async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+        DateTime? start, DateTime? end, TimeRangeType range, params (FinancialStatType type, decimal value)[] filters)
     {
-        var results = new ConcurrentDictionary<string, PricesAndCorporateActions>();
+        var results = new Dictionary<int, PricesAndCorporateActions>();
         if (range == TimeRangeType.Unknown && (start == null || end == null))
         {
             throw new InvalidOperationException("Range must be set, or provide both start and end time.");
         }
 
+        // filter out some unwanted securities.        
+        if (filters.Length > 0)
+        {
+            securities = await FilterSecuritiesAsync(securities, filters);
+        }
+
         using var httpClient = new HttpClient();
 
-        var buckets = tickers.Split(200);
+        var buckets = securities.Split(200).ToList();
         ParallelOptions parallelOptions = new() { MaxDegreeOfParallelism = 50 };
-        foreach (var bucket in buckets)
+        for (int i = 0; i < buckets.Count; i++)
         {
-            await Parallel.ForEachAsync(bucket, parallelOptions, async (ticker, ct) =>
+            var bucket = buckets[i]!;
+            _log.Info($"Retrieving {i}/{buckets.Count} bucket.");
+            await Parallel.ForEachAsync(bucket, parallelOptions, async (security, ct) =>
             {
-                var formattedTicker = Uri.EscapeDataString(ticker);
+                if (security.YahooTicker.IsBlank()) return;
+
+                var ticker = security.YahooTicker;
+                var formattedTicker = Uri.EscapeDataString(security.YahooTicker);
                 var intervalStr = IntervalTypeConverter.ToYahooIntervalString(interval);
 
                 PricesAndCorporateActions? tuple = null;
@@ -77,12 +89,38 @@ public class PriceReader
 
                 if (tuple != null)
                 {
-                    results[ticker] = tuple!;
+                    lock (results)
+                        results[security.Id] = tuple!;
                 }
             });
             Thread.Sleep(1000);
         }
         return results;
+    }
+
+    private static async Task<List<Security>> FilterSecuritiesAsync(List<Security> securities, (FinancialStatType type, decimal value)[] filters)
+    {
+        var allStats = await Storage.ReadFinancialStats();
+        var filteredSecurities = new List<Security>();
+        foreach (var (type, value) in filters)
+        {
+            if (type == FinancialStatType.MarketCap)
+            {
+                var stats = allStats.ToDictionary(k => k.SecurityId, v => v.MarketCap);
+                foreach (var security in securities)
+                {
+                    if (stats.TryGetValue(security.Id, out var marketCap))
+                    {
+                        if (marketCap >= value)
+                        {
+                            filteredSecurities.Add(security);
+                        }
+                    }
+                }
+            }
+        }
+        _log.Info($"Security filter is applied. Before {securities.Count}, after {filteredSecurities.Count}.");
+        return filteredSecurities;
     }
 
     private static async Task<PricesAndCorporateActions?> InternalReadYahooPrices(HttpClient httpClient,

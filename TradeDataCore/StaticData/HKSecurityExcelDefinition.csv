@@ -10,3 +10,4 @@
 "8","Isin","ISIN","string","@","TRUE",,,"FALSE"
 "9","IsShortable","Shortsell Eligible","bool","@","FALSE",,,"FALSE"
 "10","DerivativeSetting.ExpiryDate","Expiry Date","date","dd/MM/yyyy","TRUE",,,"FALSE"
+"11","YahooTicker","YahooTicker","string","@","TRUE",,,"FALSE"
