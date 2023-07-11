@@ -55,7 +55,7 @@ public class PriceController : Controller
                 return BadRequest("Invalid end date-time.");
         }
         var security = await Storage.ReadSecurity(exchange, code, secType);
-        var prices = Storage.ReadPrices(security.Id, intervalStr, start, end);
+        var prices = await Storage.ReadPrices(security.Id, interval, secType, start, end);
         return Ok(prices);
     }
 
@@ -156,7 +156,8 @@ public class PriceController : Controller
     public async Task<ActionResult> GetAndSaveBinancePrices(
         [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
-        [FromQuery(Name = "start")] string startStr = "20230101",
+        [FromQuery(Name = "symbols")] string? concatenatedSymbols = "BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,SOLUSDT,LTCUSDT,MATICUSDT,BCHUSDT,COMPUSDT,ARBUSDT",
+        [FromQuery(Name = "start")] string startStr = "20220101",
         [FromQuery(Name = "end")] string? endStr = null)
     {
         if (intervalStr.IsBlank())
@@ -165,6 +166,8 @@ public class PriceController : Controller
         if (interval == IntervalType.Unknown)
             return BadRequest("Invalid interval string.");
         var secType = SecurityTypeConverter.Parse(secTypeStr);
+        if (secType == SecurityType.Unknown)
+            return BadRequest("Invalid sec-type string.");
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
         if (startStr == null)
@@ -180,7 +183,13 @@ public class PriceController : Controller
                 return BadRequest("Invalid end date-time.");
         }
 
+        var symbols = concatenatedSymbols?.Split(',')
+            .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
+        if (symbols == null || symbols.Count == 0)
+            return BadRequest("Missing symbols (delimited by ',').");
+
         var securities = await Storage.ReadSecurities(ExchangeNames.Binance, secType);
+        securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         var priceReader = new TradeDataCore.Importing.Binance.HistoricalPriceReader();
         var allPrices = await priceReader.ReadPrices(securities, start, end, interval);
 
@@ -268,14 +277,14 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var securities = await Storage.ReadSecurities(exchange, secType);
-        var idTable = await Storage.Execute("SELECT DISTINCT SecurityId FROM " + DatabaseNames.StockPrice1hTable, DatabaseNames.MarketData);
+        //var securityTable = DatabaseNames.GetDefinitionTableName(secType);
+        //var idTable = await Storage.Execute($"SELECT DISTINCT SecurityId FROM {securityTable} WHERE", DatabaseNames.StaticData);
 
-        var ids = (from DataRow dr in idTable.Rows
-                   select dr["SecurityId"].ToString().ParseInt()).Distinct().ToList();
-        securities = securities.Where(s => ids.Contains(s.Id)).ToList();
+        //var ids = idTable.GetDistinctValues<int>("SecurityId");
+        //securities = securities.Where(s => ids.Contains(s.Id)).ToList();
 
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
-        var allPrices = await Storage.ReadAllPrices(securities, interval, range);
+        var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
 
         var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
             .OrderBy(i => i.Exchange).ThenBy(i => i.Code).ThenBy(i => i.Interval).ThenBy(i => i.Start)
@@ -293,7 +302,7 @@ public class PriceController : Controller
     /// Get the count of price entries in database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("metrics/count")]
+    [HttpGet("metrics/all-row-count")]
     public async Task<ActionResult> Count(
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
@@ -307,7 +316,7 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var resultSet = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
+        var resultSet = await Storage.Execute("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
         if (resultSet != null)
         {
             return Ok(resultSet.Rows[0][0]);
@@ -319,11 +328,24 @@ public class PriceController : Controller
     /// Get the count of price entries for each ticker in database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("metrics/report-price/count")]
-    public async Task<ActionResult> ReportPriceCount()
+    [HttpGet("metrics/per-security-row-count")]
+    public async Task<ActionResult> ReportPriceCount(
+        [FromQuery(Name = "interval")] string intervalStr = "1h",
+        [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        var dt1 = await Storage.Execute($"select count(Close) as Count, SecurityId, Interval from {DatabaseNames.StockPrice1hTable} group by SecurityId, Interval", DatabaseNames.MarketData);
-        var dt2 = await Storage.Execute($"select Id, Code, Exchange, Name from {DatabaseNames.StockDefinitionTable}", DatabaseNames.StaticData);
+        if (intervalStr.IsBlank())
+            return BadRequest("Invalid interval string.");
+        var interval = IntervalTypeConverter.Parse(intervalStr);
+        if (interval == IntervalType.Unknown)
+            return BadRequest("Invalid interval string.");
+        var secType = SecurityTypeConverter.Parse(secTypeStr);
+        if (secType == SecurityType.Unknown)
+            return BadRequest("Invalid sec-type string.");
+
+        var priceTableName = DatabaseNames.GetPriceTableName(interval, secType);
+        var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
+        var dt1 = await Storage.Execute($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
+        var dt2 = await Storage.Execute($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
         if (dt1 != null && dt2 != null)
         {
             var result = from table1 in dt1.AsEnumerable()
@@ -332,7 +354,6 @@ public class PriceController : Controller
                          {
                              SecurityId = (string)table1["SecurityId"],
                              Count = (string)table1["Count"],
-                             Interval = (string)table1["Interval"],
                              Code = (string)table2["Code"],
                              Exchange = (string)table2["Exchange"],
                              Name = (string)table2["Name"],

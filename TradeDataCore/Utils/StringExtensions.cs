@@ -12,6 +12,25 @@ public static class StringExtensions
     /// <returns></returns>
     public static bool IsBlank([NotNullWhen(false)][AllowNull] this string value) => string.IsNullOrWhiteSpace(value);
 
+    public static bool ContainsIgnoreCase(this string @string, string subString)
+    {
+        if (@string == null) throw new ArgumentNullException(nameof(@string));
+        if (subString == null) throw new ArgumentNullException(nameof(subString));
+        return @string.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    public static bool ContainsIgnoreCase(this IList<string> strings, string? value)
+    {
+        if (strings == null) throw new ArgumentNullException(nameof(strings));
+
+        for (int i = 0; i < strings.Count; i++)
+        {
+            if (strings[i].Equals(value, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     public static DateTime ParseDate(this string? value, string? format = "yyyyMMdd", DateTime defaultValue = default)
     {
         if (value.IsBlank())

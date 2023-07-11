@@ -78,6 +78,30 @@ public class StaticDataController : Controller
     }
 
     /// <summary>
+    /// Get single security's financial stats.
+    /// </summary>
+    /// <param name="exchange">Exchange abbreviation.</param>
+    /// <param name="code">Security Code defined by exchange.</param>
+    /// <param name="secTypeStr"></param>
+    /// <returns></returns>
+    [HttpGet("financial-stats/{exchange}/{code}")]
+    public async Task<IActionResult> GetFinancialStats(
+        string exchange = ExchangeNames.Hkex,
+        string code = "00001",
+        [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
+    {
+        var secType = SecurityTypeConverter.Parse(secTypeStr);
+        if (secType == SecurityType.Unknown)
+            return BadRequest("Invalid sec-type string.");
+
+        var security = await Storage.ReadSecurity(exchange, code, secType);
+        if (security == null)
+            return NotFound();
+        var stats = await Storage.ReadFinancialStats(security.Id);
+        return Ok(stats);
+    }
+
+    /// <summary>
     /// Gets all security definitions in Binance and save to database.
     /// </summary>
     /// <returns></returns>

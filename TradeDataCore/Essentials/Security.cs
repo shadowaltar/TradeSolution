@@ -12,7 +12,7 @@ public class Security
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }
-    public bool IsShortable { get; set; }
+    public bool? IsShortable { get; set; }
     public FxSetting? FxSetting { get; set; }
     public StockSetting? StockSetting { get; set; }
     public DerivativeSetting? DerivativeSetting { get; set; }

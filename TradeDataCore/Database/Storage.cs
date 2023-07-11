@@ -442,7 +442,7 @@ WHERE
             {
                 sql =
 @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency,IsShortable
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency
 FROM {tableName}
 WHERE
     Code = $Code AND
@@ -458,35 +458,22 @@ WHERE
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
-            command.Parameters.AddWithValue("$Code", code);
-            command.Parameters.AddWithValue("$Exchange", exchange);
+            command.Parameters.AddWithValue("$Code", code.ToUpperInvariant());
+            command.Parameters.AddWithValue("$Exchange", exchange.ToUpperInvariant());
 
             using var r = await command.ExecuteReaderAsync();
-            var results = new List<Security>();
+            using var sqlHelper = new SqlHelper<Security>(r);
             while (await r.ReadAsync())
             {
-                var security = new Security
-                {
-                    Id = r["Id"].ToString().ParseInt(),
-                    Code = r["Code"].ParseString(),
-                    Name = r["Name"].ParseString(),
-                    Exchange = r["Exchange"].ParseString(),
-                    Type = r["Type"].ParseString(),
-                    SubType = r["SubType"].ParseString(),
-                    LotSize = r["LotSize"].ToString().ParseInt(),
-                    Currency = r["Currency"].ParseString(),
-                    Cusip = r["Cusip"].ParseString(null),
-                    Isin = r["Isin"].ParseString(null),
-                    IsShortable = r["IsShortable"].ToString().ParseBool(),
-                };
-                var baseCcy = r["BaseCurrency"]?.ParseString();
-                var quoteCcy = r["QuoteCurrency"]?.ParseString();
-                if (baseCcy != null && quoteCcy!=null)
+                var security = sqlHelper.Read();
+                var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
+                var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
+                if (baseCcy != null && quoteCcy != null)
                 {
                     security.FxSetting = new FxSetting
                     {
                         BaseCurrency = baseCcy,
-                        QuoteCurrency = quoteCcy,
+                        QuoteCurrency = quoteCcy
                     };
                 }
                 Log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
@@ -499,6 +486,7 @@ WHERE
         {
             var tableName = DatabaseNames.GetDefinitionTableName(type);
             var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            exchange = exchange.ToUpperInvariant();
             string sql;
             if (type == SecurityType.Equity)
             {
@@ -518,7 +506,7 @@ WHERE
             {
                 sql =
 @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency,IsShortable
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency
 FROM {tableName}
 WHERE
     IsEnabled = true AND
@@ -540,25 +528,35 @@ WHERE
             command.Parameters.AddWithValue("$Type", type);
 
             using var r = await command.ExecuteReaderAsync();
-
+            using var sqlHelper = new SqlHelper<Security>(r);
             var results = new List<Security>();
             while (await r.ReadAsync())
             {
-                var security = new Security
+                var security = sqlHelper.Read();
+                //{
+                //    Id = r.GetInt32("Id"),
+                //    Code = r.SafeGetString("Code"),
+                //    Name = r.SafeGetString("Name"),
+                //    Exchange = r.SafeGetString("Exchange"),
+                //    Type = r.SafeGetString("Type").ToUpperInvariant(),
+                //    SubType = r.SafeGetString("SubType"),
+                //    LotSize = r.GetInt32("LotSize"),
+                //    Currency = r.SafeGetString("Currency"),
+                //    Cusip = r.SafeGetString("Cusip"),
+                //    Isin = r.SafeGetString("Isin"),
+                //    YahooTicker = r.SafeGetString("YahooTicker"),
+                //    IsShortable = r.GetBoolean("IsShortable"),
+                //};
+                var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
+                var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
+                if (baseCcy != null && quoteCcy != null)
                 {
-                    Id = r["Id"].ToString().ParseInt(),
-                    Code = r["Code"].ParseString(),
-                    Name = r["Name"].ParseString(),
-                    Exchange = r["Exchange"].ParseString(),
-                    Type = r["Type"].ParseString().ToUpperInvariant(),
-                    SubType = r["SubType"].ParseString(),
-                    LotSize = r["LotSize"].ToString().ParseInt(),
-                    Currency = r["Currency"].ParseString(),
-                    Cusip = r["Cusip"].ParseString(null),
-                    Isin = r["Isin"].ParseString(null),
-                    YahooTicker = r["YahooTicker"].ParseString(null),
-                    IsShortable = r["IsShortable"].ToString().ParseBool(),
-                };
+                    security.FxSetting = new FxSetting
+                    {
+                        BaseCurrency = baseCcy,
+                        QuoteCurrency = quoteCcy
+                    };
+                }
                 results.Add(security);
             }
             Log.Info($"Read {results.Count} entries from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
@@ -577,29 +575,50 @@ FROM {DatabaseNames.FinancialStatsTable}
             using var command = connection.CreateCommand();
             command.CommandText = sql;
             using var r = await command.ExecuteReaderAsync();
-
+            using var sqlHelper = new SqlHelper<FinancialStats>(r);
             var results = new List<FinancialStats>();
             while (await r.ReadAsync())
             {
-                var security = new FinancialStats
-                {
-                    SecurityId = r["SecurityId"].ToString().ParseInt(),
-                    MarketCap = r.GetDecimal("MarketCap"),
-                };
-                results.Add(security);
+                var stats = sqlHelper.Read();
+                results.Add(stats);
             }
             Log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
             return results;
         }
 
-        public static async Task<List<OhlcPrice>> ReadPrices(int securityId, string intervalStr, DateTime start, DateTime? end = null)
+        public static async Task<List<FinancialStats>> ReadFinancialStats(int secId)
         {
             string sql =
 @$"
-SELECT SecurityId, Open, High, Low, Close, Volume, StartTime, Interval
-FROM {DatabaseNames.StockPrice1hTable}
+SELECT SecurityId,MarketCap
+FROM {DatabaseNames.FinancialStatsTable}
+WHERE SecurityId = $SecurityId
+";
+            using var connection = await Connect(DatabaseNames.StaticData);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.Add("$SecurityId", SqliteType.Text).Value = secId;
+            using var r = await command.ExecuteReaderAsync();
+            using var sqlHelper = new SqlHelper<FinancialStats>(r);
+            var results = new List<FinancialStats>();
+            while (await r.ReadAsync())
+            {
+                var stats = sqlHelper.Read();
+                results.Add(stats);
+            }
+            Log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+            return results;
+        }
+
+        public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null)
+        {
+            var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+            string sql =
+@$"
+SELECT SecurityId, Open, High, Low, Close, Volume, StartTime
+FROM {tableName}
 WHERE
-    Interval = $Interval AND
     SecurityId = $SecurityId AND
     StartTime > $StartTime
 ";
@@ -610,28 +629,26 @@ WHERE
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
-            command.Parameters.AddWithValue("$Interval", intervalStr);
             command.Parameters.AddWithValue("$SecurityId", securityId);
             command.Parameters.AddWithValue("$StartTime", start);
             command.Parameters.AddWithValue("$EndTime", end);
 
             using var r = await command.ExecuteReaderAsync();
-
             var results = new List<OhlcPrice>();
             while (await r.ReadAsync())
             {
                 var price = new OhlcPrice
                 (
-                    Open: r["Open"].ToString().ParseDecimal(),
-                    High: r["High"].ToString().ParseDecimal(),
-                    Low: r["Low"].ToString().ParseDecimal(),
-                    Close: r["Close"].ToString().ParseDecimal(),
-                    Volume: r["Volume"].ToString().ParseDecimal(),
-                    Start: r["StartTime"].ToString().ParseDate("yyyy-MM-dd HH:mm:ss")
+                    Open: r.GetDecimal("Open"),
+                    High: r.GetDecimal("High"),
+                    Low: r.GetDecimal("Low"),
+                    Close: r.GetDecimal("Close"),
+                    Volume: r.GetDecimal("Volume"),
+                    Start: r.GetDateTime("StartTime")
                 );
                 results.Add(price);
             }
-            Log.Info($"Read {results.Count} entries from {DatabaseNames.StockPrice1hTable} table in {DatabaseNames.MarketData}.");
+            Log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
             return results;
         }
 
@@ -705,15 +722,19 @@ WHERE
             return conn;
         }
 
-        public static async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, TimeRangeType range)
+        public static async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType secType, TimeRangeType range)
         {
+            if (securities.Count == 0)
+                return new();
+
             var now = DateTime.Today;
             var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
             var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(now);
+            var tableName = DatabaseNames.GetPriceTableName(interval, secType);
             string sql =
 @$"
 SELECT SecurityId, Open, High, Low, Close, Volume, StartTime
-FROM {DatabaseNames.StockPrice1hTable}
+FROM {tableName}
 WHERE
     StartTime > $StartTime AND
     SecurityId IN 
@@ -750,11 +771,11 @@ WHERE
                     Close: r.GetDecimal("Close"),
                     Volume: r.GetDecimal("Volume"),
                     Interval: intervalStr,
-                    Start: r.GetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
+                    Start: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
                 );
                 list.Add(price);
             }
-            Log.Info($"Read {results.Count} entries from {DatabaseNames.StockPrice1hTable} table in {DatabaseNames.MarketData}.");
+            Log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
             return results;
         }
     }

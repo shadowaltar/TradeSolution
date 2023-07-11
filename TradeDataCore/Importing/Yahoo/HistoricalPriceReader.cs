@@ -125,7 +125,7 @@ public class HistoricalPriceReader
     private static async Task<PricesAndCorporateActions?> InternalReadYahooPrices(HttpClient httpClient,
         string ticker, IntervalType interval, string url)
     {
-        var jo = await HttpHelper.ReadJson(url, _log);
+        var jo = await HttpHelper.ReadJson(url, httpClient, _log);
         if (jo == null)
             return null;
 

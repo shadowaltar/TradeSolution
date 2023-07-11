@@ -16,6 +16,12 @@ public static class ReflectionUtils
     /// </summary>
     private static readonly Dictionary<Type, object> _setterMaps = new();
 
+    /// <summary>
+    /// Cached <see cref="PropertyInfo"/>s. Key is the object type (which holds the properties).
+    /// </summary>
+    private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfoMaps = new();
+
+
     private static readonly Dictionary<string, Type?> _typesWithNameOnly = new();
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
@@ -62,7 +68,7 @@ public static class ReflectionUtils
 
     public static List<(string name, Type type, Action<T, object> setter)> BuildUntypedSetters<T>()
     {
-        var properties = typeof(T).GetProperties();
+        var properties = GetProperties<T>().Values;
         List<(string name, Type type, Action<T, object> setter)> tuples = new();
         foreach (var property in properties)
         {
@@ -94,7 +100,7 @@ public static class ReflectionUtils
 
     public static List<(string name, Type type, Func<T, object> getter)> BuildUntypedGetters<T>()
     {
-        var properties = typeof(T).GetProperties();
+        var properties = GetProperties<T>().Values;
         List<(string name, Type type, Func<T, object> getter)> tuples = new();
         foreach (var property in properties)
         {
@@ -111,9 +117,8 @@ public static class ReflectionUtils
 
     public static DataTable BuildDataTable<T>()
     {
-        var t = typeof(T);
         var table = new DataTable();
-        var propMap = t.GetProperties();
+        var propMap = GetProperties<T>().Values;
         foreach (var property in propMap)
         {
             var type = property.PropertyType;
@@ -136,14 +141,26 @@ public static class ReflectionUtils
         return table;
     }
 
+    public static Dictionary<string, PropertyInfo> GetProperties<T>()
+    {
+        var t = typeof(T);
+        if (!_propertyInfoMaps.TryGetValue(t, out var result))
+        {
+            var properties = t.GetProperties();
+            result = properties.ToDictionary(p => p.Name, p => p);
+            _propertyInfoMaps[t] = result;
+        }
+        return result;
+    }
+
     public static Dictionary<string, Func<T, object>> GetGetterMap<T>()
     {
         var t = typeof(T);
         if (!_getterMaps.TryGetValue(t, out var result))
         {
-            var properties = t.GetProperties();
+            var properties = GetProperties<T>();
             var map = new Dictionary<string, Func<T, object>>();
-            foreach (var property in properties)
+            foreach (var property in properties.Values)
             {
                 // must exclude the static ones
                 if (property.GetGetMethod()?.IsStatic ?? false)
@@ -161,9 +178,9 @@ public static class ReflectionUtils
         var t = typeof(T);
         if (!_setterMaps.TryGetValue(t, out var result))
         {
-            var properties = t.GetProperties();
+            var properties = GetProperties<T>();
             var map = new Dictionary<string, Action<T, object?>>();
-            foreach (var property in properties)
+            foreach (var property in properties.Values)
             {
                 // must exclude the static ones
                 if (property.GetGetMethod()?.IsStatic ?? false)
