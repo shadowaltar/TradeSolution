@@ -6,7 +6,7 @@ public static class EmbeddedResourceReader
 {
     private static readonly ILog Log = LogManager.GetLogger(typeof(EmbeddedResourceReader));
 
-    public static StreamReader? GetStreamReader(string resourceName)
+    public static StreamReader? GetStreamReader(string resourceName, string? suffix = "csv")
     {
         var assembly = Assembly.GetExecutingAssembly();
         try
@@ -15,8 +15,11 @@ public static class EmbeddedResourceReader
             if (stream == null)
             {
                 resourceName = $"{assembly.GetName().Name}.{resourceName}";
-                if (!resourceName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-                    resourceName += ".csv";
+                if (!suffix.IsBlank())
+                {
+                    if (!resourceName.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase))
+                        resourceName += "." + suffix;
+                }
             }
             stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)

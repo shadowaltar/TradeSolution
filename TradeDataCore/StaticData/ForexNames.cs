@@ -4,9 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradeDataCore.Importing.Binance
+namespace TradeDataCore.StaticData;
+public static class ForexNames
 {
-    internal class PriceReader
-    {
-    }
+    public const string Hkd = "HKD";
 }

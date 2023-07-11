@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+﻿using log4net;
 using System.Text.Json.Nodes;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
@@ -8,18 +8,18 @@ namespace TradeDataCore.Importing.Binance
 {
     public class DefinitionReader
     {
+        private static readonly ILog _log = LogManager.GetLogger(typeof(DefinitionReader));
+
         public async Task<List<Security>?> ReadAndSave(SecurityType type)
         {
             const string url = "https://data-api.binance.vision/api/v3/exchangeInfo";
-            using var httpClient = new HttpClient();
-            var json = await httpClient.GetStringAsync(url);
-
-            var jo = JsonNode.Parse(json)?.AsObject();
+            
+            var jo = await HttpHelper.ReadJson(url, _log);
             if (jo == null)
                 return null;
             var securities = new List<Security>();
             var symbolsObj = jo["symbols"]!.AsArray();
-            foreach (JsonObject symbolObj in symbolsObj)
+            foreach (JsonObject symbolObj in symbolsObj.Cast<JsonObject>())
             {
                 if (symbolObj!["status"].ParseString() != "TRADING")
                     continue;

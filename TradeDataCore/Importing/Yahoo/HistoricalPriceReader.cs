@@ -1,5 +1,4 @@
 ﻿using log4net;
-using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
@@ -7,9 +6,9 @@ using TradeDataCore.Utils;
 
 namespace TradeDataCore.Importing.Yahoo;
 
-public class PriceReader
+public class HistoricalPriceReader
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(PriceReader));
+    private static readonly ILog _log = LogManager.GetLogger(typeof(HistoricalPriceReader));
 
     /// <summary>
     /// String key here is the yahoo symbol. Format usually look like "xxxxxx.SZ" (or "SS") for SZ/SH exchanges, or "xxxx.HK" for HKEX.
@@ -126,23 +125,7 @@ public class PriceReader
     private static async Task<PricesAndCorporateActions?> InternalReadYahooPrices(HttpClient httpClient,
         string ticker, IntervalType interval, string url)
     {
-        string json;
-        try
-        {
-            json = await httpClient.GetStringAsync(url);
-        }
-        catch (HttpRequestException e)
-        {
-            _log.Error($"Yahoo price does not exist for ticker {ticker}. StatusCode: {e.StatusCode}. Message: {e.Message}. Url: {url}", e);
-            return null;
-        }
-        catch (Exception e)
-        {
-            _log.Error($"Yahoo price does not exist for ticker {ticker}. Url: {url}", e);
-            return null;
-        }
-
-        var jo = JsonNode.Parse(json)?.AsObject();
+        var jo = await HttpHelper.ReadJson(url, _log);
         if (jo == null)
             return null;
 

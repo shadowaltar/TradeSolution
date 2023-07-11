@@ -33,32 +33,19 @@ namespace TradeDataCore.Importing.Yahoo
                     var ticker = tuple.Key;
                     var security = tuple.Value;
                     var actualUrl = string.Format(url, ticker);
-                    string json;
-                    try
-                    {
-                        json = await httpClient.GetStringAsync(actualUrl);
+                    var jo = await HttpHelper.ReadJson(actualUrl, httpClient, _log);
+                    if (jo == null)
+                        return;
 
-                        var jo = JsonNode.Parse(json)?.AsObject();
-                        if (jo == null)
-                            return;
+                    var rootObj = jo["optionChain"]?["result"]?.AsArray()[0]?["quote"];
+                    if (rootObj == null)
+                        return;
 
-                        var rootObj = jo["optionChain"]?["result"]?.AsArray()[0]?["quote"];
-                        if (rootObj == null) return;
-
-                        var map = new Dictionary<FinancialStatType, decimal>
-                        {
-                            [FinancialStatType.MarketCap] = rootObj["marketCap"].GetDecimal()
-                        };
-                        results[security.Id] = map;
-                    }
-                    catch (HttpRequestException e)
+                    var map = new Dictionary<FinancialStatType, decimal>
                     {
-                        _log.Error($"Yahoo options does not exist for ticker {ticker}. StatusCode: {e.StatusCode}. Message: {e.Message}. Url: {actualUrl}", e);
-                    }
-                    catch (Exception e)
-                    {
-                        _log.Error($"Yahoo options does not exist for ticker {ticker}. Url: {url}", e);
-                    }
+                        [FinancialStatType.MarketCap] = rootObj["marketCap"].GetDecimal()
+                    };
+                    results[security.Id] = map;
                 });
             }
             return results;

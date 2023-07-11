@@ -5,7 +5,7 @@ public static class Identifiers
 {
     public static string ToYahooSymbol(string code, string exchange)
     {
-        if (exchange == "HKEX")
+        if (exchange == ExchangeNames.Hkex)
         {
             return ToYahooSymbolForHK(code);
         }

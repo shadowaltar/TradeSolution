@@ -6,6 +6,9 @@ using TradeDataCore.Utils;
 
 namespace TradePort.Controllers;
 
+/// <summary>
+/// Provides admin tasks access.
+/// </summary>
 [ApiController]
 [Route("admin")]
 public class AdminController : Controller
@@ -49,21 +52,19 @@ public class AdminController : Controller
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsPasswordCorrect(password)) return BadRequest();
 
-        await Storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Equity);
-        await Storage.CreatePriceTable(IntervalType.OneDay, SecurityType.Equity);
-        await Storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Fx);
-        await Storage.CreatePriceTable(IntervalType.OneDay, SecurityType.Fx);
-
-        var tuples = new (string table, string db)[]
+        var tuples = new (string table, string db, IntervalType interval, SecurityType secType)[]
         {
-            (DatabaseNames.StockPrice1hTable, DatabaseNames.MarketData),
-            (DatabaseNames.StockPrice1dTable, DatabaseNames.MarketData),
-            (DatabaseNames.FxPrice1hTable, DatabaseNames.MarketData),
-            (DatabaseNames.FxPrice1dTable, DatabaseNames.MarketData),
+            (DatabaseNames.StockPrice1mTable, DatabaseNames.MarketData, IntervalType.OneMinute, SecurityType.Equity),
+            (DatabaseNames.StockPrice1hTable, DatabaseNames.MarketData, IntervalType.OneHour, SecurityType.Equity),
+            (DatabaseNames.StockPrice1dTable, DatabaseNames.MarketData, IntervalType.OneDay, SecurityType.Equity),
+            (DatabaseNames.FxPrice1mTable, DatabaseNames.MarketData, IntervalType.OneMinute, SecurityType.Fx),
+            (DatabaseNames.FxPrice1hTable, DatabaseNames.MarketData, IntervalType.OneHour, SecurityType.Fx),
+            (DatabaseNames.FxPrice1dTable, DatabaseNames.MarketData, IntervalType.OneDay, SecurityType.Fx),
         };
         var results = await Task.WhenAll(tuples.Select(async t =>
         {
-            var (table, db) = t;
+            var (table, db, interval, secType) = t;
+            await Storage.CreatePriceTable(interval, secType);
             var r = await Storage.CheckTableExists(table, db);
             return (table, r);
         }));

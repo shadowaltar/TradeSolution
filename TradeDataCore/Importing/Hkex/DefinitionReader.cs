@@ -25,8 +25,7 @@ namespace TradeDataCore.Importing.Hkex
         {
             const string url = "https://www.hkex.com.hk/eng/services/trading/securities/securitieslists/ListOfSecurities.xlsx";
             var filePath = Path.GetTempFileName();
-            var downloader = new WebDownloader();
-            await downloader.Download(url, filePath);
+            await HttpHelper.ReadFile(url, filePath);
 
             var reader = new ExcelReader();
             var securities = reader.ReadSheet<Security>(filePath, "StaticData.HKSecurityExcelDefinition",
@@ -35,9 +34,9 @@ namespace TradeDataCore.Importing.Hkex
                     HeaderSkipLineCount = 2,
                     HardcodedValues = new()
                     {
-                    { nameof(Security.Exchange), "HKEX" },
-                    { nameof(Security.Currency), "HKD" },
-                    { nameof(Security.YahooTicker), new ComplexMapping(code => Identifiers.ToYahooSymbol((string)code, "HKEX"), nameof(Security.Code)) },
+                        { nameof(Security.Exchange), ExchangeNames.Hkex },
+                        { nameof(Security.Currency), ForexNames.Hkd },
+                        { nameof(Security.YahooTicker), new ComplexMapping(code => Identifiers.ToYahooSymbol((string)code, ExchangeNames.Hkex), nameof(Security.Code)) },
                     }
                 });
             if (securities == null)

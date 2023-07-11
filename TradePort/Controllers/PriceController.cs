@@ -3,7 +3,7 @@ using System.Data;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.Exporting;
-using TradeDataCore.Importing.Yahoo;
+using TradeDataCore.StaticData;
 using TradeDataCore.Utils;
 
 namespace TradePort.Controllers;
@@ -26,9 +26,9 @@ public class PriceController : Controller
     /// <param name="endStr">In yyyyMMdd</param>
     /// <returns></returns>
     [HttpGet("{exchange}/{code}")]
-    public async Task<ActionResult> GetPrices(string exchange = "HKEX",
+    public async Task<ActionResult> GetPrices(string exchange = ExchangeNames.Hkex,
         string code = "00001",
-        [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
+        [FromQuery(Name = "sec-type")] string secTypeStr = nameof(SecurityType.Equity),
         [FromQuery(Name = "interval")] string intervalStr = "1d",
         [FromQuery(Name = "start")] string startStr = "20230101",
         [FromQuery(Name = "end")] string? endStr = null)
@@ -69,7 +69,7 @@ public class PriceController : Controller
     /// <param name="rangeStr"></param>
     /// <returns></returns>
     [HttpGet("yahoo/{exchange}/{code}")]
-    public async Task<ActionResult> GetPriceFromYahoo(string exchange = "HKEX",
+    public async Task<ActionResult> GetPriceFromYahoo(string exchange = ExchangeNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1d",
@@ -90,23 +90,22 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
-        var prices = new PriceReader().ReadYahooPrices(new List<Security> { security }, interval, range);
+        var prices = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader()
+            .ReadYahooPrices(new List<Security> { security }, interval, range);
         return Ok(prices);
     }
 
     /// <summary>
-    /// VERY HEAVY CALL!
-    /// Gets all security price data from Yahoo in this exchange and save to database.
+    /// HEAVY CALL!
+    /// Gets all security price data in HKEX from Yahoo and save to database.
     /// </summary>
-    /// <param name="exchange"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
     /// <param name="minMarketCapStr"></param>
     /// <returns></returns>
-    [HttpGet("{exchange}/get-and-save-all")]
-    public async Task<ActionResult> GetAndSaveHongKong(
-        string exchange = "HKEX",
+    [HttpGet($"{ExchangeNames.Hkex}/get-and-save-all")]
+    public async Task<ActionResult> GetAndSaveHkexPrices(
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1d",
         [FromQuery(Name = "range")] string rangeStr = "10y",
@@ -130,8 +129,8 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var securities = await Storage.ReadSecurities(exchange, secType);
-        var priceReader = new PriceReader();
+        var securities = await Storage.ReadSecurities(ExchangeNames.Hkex, secType);
+        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(securities, interval, range, (FinancialStatType.MarketCap, minMarketCap));
 
         foreach (var security in securities)
@@ -145,6 +144,57 @@ public class PriceController : Controller
     }
 
     /// <summary>
+    /// HEAVY CALL!
+    /// Gets crypto price data in Binance and save to database.
+    /// </summary>
+    /// <param name="secTypeStr"></param>
+    /// <param name="intervalStr"></param>
+    /// <param name="startStr"></param>
+    /// <param name="endStr">Default is UTC Now.</param>
+    /// <returns></returns>
+    [HttpGet($"{ExchangeNames.Binance}/get-and-save-all")]
+    public async Task<ActionResult> GetAndSaveBinancePrices(
+        [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
+        [FromQuery(Name = "interval")] string intervalStr = "1h",
+        [FromQuery(Name = "start")] string startStr = "20230101",
+        [FromQuery(Name = "end")] string? endStr = null)
+    {
+        if (intervalStr.IsBlank())
+            return BadRequest("Invalid interval string.");
+        var interval = IntervalTypeConverter.Parse(intervalStr);
+        if (interval == IntervalType.Unknown)
+            return BadRequest("Invalid interval string.");
+        var secType = SecurityTypeConverter.Parse(secTypeStr);
+        if (secType == SecurityType.Unknown)
+            return BadRequest("Invalid sec-type string.");
+        if (startStr == null)
+            return BadRequest("Missing start date-time.");
+        var start = startStr.ParseDate();
+        if (start == DateTime.MinValue)
+            return BadRequest("Invalid start date-time.");
+        DateTime end = DateTime.UtcNow;
+        if (endStr != null)
+        {
+            end = endStr.ParseDate();
+            if (end == DateTime.MinValue)
+                return BadRequest("Invalid end date-time.");
+        }
+
+        var securities = await Storage.ReadSecurities(ExchangeNames.Binance, secType);
+        var priceReader = new TradeDataCore.Importing.Binance.HistoricalPriceReader();
+        var allPrices = await priceReader.ReadPrices(securities, start, end, interval);
+
+        foreach (var security in securities)
+        {
+            if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
+            {
+                await Storage.InsertPrices(security.Id, interval, secType, list);
+            }
+        }
+        return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
+    }
+
+    /// <summary>
     /// Gets one security price data from Yahoo in this exchange and save to database.
     /// </summary>
     /// <param name="exchange"></param>
@@ -155,7 +205,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("{exchange}/get-and-save-one")]
     public async Task<ActionResult> GetAndSaveHongKongOne(
-        string exchange = "HKEX",
+        string exchange = ExchangeNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
@@ -176,7 +226,7 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
-        var priceReader = new PriceReader();
+        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
@@ -189,17 +239,16 @@ public class PriceController : Controller
     }
 
     /// <summary>
-    /// Gets one security price data from Yahoo in this exchange and save to database.
+    /// Download all security data as JSON from the given exchange.
     /// </summary>
     /// <param name="exchange"></param>
     /// <param name="secTypeStr"></param>
-    /// <param name="code"></param>
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
     /// <returns></returns>
     [HttpGet("{exchange}/download-json")]
     public async Task<ActionResult> DownloadAll(
-        string exchange = "HKEX",
+        string exchange = ExchangeNames.Hkex,
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "range")] string rangeStr = "2y")
