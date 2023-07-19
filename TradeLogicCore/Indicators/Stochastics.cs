@@ -1,52 +1,70 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeDataCore.Essentials;
+﻿using TradeDataCore.Essentials;
 
 namespace TradeLogicCore.Indicators;
-internal class Stochastics : PriceSeriesIndicator<(double, double)>
+public class Stochastics : PriceSeriesIndicator<decimal[]>
 {
+    public int[] Periods { get; }
     public int KPeriod { get; }
     public int DPeriod { get; }
+    public int JPeriod { get; }
 
-    public Stochastics(int kPeriod = 14, int dPeriod = 7) : base(Math.Max(kPeriod, dPeriod))
+    private readonly List<Component> _components = new();
+
+    public class Component
     {
-        KPeriod = kPeriod;
-        DPeriod = dPeriod;
+        public int Period { get; set; }
+        public string Label { get; set; }
+        public Component(int period, string label)
+        {
+            Period = period;
+            Label = label;
+        }
     }
 
-    public override (double, double) Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null)
+    public Stochastics(params int[] periods) : base(periods.Max())
     {
-        var kStart = ohlcPrices.Count - KPeriod;
-        var dStart = ohlcPrices.Count - DPeriod;
-        if (kStart < 0 || dStart < 0)
-            return (double.NaN, double.NaN);
+        if (periods.Length == 0) throw new ArgumentException(nameof(periods));
+        KPeriod = periods[0];
+        _components.Add(new Component(periods[0], "K"));
 
-        var start = Math.Min(kStart, dStart);
-        var kLow = ohlcPrices[Period - 1].Low;
-        var kHigh = ohlcPrices[Period - 1].High;
-        var dLow = ohlcPrices[Period - 1].Low;
-        var dHigh = ohlcPrices[Period - 1].High;
-        for (int i = Period - 1; i >= start; i--)
+        if (periods.Length > 1)
         {
-            if (i >= kStart)
-            {
-                kLow = Math.Min(ohlcPrices[i].Low, kLow);
-                kHigh = Math.Max(ohlcPrices[i].High, kHigh);
-            }
-            if (i >= dStart)
-            {
-                dLow = Math.Min(ohlcPrices[i].Low, dLow);
-                dHigh = Math.Max(ohlcPrices[i].High, dHigh);
-            }
+            DPeriod = periods[1];
+            _components.Add(new Component(periods[1], "D"));
         }
-        static decimal GetResult(decimal recentClose, decimal high, decimal low)
+        if (periods.Length > 2)
         {
-            return (recentClose - low) / (high - low) * 100;
+            JPeriod = periods[2];
+            _components.Add(new Component(periods[2], "J"));
         }
-        var close = ohlcPrices[Period - 1].Close;
-        return (decimal.ToDouble(GetResult(close, kHigh, kLow)), decimal.ToDouble(GetResult(close, dHigh, dLow)));
     }
+
+    public override decimal[] Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null)
+    {
+        var results = new decimal[_components.Count];
+        for (int i = 0; i < _components.Count; i++)
+        {
+            var component = _components[i];
+            var startIndex = ohlcPrices.Count - component.Period;
+            if (startIndex < 0)
+                continue;
+
+            var low = decimal.MaxValue;
+            var high = decimal.MinValue;
+            var close = ohlcPrices[ohlcPrices.Count - 1].Close;
+
+            for (int j = startIndex; j < ohlcPrices.Count; j++)
+            {
+                var p = ohlcPrices[j];
+                if (low > p.Low)
+                    low = p.Low;
+                if (high < p.High)
+                    high = p.High;
+            }
+            results[i] = RunFormula(close, high, low);
+        }
+        return results;
+    }
+
+    static decimal RunFormula(decimal c, decimal h, decimal l) => (c - l) / (h - l) * 100;
 }

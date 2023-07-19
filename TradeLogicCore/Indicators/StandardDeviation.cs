@@ -1,7 +1,7 @@
 ﻿using TradeDataCore.Essentials;
 
 namespace TradeLogicCore.Indicators;
-internal class StandardDeviation : PriceSeriesIndicator<double>
+public class StandardDeviation : PriceSeriesIndicator<double>
 {
     public StandardDeviation(int period, Func<OhlcPrice, decimal>? selector = null) : base(period, selector)
     {

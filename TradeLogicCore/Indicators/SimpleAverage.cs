@@ -1,7 +1,7 @@
 ﻿using TradeDataCore.Essentials;
 
 namespace TradeLogicCore.Indicators;
-internal class SimpleAverage : PriceSeriesIndicator<double>
+public class SimpleAverage : PriceSeriesIndicator<double>
 {
     public SimpleAverage(int period, Func<OhlcPrice, decimal>? selector = null) : base(period, selector)
     {
