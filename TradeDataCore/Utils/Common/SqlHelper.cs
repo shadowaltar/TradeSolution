@@ -1,30 +1,31 @@
 ﻿using System.Data;
 using System.Data.Common;
 using System.Reflection;
-using System.Xml.Linq;
+using Common;
 
-namespace TradeDataCore.Utils;
+namespace TradeDataCore.Utils.Common;
 
 public class SqlHelper<T> : IDisposable where T : new()
 {
     private Dictionary<string, PropertyInfo> _properties;
-    private Dictionary<string, Action<T, object?>> _setters;
+    private ValueSetter<T> _valueSetter;
 
     public SqlHelper(DbDataReader reader)
     {
         Reader = reader;
         Columns = reader.GetSchemaTable()!.GetDistinctValues<string>("ColumnName");
-        _properties = ReflectionUtils.GetProperties<T>();
-        _setters = ReflectionUtils.GetSetterMap<T>();
+        _properties = ReflectionUtils.GetPropertyToName(typeof(T));
+        _valueSetter = ReflectionUtils.GetValueSetter<T>();
     }
 
     public DbDataReader Reader { get; private set; }
+
     public HashSet<string> Columns { get; private set; }
 
     public T Read()
     {
         var entry = new T();
-        foreach (var (name, setter) in _setters)
+        foreach (var name in _valueSetter.GetFieldNames())
         {
             if (!Columns.Contains(name))
                 continue; // skip when schema is available and property name doesn't exist in returned columns
@@ -32,7 +33,7 @@ public class SqlHelper<T> : IDisposable where T : new()
             if (_properties.TryGetValue(name, out var pi))
             {
                 var type = pi.PropertyType;
-                setter(entry, Get(type, name));
+                _valueSetter.Set(entry, name, Get(type, name));
             }
         }
         return entry;
@@ -66,7 +67,7 @@ public class SqlHelper<T> : IDisposable where T : new()
         Columns.Clear();
         Reader = null;
         _properties = null;
-        _setters = null;
+        _valueSetter = null;
     }
 
     public TV? GetOrDefault<TV>(string columnName, TV? defaultValue = default)

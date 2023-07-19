@@ -1,7 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
-namespace TradeDataCore.Utils;
+namespace Common;
 
 public static class StringExtensions
 {
@@ -42,13 +43,9 @@ public static class StringExtensions
 
     public static DateTime ParseLocalUnixDate(this string? value, DateTime defaultValue = default)
     {
-        if (value.IsBlank())
+        if (!value.IsBlank() && int.TryParse(value, CultureInfo.InvariantCulture, out var seconds))
         {
-            return defaultValue;
-        }
-        if (int.TryParse(value, CultureInfo.InvariantCulture, out var seconds))
-        {
-            return DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime().DateTime;
+            return DateUtils.FromLocalUnixSec(seconds);
         }
         return defaultValue;
     }

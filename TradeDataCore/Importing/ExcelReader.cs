@@ -1,4 +1,5 @@
-﻿using log4net;
+﻿using Common;
+using log4net;
 using OfficeOpenXml;
 using TradeDataCore.Reporting;
 using TradeDataCore.StaticData;
@@ -16,7 +17,6 @@ public class ExcelReader
 
         var columns = ColumnMappingReader.Read(columnDefinitionResourcePath);
         if (columns == null) return null;
-
 
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var package = new ExcelPackage(stream);
@@ -41,7 +41,7 @@ public class ExcelReader
             headers[j] = column;
         }
 
-        var setters = ReflectionUtils.GetSetterMap<T>();
+        var vs = ReflectionUtils.GetValueSetter<T>();
 
         var hardcodedColumns = GetHardcodedValueAndColumns(setting?.HardcodedValues, columns);
         for (int i = start.Row + 1 + headerSkipLineCount; i <= end.Row; i++) // line 0 is header
@@ -60,8 +60,7 @@ public class ExcelReader
                         if (cellValue.IsBlank() && column.IsNullable)
                             continue;
 
-                        var firstLevelSetter = setters[inner.firstLevelFieldName];
-                        firstLevelSetter(entry, inner.innerObject);
+                        vs.Set(entry, inner.firstLevelFieldName, inner.innerObject);
 
                         var firstLevelType = inner.innerObject.GetType();
                         var value = ParseCell(cellValue, column);
@@ -75,7 +74,6 @@ public class ExcelReader
                     }
                     else
                     {
-                        var setter = setters[actualFieldName];
                         var value = ParseCell(cellValue, column);
                         if (value is string strObj && !column.IsNullable && strObj.IsBlank())
                         {
@@ -83,7 +81,7 @@ public class ExcelReader
                             entry = null;
                             break;
                         }
-                        setter(entry, value);
+                        vs.Set(entry, actualFieldName, value);
                     }
                 }
             }
@@ -92,7 +90,6 @@ public class ExcelReader
             {
                 foreach (var (col, hardcodedValue) in hardcodedColumns)
                 {
-                    var setter = setters[col.FieldName];
                     if (hardcodedValue is ComplexMapping cm)
                     {
                         try
@@ -100,7 +97,7 @@ public class ExcelReader
                             var f = cm.Function;
                             var paramName = cm.ParameterFieldName;
                             var paramValue = entry.GetPropertyValue(typeof(T), paramName);
-                            setter(entry, f(paramValue));
+                            vs.Set(entry, col.FieldName, f(paramValue));
                         }
                         catch (Exception e)
                         {
@@ -109,7 +106,7 @@ public class ExcelReader
                     }
                     else
                     {
-                        setter(entry, hardcodedValue);
+                        vs.Set(entry, col.FieldName, hardcodedValue);
                     }
                 }
             }

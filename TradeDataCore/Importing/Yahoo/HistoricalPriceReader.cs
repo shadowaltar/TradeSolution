@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.Utils;
+using Common;
 
 namespace TradeDataCore.Importing.Yahoo;
 
@@ -203,7 +204,7 @@ public class HistoricalPriceReader
 
             static decimal[]? ToDecimalValues(JsonNode? parentNode, string key)
             {
-                return parentNode?[key]?.AsArray().Select(n => n.GetDecimal()).ToArray();
+                return parentNode?[key]?.AsArray().Select(n => n!.GetValue<decimal>()).ToArray();
             }
 
             var prices = new List<OhlcPrice>();

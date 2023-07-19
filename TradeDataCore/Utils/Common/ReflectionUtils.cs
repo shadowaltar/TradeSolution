@@ -1,28 +1,31 @@
-﻿using System.Data;
+﻿using System.Collections;
+using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
+using TradeDataCore.Utils;
 
-namespace TradeDataCore.Utils;
-
+namespace Common;
 public static class ReflectionUtils
 {
     /// <summary>
     /// Cached untyped getters. Key is the object type (which holds the property getters).
     /// </summary>
-    private static readonly Dictionary<Type, object> _getterMaps = new();
+    private static readonly Dictionary<Type, object> _typeToValueGetters = new();
 
     /// <summary>
     /// Cached untyped setters. Key is the object type (which holds the property setters).
     /// </summary>
-    private static readonly Dictionary<Type, object> _setterMaps = new();
+    private static readonly Dictionary<Type, object> _typeToValueSetters = new();
 
     /// <summary>
-    /// Cached <see cref="PropertyInfo"/>s. Key is the object type (which holds the properties).
+    /// Cache of types which the key is its type name (not fully qualified name).
     /// </summary>
-    private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _propertyInfoMaps = new();
+    private static readonly Dictionary<string, Type?> _nameOnlyTypeToTypes = new();
 
-
-    private static readonly Dictionary<string, Type?> _typesWithNameOnly = new();
+    /// <summary>
+    /// Cache of property info for a given type. Property info are keyed by its name.
+    /// </summary>
+    private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _typeToPropertyInfoMap = new();
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
     {
@@ -68,7 +71,7 @@ public static class ReflectionUtils
 
     public static List<(string name, Type type, Action<T, object> setter)> BuildUntypedSetters<T>()
     {
-        var properties = GetProperties<T>().Values;
+        var properties = typeof(T).GetProperties();
         List<(string name, Type type, Action<T, object> setter)> tuples = new();
         foreach (var property in properties)
         {
@@ -100,7 +103,7 @@ public static class ReflectionUtils
 
     public static List<(string name, Type type, Func<T, object> getter)> BuildUntypedGetters<T>()
     {
-        var properties = GetProperties<T>().Values;
+        var properties = typeof(T).GetProperties();
         List<(string name, Type type, Func<T, object> getter)> tuples = new();
         foreach (var property in properties)
         {
@@ -117,8 +120,9 @@ public static class ReflectionUtils
 
     public static DataTable BuildDataTable<T>()
     {
+        var t = typeof(T);
         var table = new DataTable();
-        var propMap = GetProperties<T>().Values;
+        var propMap = t.GetProperties();
         foreach (var property in propMap)
         {
             var type = property.PropertyType;
@@ -130,69 +134,40 @@ public static class ReflectionUtils
     public static DataTable AddDataRow<T>(DataTable table, T entry) where T : notnull
     {
         var t = typeof(T);
-        var map = GetGetterMap<T>();
+        var vg = GetValueGetter<T>();
         var tableRow = table.NewRow();
 
-        foreach (var (name, getter) in map)
+        foreach (var (name, value) in vg.GetAllValues(entry))
         {
-            tableRow[name] = getter(entry);
+            tableRow[name] = value;
         }
         table.Rows.Add(tableRow);
         return table;
     }
 
-    public static Dictionary<string, PropertyInfo> GetProperties<T>()
+    public static ValueGetter<T> GetValueGetter<T>(BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         var t = typeof(T);
-        if (!_propertyInfoMaps.TryGetValue(t, out var result))
+        if (!_typeToValueGetters.TryGetValue(t, out var vg))
         {
-            var properties = t.GetProperties();
-            result = properties.ToDictionary(p => p.Name, p => p);
-            _propertyInfoMaps[t] = result;
+            var properties = GetPropertyToName(t, flags);
+            vg = new ValueGetter<T>(properties.Values);
+            _typeToValueGetters[t] = vg;
         }
-        return result;
+        return (ValueGetter<T>)vg;
     }
 
-    public static Dictionary<string, Func<T, object>> GetGetterMap<T>()
-    {
-        var t = typeof(T);
-        if (!_getterMaps.TryGetValue(t, out var result))
-        {
-            var properties = GetProperties<T>();
-            var map = new Dictionary<string, Func<T, object>>();
-            foreach (var property in properties.Values)
-            {
-                // must exclude the static ones
-                if (property.GetGetMethod()?.IsStatic ?? false)
-                    continue;
-                map[property.Name] = BuildUntypedGetter<T>(property);
-            }
-            result = map;
-            _getterMaps[t] = result;
-        }
-        return (Dictionary<string, Func<T, object>>)result;
-    }
 
-    public static Dictionary<string, Action<T, object?>> GetSetterMap<T>()
+    public static ValueSetter<T> GetValueSetter<T>(BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         var t = typeof(T);
-        if (!_setterMaps.TryGetValue(t, out var result))
+        if (!_typeToValueGetters.TryGetValue(t, out var vg))
         {
-            var properties = GetProperties<T>();
-            var map = new Dictionary<string, Action<T, object?>>();
-            foreach (var property in properties.Values)
-            {
-                // must exclude the static ones
-                if (property.GetGetMethod()?.IsStatic ?? false)
-                    continue;
-                var setter = BuildUntypedSetter<T>(property);
-                if (setter != null)
-                    map[property.Name] = setter;
-            }
-            result = map;
-            _setterMaps[t] = result;
+            var properties = GetPropertyToName(t, flags).Values;
+            vg = new ValueSetter<T>(properties);
+            _typeToValueGetters[t] = vg;
         }
-        return (Dictionary<string, Action<T, object?>>)result;
+        return (ValueSetter<T>)vg;
     }
 
     /// <summary>
@@ -205,7 +180,7 @@ public static class ReflectionUtils
     {
         if (typeName.IsBlank()) throw new ArgumentNullException(nameof(typeName));
 
-        if (_typesWithNameOnly.TryGetValue(typeName, out var result))
+        if (_nameOnlyTypeToTypes.TryGetValue(typeName, out var result))
             return result;
 
         foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
@@ -218,12 +193,87 @@ public static class ReflectionUtils
                 }
                 if (t.Name == typeName)
                 {
-                    _typesWithNameOnly[typeName] = t;
+                    _nameOnlyTypeToTypes[typeName] = t;
                     return t;
                 }
             }
         }
-        _typesWithNameOnly[typeName] = null;
+        _nameOnlyTypeToTypes[typeName] = null;
         return null;
+    }
+
+    public static Dictionary<string, PropertyInfo> GetPropertyToName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
+    {
+        if (_typeToPropertyInfoMap.TryGetValue(type, out var result))
+        {
+            return result;
+        }
+        result = type.GetProperties(flags).ToDictionary(p => p.Name, p => p);
+        _typeToPropertyInfoMap[type] = result;
+        return result;
+    }
+}
+
+public class ValueGetter<T>
+{
+    private readonly Dictionary<string, Func<T, object>> _getters = new();
+    private readonly Dictionary<string, Type> _getterPropertyTypes = new();
+
+    public ValueGetter(IEnumerable<PropertyInfo> properties)
+    {
+        foreach (var property in properties)
+        {
+            // must exclude the static ones
+            if (property.GetGetMethod()?.IsStatic ?? false)
+                continue;
+            _getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
+            _getterPropertyTypes[property.Name] = property.PropertyType;
+        }
+    }
+
+    public object? Get(T targetObject, string propertyName)
+    {
+        return _getters[propertyName].Invoke(targetObject);
+    }
+
+    public (object?, Type) GetTypeAndValue(T targetObject, string propertyName)
+    {
+        return (_getters[propertyName].Invoke(targetObject), _getterPropertyTypes[propertyName]);
+    }
+
+    public IEnumerable<(string, object)> GetAllValues(T entry)
+    {
+        foreach (var (name, getter) in _getters)
+        {
+            yield return (name, getter(entry));
+        }
+    }
+}
+
+public class ValueSetter<T>
+{
+    private readonly Dictionary<string, Action<T, object>> _setters = new();
+
+    public ValueSetter(Dictionary<string, PropertyInfo>.ValueCollection properties)
+    {
+        foreach (var property in properties)
+        {
+            // must exclude the static ones
+            if (property.GetGetMethod()?.IsStatic ?? false)
+                continue;
+            var setter = ReflectionUtils.BuildUntypedSetter<T>(property);
+            if (setter != null)
+                _setters[property.Name] = setter;
+        }
+    }
+
+    public void Set(T targetObject, string propertyName, object? value)
+    {
+        _setters[propertyName].Invoke(targetObject, value);
+    }
+
+    public IEnumerable<string> GetFieldNames()
+    {
+        return _setters.Keys;
     }
 }

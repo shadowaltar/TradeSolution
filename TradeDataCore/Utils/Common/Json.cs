@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace TradeDataCore.Utils;
+namespace Common;
 public static class Json
 {
     public static T? Clone<T>(T obj)

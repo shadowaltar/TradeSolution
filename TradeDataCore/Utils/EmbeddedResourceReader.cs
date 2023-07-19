@@ -1,10 +1,11 @@
-﻿using log4net;
+﻿using Common;
+using log4net;
 using System.Reflection;
 
 namespace TradeDataCore.Utils;
 public static class EmbeddedResourceReader
 {
-    private static readonly ILog Log = LogManager.GetLogger(typeof(EmbeddedResourceReader));
+    private static readonly ILog _log = LogManager.GetLogger(typeof(EmbeddedResourceReader));
 
     public static StreamReader? GetStreamReader(string resourceName, string? suffix = "csv")
     {
@@ -30,7 +31,7 @@ public static class EmbeddedResourceReader
         }
         catch (Exception ex)
         {
-            Log.Error("Failed to read resource: " + resourceName, ex);
+            _log.Error("Failed to read resource: " + resourceName, ex);
             return null;
         }
     }

@@ -1,4 +1,5 @@
-﻿using CsvHelper;
+﻿using Common;
+using CsvHelper;
 using log4net;
 using System.Globalization;
 using TradeDataCore.Utils;

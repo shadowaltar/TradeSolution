@@ -1,8 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Reflection;
 
-namespace TradeDataCore.Utils;
-
+namespace Common;
 public static class EnumExtensions
 {
     private static readonly Dictionary<Type, Dictionary<string, object>> _enumValues = new();

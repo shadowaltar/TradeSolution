@@ -1,7 +1,7 @@
 ﻿using log4net;
 using System.Text.Json.Nodes;
 
-namespace TradeDataCore.Utils;
+namespace Common;
 public class HttpHelper
 {
     private static readonly ILog _log = LogManager.GetLogger(typeof(HttpHelper));

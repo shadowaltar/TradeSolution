@@ -1,4 +1,5 @@
-﻿using log4net;
+﻿using Common;
+using log4net;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.StaticData;

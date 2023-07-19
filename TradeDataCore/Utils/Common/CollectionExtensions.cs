@@ -1,7 +1,34 @@
-﻿namespace TradeDataCore.Utils;
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 
-public static class EnumerableExtensions
+namespace Common;
+public static class CollectionExtensions
 {
+    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key)
+        where TK : notnull
+        where TV : new()
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (map.TryGetValue(key, out var value))
+            return value;
+        value = new TV();
+        map[key] = value;
+        return value;
+    }
+
+    /// <summary>
+    /// Returns true if <paramref name="collection"/> is null or empty.
+    /// </summary>
+    /// <param name="collection"></param>
+    /// <returns></returns>
+    public static bool IsNullOrEmpty<T>([NotNullWhen(false)][AllowNull] this ICollection<T> collection) => collection == null || collection.Count == 0;
+
+    public static void AddRange<T>(this Collection<T> collection, IEnumerable<T> values)
+    {
+        foreach (var v in values)
+            collection.Add(v);
+    }
+
     public static IEnumerable<List<T>> Split<T>(this IEnumerable<T> items, int bucketSize = 30)
     {
         if (bucketSize <= 0)

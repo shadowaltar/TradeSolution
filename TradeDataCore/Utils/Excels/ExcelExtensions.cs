@@ -3,9 +3,8 @@ using OfficeOpenXml.Filter;
 using OfficeOpenXml.Style;
 using System.Diagnostics;
 using System.Drawing;
-using TradeDataCore.Reporting;
 
-namespace TradeDataCore.Utils.Excels;
+namespace Common.Excels;
 public static class ExcelExtensions
 {
     private static readonly ColorConverter _colorConverter = new();

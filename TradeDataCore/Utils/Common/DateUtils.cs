@@ -1,8 +1,6 @@
-﻿namespace TradeDataCore.Utils;
+﻿namespace Common;
 public static class DateUtils
 {
-    public static DateTime Max { get; } = new DateTime(9999, 1, 1);
-
     public static int ToUnixSec(this DateTime value)
     {
         return (int)value.Subtract(DateTime.UnixEpoch).TotalSeconds;

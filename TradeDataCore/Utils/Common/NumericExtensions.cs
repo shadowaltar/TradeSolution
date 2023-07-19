@@ -1,4 +1,4 @@
-﻿namespace TradeDataCore.Utils;
+﻿namespace Common;
 public static class NumericExtensions
 {
     public static decimal? NullIfZero(this decimal value)

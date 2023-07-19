@@ -1,12 +1,9 @@
 ﻿using CsvHelper;
-using log4net;
 using System.Globalization;
 
-namespace TradeDataCore.Utils;
+namespace Common;
 public static class Csv
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(Csv));
-
     public static Dictionary<string, TV?> ReadAsDictionary<TV>(string fileName, Func<string[], TV>? converter = null) where TV : class
     {
         using var reader = new StreamReader(fileName);

@@ -1,9 +1,10 @@
-﻿using log4net;
+﻿using Common;
+using Common.Excels;
+using log4net;
 using OfficeOpenXml;
 using OfficeOpenXml.Sorting;
 using System.Diagnostics;
 using TradeDataCore.Utils;
-using TradeDataCore.Utils.Excels;
 
 namespace TradeDataCore.Reporting;
 public class ExcelWriter
@@ -121,7 +122,7 @@ public class ExcelWriter
     /// <returns></returns>
     protected virtual object?[] GetRowValuesByReflection<T>(T entry, List<ColumnDefinition> columns, Func<string?, string?>? postProcessFormula = null)
     {
-        var getters = ReflectionUtils.GetGetterMap<T>();
+        var vg = ReflectionUtils.GetValueGetter<T>();
 
         entry = entry ?? throw new ArgumentNullException(nameof(entry));
         var values = new object?[columns.Count];
@@ -135,7 +136,7 @@ public class ExcelWriter
             }
             else
             {
-                var v = getters[cd.FieldName](entry);
+                var v = vg.Get(entry, cd.FieldName);
                 // handle nullable
                 if (v != null && cd.IsNullable)
                 {

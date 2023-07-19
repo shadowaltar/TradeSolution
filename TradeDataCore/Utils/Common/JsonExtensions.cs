@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Nodes;
 
-namespace TradeDataCore.Utils;
+namespace Common;
+
 public static class JsonExtensions
 {
     public static int GetInt(this JsonNode? node, string? fieldName = null, int defaultValue = default)

@@ -1,4 +1,4 @@
-﻿using TradeDataCore.Utils;
+﻿using Common;
 
 namespace TradeDataCore.StaticData;
 public class Credential
