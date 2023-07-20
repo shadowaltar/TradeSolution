@@ -1,15 +1,19 @@
-﻿using log4net;
+﻿using Common;
+using log4net;
 using System.Text.Json.Nodes;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Corporates;
+using TradeCommon.Essentials.Fundamentals;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Prices;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
-using TradeDataCore.Utils;
-using Common;
 
 namespace TradeDataCore.Importing.Yahoo;
 
 public class HistoricalPriceReader
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(HistoricalPriceReader));
+    private static readonly ILog _log = Logger.New();
 
     /// <summary>
     /// String key here is the yahoo symbol. Format usually look like "xxxxxx.SZ" (or "SS") for SZ/SH exchanges, or "xxxx.HK" for HKEX.

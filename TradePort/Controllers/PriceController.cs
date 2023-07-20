@@ -1,10 +1,13 @@
 ﻿using Common;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
+using TradeCommon.Constants;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Fundamentals;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Exporting;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
-using TradeDataCore.Exporting;
-using TradeDataCore.StaticData;
 
 namespace TradePort.Controllers;
 
@@ -287,7 +290,7 @@ public class PriceController : Controller
         var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
 
         var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
-            .OrderBy(i => i.Exchange).ThenBy(i => i.Code).ThenBy(i => i.Interval).ThenBy(i => i.Start)
+            .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
         var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start:yyyyMMdd}_{exchange}.json");
         if (System.IO.File.Exists(filePath))

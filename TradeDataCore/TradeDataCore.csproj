@@ -17,16 +17,29 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Utils\**" />
+    <EmbeddedResource Remove="Utils\**" />
+    <None Remove="Utils\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Importing\Binance\ExamplePrices.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CsvHelper" Version="30.0.1" />
-    <PackageReference Include="EPPlus" Version="6.2.6" />
     <PackageReference Include="log4net" Version="2.0.15" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="StaticData\HKSecurityExcelDefinition.csv" />
     <EmbeddedResource Include="Importing\Binance\ExamplePrices.json" />
+    <EmbeddedResource Include="StaticData\HKSecurityExcelDefinition.csv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
   </ItemGroup>
 
   <ItemGroup>

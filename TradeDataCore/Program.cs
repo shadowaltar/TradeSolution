@@ -1,12 +1,8 @@
 ﻿using log4net.Config;
 using OfficeOpenXml;
-using System.Data;
 using System.Text;
-using TradeDataCore.Database;
-using TradeDataCore.Essentials;
-using TradeDataCore.Exporting;
+using TradeCommon.Essentials;
 using TradeDataCore.Importing.Binance;
-using TradeDataCore.Utils;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();

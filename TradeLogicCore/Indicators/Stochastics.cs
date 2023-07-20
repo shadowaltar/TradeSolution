@@ -1,4 +1,4 @@
-﻿using TradeDataCore.Essentials;
+﻿using TradeCommon.Essentials.Prices;
 
 namespace TradeLogicCore.Indicators;
 public class Stochastics : PriceSeriesIndicator<decimal[]>
@@ -51,15 +51,15 @@ public class Stochastics : PriceSeriesIndicator<decimal[]>
 
             var low = decimal.MaxValue;
             var high = decimal.MinValue;
-            var close = ohlcPrices[ohlcPrices.Count - 1].Close;
+            var close = ohlcPrices[ohlcPrices.Count - 1].C;
 
             for (int j = startIndex; j < ohlcPrices.Count; j++)
             {
                 var p = ohlcPrices[j];
-                if (low > p.Low)
-                    low = p.Low;
-                if (high < p.High)
-                    high = p.High;
+                if (low > p.L)
+                    low = p.L;
+                if (high < p.H)
+                    high = p.H;
             }
             results[i] = RunFormula(close, high, low);
         }

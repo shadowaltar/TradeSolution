@@ -1,15 +1,14 @@
 ﻿using Common;
 using log4net;
 using System.Text.Json.Nodes;
+using TradeCommon.Essentials.Instruments;
 using TradeDataCore.Database;
-using TradeDataCore.Essentials;
-using TradeDataCore.Utils;
 
 namespace TradeDataCore.Importing.Binance;
 
 public class DefinitionReader
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(DefinitionReader));
+    private static readonly ILog _log = Logger.New();
 
     public async Task<List<Security>?> ReadAndSave(SecurityType type)
     {
@@ -34,7 +33,7 @@ public class DefinitionReader
                 SubType = "CRYPTO",
                 LotSize = 0,
                 Currency = "",
-                FxSetting = new FxSetting
+                FxInfo = new FxSecurityInfo
                 {
                     BaseCurrency = symbolObj["baseAsset"].ParseString(),
                     QuoteCurrency = symbolObj["quoteAsset"].ParseString(),

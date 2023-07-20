@@ -2,15 +2,17 @@
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Fundamentals;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Prices;
 using TradeDataCore.Essentials;
-using TradeDataCore.Utils;
-using TradeDataCore.Utils.Common;
 
 namespace TradeDataCore.Database;
 
 public class Storage
 {
-    private static readonly ILog Log = LogManager.GetLogger(typeof(Storage));
+    private static readonly ILog _log = Logger.New();
 
     public static readonly string DatabaseFolder = @"c:\temp";
 
@@ -47,11 +49,11 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            Log.Info($"Upserted {count} entries into financial stats table.");
+            _log.Info($"Upserted {count} entries into financial stats table.");
         }
         catch (Exception e)
         {
-            Log.Error($"Failed to upsert into financial stats table.", e);
+            _log.Error($"Failed to upsert into financial stats table.", e);
             transaction.Rollback();
         }
         finally
@@ -117,11 +119,11 @@ DO UPDATE SET
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            Log.Info($"Upserted {entries.Count} entries into securities table.");
+            _log.Info($"Upserted {entries.Count} entries into securities table.");
         }
         catch (Exception e)
         {
-            Log.Error($"Failed to upsert into securities table.", e);
+            _log.Error($"Failed to upsert into securities table.", e);
             transaction.Rollback();
         }
         finally
@@ -171,8 +173,8 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$LotSize", entry.LotSize);
                 command.Parameters.AddWithValue("$Currency", entry.Currency.ToUpperInvariant());
-                command.Parameters.AddWithValue("$BaseCurrency", entry.FxSetting!.BaseCurrency.ToUpperInvariant());
-                command.Parameters.AddWithValue("$QuoteCurrency", entry.FxSetting!.QuoteCurrency.ToUpperInvariant());
+                command.Parameters.AddWithValue("$BaseCurrency", entry.FxInfo!.BaseCurrency.ToUpperInvariant());
+                command.Parameters.AddWithValue("$QuoteCurrency", entry.FxInfo!.QuoteCurrency.ToUpperInvariant());
                 command.Parameters.AddWithValue("$IsEnabled", true);
                 command.Parameters.AddWithValue("$LocalStartDate", 0);
                 command.Parameters.AddWithValue("$LocalEndDate", DateTime.MaxValue.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -180,11 +182,11 @@ DO UPDATE SET
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            Log.Info($"Upserted {entries.Count} entries into securities table.");
+            _log.Info($"Upserted {entries.Count} entries into securities table.");
         }
         catch (Exception e)
         {
-            Log.Error($"Failed to upsert into securities table.", e);
+            _log.Error($"Failed to upsert into securities table.", e);
             transaction.Rollback();
         }
         finally
@@ -231,21 +233,21 @@ DO UPDATE SET
             {
                 command.Parameters.Clear();
                 command.Parameters.AddWithValue("$SecurityId", securityId);
-                command.Parameters.AddWithValue("$Open", price.Open);
-                command.Parameters.AddWithValue("$High", price.High);
-                command.Parameters.AddWithValue("$Low", price.Low);
-                command.Parameters.AddWithValue("$Close", price.Close);
-                command.Parameters.AddWithValue("$Volume", price.Volume);
-                command.Parameters.AddWithValue("$StartTime", price.Start);
+                command.Parameters.AddWithValue("$Open", price.O);
+                command.Parameters.AddWithValue("$High", price.H);
+                command.Parameters.AddWithValue("$Low", price.L);
+                command.Parameters.AddWithValue("$Close", price.C);
+                command.Parameters.AddWithValue("$Volume", price.V);
+                command.Parameters.AddWithValue("$StartTime", price.T);
 
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            Log.Info($"Upserted {prices.Count} prices into prices table.");
+            _log.Info($"Upserted {prices.Count} prices into prices table.");
         }
         catch (Exception e)
         {
-            Log.Error($"Failed to upsert into prices table.", e);
+            _log.Error($"Failed to upsert into prices table.", e);
             transaction.Rollback();
         }
         finally
@@ -312,7 +314,7 @@ CREATE UNIQUE INDEX idx_code_exchange
         createCommand.CommandText = createSql;
         await createCommand.ExecuteNonQueryAsync();
 
-        Log.Info($"Created {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Created {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
     }
 
     private static async Task CreateFxDefinitionTable()
@@ -353,7 +355,7 @@ CREATE UNIQUE INDEX idx_code_exchange
         createCommand.CommandText = createSql;
         await createCommand.ExecuteNonQueryAsync();
 
-        Log.Info($"Created {DatabaseNames.FxDefinitionTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Created {DatabaseNames.FxDefinitionTable} table in {DatabaseNames.StaticData}.");
     }
 
     public static async Task CreatePriceTable(IntervalType interval, SecurityType securityType)
@@ -392,7 +394,7 @@ ON {tableName} (SecurityId);
         createCommand.CommandText = createSql;
         await createCommand.ExecuteNonQueryAsync();
 
-        Log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
+        _log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
     }
 
     public static async Task CreateFinancialStatsTable()
@@ -420,7 +422,7 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         createCommand.CommandText = createSql;
         await createCommand.ExecuteNonQueryAsync();
 
-        Log.Info($"Created {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Created {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
     }
 
     public static async Task<Security> ReadSecurity(string exchange, string code, SecurityType type)
@@ -472,13 +474,13 @@ WHERE
             var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
             if (baseCcy != null && quoteCcy != null)
             {
-                security.FxSetting = new FxSetting
+                security.FxInfo = new FxSecurityInfo
                 {
                     BaseCurrency = baseCcy,
                     QuoteCurrency = quoteCcy
                 };
             }
-            Log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
+            _log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
             return security;
         }
         return null;
@@ -539,7 +541,7 @@ WHERE
             var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
             if (baseCcy != null && quoteCcy != null)
             {
-                security.FxSetting = new FxSetting
+                security.FxInfo = new FxSecurityInfo
                 {
                     BaseCurrency = baseCcy,
                     QuoteCurrency = quoteCcy
@@ -547,7 +549,7 @@ WHERE
             }
             results.Add(security);
         }
-        Log.Info($"Read {results.Count} entries from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Read {results.Count} entries from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
         return results;
     }
 
@@ -570,7 +572,7 @@ FROM {DatabaseNames.FinancialStatsTable}
             var stats = sqlHelper.Read();
             results.Add(stats);
         }
-        Log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
         return results;
     }
 
@@ -595,7 +597,7 @@ WHERE SecurityId = $SecurityId
             var stats = sqlHelper.Read();
             results.Add(stats);
         }
-        Log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
         return results;
     }
 
@@ -627,16 +629,16 @@ WHERE
         {
             var price = new OhlcPrice
             (
-                Open: r.GetDecimal("Open"),
-                High: r.GetDecimal("High"),
-                Low: r.GetDecimal("Low"),
-                Close: r.GetDecimal("Close"),
-                Volume: r.GetDecimal("Volume"),
-                Start: r.GetDateTime("StartTime")
+                O: r.GetDecimal("Open"),
+                H: r.GetDecimal("High"),
+                L: r.GetDecimal("Low"),
+                C: r.GetDecimal("Close"),
+                V: r.GetDecimal("Volume"),
+                T: r.GetDateTime("StartTime")
             );
             results.Add(price);
         }
-        Log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }
 
@@ -670,7 +672,7 @@ WHERE
             j++;
         }
 
-        Log.Info($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
+        _log.Info($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
         return entries;
     }
 
@@ -692,13 +694,13 @@ WHERE
         try
         {
             File.Delete(DatabaseNames.MarketData + ".db");
-            Log.Info($"Deleted database file {DatabaseNames.MarketData}.db.");
+            _log.Info($"Deleted database file {DatabaseNames.MarketData}.db.");
             File.Delete(DatabaseNames.StaticData + ".db");
-            Log.Info($"Deleted database file {DatabaseNames.StaticData}.db.");
+            _log.Info($"Deleted database file {DatabaseNames.StaticData}.db.");
         }
         catch (Exception e)
         {
-            Log.Error($"Failed to purge Sqlite database files.", e);
+            _log.Error($"Failed to purge Sqlite database files.", e);
             throw;
         }
     }
@@ -751,19 +753,19 @@ WHERE
             var list = results.GetOrCreate(secId);
             var price = new ExtendedOhlcPrice
             (
-                Code: sec.Code,
-                Exchange: sec.Exchange,
-                Open: r.GetDecimal("Open"),
-                High: r.GetDecimal("High"),
-                Low: r.GetDecimal("Low"),
-                Close: r.GetDecimal("Close"),
-                Volume: r.GetDecimal("Volume"),
-                Interval: intervalStr,
-                Start: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
+                Id: sec.Code,
+                Ex: sec.Exchange,
+                O: r.GetDecimal("Open"),
+                H: r.GetDecimal("High"),
+                L: r.GetDecimal("Low"),
+                C: r.GetDecimal("Close"),
+                V: r.GetDecimal("Volume"),
+                I: intervalStr,
+                T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
             );
             list.Add(price);
         }
-        Log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }
 }

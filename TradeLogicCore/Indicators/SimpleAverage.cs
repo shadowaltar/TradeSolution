@@ -1,4 +1,4 @@
-﻿using TradeDataCore.Essentials;
+﻿using TradeCommon.Essentials.Prices;
 
 namespace TradeLogicCore.Indicators;
 public class SimpleAverage : PriceSeriesIndicator<double>

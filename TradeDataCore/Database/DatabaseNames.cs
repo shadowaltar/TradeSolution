@@ -1,4 +1,5 @@
-﻿using TradeDataCore.Essentials;
+﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeDataCore.Database
 {

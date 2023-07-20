@@ -12,4 +12,8 @@
     <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Essentials\" />
+  </ItemGroup>
+
 </Project>

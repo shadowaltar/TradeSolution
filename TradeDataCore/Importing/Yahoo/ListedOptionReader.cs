@@ -1,14 +1,14 @@
 ﻿using Common;
 using log4net;
 using System.Collections.Concurrent;
-using TradeDataCore.Essentials;
-using TradeDataCore.StaticData;
+using TradeCommon.Essentials.Fundamentals;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeDataCore.Importing.Yahoo;
 
 public class ListedOptionReader
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(ListedOptionReader));
+    private static readonly ILog _log = Logger.New();
 
     public async Task<IDictionary<int, Dictionary<FinancialStatType, decimal>>> ReadUnderlyingStats(IEnumerable<Security> securities)
     {

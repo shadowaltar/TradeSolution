@@ -1,12 +1,14 @@
 ﻿using Common;
 using log4net;
-using TradeDataCore.Essentials;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Prices;
 
 namespace TradeDataCore.Importing.Binance;
 
 public class HistoricalPriceReader
 {
-    private static readonly ILog _log = LogManager.GetLogger(typeof(HistoricalPriceReader));
+    private static readonly ILog _log = Logger.New();
 
     public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
