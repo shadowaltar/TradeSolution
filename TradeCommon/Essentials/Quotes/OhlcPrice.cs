@@ -1,4 +1,4 @@
-﻿namespace TradeCommon.Essentials.Prices;
+﻿namespace TradeCommon.Essentials.Quotes;
 
 /// <summary>
 /// A candlestick price object.

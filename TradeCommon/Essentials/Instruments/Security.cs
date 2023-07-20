@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Constants;
+
+namespace TradeCommon.Essentials.Instruments;
 public class Security
 {
     public int Id { get; set; }
@@ -8,7 +10,7 @@ public class Security
     public string Type { get; set; }
     public string? SubType { get; set; }
     public int LotSize { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = ForexNames.Usd;
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }

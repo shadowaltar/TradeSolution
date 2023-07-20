@@ -1,9 +1,9 @@
-﻿using TradeCommon.Essentials.Prices;
+﻿using TradeCommon.Essentials.Quotes;
 
 namespace TradeLogicCore.Indicators;
 public class SimpleAverage : PriceSeriesIndicator<double>
 {
-    public SimpleAverage(int period, Func<OhlcPrice, decimal>? selector = null) : base(period, selector)
+    public SimpleAverage(int period, PriceElementType elementToUse = PriceElementType.Close, bool calculateFromBeginning = false) : base(period, elementToUse, calculateFromBeginning)
     {
     }
 
@@ -16,7 +16,7 @@ public class SimpleAverage : PriceSeriesIndicator<double>
         var sum = 0m;
         for (int i = Period - 1; i >= start; i--)
         {
-            sum += _selector(ohlcPrices[i]);
+            sum += ElementSelector(ohlcPrices[i]);
         }
         return decimal.ToDouble(sum);
     }

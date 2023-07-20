@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradeCommon.Essentials.Prices;
+namespace TradeCommon.Essentials.Quotes;
 public class Tick
 {
     public decimal Price { get; set; }

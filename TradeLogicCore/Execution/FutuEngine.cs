@@ -1,13 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeLogicCore.Execution;
 public class FutuEngine : IExecutionEngine
 {
+    public event OrderPlacedCallback OrderPlaced;
+    public event OrderModifiedCallback OrderModified;
+    public event OrderCanceledCallback OrderCanceled;
+    public event AllOrderCanceledCallback AllOrderCanceled;
+
+    public bool Initialize(User user)
+    {
+        throw new NotImplementedException();
+    }
+
     public void CancelAllOrder(Order order)
     {
         throw new NotImplementedException();

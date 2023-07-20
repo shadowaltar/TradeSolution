@@ -5,7 +5,7 @@ using System.Data;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Prices;
+using TradeCommon.Essentials.Quotes;
 using TradeDataCore.Essentials;
 
 namespace TradeDataCore.Database;

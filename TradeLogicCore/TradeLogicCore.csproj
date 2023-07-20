@@ -9,11 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
+    <PackageReference Include="futu-api" Version="7.1.3308" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Essentials\" />
+    <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
   </ItemGroup>
 
 </Project>

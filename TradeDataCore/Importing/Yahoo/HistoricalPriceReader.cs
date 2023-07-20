@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Corporates;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Prices;
+using TradeCommon.Essentials.Quotes;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
 

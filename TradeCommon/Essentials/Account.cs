@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradeCommon.Essentials.Portfolios;
+namespace TradeCommon.Essentials;
 
 /// <summary>
 /// Account represents a record of entries under a user

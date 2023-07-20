@@ -1,4 +1,4 @@
-﻿namespace TradeCommon.Essentials.Prices;
+﻿namespace TradeCommon.Essentials.Quotes;
 
 public class OrderBookLevel
 {

@@ -4,6 +4,11 @@ using TradeCommon.Constants;
 namespace TradeCommon.Essentials.Instruments;
 public static class Identifiers
 {
+    public static string ToFutuCode(Security security)
+    {
+        return security.Code;
+    }
+
     public static string ToYahooSymbol(string code, string exchange)
     {
         if (exchange == ExchangeNames.Hkex)

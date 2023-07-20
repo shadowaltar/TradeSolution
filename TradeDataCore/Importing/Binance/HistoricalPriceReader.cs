@@ -2,7 +2,7 @@
 using log4net;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Prices;
+using TradeCommon.Essentials.Quotes;
 
 namespace TradeDataCore.Importing.Binance;
 

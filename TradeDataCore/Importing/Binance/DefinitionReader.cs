@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using System.Text.Json.Nodes;
+using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeDataCore.Database;
 
@@ -28,9 +29,9 @@ public class DefinitionReader
             {
                 Code = symbolObj["symbol"].ParseString(),
                 Name = symbolObj["symbol"].ParseString(),
-                Exchange = "BINANCE",
-                Type = "FX",
-                SubType = "CRYPTO",
+                Exchange = ExchangeNames.Binance.ToUpperInvariant(),
+                Type = SecurityTypes.Fx,
+                SubType = SecurityTypes.Crypto,
                 LotSize = 0,
                 Currency = "",
                 FxInfo = new FxSecurityInfo
