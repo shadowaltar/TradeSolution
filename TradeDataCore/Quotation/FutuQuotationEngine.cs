@@ -1,6 +1,5 @@
 ﻿using Futu.OpenApi;
 using Futu.OpenApi.Pb;
-using Org.BouncyCastle.Ocsp;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
@@ -17,39 +16,32 @@ namespace TradeDataCore.Quotation;
 /// </summary>
 public class FutuQuotationEngine : IQuotationEngine
 {
-    private FTAPI_Qot? _quoter;
+    private ConnectionProxy _connectionProxy;
+    private QuoterProxy _quoterProxy;
+
+    public FutuQuotationEngine()
+    {
+        var quoter = new FTAPI_Qot();
+        _connectionProxy = new ConnectionProxy(quoter);
+        _quoterProxy = new QuoterProxy(quoter);
+    }
 
     public async Task<ExternalConnectionState> InitializeAsync()
     {
-        _quoter = new FTAPI_Qot();
-        var connectionProxy = new ConnectionProxy(_quoter);
-        return await connectionProxy.ConnectAsync("127.0.0.1", 11111, false);
+        return await _connectionProxy.ConnectAsync("127.0.0.1", 11111, false);
     }
 
-    public void Subscribe(Security security)
+    public async Task<ExternalConnectionState> SubscribeAsync(Security security)
     {
-        var market = security.Exchange switch
-        {
-            ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Equity)
-                => (int)QotCommon.QotMarket.QotMarket_HK_Security,
-            ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Future)
-                => (int)QotCommon.QotMarket.QotMarket_HK_Security,
-            _ => throw new NotImplementedException(),
-        };
-
-        var futuSecurity = QotCommon.Security.CreateBuilder()
-            .SetMarket(market)
-            .SetCode(Identifiers.ToFutuCode(security))
-            .Build();
-        var c2s = QotSub.C2S.CreateBuilder()
-            .AddSecurityList(futuSecurity)
-            .AddSubTypeList((int)QotCommon.SubType.SubType_Basic)
-            .SetIsSubOrUnSub(true)
-            .Build();
-        var request = QotSub.Request.CreateBuilder().SetC2S(c2s).Build();
-        uint seqNo = _quoter.Sub(request);
+        return await _quoterProxy.SubscribeSecurityAsync(security);
     }
 
+    public async Task<ExternalConnectionState> UnsubscribeAsync(Security security)
+    {
+        return await _quoterProxy.SubscribeSecurityAsync(security, false);
+    }
+
+    #region Connection Callbacks
     public class ConnectionProxy : FTSPI_Conn
     {
         private readonly TaskCompletionSource<ExternalConnectionState> _tcs1 = new();
@@ -64,6 +56,7 @@ public class FutuQuotationEngine : IQuotationEngine
 
         public async Task<ExternalConnectionState> ConnectAsync(string ip, int port, bool isEncryptionEnabled)
         {
+            // TODO
             _api.SetClientInfo("csharp", 1);
             _api.InitConnect(ip, (ushort)port, isEncryptionEnabled);
             return await _tcs1.Task;
@@ -79,7 +72,8 @@ public class FutuQuotationEngine : IQuotationEngine
         {
             var result = new ExternalConnectionState
             {
-                Type = ConnectionActionType.Connect,
+                Type = SubscriptionType.QuotationService,
+                Action = ConnectionActionType.Connect,
                 StatusCode = errCode.ToString(),
                 ExternalPartyId = BrokerNames.Futu,
                 UniqueConnectionId = client.GetConnectID().ToString(),
@@ -92,7 +86,8 @@ public class FutuQuotationEngine : IQuotationEngine
         {
             var result = new ExternalConnectionState
             {
-                Type = ConnectionActionType.Disconnect,
+                Type = SubscriptionType.QuotationService,
+                Action = ConnectionActionType.Disconnect,
                 StatusCode = errCode.ToString(),
                 ExternalPartyId = BrokerNames.Futu,
                 UniqueConnectionId = client.GetConnectID().ToString()
@@ -100,9 +95,49 @@ public class FutuQuotationEngine : IQuotationEngine
             _tcs2.SetResult(result);
         }
     }
+    #endregion
+
+    #region Quotation Callbacks
 
     public class QuoterProxy : FTSPI_Qot
     {
+        private FTAPI_Qot _quoter;
+
+        private readonly TaskCompletionSource<ExternalConnectionState> _tcsSubscribeSecurity = new();
+
+        public QuoterProxy(FTAPI_Qot quoter)
+        {
+            _quoter = quoter;
+        }
+
+        public async Task<ExternalConnectionState> SubscribeSecurityAsync(Security security, bool isSubscribe = true)
+        {
+            _quoter = _quoter ?? throw new InvalidOperationException("Must initialize quoter before security data subscription.");
+
+            var market = security.Exchange switch
+            {
+                ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Equity)
+                    => (int)QotCommon.QotMarket.QotMarket_HK_Security,
+                ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Future)
+                    => (int)QotCommon.QotMarket.QotMarket_HK_Future,
+                _ => throw new NotImplementedException(),
+            };
+
+            var futuSecurity = QotCommon.Security.CreateBuilder()
+                .SetMarket(market)
+                .SetCode(Identifiers.ToFutuCode(security))
+                .Build();
+            var c2s = QotSub.C2S.CreateBuilder()
+                .AddSecurityList(futuSecurity)
+                .AddSubTypeList((int)QotCommon.SubType.SubType_Basic)
+                .SetIsSubOrUnSub(isSubscribe)
+                .Build();
+            var request = QotSub.Request.CreateBuilder().SetC2S(c2s).Build();
+            _quoter.Sub(request);
+
+            return await _tcsSubscribeSecurity.Task;
+        }
+
         public void OnReply_GetBasicQot(FTAPI_Conn client, uint nSerialNo, QotGetBasicQot.Response rsp)
         {
             throw new NotImplementedException();
@@ -215,7 +250,17 @@ public class FutuQuotationEngine : IQuotationEngine
 
         public void OnReply_GetSubInfo(FTAPI_Conn client, uint nSerialNo, QotGetSubInfo.Response rsp)
         {
-            throw new NotImplementedException();
+            // TODO
+            var result = new ExternalConnectionState
+            {
+                Type = SubscriptionType.QuotationService,
+                Action = ConnectionActionType.Subscribe,
+                StatusCode = rsp.ErrCode.ToString(),
+                ExternalPartyId = BrokerNames.Futu,
+                UniqueConnectionId = nSerialNo.ToString(),
+                Description = rsp.RetMsg,
+            };
+            _tcsSubscribeSecurity.SetResult(result);
         }
 
         public void OnReply_GetTicker(FTAPI_Conn client, uint nSerialNo, QotGetTicker.Response rsp)
@@ -323,9 +368,5 @@ public class FutuQuotationEngine : IQuotationEngine
             throw new NotImplementedException();
         }
     }
-}
-
-public class Ext
-{
-
+    #endregion
 }

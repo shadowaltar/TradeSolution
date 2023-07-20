@@ -2,6 +2,7 @@
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
+using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
@@ -440,7 +441,7 @@ WHERE
     Exchange = $Exchange
 ";
             if (type == SecurityType.Equity)
-                sql += $" AND Type IN ('{string.Join("','", SecurityTypeConverter.StockTypes)}')";
+                sql += $" AND Type IN ('{string.Join("','", SecurityTypes.StockTypes)}')";
         }
         else if (type == SecurityType.Fx)
         {
@@ -504,7 +505,7 @@ WHERE
     Exchange = $Exchange
 ";
             if (type == SecurityType.Equity)
-                sql += $" AND Type IN ('{string.Join("','", SecurityTypeConverter.StockTypes)}')";
+                sql += $" AND Type IN ('{string.Join("','", SecurityTypes.StockTypes)}')";
         }
         else if (type == SecurityType.Fx)
         {
