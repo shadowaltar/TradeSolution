@@ -11,7 +11,7 @@ public static class Identifiers
 
     public static string ToYahooSymbol(string code, string exchange)
     {
-        if (exchange == ExchangeNames.Hkex)
+        if (exchange == ExternalNames.Hkex)
         {
             return ToYahooSymbolForHK(code);
         }

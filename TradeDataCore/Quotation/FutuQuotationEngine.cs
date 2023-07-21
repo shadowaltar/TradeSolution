@@ -74,8 +74,8 @@ public class FutuQuotationEngine : IQuotationEngine
             {
                 Type = SubscriptionType.QuotationService,
                 Action = ConnectionActionType.Connect,
-                StatusCode = errCode.ToString(),
-                ExternalPartyId = BrokerNames.Futu,
+                StatusCode = errCode == 0 ? nameof(StatusCodes.ConnectionOk) : $"{nameof(StatusCodes.ConnectionFailed)},{errCode}",
+                ExternalPartyId = ExternalNames.Futu,
                 UniqueConnectionId = client.GetConnectID().ToString(),
                 Description = desc,
             };
@@ -88,8 +88,8 @@ public class FutuQuotationEngine : IQuotationEngine
             {
                 Type = SubscriptionType.QuotationService,
                 Action = ConnectionActionType.Disconnect,
-                StatusCode = errCode.ToString(),
-                ExternalPartyId = BrokerNames.Futu,
+                StatusCode = errCode == 0 ? nameof(StatusCodes.DisconnectionOk) : $"{nameof(StatusCodes.DisconnectionFailed)},{errCode}",
+                ExternalPartyId = ExternalNames.Futu,
                 UniqueConnectionId = client.GetConnectID().ToString()
             };
             _tcs2.SetResult(result);
@@ -116,9 +116,9 @@ public class FutuQuotationEngine : IQuotationEngine
 
             var market = security.Exchange switch
             {
-                ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Equity)
+                ExternalNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Equity)
                     => (int)QotCommon.QotMarket.QotMarket_HK_Security,
-                ExchangeNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Future)
+                ExternalNames.Hkex when SecurityTypeConverter.Matches(security.Type, SecurityType.Future)
                     => (int)QotCommon.QotMarket.QotMarket_HK_Future,
                 _ => throw new NotImplementedException(),
             };
@@ -255,8 +255,8 @@ public class FutuQuotationEngine : IQuotationEngine
             {
                 Type = SubscriptionType.QuotationService,
                 Action = ConnectionActionType.Subscribe,
-                StatusCode = rsp.ErrCode.ToString(),
-                ExternalPartyId = BrokerNames.Futu,
+                StatusCode = rsp.ErrCode == 0 ? nameof(StatusCodes.SubscriptionOk) : $"{nameof(StatusCodes.SubscriptionFailed)},{rsp.ErrCode}",
+                ExternalPartyId = ExternalNames.Futu,
                 UniqueConnectionId = nSerialNo.ToString(),
                 Description = rsp.RetMsg,
             };

@@ -1,8 +1,9 @@
 ﻿using TradeCommon.Essentials.Quotes;
+using TradeCommon.Utils.Evaluation;
 
 namespace TradeLogicCore.Indicators;
 
-public abstract class PriceSeriesIndicator<T>
+public abstract class PriceSeriesIndicator<T> : IIndicator
 {
     protected static readonly Dictionary<PriceElementType, Func<OhlcPrice, decimal>> _priceElementSelectors = new()
     {

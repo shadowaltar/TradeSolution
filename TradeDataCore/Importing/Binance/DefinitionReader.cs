@@ -29,7 +29,7 @@ public class DefinitionReader
             {
                 Code = symbolObj["symbol"].ParseString(),
                 Name = symbolObj["symbol"].ParseString(),
-                Exchange = ExchangeNames.Binance.ToUpperInvariant(),
+                Exchange = ExternalNames.Binance.ToUpperInvariant(),
                 Type = SecurityTypes.Fx,
                 SubType = SecurityTypes.Crypto,
                 LotSize = 0,

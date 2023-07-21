@@ -1,18 +1,12 @@
 ﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Utils.Evaluation;
 
 namespace TradeLogicCore.Instruments;
 
 public interface ISecurityScreener
 {
-    public List<Security> Filter(DateTime asOfTime, SecurityScreeningCriteria criteriaType)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-[Flags]
-public enum SecurityScreeningCriteria
-{
-    DerivedByOhlcPrices,
-    Fundamentals,
+    List<Security> Filter(List<Security> securities,
+                          DateTime asOfTime,
+                          List<Criteria> indicators,
+                          BoolOp indicatorConjunction = BoolOp.And);
 }

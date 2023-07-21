@@ -164,7 +164,20 @@ public class ExcelWriter
 
             var columnIndex = i + 1;
             var column = sheet.Columns[columnIndex];
-            column.Style.Numberformat.Format = cd.Format;
+            if (cd.Type != TypeCode.Object)
+            {
+                column.Style.Numberformat.Format = cd.Format;
+            }
+            else
+            {
+                // special case for the non-conventional cell objects
+                // use the primary format for the whole column only
+                var primary = cd.ConcreteSpecialObject?.PrimaryFormat;
+                if (primary != null)
+                {
+                    column.Style.Numberformat.Format = primary;
+                }
+            }
             // set column width to 15 if not specified
             column.Width = cd.Width ?? 15;
         }

@@ -9,11 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="futu-api" Version="7.1.3308" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
+    <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
   </ItemGroup>
 
 </Project>

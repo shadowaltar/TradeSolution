@@ -29,7 +29,7 @@ public class PriceController : Controller
     /// <param name="endStr">In yyyyMMdd</param>
     /// <returns></returns>
     [HttpGet("{exchange}/{code}")]
-    public async Task<ActionResult> GetPrices(string exchange = ExchangeNames.Hkex,
+    public async Task<ActionResult> GetPrices(string exchange = ExternalNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string secTypeStr = nameof(SecurityType.Equity),
         [FromQuery(Name = "interval")] string intervalStr = "1d",
@@ -72,7 +72,7 @@ public class PriceController : Controller
     /// <param name="rangeStr"></param>
     /// <returns></returns>
     [HttpGet("yahoo/{exchange}/{code}")]
-    public async Task<ActionResult> GetPriceFromYahoo(string exchange = ExchangeNames.Hkex,
+    public async Task<ActionResult> GetPriceFromYahoo(string exchange = ExternalNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1d",
@@ -107,7 +107,7 @@ public class PriceController : Controller
     /// <param name="rangeStr"></param>
     /// <param name="minMarketCapStr"></param>
     /// <returns></returns>
-    [HttpGet($"{ExchangeNames.Hkex}/get-and-save-all")]
+    [HttpGet($"{ExternalNames.Hkex}/get-and-save-all")]
     public async Task<ActionResult> GetAndSaveHkexPrices(
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1d",
@@ -132,7 +132,7 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var securities = await Storage.ReadSecurities(ExchangeNames.Hkex, secType);
+        var securities = await Storage.ReadSecurities(ExternalNames.Hkex, secType);
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(securities, interval, range, (FinancialStatType.MarketCap, minMarketCap));
 
@@ -155,7 +155,7 @@ public class PriceController : Controller
     /// <param name="startStr"></param>
     /// <param name="endStr">Default is UTC Now.</param>
     /// <returns></returns>
-    [HttpGet($"{ExchangeNames.Binance}/get-and-save-all")]
+    [HttpGet($"{ExternalNames.Binance}/get-and-save-all")]
     public async Task<ActionResult> GetAndSaveBinancePrices(
         [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
@@ -191,7 +191,7 @@ public class PriceController : Controller
         if (symbols == null || symbols.Count == 0)
             return BadRequest("Missing symbols (delimited by ',').");
 
-        var securities = await Storage.ReadSecurities(ExchangeNames.Binance, secType);
+        var securities = await Storage.ReadSecurities(ExternalNames.Binance, secType);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         var priceReader = new TradeDataCore.Importing.Binance.HistoricalPriceReader();
         var allPrices = await priceReader.ReadPrices(securities, start, end, interval);
@@ -217,7 +217,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("{exchange}/get-and-save-one")]
     public async Task<ActionResult> GetAndSaveHongKongOne(
-        string exchange = ExchangeNames.Hkex,
+        string exchange = ExternalNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
@@ -260,7 +260,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("{exchange}/download-json")]
     public async Task<ActionResult> DownloadAll(
-        string exchange = ExchangeNames.Hkex,
+        string exchange = ExternalNames.Hkex,
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "range")] string rangeStr = "2y")

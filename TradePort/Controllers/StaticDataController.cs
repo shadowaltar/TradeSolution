@@ -43,7 +43,7 @@ public class StaticDataController : Controller
     /// <returns></returns>
     [HttpGet("securities/{exchange}")]
     public async Task<IActionResult> GetSecurities(
-        string exchange = ExchangeNames.Hkex,
+        string exchange = ExternalNames.Hkex,
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity",
         [FromQuery(Name = "limit")] int limit = 100)
     {
@@ -65,7 +65,7 @@ public class StaticDataController : Controller
     /// <returns></returns>
     [HttpGet("securities/{exchange}/{code}")]
     public async Task<IActionResult> GetSecurity(
-        string exchange = ExchangeNames.Hkex,
+        string exchange = ExternalNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {
@@ -86,7 +86,7 @@ public class StaticDataController : Controller
     /// <returns></returns>
     [HttpGet("financial-stats/{exchange}/{code}")]
     public async Task<IActionResult> GetFinancialStats(
-        string exchange = ExchangeNames.Hkex,
+        string exchange = ExternalNames.Hkex,
         string code = "00001",
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {
@@ -105,7 +105,7 @@ public class StaticDataController : Controller
     /// Gets all security definitions in Binance and save to database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet($"securities/{ExchangeNames.Binance}/get-and-save-all")]
+    [HttpGet($"securities/{ExternalNames.Binance}/get-and-save-all")]
     public async Task<IActionResult> GetAndSaveBinanceSecurityDefinition(
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
@@ -122,7 +122,7 @@ public class StaticDataController : Controller
     /// Gets all security definitions in HKEX and save to database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet($"securities/{ExchangeNames.Hkex}/get-and-save-all")]
+    [HttpGet($"securities/{ExternalNames.Hkex}/get-and-save-all")]
     public async Task<IActionResult> GetAndSaveHongKongSecurityDefinition(
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {
@@ -140,7 +140,7 @@ public class StaticDataController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpGet("financial-stats/{exchange}/get-and-save-all")]
-    public async Task<IActionResult> GetAndSaveHongKongSecurityStats(string exchange = ExchangeNames.Hkex,
+    public async Task<IActionResult> GetAndSaveHongKongSecurityStats(string exchange = ExternalNames.Hkex,
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {
         var secType = SecurityTypeConverter.Parse(secTypeStr);

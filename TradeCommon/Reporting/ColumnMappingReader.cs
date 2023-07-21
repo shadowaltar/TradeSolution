@@ -3,6 +3,7 @@ using CsvHelper;
 using log4net;
 using System.Globalization;
 using TradeCommon.Utils;
+using TradeCommon.Utils.Excels;
 
 namespace TradeCommon.Reporting;
 public class ColumnMappingReader
@@ -36,6 +37,27 @@ public class ColumnMappingReader
                     IsAscending = isAscending,
                     IsHidden = csvReader["Hidden"].ParseBool(),
                 };
+                if (cd.IsSpecialObjectColumn)
+                {
+                    // will find the exact class which represents the Type value
+                    var typeName = csvReader["Type"]?.ToString();
+                    var type = ReflectionUtils.SearchType(typeName);
+                    if (typeName.IsBlank() || type == null)
+                    {
+                        throw new ArgumentException("Invalid object type specified in the column definition file which no concrete class can be matched to it. Type value: " + typeName);
+                    }
+                    if (!cd.Format.IsBlank())
+                    {
+                        var ctor = type.GetConstructor(new[] { typeof(string) });
+                        var obj = ctor?.Invoke(new object[] { cd.Format });
+                        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
+                    }
+                    else
+                    {
+                        var obj = Activator.CreateInstance(type);
+                        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
+                    }
+                }
                 definitions.Add(cd);
             }
         }

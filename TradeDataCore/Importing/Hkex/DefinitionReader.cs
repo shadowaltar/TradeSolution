@@ -35,9 +35,9 @@ public class DefinitionReader
                 HeaderSkipLineCount = 2,
                 HardcodedValues = new()
                 {
-                    { nameof(Security.Exchange), ExchangeNames.Hkex },
+                    { nameof(Security.Exchange), ExternalNames.Hkex },
                     { nameof(Security.Currency), ForexNames.Hkd },
-                    { nameof(Security.YahooTicker), new ComplexMapping(code => Identifiers.ToYahooSymbol((string)code, ExchangeNames.Hkex), nameof(Security.Code)) },
+                    { nameof(Security.YahooTicker), new ComplexMapping(code => Identifiers.ToYahooSymbol((string)code, ExternalNames.Hkex), nameof(Security.Code)) },
                 }
             });
         if (securities == null)

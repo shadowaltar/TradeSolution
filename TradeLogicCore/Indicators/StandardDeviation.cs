@@ -3,8 +3,14 @@
 namespace TradeLogicCore.Indicators;
 public class StandardDeviation : PriceSeriesIndicator<double>
 {
-    public StandardDeviation(int period, PriceElementType elementToUse = PriceElementType.Close, bool calculateFromBeginning = false) : base(period, elementToUse, calculateFromBeginning)
+    private readonly bool _isPopulation;
+
+    public StandardDeviation(int period,
+                             PriceElementType elementToUse = PriceElementType.Close,
+                             bool isPopulation = true,
+                             bool calculateFromBeginning = false) : base(period, elementToUse, calculateFromBeginning)
     {
+        _isPopulation = isPopulation;
     }
 
     public override double Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null)
@@ -25,7 +31,10 @@ public class StandardDeviation : PriceSeriesIndicator<double>
             x += Math.Pow((double)ElementSelector(ohlcPrices[i]) - average, 2);
         }
 
-        x /= (Period - 1);
+        if (_isPopulation)
+            x /= Period;
+        else
+            x /= (Period - 1);
         return Math.Sqrt(x);
     }
 }

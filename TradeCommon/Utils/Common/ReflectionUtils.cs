@@ -175,7 +175,7 @@ public static class ReflectionUtils
     /// </summary>
     /// <param name="typeName"></param>
     /// <returns></returns>
-    public static Type? SearchType(string typeName, string namespaceHint = "")
+    public static Type? SearchType(string? typeName, string namespaceHint = "")
     {
         if (typeName.IsBlank()) throw new ArgumentNullException(nameof(typeName));
 
