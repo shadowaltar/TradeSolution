@@ -30,7 +30,7 @@ public class StandardDeviationTests
             date = date.AddDays(1);
         }
 
-        var sdFunc = new StandardDeviation(count, PriceElementType.Close, false, false);
+        var sdFunc = new StandardDeviationEvaluator(count, PriceElementType.Close, false, false);
         var sd = sdFunc.Calculate(prices);
 
         var exp = new Expression($"std({string.Join(',', closes)})");

@@ -17,12 +17,14 @@
 
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.5" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.9" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
+    <ProjectReference Include="..\TradeLogicCore\TradeLogicCore.csproj" />
   </ItemGroup>
 
 </Project>

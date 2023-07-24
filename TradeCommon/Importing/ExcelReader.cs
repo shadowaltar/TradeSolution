@@ -16,7 +16,8 @@ public class ExcelReader
         if (!File.Exists(filePath)) return null;
 
         var columns = ColumnMappingReader.Read(columnDefinitionResourcePath);
-        if (columns == null) return null;
+        if (columns.IsNullOrEmpty())
+            return null;
 
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var package = new ExcelPackage(stream);
@@ -53,7 +54,7 @@ public class ExcelReader
                 var cellValue = sheet.Cells[i, j].Text;
                 if (headers.TryGetValue(j, out var column))
                 {
-                    var actualFieldName = ProcessDeeper(column.FieldName, out var inner);
+                    var innerFieldName = ProcessDeeper<T>(column.FieldName, out var inner);
                     if (inner.innerObject != null && inner.firstLevelFieldName != null)
                     {
                         // we don't need to create 1st level object when it is a nullable 2nd level field
@@ -70,7 +71,7 @@ public class ExcelReader
                             entry = null;
                             break;
                         }
-                        inner.innerObject.SetPropertyValue(firstLevelType, actualFieldName, value);
+                        inner.innerObject.SetPropertyValue(firstLevelType, innerFieldName, value);
                     }
                     else
                     {
@@ -81,7 +82,7 @@ public class ExcelReader
                             entry = null;
                             break;
                         }
-                        vs.Set(entry, actualFieldName, value);
+                        vs.Set(entry, innerFieldName, value);
                     }
                 }
             }
@@ -161,7 +162,7 @@ public class ExcelReader
         }
     }
 
-    private string ProcessDeeper(string fieldName, out (string? firstLevelFieldName, object? innerObject) inner)
+    private string ProcessDeeper<T>(string fieldName, out (string? firstLevelFieldName, object? innerObject) inner)
     {
         inner = (null, null);
         if (fieldName.Contains('.'))
@@ -174,11 +175,14 @@ public class ExcelReader
                 throw new ArgumentException("Only support ABC or ABC.DEF two kinds of fieldName.");
 
             // only support 2 levels
-            var type = ReflectionUtils.SearchType(fields[0]);
-            if (type != null)
+            if(ReflectionUtils.GetPropertyToName(typeof(T)).TryGetValue(fields[0], out var pi))
             {
-                inner = (fields[0], Activator.CreateInstance(type));
-                return fields[1];
+                var type = pi.PropertyType;
+                if (type != null)
+                {
+                    inner = (fields[0], Activator.CreateInstance(type));
+                    return fields[1];
+                }
             }
         }
         return fieldName;

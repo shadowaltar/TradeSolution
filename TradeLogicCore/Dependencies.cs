@@ -11,19 +11,24 @@ public class Dependencies
     public static void Register(ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();
-        builder.RegisterType<FutuEngine>().Named<IExecutionEngine>(ExternalNames.Futu);
-        builder.RegisterType<BinanceEngine>().Named<IExecutionEngine>(ExternalNames.Binance);
 
-        builder.RegisterType<StockScreener>().Named<ISecurityScreener>(SecurityTypes.Stock);
-
-        // register depending project's DI entries
-        TradeDataCore.Dependencies.Register(builder);
+        builder.RegisterModule<DependencyModule>();
+        // external dependencies
+        builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
 
         Container = builder.Build();
     }
 
-    public static T Resolve<T>(string name) where T : notnull
+    public class DependencyModule : Module
     {
-        return Container!.ResolveNamed<T>(name);
+        protected override void Load(ContainerBuilder builder)
+        {
+            // Put your common registrations here.
+            builder.RegisterType<FutuEngine>().Named<IExecutionEngine>(ExternalNames.Futu).SingleInstance();
+            builder.RegisterType<BinanceEngine>().Named<IExecutionEngine>(ExternalNames.Binance).SingleInstance();
+
+            builder.RegisterType<StockScreener>().Named<ISecurityScreener>(SecurityTypes.Stock).SingleInstance();
+            builder.RegisterType<StockScreener>().As<IStockScreener>().SingleInstance();
+        }
     }
 }

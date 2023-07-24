@@ -65,11 +65,6 @@ public class AdminController : Controller
         if (secTypeStr != null)
             secType = SecurityTypeConverter.Parse(secTypeStr);
 
-        if (interval == IntervalType.Unknown || secType == SecurityType.Unknown)
-        {
-            return BadRequest("Either both interval and sec-type parameters are not set, or both must be presented.");
-        }
-
         if (interval == IntervalType.Unknown)
         {
             var tuples = new (string table, string db, IntervalType interval, SecurityType secType)[]

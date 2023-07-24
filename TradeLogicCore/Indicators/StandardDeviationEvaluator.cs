@@ -1,11 +1,11 @@
 ﻿using TradeCommon.Essentials.Quotes;
 
 namespace TradeLogicCore.Indicators;
-public class StandardDeviation : PriceSeriesIndicator<double>
+public class StandardDeviationEvaluator : PriceSeriesIndicator<double>
 {
     private readonly bool _isPopulation;
 
-    public StandardDeviation(int period,
+    public StandardDeviationEvaluator(int period,
                              PriceElementType elementToUse = PriceElementType.Close,
                              bool isPopulation = true,
                              bool calculateFromBeginning = false) : base(period, elementToUse, calculateFromBeginning)
@@ -13,22 +13,22 @@ public class StandardDeviation : PriceSeriesIndicator<double>
         _isPopulation = isPopulation;
     }
 
-    public override double Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null)
+    public override double Calculate(IList<double> values, IList<object>? otherInputs = null)
     {
-        if (!TryGetStartIndex(ohlcPrices, out var startIndex)) return double.NaN;
+        if (!TryGetStartIndex(values, out var startIndex)) return double.NaN;
 
-        var sum = 0m;
+        var sum = 0d;
         for (int i = Period - 1; i >= startIndex; i--)
         {
-            sum += ElementSelector(ohlcPrices[i]);
+            sum += values[i];
         }
 
         var x = 0d;
-        var average = decimal.ToDouble(sum / Period);
+        var average = sum / Period;
 
         for (int i = Period - 1; i >= startIndex; i--)
         {
-            x += Math.Pow((double)ElementSelector(ohlcPrices[i]) - average, 2);
+            x += Math.Pow(values[i] - average, 2);
         }
 
         if (_isPopulation)

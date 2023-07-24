@@ -214,10 +214,10 @@ VALUES
     ($SecurityId, $Open, $High, $Low, $Close, $Volume, $StartTime)
 ON CONFLICT (SecurityId, StartTime)
 DO UPDATE SET
-    Open = excluded.Open AND
-    High = excluded.High AND
-    Low = excluded.Low AND
-    Close = excluded.Close AND
+    Open = excluded.Open,
+    High = excluded.High,
+    Low = excluded.Low,
+    Close = excluded.Close,
     Volume = excluded.Volume;
 ";
 
@@ -234,7 +234,7 @@ DO UPDATE SET
             {
                 command.Parameters.Clear();
                 command.Parameters.AddWithValue("$SecurityId", securityId);
-                command.Parameters.AddWithValue("$Open", price.O);
+                command.Parameters.Add(new SqliteParameter("$Open", SqliteType.Real)).Value = price.O;
                 command.Parameters.AddWithValue("$High", price.H);
                 command.Parameters.AddWithValue("$Low", price.L);
                 command.Parameters.AddWithValue("$Close", price.C);
@@ -380,9 +380,9 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     StartTime INT NOT NULL,
     UNIQUE(SecurityId, StartTime)
 );
-CREATE UNIQUE INDEX idx_sec_start
+CREATE UNIQUE INDEX idx_{tableName}_sec_start
 ON {tableName} (SecurityId, StartTime);
-CREATE INDEX idx_sec
+CREATE INDEX idx_{tableName}_sec
 ON {tableName} (SecurityId);
 ";
         using var connection = await Connect(DatabaseNames.MarketData);

@@ -20,4 +20,18 @@ public class SimpleAverage : PriceSeriesIndicator<double>
         }
         return decimal.ToDouble(sum);
     }
+
+    public override double Calculate(IList<double> values, IList<object>? otherInputs = null)
+    {
+        var start = values.Count - Period;
+        if (start < 0)
+            return double.NaN;
+
+        var sum = 0d;
+        for (int i = Period - 1; i >= start; i--)
+        {
+            sum += values[i];
+        }
+        return sum;
+    }
 }

@@ -8,6 +8,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
 using TradeDataCore.Database;
 using TradeDataCore.Essentials;
+using TradeDataCore.MarketData;
 
 namespace TradePort.Controllers;
 
@@ -238,20 +239,23 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
+        if (security == null)
+            return BadRequest($"Security {code} in {exchange} is not found.");
+
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {
             await Storage.InsertPrices(security.Id, interval, secType, tuple.Prices);
-            var count = await Storage.Execute("SELECT COUNT(Interval) FROM " + DatabaseNames.StockPrice1hTable, DatabaseNames.MarketData);
+            var count = await Storage.Execute($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
             Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
     }
 
     /// <summary>
-    /// Download all security data as JSON from the given exchange.
+    /// Download all prices of all securities as JSON from the given exchange.
     /// </summary>
     /// <param name="exchange"></param>
     /// <param name="secTypeStr"></param>
@@ -280,12 +284,6 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var securities = await Storage.ReadSecurities(exchange, secType);
-        //var securityTable = DatabaseNames.GetDefinitionTableName(secType);
-        //var idTable = await Storage.Execute($"SELECT DISTINCT SecurityId FROM {securityTable} WHERE", DatabaseNames.StaticData);
-
-        //var ids = idTable.GetDistinctValues<int>("SecurityId");
-        //securities = securities.Where(s => ids.Contains(s.Id)).ToList();
-
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
         var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
 
@@ -333,6 +331,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("metrics/per-security-row-count")]
     public async Task<ActionResult> ReportPriceCount(
+        [FromServices()] IHistoricalMarketDataService dataService,
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {

@@ -9,30 +9,35 @@ public static class EmbeddedResourceReader
 
     public static StreamReader? GetStreamReader(string resourceName, string? suffix = "csv")
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        try
+        var assembilies = AppDomain.CurrentDomain.GetAssemblies().ToDictionary(a=>a.GetName().Name, a=>a);
+        foreach (var (_, assembly) in assembilies.Where(p=> !p.Key.StartsWith("System") && !p.Key.StartsWith("Microsoft")))
         {
-            Stream? stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
+            var name = resourceName;
+            try
             {
-                resourceName = $"{assembly.GetName().Name}.{resourceName}";
-                if (!suffix.IsBlank())
+                Stream? stream = assembly.GetManifestResourceStream(name);
+                if (stream == null)
                 {
-                    if (!resourceName.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase))
-                        resourceName += "." + suffix;
+                    name = $"{assembly.GetName().Name}.{name}";
+                    if (!suffix.IsBlank())
+                    {
+                        if (!name.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase))
+                            name += "." + suffix;
+                    }
                 }
-            }
-            stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-                return null;
+                stream = assembly.GetManifestResourceStream(name);
+                if (stream == null)
+                    continue;
 
-            var reader = new StreamReader(stream);
-            return reader;
+                var reader = new StreamReader(stream);
+                return reader;
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Failed to read resource: " + name, ex);
+                return null;
+            }
         }
-        catch (Exception ex)
-        {
-            _log.Error("Failed to read resource: " + resourceName, ex);
-            return null;
-        }
+        return null;
     }
 }

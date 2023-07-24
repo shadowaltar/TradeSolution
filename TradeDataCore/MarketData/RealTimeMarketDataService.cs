@@ -42,7 +42,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService
 
         if (!aliveExternalName.IsBlank())
         {
-            var engine = Dependencies.Resolve<IQuotationEngine>(aliveExternalName);
+            var engine = Dependencies.Container!.ResolveNamed<IQuotationEngine>(aliveExternalName);
             return await engine.SubscribeAsync(security);
         }
 

@@ -201,6 +201,12 @@ public static class ReflectionUtils
         return null;
     }
 
+    /// <summary>
+    /// Gets a dictionary matching property name to property info, which are those properties in the specific <paramref name="type"/> instance.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="flags"></param>
+    /// <returns></returns>
     public static Dictionary<string, PropertyInfo> GetPropertyToName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         if (_typeToPropertyInfoMap.TryGetValue(type, out var result))

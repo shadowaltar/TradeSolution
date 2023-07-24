@@ -5,17 +5,6 @@ namespace TradeLogicCore.Indicators;
 
 public abstract class PriceSeriesIndicator<T> : IIndicator
 {
-    protected static readonly Dictionary<PriceElementType, Func<OhlcPrice, decimal>> _priceElementSelectors = new()
-    {
-        { PriceElementType.Open, new(p => p.O) },
-        { PriceElementType.High, new(p => p.H) },
-        { PriceElementType.Low, new(p => p.L) },
-        { PriceElementType.Close, new(p => p.C) },
-        { PriceElementType.Volume, new(p => p.V) },
-        { PriceElementType.Typical3, new(p => (p.H + p.L + p.C) / 3m) },
-        { PriceElementType.Typical4, new(p => (p.O + p.H + p.L + p.C) / 4m) }
-    };
-
     /// <summary>
     /// Lookback period.
     /// </summary>
@@ -48,14 +37,30 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
 
     protected virtual Func<OhlcPrice, decimal> GetPriceElementSelector(PriceElementType priceElementType)
     {
-        return _priceElementSelectors.TryGetValue(priceElementType, out var func) ? func : _priceElementSelectors[PriceElementType.Close];
+        return OhlcPrice.PriceElementSelectors.TryGetValue(priceElementType, out var func) ? func : OhlcPrice.PriceElementSelectors[PriceElementType.Close];
     }
 
-    public abstract T Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null);
+
+    public virtual T Calculate(IList<OhlcPrice> ohlcPrices, IList<object>? otherInputs = null)
+    {
+        return Calculate(ohlcPrices.Select(p => decimal.ToDouble(ElementSelector(p))).ToList(), otherInputs);
+    }
+
+    public virtual T Calculate(IList<double> values, IList<object>? otherInputs = null)
+    {
+        return default(T);
+    }
 
     protected virtual bool TryGetStartIndex(IList<OhlcPrice> ohlcPrices, out int startIndex)
     {
         startIndex = ohlcPrices.Count - Period;
+        startIndex = CalculateFromBeginning ? 0 : startIndex;
+        return startIndex >= 0;
+    }
+
+    protected virtual bool TryGetStartIndex(IList<double> values, out int startIndex)
+    {
+        startIndex = values.Count - Period;
         startIndex = CalculateFromBeginning ? 0 : startIndex;
         return startIndex >= 0;
     }

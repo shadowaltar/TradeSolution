@@ -135,6 +135,7 @@ public class HistoricalPriceReader
         if (jo == null)
             return null;
 
+        var intervalTimeSpan = IntervalTypeConverter.ToTimeSpan(interval);
         try
         {
             var rootObj = jo["chart"]!["result"]!.AsArray()[0]!;
@@ -200,6 +201,8 @@ public class HistoricalPriceReader
                 _log.Info($"Ticker {ticker} has no market price data at all.");
                 return null;
             }
+
+            var missingDataIndexes = new HashSet<int>(); // some items will have missing values
             var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalUnixDateTime()).ToArray();
             var highs = ToDecimalValues(quoteRootObj, "high");
             var lows = ToDecimalValues(quoteRootObj, "low");
@@ -207,23 +210,80 @@ public class HistoricalPriceReader
             var closes = ToDecimalValues(quoteRootObj, "close");
             var volumes = ToDecimalValues(quoteRootObj, "volume");
 
-            static decimal[]? ToDecimalValues(JsonNode? parentNode, string key)
+            // parse the price element node into array of numbers
+            decimal[]? ToDecimalValues(JsonNode? parentNode, string key)
             {
-                return parentNode?[key]?.AsArray().Select(n => n!.GetValue<decimal>()).ToArray();
+                var array = parentNode?[key]?.AsArray();
+                if (array == null)
+                {
+                    _log.Error("Missing data! Data is: " + key);
+                    return null;
+                }
+                var result = new decimal[array.Count];
+                for (int i = 0; i < array.Count; i++)
+                {
+                    JsonNode? item = array[i];
+                    if (item == null)
+                    {
+                        missingDataIndexes!.Add(i);
+                    }
+                    else
+                    {
+                        var x = item.GetValue<decimal>();
+                        result[i] = x;
+                    }
+                }
+                return result;
             }
 
+            if (opens == null || highs == null || lows == null || closes == null || volumes == null)
+            {
+                _log.Error("Cannot construct OHLC items: some price elements are missing.");
+                return null;
+            }
+
+            // create the OHLC entries.
             var prices = new List<OhlcPrice>();
+            // the last bar from yahoo is always the real-time bar; ignore it since it is most like not aligned with 1m/1h/1d...
             for (var i = 0; i < localStartTimes.Length; i++)
             {
-                // TODO hardcode assumption: prices only have 2 dp; vol has 0.
-                opens[i] = Math.Round(opens[i], 2, MidpointRounding.ToEven);
-                highs[i] = Math.Round(highs[i], 2, MidpointRounding.ToEven);
-                lows[i] = Math.Round(lows[i], 2, MidpointRounding.ToEven);
-                closes[i] = Math.Round(closes[i], 2, MidpointRounding.ToEven);
-                volumes[i] = Math.Round(volumes[i], MidpointRounding.ToEven);
+                if (missingDataIndexes.Contains(i))
+                {
+                    continue;
+                }
+
+                if (i == localStartTimes.Length - 1)
+                {
+                    var last2Time = localStartTimes[i - 1];
+                    var last1Time = localStartTimes[i];
+                    if (last1Time - last2Time != intervalTimeSpan)
+                    {
+                        continue;
+                    }
+                }
+                // TODO hardcode assumption: prices only have 8 dp; vol has 8.
+                opens[i] = Math.Round(opens[i], 8, MidpointRounding.ToEven);
+                highs[i] = Math.Round(highs[i], 8, MidpointRounding.ToEven);
+                lows[i] = Math.Round(lows[i], 8, MidpointRounding.ToEven);
+                closes[i] = Math.Round(closes[i], 8, MidpointRounding.ToEven);
+                volumes[i] = Math.Round(volumes[i], 8, MidpointRounding.ToEven);
+
                 var price = new OhlcPrice(opens[i], highs[i], lows[i], closes[i], volumes[i], localStartTimes[i]);
                 prices.Add(price);
             }
+
+            // print the dates of missing data
+            var missingDataTimes = new List<DateTime>(missingDataIndexes.Count);
+            foreach (var index in missingDataIndexes.OrderBy(i => i))
+            {
+                missingDataTimes.Add(localStartTimes[index]);
+            }
+            if (missingDataTimes.Count > 0)
+            {
+                _log.Warn("Data entries with below start times are ignored as they don't have valid price elements: "
+                    + string.Join(',', missingDataTimes.Select(t => t.ToString("MMdd-HHmmss"))));
+            }
+
             return new PricesAndCorporateActions(prices, corporateActions);
         }
         catch (Exception ex)

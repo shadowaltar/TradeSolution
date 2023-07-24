@@ -4,6 +4,7 @@ using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeDataCore.Quotation;
+using TradeDataCore.StaticData;
 
 namespace TradeDataCore;
 public class Dependencies
@@ -13,19 +14,22 @@ public class Dependencies
     public static void Register(ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();
-        
-        builder.RegisterType<FutuQuotationEngine>().Named<IQuotationEngine>(ExternalNames.Futu);
-        
-        builder.RegisterType<RealTimeMarketDataService>().As<IRealTimeMarketDataService>();
-        builder.RegisterType<HistoricalMarketDataService>().As<IHistoricalMarketDataService>();
-        
-        builder.RegisterType<SecurityService>().As<ISecurityService>();
-
+        builder.RegisterModule<DependencyModule>();
         Container = builder.Build();
     }
 
-    public static T Resolve<T>(string name) where T : notnull
+    public class DependencyModule : Module
     {
-        return Container!.ResolveNamed<T>(name);
+        protected override void Load(ContainerBuilder builder)
+        {
+            builder.RegisterType<FutuQuotationEngine>().Named<IQuotationEngine>(ExternalNames.Futu).SingleInstance();
+
+            builder.RegisterType<DataServices>().As<IDataServices>().SingleInstance();
+            builder.RegisterType<HistoricalMarketDataService>().As<IHistoricalMarketDataService>().SingleInstance();
+            builder.RegisterType<RealTimeMarketDataService>().As<IRealTimeMarketDataService>().SingleInstance();
+            builder.RegisterType<FinancialStatsDataService>().As<IFinancialStatsDataService>().SingleInstance();
+
+            builder.RegisterType<SecurityService>().As<ISecurityService>();
+        }
     }
 }
