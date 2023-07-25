@@ -1,5 +1,6 @@
 ﻿using Common;
 using Microsoft.Data.SqlClient;
+using System.Data;
 using System.Data.Common;
 
 namespace Common;
@@ -74,6 +75,8 @@ public static class SqlExtensions
 
     public static string? SafeGetString(this DbDataReader reader, string fieldName, string defaultValue = "")
     {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))
             return defaultValue;
@@ -82,6 +85,8 @@ public static class SqlExtensions
 
     public static decimal SafeGetDecimal(this DbDataReader reader, string fieldName, decimal defaultValue = default)
     {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))
             return defaultValue;
@@ -90,6 +95,8 @@ public static class SqlExtensions
 
     public static int? SafeGetInt(this DbDataReader reader, string fieldName, int? defaultValue = null)
     {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))
             return defaultValue;
@@ -98,6 +105,8 @@ public static class SqlExtensions
 
     public static DateTime? SafeGetDateTime(this DbDataReader reader, string fieldName, DateTime? defaultValue = null)
     {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))
             return defaultValue;
@@ -106,9 +115,21 @@ public static class SqlExtensions
 
     public static bool? SafeGetBool(this DbDataReader reader, string fieldName, bool? defaultValue = null)
     {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))
             return defaultValue;
         return reader.GetBoolean(i);
+    }
+
+    public static bool HasColumn(this IDataRecord record, string columnName)
+    {
+        for (int i = 0; i < record.FieldCount; i++)
+        {
+            if (record.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 }

@@ -4,6 +4,7 @@ public enum TimeRangeType
 {
     Unknown,
     OneDay,
+    OneWeek,
     OneMonth,
     SixMonths,
     OneYear,
@@ -26,12 +27,13 @@ public static class TimeRangeTypeConverter
         return strInterval switch
         {
             "1D" => TimeRangeType.OneDay,
+            "1W" => TimeRangeType.OneWeek,
             "1MO" or "1MONTH" => TimeRangeType.OneMonth,
             "6MO" or "6MONTH" => TimeRangeType.SixMonths,
-            "1Y" => TimeRangeType.OneYear,
-            "2Y" => TimeRangeType.TwoYears,
-            "3Y" => TimeRangeType.ThreeYears,
-            "10Y" => TimeRangeType.TenYears,
+            "1Y" or "1YR" => TimeRangeType.OneYear,
+            "2Y" or "2YR" => TimeRangeType.TwoYears,
+            "3Y" or "3YR" => TimeRangeType.ThreeYears,
+            "10Y" or "10YR" => TimeRangeType.TenYears,
             "YTD" => TimeRangeType.YearToDay,
             "MAX" => TimeRangeType.Max,
             _ => TimeRangeType.Unknown,
@@ -43,6 +45,7 @@ public static class TimeRangeTypeConverter
         return interval switch
         {
             TimeRangeType.OneDay => "1d",
+            TimeRangeType.OneWeek => "1w",
             TimeRangeType.OneMonth => "1mo",
             TimeRangeType.SixMonths => "6mo",
             TimeRangeType.OneYear => "1y",
@@ -66,6 +69,16 @@ public static class TimeRangeTypeConverter
                     {
                         OperatorType.Plus => input.AddDays(1),
                         OperatorType.Minus => input.AddDays(-1),
+                        _ => input
+                    };
+                });
+            case TimeRangeType.OneWeek:
+                return new Func<DateTime, DateTime>(input =>
+                {
+                    return op switch
+                    {
+                        OperatorType.Plus => input.AddDays(7),
+                        OperatorType.Minus => input.AddDays(-7),
                         _ => input
                     };
                 });

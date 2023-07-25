@@ -27,7 +27,6 @@ public class Dependencies
             builder.RegisterType<FutuEngine>().Named<IExecutionEngine>(ExternalNames.Futu).SingleInstance();
             builder.RegisterType<BinanceEngine>().Named<IExecutionEngine>(ExternalNames.Binance).SingleInstance();
 
-            builder.RegisterType<StockScreener>().Named<ISecurityScreener>(SecurityTypes.Stock).SingleInstance();
             builder.RegisterType<StockScreener>().As<IStockScreener>().SingleInstance();
         }
     }

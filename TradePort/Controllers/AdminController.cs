@@ -47,7 +47,7 @@ public class AdminController : Controller
     /// WARNING, this will erase all the data. Rebuild all the tables.
     /// </summary>
     /// <param name="password">Mandatory</param>
-    /// <param name="intervalStr">Must be used along with <paramref name="secTypeStr"/>. Only supports <see cref="IntervalType.OneMinute"/> / <see cref="IntervalType.OneHour"/>, Only supports <see cref="IntervalType.OneDay"/>.</param>
+    /// <param name="intervalStr">Must be used along with <paramref name="secTypeStr"/>. Only supports 1m, 1h or 1d. If not set, all will be rebuilt.</param>
     /// <param name="secTypeStr">Must be used along with <paramref name="intervalStr"/>.</param>
     /// <returns></returns>
     [HttpGet("rebuild-price-tables")]

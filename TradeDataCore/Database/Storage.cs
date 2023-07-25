@@ -1,5 +1,4 @@
-﻿using BenchmarkDotNet.Columns;
-using Common;
+﻿using Common;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
@@ -698,6 +697,66 @@ LIMIT $EntryCount
         return results;
     }
 
+    public static async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
+    {
+        if (securities.Count == 0)
+            return new();
+
+        var now = DateTime.Today;
+        var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
+        var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(now);
+        var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        string sql =
+@$"
+SELECT SecurityId, Open, High, Low, Close, {dailyPriceSpecificColumn} Volume, StartTime
+FROM {tableName}
+WHERE
+    StartTime > $StartTime AND
+    SecurityId IN 
+";
+        var ids = securities.Select((s, i) => (id: s.Id, param: $"$Id{i}")).ToArray();
+        var securityMap = securities.ToDictionary(s => s.Id, s => s);
+        sql = sql + "(" + string.Join(",", ids.Select(p => p.param)) + ")";
+        using var connection = await Connect(DatabaseNames.MarketData);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$StartTime", start);
+
+        for (int i = 0; i < ids.Length; i++)
+        {
+            command.Parameters.AddWithValue(ids[i].param, ids[i].id);
+        }
+        using var r = await command.ExecuteReaderAsync();
+
+        var results = new Dictionary<int, List<ExtendedOhlcPrice>>();
+        while (await r.ReadAsync())
+        {
+            var close = r.GetDecimal("Close");
+            var secId = r.GetInt32("SecurityId");
+            if (!securityMap.TryGetValue(secId, out var sec))
+                continue;
+            var list = results.GetOrCreate(secId);
+            var price = new ExtendedOhlcPrice
+            (
+                Id: sec.Code,
+                Ex: sec.Exchange,
+                O: r.GetDecimal("Open"),
+                H: r.GetDecimal("High"),
+                L: r.GetDecimal("Low"),
+                C: close,
+                AC: r.SafeGetDecimal("AdjClose", close),
+                V: r.GetDecimal("Volume"),
+                I: intervalStr,
+                T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
+            );
+            list.Add(price);
+        }
+        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        return results;
+    }
+
     public static async Task<DataTable> QueryColumns(string sql, string database, params TypeCode[] typeCodes)
     {
         var entries = new DataTable();
@@ -826,64 +885,5 @@ LIMIT $EntryCount
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
-    }
-
-    public static async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType secType, TimeRangeType range)
-    {
-        if (securities.Count == 0)
-            return new();
-
-        var now = DateTime.Today;
-        var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
-        var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(now);
-        var tableName = DatabaseNames.GetPriceTableName(interval, secType);
-        string sql =
-@$"
-SELECT SecurityId, Open, High, Low, Close, Volume, StartTime
-FROM {tableName}
-WHERE
-    StartTime > $StartTime AND
-    SecurityId IN 
-";
-        var ids = securities.Select((s, i) => (id: s.Id, param: $"$Id{i}")).ToArray();
-        var securityMap = securities.ToDictionary(s => s.Id, s => s);
-        sql = sql + "(" + string.Join(",", ids.Select(p => p.param)) + ")";
-        using var connection = await Connect(DatabaseNames.MarketData);
-
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$StartTime", start);
-
-        for (int i = 0; i < ids.Length; i++)
-        {
-            command.Parameters.AddWithValue(ids[i].param, ids[i].id);
-        }
-        using var r = await command.ExecuteReaderAsync();
-
-        var results = new Dictionary<int, List<ExtendedOhlcPrice>>();
-        while (await r.ReadAsync())
-        {
-            var close = r.GetDecimal("Close");
-            var secId = r.GetInt32("SecurityId");
-            if (!securityMap.TryGetValue(secId, out var sec))
-                continue;
-            var list = results.GetOrCreate(secId);
-            var price = new ExtendedOhlcPrice
-            (
-                Id: sec.Code,
-                Ex: sec.Exchange,
-                O: r.GetDecimal("Open"),
-                H: r.GetDecimal("High"),
-                L: r.GetDecimal("Low"),
-                C: close,
-                AC: r.SafeGetDecimal("AdjClose", close),
-                V: r.GetDecimal("Volume"),
-                I: intervalStr,
-                T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
-            );
-            list.Add(price);
-        }
-        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
-        return results;
     }
 }

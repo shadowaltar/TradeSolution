@@ -22,6 +22,7 @@ public class StockScreeningController : Controller
     /// <param name="count">Count of securities to be filtered in.</param>
     /// <param name="endStr">End date in yyyyMMdd or yyyyMMdd-HHmmss.</param>
     /// <param name="lookBackPeriod">OHLC entry count to trace backwards from end date.</param>
+    /// <param name="excludedCodeStr">List of excluded stock codes, delimited by ",". Eg.: 00001,00002 </param>
     /// <param name="exchangeStr">Exchange of the security.</param>
     /// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
     /// <param name="secTypeStr">Security type like Equity/Fx.</param>
@@ -33,6 +34,7 @@ public class StockScreeningController : Controller
                                                          int count = 10,
                                                          [FromQuery(Name = "end")] string? endStr = "20230701",
                                                          int lookBackPeriod = 14,
+                                                         [FromQuery(Name = "excluded-codes")] string excludedCodeStr = "",
                                                          [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Hkex,
                                                          [FromQuery(Name = "interval")] string? intervalStr = "1h",
                                                          [FromQuery(Name = "sec-type")] string? secTypeStr = "equity",
@@ -54,6 +56,7 @@ public class StockScreeningController : Controller
         var exchange = ExchangeTypeConverter.Parse(exchangeStr);
         if (exchange == ExchangeType.Unknown)
             return BadRequest("Invalid exchange string.");
+        var excludedCodes = excludedCodeStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
         var elementType = PriceElementTypeConverter.Parse(ohlcStr);
 
         var stdevIndicator = new StandardDeviationEvaluator(lookBackPeriod);
@@ -64,10 +67,12 @@ public class StockScreeningController : Controller
             ElementType = elementType,
             EndTime = end,
             LookBackPeriod = lookBackPeriod,
+            RankingSortingType = SortingType.Descending,
             Aggregator = new Func<IList<double>, double>((returns) => stdevIndicator.Calculate(returns)),
             RankingType = rankType,
             RankingCount = count,
         };
+        criteria.ExcludedCodes.AddRange(excludedCodes);
 
         var r = await screener.Filter(exchange, criteria);
         return Ok(r);

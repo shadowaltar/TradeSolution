@@ -1,4 +1,5 @@
-﻿using log4net;
+﻿using Common;
+using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -36,6 +37,10 @@ public class StockScreener : IStockScreener
     public async Task<SecurityScreeningResult> Filter(ExchangeType exchange, ScreeningCriteria criteria)
     {
         var securities = await _securityService.GetSecurities(exchange, SecurityType.Equity);
+        if (!criteria.ExcludedCodes.IsNullOrEmpty())
+        {
+            securities = securities.Where(s => !criteria.ExcludedCodes.Contains(s.Code)).ToList();
+        }
         return Filter(securities, criteria);
     }
 
@@ -92,15 +97,36 @@ public class StockScreener : IStockScreener
     }
 }
 
+/// <summary>
+/// The screening criteria class defines parameters for security screening.
+/// 
+/// </summary>
 public abstract class ScreeningCriteria
 {
     /// <summary>
     /// Checks values from a start time.
     /// </summary>
     public DateTime? StartTime { get; set; } = null;
+
+    /// <summary>
+    /// Interval type which is the length of OHLC price.
+    /// </summary>
     public IntervalType IntervalType { get; set; } = IntervalType.Unknown;
+
+    /// <summary>
+    /// Security type for screening.
+    /// </summary>
     public SecurityType SecurityType { get; set; } = SecurityType.Unknown;
 
+    /// <summary>
+    /// Security codes to be excluded from screening results.
+    /// </summary>
+    public List<string> ExcludedCodes { get; } = new();
+
+    /// <summary>
+    /// End time for the indicator calculation.
+    /// It should be the <see cref="StartTime"/> of the last OHLC price.
+    /// </summary>
     public DateTime EndTime { get; set; }
 
     /// <summary>
@@ -205,14 +231,12 @@ public abstract class ScreeningCriteria
     }
 }
 
-public class SecurityScreeningResult
+public class SecurityScreeningResult : List<SecurityScreeningResult.Pair>
 {
     public record Pair(SimpleSecurity Security, double Value);
 
-    public List<Pair> Results { get; } = new List<Pair>();
-
     public void Add(SimpleSecurity simpleSecurity, double value)
     {
-        Results.Add(new Pair(simpleSecurity, value));
+        Add(new Pair(simpleSecurity, value));
     }
 }

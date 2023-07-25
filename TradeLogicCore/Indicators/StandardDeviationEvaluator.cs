@@ -5,8 +5,6 @@ public class StandardDeviationEvaluator : PriceSeriesIndicator<double>
 {
     private readonly bool _isPopulation;
 
-
-
     public StandardDeviationEvaluator(int period,
                                       PriceElementType elementToUse = PriceElementType.Close,
                                       bool isPopulation = true,
