@@ -41,10 +41,16 @@ builder.Services.AddMvc().AddJsonOptions(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+//if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
+    Console.WriteLine("HelloWorld");
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        //c.RoutePrefix = string.Empty;
+        c.SwaggerEndpoint("../swagger/v1/swagger.json", "Web UI");
+    });
 }
 
 app.UseHttpsRedirection();
