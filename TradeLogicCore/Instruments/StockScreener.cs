@@ -2,10 +2,10 @@
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Quotes;
 using TradeCommon.Utils.Evaluation;
 using TradeDataCore;
 using TradeDataCore.Instruments;
+using static OfficeOpenXml.ExcelErrorValue;
 
 namespace TradeLogicCore.Instruments;
 
@@ -20,41 +20,18 @@ namespace TradeLogicCore.Instruments;
 /// Universal screening filters:
 /// * on average for last n days: best or worst performer
 /// </summary>
-public class StockScreener : IStockScreener, ISecurityScreener
+public class StockScreener : IStockScreener
 {
     private static readonly ILog _log = Common.Logger.New();
 
     private readonly IDataServices _dataServices;
     private readonly ISecurityService _securityService;
 
-    public Timer PeriodicTimer { get; private set; }
-
     public StockScreener(IDataServices dataServices, ISecurityService securityService)
     {
         _dataServices = dataServices;
         _securityService = securityService;
     }
-
-    public void StartFilterPeriodically(IntervalType type, int multiplier = 1)
-    {
-        StopFilterPeriodically();
-
-        var interval = IntervalTypeConverter.ToTimeSpan(type).Multiply(multiplier);
-        PeriodicTimer ??= new Timer(OnFilterTriggered, null, TimeSpan.Zero, interval);
-        _log.Info("Started stock screener periodically: every " + interval);
-    }
-
-    public void StopFilterPeriodically()
-    {
-        PeriodicTimer?.Dispose();
-        _log.Info("Stopped stock screener.");
-    }
-
-    private void OnFilterTriggered(object? state)
-    {
-        throw new NotImplementedException();
-    }
-
 
     public async Task<SecurityScreeningResult> Filter(ExchangeType exchange, ScreeningCriteria criteria)
     {
@@ -76,8 +53,7 @@ public class StockScreener : IStockScreener, ISecurityScreener
 
                 if (criteria.Compare(value))
                 {
-                    result.Securities.Add(security);
-                    result.AssociatedValues.Add(value);
+                    result.Add(new SimpleSecurity(security), value);
                 }
             }
         }
@@ -87,7 +63,8 @@ public class StockScreener : IStockScreener, ISecurityScreener
             foreach (var security in securityCandidates)
             {
                 var val = criteria.CalculateValue(_dataServices, security);
-
+                if (double.IsNaN(val))
+                    continue;
                 toBeRanked.Add((security, val));
             }
             var sorted = criteria.RankingSortingType == SortingType.Ascending ?
@@ -97,11 +74,20 @@ public class StockScreener : IStockScreener, ISecurityScreener
             {
                 foreach (var (sec, val) in sorted.Take(criteria.RankingCount))
                 {
-                    result.Securities.Add(sec);
-                    result.AssociatedValues.Add(val);
+                    result.Add(new SimpleSecurity(sec), val);
+                }
+            }
+            else if (criteria.RankingType == RankingType.BottomN)
+            {
+                foreach (var (sec, val) in sorted.Skip(criteria.RankingCount - toBeRanked.Count))
+                {
+                    result.Add(new SimpleSecurity(sec), val);
                 }
             }
         }
+
+        _log.Info($"Screening finished. Found {criteria.RankingCount} out of {securityCandidates.Count} stocks. Criteria is {criteria}");
+
         return result;
     }
 }
@@ -112,6 +98,8 @@ public abstract class ScreeningCriteria
     /// Checks values from a start time.
     /// </summary>
     public DateTime? StartTime { get; set; } = null;
+    public IntervalType IntervalType { get; set; } = IntervalType.Unknown;
+    public SecurityType SecurityType { get; set; } = SecurityType.Unknown;
 
     public DateTime EndTime { get; set; }
 
@@ -136,15 +124,15 @@ public abstract class ScreeningCriteria
     public int? LookBackPeriod { get; set; } = null;
 
     /// <summary>
+    /// Gets / sets whether the criteria is related to security return.
+    /// If yes, it needs one more data point (vs <see cref="LookBackPeriod"/>) to calculate the return.
+    /// </summary>
+    public bool IsRelatedToReturn { get; set; } = true;
+
+    /// <summary>
     /// When checking values for a past period of time, values are aggregated into a single value for checking.
     /// </summary>
     public Func<IList<double>, double>? Aggregator { get; set; }
-
-    /// <summary>
-    /// When checking values for a past period of time, <see cref="OhlcPrice"/>s are aggregated into a single value for checking.
-    /// Only one of <see cref="Aggregator"/> and this will be effective.
-    /// </summary>
-    public Func<IList<OhlcPrice>, double>? OhlcAggregator { get; set; }
 
     /// <summary>
     /// The operator to compare the value for checking vs the benchmark value.
@@ -170,6 +158,11 @@ public abstract class ScreeningCriteria
     /// Used in ranking mode only.
     /// </summary>
     public SortingType RankingSortingType { get; set; } = SortingType.Ascending;
+
+    public override string ToString()
+    {
+        return base.ToString();
+    }
 
     public abstract double CalculateValue(IDataServices dataServices, Security security);
 
@@ -212,34 +205,14 @@ public abstract class ScreeningCriteria
     }
 }
 
-public class OhlcPriceScreeningCriteria : ScreeningCriteria
-{
-    public PriceElementType ElementType { get; }
-    public IntervalType IntervalType { get; }
-
-    public override double CalculateValue(IDataServices dataServices, Security security)
-    {
-        double Selector(OhlcPrice d) => decimal.ToDouble(OhlcPrice.PriceElementSelectors[ElementType](d));
-
-        IList<double>? values = null;
-        if (StartTime != null)
-        {
-            values = dataServices.GetOhlcPrices(security, IntervalType, StartTime.Value, EndTime).Select(Selector).ToList();
-        }
-        else if (StartTime == null && LookBackPeriod != null)
-        {
-            values = dataServices.GetOhlcPrices(security, IntervalType, EndTime, LookBackPeriod.Value).Select(Selector).ToList();
-        }
-        if (values != null)
-        {
-            return Aggregator?.Invoke(values) ?? double.NaN;
-        }
-        return double.NaN;
-    }
-}
-
 public class SecurityScreeningResult
 {
-    public List<Security> Securities { get; } = new();
-    public List<double> AssociatedValues { get; } = new();
+    public record Pair(SimpleSecurity Security, double Value);
+
+    public List<Pair> Results { get; } = new List<Pair>();
+
+    public void Add(SimpleSecurity simpleSecurity, double value)
+    {
+        Results.Add(new Pair(simpleSecurity, value));
+    }
 }

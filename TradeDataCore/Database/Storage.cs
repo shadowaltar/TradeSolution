@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using BenchmarkDotNet.Columns;
+using Common;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
@@ -203,21 +204,25 @@ DO UPDATE SET
         return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
     }
 
-    public static async Task InsertPrices(int securityId, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
+    public static async Task InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
-        var tableName = DatabaseNames.GetPriceTableName(interval, secType);
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
+        var dailyPriceSpecificColumn2 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "$AdjClose," : "";
+        var dailyPriceSpecificColumn3 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose = excluded.AdjClose," : "";
         string sql =
 @$"
 INSERT INTO {tableName}
-    (SecurityId, Open, High, Low, Close, Volume, StartTime)
+    (SecurityId, Open, High, Low, Close, Volume, {dailyPriceSpecificColumn1} StartTime)
 VALUES
-    ($SecurityId, $Open, $High, $Low, $Close, $Volume, $StartTime)
+    ($SecurityId, $Open, $High, $Low, $Close, $Volume, {dailyPriceSpecificColumn2} $StartTime)
 ON CONFLICT (SecurityId, StartTime)
 DO UPDATE SET
     Open = excluded.Open,
     High = excluded.High,
     Low = excluded.Low,
     Close = excluded.Close,
+    {dailyPriceSpecificColumn3}
     Volume = excluded.Volume;
 ";
 
@@ -238,6 +243,8 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$High", price.H);
                 command.Parameters.AddWithValue("$Low", price.L);
                 command.Parameters.AddWithValue("$Close", price.C);
+                if (securityType == SecurityType.Equity && interval == IntervalType.OneDay)
+                    command.Parameters.AddWithValue("$AdjClose", price.AC);
                 command.Parameters.AddWithValue("$Volume", price.V);
                 command.Parameters.AddWithValue("$StartTime", price.T);
 
@@ -365,9 +372,10 @@ CREATE UNIQUE INDEX idx_code_exchange
         string dropSql =
 @$"
 DROP TABLE IF EXISTS {tableName};
-DROP INDEX IF EXISTS idx_sec_start;
-DROP INDEX IF EXISTS idx_sec;
+DROP INDEX IF EXISTS idx_{tableName}_sec_start;
+DROP INDEX IF EXISTS idx_{tableName}_sec;
 ";
+        var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose REAL NOT NULL," : "";
         string createSql =
 @$"
 CREATE TABLE IF NOT EXISTS {tableName} (
@@ -376,6 +384,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     High REAL NOT NULL,
     Low REAL NOT NULL,
     Close REAL NOT NULL,
+    {dailyPriceSpecificColumn}
     Volume REAL NOT NULL,
     StartTime INT NOT NULL,
     UNIQUE(SecurityId, StartTime)
@@ -605,9 +614,10 @@ WHERE SecurityId = $SecurityId
     public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
         string sql =
 @$"
-SELECT SecurityId, Open, High, Low, Close, Volume, StartTime
+SELECT SecurityId, Open, High, Low, Close, {dailyPriceSpecificColumn} Volume, StartTime
 FROM {tableName}
 WHERE
     SecurityId = $SecurityId AND
@@ -628,12 +638,14 @@ WHERE
         var results = new List<OhlcPrice>();
         while (await r.ReadAsync())
         {
+            var close = r.GetDecimal("Close");
             var price = new OhlcPrice
             (
                 O: r.GetDecimal("Open"),
                 H: r.GetDecimal("High"),
                 L: r.GetDecimal("Low"),
-                C: r.GetDecimal("Close"),
+                C: close,
+                AC: r.SafeGetDecimal("AdjClose", close),
                 V: r.GetDecimal("Volume"),
                 T: r.GetDateTime("StartTime")
             );
@@ -643,7 +655,108 @@ WHERE
         return results;
     }
 
-    public static async Task<DataTable> Execute(string sql, string database)
+    public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount)
+    {
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
+        string sql =
+@$"
+SELECT SecurityId, Open, High, Low, Close, {dailyPriceSpecificColumn} Volume, StartTime
+FROM {tableName}
+WHERE
+    SecurityId = $SecurityId AND
+    StartTime <= $StartTime
+LIMIT $EntryCount
+";
+
+        using var connection = await Connect(DatabaseNames.MarketData);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$SecurityId", securityId);
+        command.Parameters.AddWithValue("$StartTime", end);
+        command.Parameters.AddWithValue("$EntryCount", entryCount);
+
+        using var r = await command.ExecuteReaderAsync();
+        var results = new List<OhlcPrice>();
+        while (await r.ReadAsync())
+        {
+            var close = r.GetDecimal("Close");
+            var price = new OhlcPrice
+            (
+                O: r.GetDecimal("Open"),
+                H: r.GetDecimal("High"),
+                L: r.GetDecimal("Low"),
+                C: close,
+                AC: r.SafeGetDecimal("AdjClose", close),
+                V: r.GetDecimal("Volume"),
+                T: r.GetDateTime("StartTime")
+            );
+            results.Add(price);
+        }
+        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        return results;
+    }
+
+    public static async Task<DataTable> QueryColumns(string sql, string database, params TypeCode[] typeCodes)
+    {
+        var entries = new DataTable();
+
+        using var connection = await Connect(database);
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+
+        using var r = await command.ExecuteReaderAsync();
+
+        if (r.FieldCount != typeCodes.Length)
+            throw new InvalidOperationException("Wrong type-code count vs SQL column count.");
+
+        if (!r.HasRows)
+            return entries;
+
+        for (int i = 0; i < r.FieldCount; i++)
+        {
+            entries.Columns.Add(new DataColumn(r.GetName(i)));
+        }
+
+        int j = 0;
+        while (r.Read())
+        {
+            DataRow row = entries.NewRow();
+            entries.Rows.Add(row);
+
+            for (int i = 0; i < r.FieldCount; i++)
+            {
+                switch (typeCodes[i])
+                {
+                    case TypeCode.Char:
+                    case TypeCode.String:
+                        entries.Rows[j][i] = r.GetString(i); break;
+                    case TypeCode.Decimal:
+                        entries.Rows[j][i] = r.GetDecimal(i); break;
+                    case TypeCode.DateTime:
+                        entries.Rows[j][i] = r.GetDateTime(i); break;
+                    case TypeCode.Int32:
+                        entries.Rows[j][i] = r.GetInt32(i); break;
+                    case TypeCode.Boolean:
+                        entries.Rows[j][i] = r.GetBoolean(i); break;
+                    case TypeCode.Double:
+                        entries.Rows[j][i] = r.GetDouble(i); break;
+                    case TypeCode.Int64:
+                        entries.Rows[j][i] = r.GetInt64(i); break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+
+            j++;
+        }
+
+        _log.Info($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
+        return entries;
+    }
+
+    public static async Task<DataTable> Query(string sql, string database)
     {
         var entries = new DataTable();
 
@@ -668,7 +781,9 @@ WHERE
             entries.Rows.Add(row);
 
             for (int i = 0; i < r.FieldCount; i++)
+            {
                 entries.Rows[j][i] = r.GetValue(i);
+            }
 
             j++;
         }
@@ -748,6 +863,7 @@ WHERE
         var results = new Dictionary<int, List<ExtendedOhlcPrice>>();
         while (await r.ReadAsync())
         {
+            var close = r.GetDecimal("Close");
             var secId = r.GetInt32("SecurityId");
             if (!securityMap.TryGetValue(secId, out var sec))
                 continue;
@@ -759,7 +875,8 @@ WHERE
                 O: r.GetDecimal("Open"),
                 H: r.GetDecimal("High"),
                 L: r.GetDecimal("Low"),
-                C: r.GetDecimal("Close"),
+                C: close,
+                AC: r.SafeGetDecimal("AdjClose", close),
                 V: r.GetDecimal("Volume"),
                 I: intervalStr,
                 T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")

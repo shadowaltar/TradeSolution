@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using TradeCommon.Constants;
-using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeDataCore.Quotation;
@@ -28,6 +27,10 @@ public class Dependencies
             builder.RegisterType<HistoricalMarketDataService>().As<IHistoricalMarketDataService>().SingleInstance();
             builder.RegisterType<RealTimeMarketDataService>().As<IRealTimeMarketDataService>().SingleInstance();
             builder.RegisterType<FinancialStatsDataService>().As<IFinancialStatsDataService>().SingleInstance();
+
+            builder.RegisterType<QuotationEngines>().AsSelf().SingleInstance();
+            builder.RegisterType<FutuQuotationEngine>().Keyed<IQuotationEngine>(ExternalNames.Futu).SingleInstance();
+            builder.RegisterType<BinanceQuotationEngine>().Keyed<IQuotationEngine>(ExternalNames.Binance).SingleInstance();
 
             builder.RegisterType<SecurityService>().As<ISecurityService>();
         }

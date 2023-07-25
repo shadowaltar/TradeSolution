@@ -31,6 +31,6 @@ public class FutuEngine : IExecutionEngine
 
     public void PlaceOrder(Order order)
     {
-        throw new NotImplementedException();
+
     }
 }

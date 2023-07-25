@@ -15,9 +15,9 @@ public interface IDataServices
 
     IFinancialStatsDataService FinancialStatsData { get; }
 
-    OhlcPrice GetOhlcPrice(Security security, IntervalType type, DateTime at);
-    List<OhlcPrice> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end);
-    List<OhlcPrice> GetOhlcPrices(Security security, IntervalType type, DateTime end, int lookBackPeriod);
+    Task<OhlcPrice> GetOhlcPrice(Security security, IntervalType type, DateTime at);
+    Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end);
+    Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType type, DateTime end, int lookBackPeriod);
 
     double GetFinancialStat(Security security, FinancialStatType type, DateTime at);
     List<double> GetFinancialStats(Security security, FinancialStatType type, DateTime start, DateTime end);

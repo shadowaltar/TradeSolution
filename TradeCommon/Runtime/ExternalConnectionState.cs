@@ -8,6 +8,11 @@ public class ExternalConnectionState
     public string? ExternalPartyId { get; set; }
     public string? UniqueConnectionId { get; set; }
     public string? Description { get; set; }
+
+    public override string ToString()
+    {
+        return $"ConnState [{Type}] action [{Action}] [{StatusCode}][{UniqueConnectionId}]";
+    }
 }
 
 public enum SubscriptionType

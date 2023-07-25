@@ -2,7 +2,7 @@
 
 public static class IntervalTypeConverter
 {
-    public static IntervalType Parse(string intervalStr)
+    public static IntervalType Parse(string? intervalStr)
     {
         if (intervalStr == null)
             return IntervalType.Unknown;

@@ -1,7 +1,10 @@
-﻿using TradeCommon.Essentials;
+﻿using Common;
+using System.Data;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeDataCore.Database;
 using TradeDataCore.MarketData;
 using TradeDataCore.StaticData;
 
@@ -21,19 +24,47 @@ public class DataServices : IDataServices
     public IRealTimeMarketDataService RealTimeMarketData { get; }
     public IFinancialStatsDataService FinancialStatsData { get; }
 
-    public OhlcPrice GetOhlcPrice(Security security, IntervalType type, DateTime at)
+    public Task<OhlcPrice> GetOhlcPrice(Security security, IntervalType type, DateTime at)
     {
         throw new NotImplementedException();
     }
 
-    public List<OhlcPrice> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end)
+    public Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end)
     {
         throw new NotImplementedException();
     }
 
-    public List<OhlcPrice> GetOhlcPrices(Security security, IntervalType type, DateTime end, int lookBackPeriod)
+    public async Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime end, int lookBackPeriod)
     {
-        throw new NotImplementedException();
+        var securityType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        // find out the exact start time
+        // roughly -x biz days:
+        DateTime roughStart;
+        if (interval == IntervalType.OneDay)
+            roughStart = end.AddBusinessDays(-lookBackPeriod);
+
+        var prices = await Storage.ReadPrices(security.Id, interval, securityType, end, lookBackPeriod);
+
+        return prices;
+    }
+
+    public async Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval)
+    {
+        var securityType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dt = await Storage.QueryColumns($"SELECT SecurityId, StartTime FROM {tableName} WHERE SecurityId = {security.Id}",
+            DatabaseNames.MarketData,
+            TypeCode.Int32, TypeCode.DateTime);
+
+        var results = new Dictionary<int, List<DateTime>>();
+        foreach (DataRow row in dt.Rows)
+        {
+            var id = (int)row["SecurityId"];
+            var dateTimes = results.GetOrCreate(security.Id);
+            dateTimes.Add((DateTime)row["StartTime"]);
+        }
+        return results;
     }
 
     public double GetFinancialStat(Security security, FinancialStatType type, DateTime at)

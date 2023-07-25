@@ -11,6 +11,12 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
     public virtual int Period { get; set; }
 
     /// <summary>
+    /// Specify the additional data point count older than <see cref="Period"/>.
+    /// For example, return value will needs 1 data point older than look back period.
+    /// </summary>
+    public virtual int OlderPointCount { get; set; }
+
+    /// <summary>
     /// If true, calculate even the count of given price points is less than the <see cref="Period"/> value.
     /// </summary>
     public bool CalculateFromBeginning { get; }
@@ -53,14 +59,14 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
 
     protected virtual bool TryGetStartIndex(IList<OhlcPrice> ohlcPrices, out int startIndex)
     {
-        startIndex = ohlcPrices.Count - Period;
+        startIndex = ohlcPrices.Count - (Period + 1);
         startIndex = CalculateFromBeginning ? 0 : startIndex;
         return startIndex >= 0;
     }
 
     protected virtual bool TryGetStartIndex(IList<double> values, out int startIndex)
     {
-        startIndex = values.Count - Period;
+        startIndex = values.Count - (Period + 1);
         startIndex = CalculateFromBeginning ? 0 : startIndex;
         return startIndex >= 0;
     }

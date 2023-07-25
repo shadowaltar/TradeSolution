@@ -18,4 +18,9 @@ public class Security
     public FxSecurityInfo? FxInfo { get; set; }
     public StockSecurityInfo? StockInfo { get; set; }
     public OptionSecurityInfo? DerivativeInfo { get; set; }
+
+    public override string ToString()
+    {
+        return $"[{Id}] [{Code} {Exchange}] {Name} ({Type})";
+    }
 }

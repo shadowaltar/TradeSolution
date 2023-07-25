@@ -248,7 +248,7 @@ public class PriceController : Controller
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {
             await Storage.InsertPrices(security.Id, interval, secType, tuple.Prices);
-            var count = await Storage.Execute($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
+            var count = await Storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
             Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
@@ -290,7 +290,7 @@ public class PriceController : Controller
         var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
             .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
-        var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start:yyyyMMdd}_{exchange}.json");
+        var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
         if (System.IO.File.Exists(filePath))
         {
             return File(System.IO.File.OpenRead(filePath), "application/octet-stream", Path.GetFileName(filePath));
@@ -317,7 +317,7 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var resultSet = await Storage.Execute("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
+        var resultSet = await Storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
         if (resultSet != null)
         {
             return Ok(resultSet.Rows[0][0]);
@@ -346,8 +346,8 @@ public class PriceController : Controller
 
         var priceTableName = DatabaseNames.GetPriceTableName(interval, secType);
         var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
-        var dt1 = await Storage.Execute($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
-        var dt2 = await Storage.Execute($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
+        var dt1 = await Storage.Query($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
+        var dt2 = await Storage.Query($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
         if (dt1 != null && dt2 != null)
         {
             var result = from table1 in dt1.AsEnumerable()

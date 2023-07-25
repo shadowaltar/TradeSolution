@@ -26,7 +26,7 @@ public class StaticDataController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var resultSet = await Storage.Execute("SELECT COUNT(Id) FROM " + DatabaseNames.GetDefinitionTableName(secType), DatabaseNames.StaticData);
+        var resultSet = await Storage.Query("SELECT COUNT(Id) FROM " + DatabaseNames.GetDefinitionTableName(secType), DatabaseNames.StaticData);
         if (resultSet != null)
         {
             return Ok(resultSet.Rows[0][0]);

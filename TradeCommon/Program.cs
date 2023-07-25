@@ -5,11 +5,8 @@ using OfficeOpenXml;
 using System.Text;
 using TradeCommon.CodeAnalysis;
 
-Console.WriteLine("Hello, World!");
-
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
 
 var summary = BenchmarkRunner.Run<BinaryFunctionsBenchmark>();

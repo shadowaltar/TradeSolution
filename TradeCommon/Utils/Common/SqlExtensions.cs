@@ -80,7 +80,7 @@ public static class SqlExtensions
         return reader.GetString(i);
     }
 
-    public static decimal? SafeGetDecimal(this DbDataReader reader, string fieldName, decimal? defaultValue = null)
+    public static decimal SafeGetDecimal(this DbDataReader reader, string fieldName, decimal defaultValue = default)
     {
         var i = reader.GetOrdinal(fieldName);
         if (reader.IsDBNull(i))

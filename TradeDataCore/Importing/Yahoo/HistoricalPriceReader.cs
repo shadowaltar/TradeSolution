@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using System.Text.Json.Nodes;
+using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Corporates;
 using TradeCommon.Essentials.Fundamentals;
@@ -142,15 +143,16 @@ public class HistoricalPriceReader
             var priceRootObj = rootObj["indicators"]!;
             var timeRootObj = rootObj["timestamp"]!;
             var corporateActions = new List<IStockCorporateAction>();
+
+            decimal[]? adjustedCloses = null;
             if (interval == IntervalType.OneDay)
             {
-                // TODO useless for now
                 var adjustedClosesObj = priceRootObj!["adjclose"]?.AsArray()?[0]?["adjclose"];
                 if (adjustedClosesObj != null)
                 {
-                    var adjustedCloses = adjustedClosesObj!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
+                    adjustedCloses = adjustedClosesObj!.AsArray().Select(n => (decimal)(n ?? 0m).AsValue()).ToArray();
                 }
-                // TODO
+
                 var corporateActionsObj = rootObj["events"];
                 if (corporateActionsObj != null)
                 {
@@ -167,7 +169,7 @@ public class HistoricalPriceReader
                             var exDate = contentObj.GetLocalUnixDateTime("date");
                             if (payableDate == default || numerator == default || denominator == default || exDate == default)
                             {
-                                _log.Warn($"Invalid stock split entry. Payable:{payableDate:yyyyMMdd},Ex:{exDate:yyyyMMdd},N/D:{numerator}/{denominator}");
+                                _log.Warn($"Invalid stock split entry. Payable:{payableDate.ToString(Constants.DefaultDateFormat)},Ex:{exDate.ToString(Constants.DefaultDateFormat)},N/D:{numerator}/{denominator}");
                                 continue;
                             }
 
@@ -267,8 +269,9 @@ public class HistoricalPriceReader
                 lows[i] = Math.Round(lows[i], 8, MidpointRounding.ToEven);
                 closes[i] = Math.Round(closes[i], 8, MidpointRounding.ToEven);
                 volumes[i] = Math.Round(volumes[i], 8, MidpointRounding.ToEven);
+                var adjustedClose = adjustedCloses != null ? Math.Round(adjustedCloses[i], 8, MidpointRounding.ToEven) : closes[i];
 
-                var price = new OhlcPrice(opens[i], highs[i], lows[i], closes[i], volumes[i], localStartTimes[i]);
+                var price = new OhlcPrice(opens[i], highs[i], lows[i], closes[i], adjustedClose, volumes[i], localStartTimes[i]);
                 prices.Add(price);
             }
 
@@ -281,7 +284,7 @@ public class HistoricalPriceReader
             if (missingDataTimes.Count > 0)
             {
                 _log.Warn("Data entries with below start times are ignored as they don't have valid price elements: "
-                    + string.Join(',', missingDataTimes.Select(t => t.ToString("MMdd-HHmmss"))));
+                    + string.Join(',', missingDataTimes.Select(t => t.ToString(Constants.DefaultDateTimeFormat))));
             }
 
             return new PricesAndCorporateActions(prices, corporateActions);

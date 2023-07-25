@@ -1,6 +1,7 @@
 ﻿using Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using TradeCommon.Constants;
 
 namespace Common;
 
@@ -32,13 +33,34 @@ public static class StringExtensions
         return false;
     }
 
-    public static DateTime ParseDate(this string? value, string? format = "yyyyMMdd", DateTime defaultValue = default)
+    public static DateTime ParseDate(this string? value, string? format = Constants.DefaultDateFormat, DateTime defaultValue = default)
     {
         if (value.IsBlank())
         {
             return defaultValue;
         }
         return DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : defaultValue;
+    }
+
+    public static DateTime ParseDateOrTime(this string? value,
+                                           string? dateFormat = Constants.DefaultDateFormat,
+                                           string? timeFormat = Constants.DefaultDateTimeFormat,
+                                           DateTime defaultValue = default)
+    {
+        if (value.IsBlank())
+        {
+            return defaultValue;
+        }
+
+        if (DateTime.TryParseExact(value, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date;
+        }
+        else if (DateTime.TryParseExact(value, timeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateTime))
+        {
+            return dateTime;
+        }
+        return defaultValue;
     }
 
     public static DateTime ParseLocalUnixDate(this string? value, DateTime defaultValue = default)
