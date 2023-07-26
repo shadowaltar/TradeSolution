@@ -6,7 +6,9 @@ using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeDataCore.Essentials;
 
 namespace TradeDataCore.Database;
@@ -16,55 +18,6 @@ public class Storage
     private static readonly ILog _log = Logger.New();
 
     public static readonly string DatabaseFolder = @"c:\temp";
-
-    public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<FinancialStatType, decimal>> stats)
-    {
-        var count = 0;
-        const string sql =
-@$"
-INSERT INTO {DatabaseNames.FinancialStatsTable}
-    (SecurityId, MarketCap)
-VALUES
-    ($SecurityId, $MarketCap)
-ON CONFLICT (SecurityId)
-DO UPDATE SET MarketCap = excluded.MarketCap;
-";
-        using var connection = await Connect(DatabaseNames.StaticData);
-        using var transaction = connection.BeginTransaction();
-
-        SqliteCommand? command = null;
-        try
-        {
-            command = connection.CreateCommand();
-            command.CommandText = sql;
-            foreach (var (id, map) in stats)
-            {
-                if (!map.TryGetValue(FinancialStatType.MarketCap, out var marketCap))
-                {
-                    continue;
-                }
-                command.Parameters.Clear();
-                command.Parameters.AddWithValue("$SecurityId", id);
-                command.Parameters.AddWithValue("$MarketCap", marketCap);
-                count++;
-                await command.ExecuteNonQueryAsync();
-            }
-            transaction.Commit();
-            _log.Info($"Upserted {count} entries into financial stats table.");
-        }
-        catch (Exception e)
-        {
-            _log.Error($"Failed to upsert into financial stats table.", e);
-            transaction.Rollback();
-        }
-        finally
-        {
-            command?.Dispose();
-        }
-
-        await connection.CloseAsync();
-        return count;
-    }
 
     public static async Task InsertStockDefinitions(List<Security> entries)
     {
@@ -198,11 +151,6 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    private static string? GetConnectionString(string databaseName)
-    {
-        return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
-    }
-
     public static async Task InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
@@ -263,6 +211,70 @@ DO UPDATE SET
         }
 
         await connection.CloseAsync();
+    }
+
+    public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<FinancialStatType, decimal>> stats)
+    {
+        var count = 0;
+        const string sql =
+@$"
+INSERT INTO {DatabaseNames.FinancialStatsTable}
+    (SecurityId, MarketCap)
+VALUES
+    ($SecurityId, $MarketCap)
+ON CONFLICT (SecurityId)
+DO UPDATE SET MarketCap = excluded.MarketCap;
+";
+        using var connection = await Connect(DatabaseNames.StaticData);
+        using var transaction = connection.BeginTransaction();
+
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach (var (id, map) in stats)
+            {
+                if (!map.TryGetValue(FinancialStatType.MarketCap, out var marketCap))
+                {
+                    continue;
+                }
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("$SecurityId", id);
+                command.Parameters.AddWithValue("$MarketCap", marketCap);
+                count++;
+                await command.ExecuteNonQueryAsync();
+            }
+            transaction.Commit();
+            _log.Info($"Upserted {count} entries into financial stats table.");
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to upsert into financial stats table.", e);
+            transaction.Rollback();
+        }
+        finally
+        {
+            command?.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return count;
+    }
+
+    public static async Task InsertOrder(Order order, SecurityType securityType)
+    {
+        var tableName = DatabaseNames.GetOrderTableName(securityType);
+    }
+
+    public static async Task InsertTrade(Trade trade, SecurityType securityType)
+    {
+        var tableName = DatabaseNames.GetTradeTableName(securityType);
+    }
+
+    public static async Task InsertPosition(Position trade, SecurityType securityType)
+    {
+        var tableName = DatabaseNames.GetPositionTableName(securityType);
     }
 
     public static async Task CreateSecurityTable(SecurityType type)
@@ -404,6 +416,21 @@ ON {tableName} (SecurityId);
         await createCommand.ExecuteNonQueryAsync();
 
         _log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
+    }
+
+    public static async Task CreateOrderTable(SecurityType securityType)
+    {
+
+    }
+
+    public static async Task CreateTradeTable(SecurityType securityType)
+    {
+
+    }
+
+    public static async Task CreatePositionTable(SecurityType securityType)
+    {
+
     }
 
     public static async Task CreateFinancialStatsTable()
@@ -558,11 +585,11 @@ WHERE
             }
             results.Add(security);
         }
-        _log.Info($"Read {results.Count} entries from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.StaticData}.");
         return results;
     }
 
-    public static async Task<List<FinancialStats>> ReadFinancialStats()
+    public static async Task<List<FinancialStat>> ReadFinancialStats()
     {
         string sql =
 @$"
@@ -574,8 +601,8 @@ FROM {DatabaseNames.FinancialStatsTable}
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlHelper<FinancialStats>(r);
-        var results = new List<FinancialStats>();
+        using var sqlHelper = new SqlHelper<FinancialStat>(r);
+        var results = new List<FinancialStat>();
         while (await r.ReadAsync())
         {
             var stats = sqlHelper.Read();
@@ -585,7 +612,7 @@ FROM {DatabaseNames.FinancialStatsTable}
         return results;
     }
 
-    public static async Task<List<FinancialStats>> ReadFinancialStats(int secId)
+    public static async Task<List<FinancialStat>> ReadFinancialStats(int secId)
     {
         string sql =
 @$"
@@ -599,8 +626,8 @@ WHERE SecurityId = $SecurityId
         command.CommandText = sql;
         command.Parameters.Add("$SecurityId", SqliteType.Text).Value = secId;
         using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlHelper<FinancialStats>(r);
-        var results = new List<FinancialStats>();
+        using var sqlHelper = new SqlHelper<FinancialStat>(r);
+        var results = new List<FinancialStat>();
         while (await r.ReadAsync())
         {
             var stats = sqlHelper.Read();
@@ -757,7 +784,17 @@ WHERE
         return results;
     }
 
-    public static async Task<DataTable> QueryColumns(string sql, string database, params TypeCode[] typeCodes)
+    /// <summary>
+    /// Execute a query and return a <see cref="DataTable"/>.
+    /// Must specify all columns' type in <see cref="TypeCode"/>.
+    /// </summary>
+    /// <param name="sql"></param>
+    /// <param name="database"></param>
+    /// <param name="typeCodes"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="NotImplementedException"></exception>
+    public static async Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes)
     {
         var entries = new DataTable();
 
@@ -815,6 +852,12 @@ WHERE
         return entries;
     }
 
+    /// <summary>
+    /// Execute a query and return a <see cref="DataTable"/>. All values are in strings.
+    /// </summary>
+    /// <param name="sql"></param>
+    /// <param name="database"></param>
+    /// <returns></returns>
     public static async Task<DataTable> Query(string sql, string database)
     {
         var entries = new DataTable();
@@ -851,6 +894,12 @@ WHERE
         return entries;
     }
 
+    /// <summary>
+    /// Check if a table exists.
+    /// </summary>
+    /// <param name="tableName"></param>
+    /// <param name="database"></param>
+    /// <returns></returns>
     public static async Task<bool> CheckTableExists(string tableName, string database)
     {
         if (tableName.IsBlank()) return false;
@@ -864,20 +913,30 @@ WHERE
         return r != null;
     }
 
-    public static void Purge()
+    /// <summary>
+    /// Purge the databases.
+    /// </summary>
+    public static void PurgeDatabase()
     {
+        var databaseNames = new[] { DatabaseNames.MarketData, DatabaseNames.StaticData, DatabaseNames.ExecutionData };
         try
         {
-            File.Delete(DatabaseNames.MarketData + ".db");
-            _log.Info($"Deleted database file {DatabaseNames.MarketData}.db.");
-            File.Delete(DatabaseNames.StaticData + ".db");
-            _log.Info($"Deleted database file {DatabaseNames.StaticData}.db.");
+            foreach (var databaseName in databaseNames)
+            {
+                var filePath = Path.Combine(DatabaseFolder, (databaseName + ".db"));
+                File.Delete(filePath);
+                _log.Info($"Deleted database file: {filePath}");
+            }
         }
         catch (Exception e)
         {
             _log.Error($"Failed to purge Sqlite database files.", e);
-            throw;
         }
+    }
+
+    private static string? GetConnectionString(string databaseName)
+    {
+        return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
     }
 
     private static async Task<SqliteConnection> Connect(string database)
@@ -885,5 +944,39 @@ WHERE
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
+    }
+
+    public static async Task Insert(IPersistenceTask task)
+    {
+        if (task is OhlcPricePersistenceTask priceTask)
+        {
+            await InsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
+        }
+        else if (task is PersistenceTask<Order> orderTask)
+        {
+            var firstItem = orderTask.Entries[0];
+            await InsertOrder(firstItem, orderTask.SecurityType);
+        }
+        else if (task is PersistenceTask<Trade> tradeTask)
+        {
+            var firstItem = tradeTask.Entries[0];
+            await InsertTrade(firstItem, tradeTask.SecurityType);
+        }
+        else if (task is PersistenceTask<Position> positionTask)
+        {
+            var firstItem = positionTask.Entries[0];
+            await InsertPosition(firstItem, positionTask.SecurityType);
+        }
+        else if (task is PersistenceTask<Security> securityTask)
+        {
+            if (securityTask.SecurityType == SecurityType.Equity)
+                await InsertStockDefinitions(securityTask.Entries);
+            if (securityTask.SecurityType == SecurityType.Fx)
+                await InsertFxDefinitions(securityTask.Entries);
+        }
+        else if (task is PersistenceTask<FinancialStat> financialStatsTask)
+        {
+            await InsertSecurityFinancialStats()
+        }
     }
 }

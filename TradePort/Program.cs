@@ -1,11 +1,15 @@
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Common;
 using log4net.Config;
+using Microsoft.Extensions.FileProviders;
 using OfficeOpenXml;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 using TradePort;
+
+var log = Logger.New();
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
@@ -16,8 +20,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddDirectoryBrowser();
+
 builder.Services.AddSwaggerGen(c =>
 {
     // Set the comments path for the Swagger JSON and UI.
@@ -40,22 +47,30 @@ builder.Services.AddMvc().AddJsonOptions(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+// both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+
+app.UseDeveloperExceptionPage();
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    Console.WriteLine("HelloWorld");
-    app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        //c.RoutePrefix = string.Empty;
-        c.SwaggerEndpoint("../swagger/v1/swagger.json", "Web UI");
-    });
-}
+    //c.RoutePrefix = string.Empty;
+    c.SwaggerEndpoint("../swagger/v1/swagger.json", "Web UI");
+});
 
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+var fileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "images"));
+var requestPath = "/images";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Cache-Control", "$public, max-age=3600");
+    }
+});
 
 app.MapControllers();
 

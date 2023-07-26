@@ -53,7 +53,7 @@ public class DataServices : IDataServices
     {
         var securityType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
-        var dt = await Storage.QueryColumns($"SELECT SecurityId, StartTime FROM {tableName} WHERE SecurityId = {security.Id}",
+        var dt = await Storage.Query($"SELECT SecurityId, StartTime FROM {tableName} WHERE SecurityId = {security.Id}",
             DatabaseNames.MarketData,
             TypeCode.Int32, TypeCode.DateTime);
 

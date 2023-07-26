@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using TradeCommon.Constants;
+using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeDataCore.Quotation;
@@ -8,7 +9,7 @@ using TradeDataCore.StaticData;
 namespace TradeDataCore;
 public class Dependencies
 {
-    public static IContainer? Container { get; private set; }
+    public static IComponentContext? Container { get; private set; }
 
     public static void Register(ContainerBuilder? builder = null)
     {
@@ -21,18 +22,18 @@ public class Dependencies
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<FutuQuotationEngine>().Named<IQuotationEngine>(ExternalNames.Futu).SingleInstance();
+            builder.RegisterSingleton<IQuotationEngine, FutuQuotationEngine>(ExternalNames.Futu);
 
-            builder.RegisterType<DataServices>().As<IDataServices>().SingleInstance();
-            builder.RegisterType<HistoricalMarketDataService>().As<IHistoricalMarketDataService>().SingleInstance();
-            builder.RegisterType<RealTimeMarketDataService>().As<IRealTimeMarketDataService>().SingleInstance();
-            builder.RegisterType<FinancialStatsDataService>().As<IFinancialStatsDataService>().SingleInstance();
+            builder.RegisterSingleton<IDataServices, DataServices>();
+            builder.RegisterSingleton<IHistoricalMarketDataService, HistoricalMarketDataService>();
+            builder.RegisterSingleton<IRealTimeMarketDataService, RealTimeMarketDataService>();
+            builder.RegisterSingleton<IFinancialStatsDataService, FinancialStatsDataService>();
 
-            builder.RegisterType<QuotationEngines>().AsSelf().SingleInstance();
-            builder.RegisterType<FutuQuotationEngine>().Keyed<IQuotationEngine>(ExternalNames.Futu).SingleInstance();
-            builder.RegisterType<BinanceQuotationEngine>().Keyed<IQuotationEngine>(ExternalNames.Binance).SingleInstance();
+            builder.RegisterSingleton<QuotationEngines>();
+            builder.RegisterSingleton<IQuotationEngine, FutuQuotationEngine>(ExternalNames.Futu);
+            builder.RegisterSingleton<IQuotationEngine, BinanceQuotationEngine>(ExternalNames.Binance);
 
-            builder.RegisterType<SecurityService>().As<ISecurityService>();
+            builder.RegisterSingleton<ISecurityService, SecurityService>();
         }
     }
 }

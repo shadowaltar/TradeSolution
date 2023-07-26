@@ -59,6 +59,11 @@ public class Trade
     public decimal Quantity { get; set; }
 
     /// <summary>
+    /// The fee incurred in this trade.
+    /// </summary>
+    public decimal Fee { get; set; }
+
+    /// <summary>
     /// Indicates if the trade is on maker or trader side.
     /// </summary>
     public MakerTaker MakerTaker { get; set; } = MakerTaker.Unknown;

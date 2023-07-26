@@ -3,9 +3,9 @@ using static TradeDataCore.Dependencies;
 
 namespace TradePort;
 
-public class Dependencies
+public static class Dependencies
 {
-    public static IContainer? Container { get; private set; }
+    public static IComponentContext? Container { get; private set; }
 
     public static void Register(ContainerBuilder? builder = null)
     {

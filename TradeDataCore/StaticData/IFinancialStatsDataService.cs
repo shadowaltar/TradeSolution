@@ -7,5 +7,5 @@ namespace TradeDataCore.StaticData;
 public interface IFinancialStatsDataService
 {
     List<IStockCorporateAction> GetCorporateActions(Security security, DateTime start, DateTime end);
-    List<FinancialStats> GetFundamentals(Security security, DateTime start, DateTime end);
+    List<FinancialStat> GetFundamentals(Security security, DateTime start, DateTime end);
 }

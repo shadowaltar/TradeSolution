@@ -1,5 +1,8 @@
 ﻿using CsvHelper;
+using CsvHelper.Configuration;
 using System.Globalization;
+using System.Linq.Expressions;
+using TradeCommon.Constants;
 
 namespace Common;
 public static class Csv
@@ -65,12 +68,16 @@ public static class Csv
         return results;
     }
 
-    public static Dictionary<string, T> Read<T>(string fileName, Func<T, string> keySelector)
+    public static Dictionary<string, T> Read<T>(string fileName, Func<T, string> keySelector, bool robustBooleanConversion = false)
     {
         // key is Id, value is CustodianAccountSetting
         var records = new Dictionary<string, T>();
         using var reader = new StreamReader(fileName);
         using var csvReader = new CsvReader(reader, CultureInfo.InvariantCulture);
+        if (robustBooleanConversion)
+        {
+            csvReader.Context.RegisterClassMap<CsvSettings<T>.BooleanCsvConversion>();
+        }
         csvReader.Read();
         csvReader.ReadHeader();
         while (csvReader.Read())
@@ -99,5 +106,31 @@ public static class Csv
             records.Add(record);
         }
         return records;
+    }
+}
+
+public static class CsvSettings<T>
+{
+    public class BooleanCsvConversion : ClassMap<T>
+    {
+        public static List<Expression<Func<T, bool>>> BooleanConversionPropertySelectors { get; } = new();
+
+        public BooleanCsvConversion(bool treatEmptyStringAsFalse = false)
+        {
+            var noStrings = Constants.NoStrings;
+            if (treatEmptyStringAsFalse)
+            {
+                var temp = new List<string>(Constants.NoStrings);
+                temp.Add(string.Empty);
+                noStrings = temp.ToArray();
+            }
+
+            AutoMap(CultureInfo.InvariantCulture);
+            foreach (var selector in BooleanConversionPropertySelectors)
+            {
+                Map(selector).TypeConverterOption.BooleanValues(true, true, Constants.YesStrings);
+                Map(selector).TypeConverterOption.BooleanValues(false, true, noStrings);
+            }
+        }
     }
 }

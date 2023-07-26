@@ -1,12 +1,15 @@
 ﻿using Autofac;
 using TradeCommon.Constants;
+using TradeCommon.Utils.Common;
 using TradeLogicCore.Execution;
 using TradeLogicCore.Instruments;
+using TradeLogicCore.PortfolioManagement;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
-public class Dependencies
+public static class Dependencies
 {
-    public static IContainer? Container { get; private set; }
+    public static IComponentContext? Container { get; private set; }
 
     public static void Register(ContainerBuilder? builder = null)
     {
@@ -23,11 +26,14 @@ public class Dependencies
     {
         protected override void Load(ContainerBuilder builder)
         {
-            // Put your common registrations here.
-            builder.RegisterType<FutuEngine>().Named<IExecutionEngine>(ExternalNames.Futu).SingleInstance();
-            builder.RegisterType<BinanceEngine>().Named<IExecutionEngine>(ExternalNames.Binance).SingleInstance();
+            builder.RegisterSingleton<IExecutionEngine, FutuEngine>(ExternalNames.Futu);
+            builder.RegisterSingleton<IExecutionEngine, BinanceEngine>(ExternalNames.Binance);
 
-            builder.RegisterType<StockScreener>().As<IStockScreener>().SingleInstance();
+            builder.RegisterSingleton<IStockScreener, StockScreener>();
+
+            builder.RegisterSingleton<IOrderService, OrderService>();
+            builder.RegisterSingleton<ITradeService, TradeService>();
+            builder.RegisterSingleton<IPortfolioEngine, PortfolioEngine>();
         }
     }
 }

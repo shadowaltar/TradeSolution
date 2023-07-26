@@ -10,7 +10,7 @@ public class FinancialStatsDataService : IFinancialStatsDataService
         throw new NotImplementedException();
     }
 
-    public List<FinancialStats> GetFundamentals(Security security, DateTime start, DateTime end)
+    public List<FinancialStat> GetFundamentals(Security security, DateTime start, DateTime end)
     {
         throw new NotImplementedException();
     }
