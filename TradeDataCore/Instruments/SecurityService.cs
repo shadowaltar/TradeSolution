@@ -1,10 +1,4 @@
-﻿using Iced.Intel;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Constants;
+﻿using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
 
@@ -15,5 +9,11 @@ public class SecurityService : ISecurityService
     {
         var exchStr = ExchangeTypeConverter.ToString(exchange);
         return await Storage.ReadSecurities(exchStr, securityType);
+    }
+
+    public async Task<Security> GetSecurity(string code, ExchangeType exchange, SecurityType securityType)
+    {
+        var exchStr = ExchangeTypeConverter.ToString(exchange);
+        return await Storage.ReadSecurity(exchStr, code, securityType);
     }
 }

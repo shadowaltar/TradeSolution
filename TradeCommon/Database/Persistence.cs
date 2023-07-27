@@ -7,32 +7,19 @@ public class Persistence : IDisposable
     private readonly MessageBroker<IPersistenceTask> _broker;
     private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    private bool _isRunning;
+    private readonly bool _isRunning;
 
     public event Action<IPersistenceTask>? Persisted;
 
     public Persistence(MessageBroker<IPersistenceTask> broker)
     {
         _broker = broker;
-        _broker.NewItem += OnNewItem;
+        Task.Factory.StartNew(async (t) => await Run(), TaskCreationOptions.LongRunning, CancellationToken.None);
     }
 
-    private void OnNewItem()
+    public void Enqueue(IPersistenceTask task)
     {
-        var item = _broker.Dequeue();
-        if (item != null)
-        {
-            _tasks.Enqueue(item);
-        }
-    }
-
-    public void Start()
-    {
-        _isRunning = true;
-        Task.Factory.StartNew(() => Run(),
-                              _cancellationTokenSource.Token,
-                              TaskCreationOptions.LongRunning,
-                              TaskScheduler.Default);
+        _broker.Enqueue(task);
     }
 
     private async Task Run()
@@ -55,6 +42,6 @@ public class Persistence : IDisposable
     {
         _cancellationTokenSource.Cancel();
         Persisted = null;
-        _broker.NewItem -= OnNewItem;
+        _broker.Dispose();
     }
 }

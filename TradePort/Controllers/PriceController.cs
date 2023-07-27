@@ -2,11 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
-using TradeCommon.Database;
+using TradeCommon.Utils.Common;
 using TradeDataCore.Essentials;
 using TradeDataCore.MarketData;
 
@@ -208,6 +209,35 @@ public class PriceController : Controller
     }
 
     /// <summary>
+    /// Get one piece of real-time OHLC price entry from Binance.
+    /// </summary>
+    /// <param name="intervalStr"></param>
+    /// <param name="symbol"></param>
+    /// <returns></returns>
+    [HttpGet($"{ExternalNames.Binance}/real-time")]
+    public async Task<ActionResult> GetOneRealTimeBinancePrice(
+       [FromQuery(Name = "interval")] string intervalStr = "1m",
+       [FromQuery(Name = "symbols")] string? symbol = "BTCUSDT")
+    {
+        if (intervalStr.IsBlank())
+            return BadRequest("Invalid interval string.");
+        var interval = IntervalTypeConverter.Parse(intervalStr);
+        if (interval == IntervalType.Unknown)
+            return BadRequest("Invalid interval string.");
+
+        if (symbol.IsBlank())
+            return BadRequest("Missing symbol.");
+
+        var security = await Storage.ReadSecurity(ExternalNames.Binance, symbol, SecurityType.Fx);
+
+        var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(interval).ToLowerInvariant()}";
+        var url = $"wss://stream.binance.com:9443/stream?streams={wsName}";
+        var result = await WebSocketHelper.ListenOne(url);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets one security price data from Yahoo in this exchange and save to database.
     /// </summary>
     /// <param name="exchange"></param>
@@ -291,12 +321,9 @@ public class PriceController : Controller
             .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
         var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
-        if (System.IO.File.Exists(filePath))
-        {
-            return File(System.IO.File.OpenRead(filePath), "application/octet-stream", Path.GetFileName(filePath));
-        }
-
-        return NotFound();
+        return System.IO.File.Exists(filePath)
+            ? File(System.IO.File.OpenRead(filePath), "application/octet-stream", Path.GetFileName(filePath))
+            : NotFound();
     }
 
     /// <summary>
@@ -318,11 +345,7 @@ public class PriceController : Controller
             return BadRequest("Invalid sec-type string.");
 
         var resultSet = await Storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
-        if (resultSet != null)
-        {
-            return Ok(resultSet.Rows[0][0]);
-        }
-        return BadRequest();
+        return resultSet != null ? Ok(resultSet.Rows[0][0]) : BadRequest();
     }
 
     /// <summary>

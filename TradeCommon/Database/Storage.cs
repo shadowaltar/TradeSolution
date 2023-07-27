@@ -213,7 +213,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public static async Task<int> InsertSecurityFinancialStats(IDictionary<int, Dictionary<FinancialStatType, decimal>> stats)
+    public static async Task<int> InsertSecurityFinancialStats(List<FinancialStat> stats)
     {
         var count = 0;
         const string sql =
@@ -233,15 +233,11 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         {
             command = connection.CreateCommand();
             command.CommandText = sql;
-            foreach (var (id, map) in stats)
+            foreach (var stat in stats)
             {
-                if (!map.TryGetValue(FinancialStatType.MarketCap, out var marketCap))
-                {
-                    continue;
-                }
                 command.Parameters.Clear();
-                command.Parameters.AddWithValue("$SecurityId", id);
-                command.Parameters.AddWithValue("$MarketCap", marketCap);
+                command.Parameters.AddWithValue("$SecurityId", stat.SecurityId);
+                command.Parameters.AddWithValue("$MarketCap", stat.MarketCap);
                 count++;
                 await command.ExecuteNonQueryAsync();
             }
@@ -976,7 +972,7 @@ WHERE
         }
         else if (task is PersistenceTask<FinancialStat> financialStatsTask)
         {
-            //await InsertSecurityFinancialStats()
+            await InsertSecurityFinancialStats(financialStatsTask.Entries);
         }
     }
 }

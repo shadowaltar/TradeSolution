@@ -7,12 +7,12 @@ public interface IOrderService
     /// <summary>
     /// Invoked when an order is successfully created.
     /// </summary>
-    event Action<Order> OrderCreated;
+    event Action<Order>? OrderCreated;
 
     /// <summary>
     /// Invoked when an order is successfully cancelled.
     /// </summary>
-    event Action<Order> OrderCancelled;
+    event Action<Order>? OrderCancelled;
 
     /// <summary>
     /// Get an order from cache by its id.

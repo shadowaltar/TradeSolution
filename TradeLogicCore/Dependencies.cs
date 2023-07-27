@@ -1,14 +1,15 @@
 ﻿using Autofac;
 using Common;
+using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
-using TradeCommon.Utils.Common;
 using TradeLogicCore.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
 public static class Dependencies
 {
-    public static IComponentContext? Container { get; private set; }
+    [NotNull]
+    public static IComponentContext? ComponentContext { get; private set; }
 
     public static void Register(string externalName, ContainerBuilder? builder = null)
     {
@@ -28,7 +29,9 @@ public static class Dependencies
                 break;
         }
 
-        Container = builder.Build();
+        var container = builder.Build();
+
+        ComponentContext = container.Resolve<IComponentContext>();
     }
 
     public class DependencyModule : Module

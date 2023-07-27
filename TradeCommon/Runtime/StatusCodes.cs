@@ -6,6 +6,9 @@ public static class StatusCodes
     public const int DisconnectionOk = 101;
     public const int SubscriptionOk = 102;
     public const int UnsubscriptionOk = 103;
+    
+    public const int SubscriptionWaiting = 202;
+    public const int UnsubscriptionWaiting = 202;
 
     public const int InvalidArgument = 400;
     public const int InvalidCredential = 401;

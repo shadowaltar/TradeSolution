@@ -1,13 +1,11 @@
 ﻿using Autofac;
 using Common;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
-using TradeCommon.Utils.Common;
-using TradeCommon.Database;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
-using TradeDataCore.Quotation;
 using TradeDataCore.StaticData;
 
 namespace TradeDataCore;
@@ -38,8 +36,6 @@ public class Dependencies
             builder.RegisterSingleton<IHistoricalMarketDataService, HistoricalMarketDataService>();
             builder.RegisterSingleton<IRealTimeMarketDataService, RealTimeMarketDataService>();
             builder.RegisterSingleton<IFinancialStatsDataService, FinancialStatsDataService>();
-
-            builder.RegisterSingleton<QuotationEngines>();
 
             builder.RegisterSingleton<MessageBroker<Order>>(nameof(Order));
             builder.RegisterSingleton<MessageBroker<Trade>>(nameof(Trade));

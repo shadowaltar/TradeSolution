@@ -10,7 +10,7 @@ public class ListedOptionReader
 {
     private static readonly ILog _log = Logger.New();
 
-    public async Task<IDictionary<int, Dictionary<FinancialStatType, decimal>>> ReadUnderlyingStats(IEnumerable<Security> securities)
+    public async Task<List<FinancialStat>> ReadUnderlyingStats(IEnumerable<Security> securities)
     {
         const string url = @"https://query1.finance.yahoo.com/v7/finance/options/{0}";
 
@@ -18,7 +18,7 @@ public class ListedOptionReader
             .ToDictionary(s => Identifiers.ToYahooSymbol(s.Code, s.Exchange), s => s);
 
         _log.Info($"Retrieving {tickers.Count} tickers financial stats from Yahoo.");
-        var results = new ConcurrentDictionary<int, Dictionary<FinancialStatType, decimal>>();
+        var results = new List<FinancialStat>();
         using var httpClient = new HttpClient();
 
         var buckets = tickers.Split(200).ToList();
@@ -40,11 +40,13 @@ public class ListedOptionReader
                 if (rootObj == null)
                     return;
 
-                var map = new Dictionary<FinancialStatType, decimal>
+                var stat = new FinancialStat
                 {
-                    [FinancialStatType.MarketCap] = rootObj["marketCap"].GetDecimal()
+                    SecurityId = security.Id,
+                    MarketCap = rootObj["marketCap"].GetDecimal(),
                 };
-                results[security.Id] = map;
+                lock (results)
+                    results.Add(stat);
             });
         }
         return results;

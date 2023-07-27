@@ -14,7 +14,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private static readonly IdGenerator _positionIdGenerator = new();
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
-    private readonly MessageBroker<IPersistenceTask> _broker = new();
+    private readonly Persistence _persistence;
     private readonly Dictionary<int, int> _orderToPositionIds = new();
     private readonly Dictionary<int, Position> _openPositions = new();
     private readonly Dictionary<int, Position> _closedPositions = new();
@@ -24,11 +24,11 @@ public class PortfolioService : IPortfolioService, IDisposable
     public event Action<Position>? PositionUpdated;
     public event Action<Position>? PositionClosed;
 
-    public PortfolioService(IOrderService orderService, ITradeService tradeService)
+    public PortfolioService(IOrderService orderService, ITradeService tradeService, Persistence persistence)
     {
         _orderService = orderService;
         _tradeService = tradeService;
-
+        _persistence = persistence;
         _tradeService.NewTrade += OnNewTrade;
     }
 
@@ -204,7 +204,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             Entry = position,
             DatabaseName = DatabaseNames.ExecutionData
         };
-        _broker.Enqueue(task);
+        _persistence.Enqueue(task);
     }
 
     public void Dispose()

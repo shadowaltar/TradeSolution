@@ -61,9 +61,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-var fileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "images"));
-var requestPath = "/images";
-
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>

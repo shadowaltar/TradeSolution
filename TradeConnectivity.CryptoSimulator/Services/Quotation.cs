@@ -1,5 +1,7 @@
 ﻿using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
@@ -8,23 +10,20 @@ public class Quotation : IExternalQuotationManagement
 {
     public string Name => ExternalNames.CryptoSimulator;
 
-    public Task<ExternalConnectionState> InitializeAsync()
+    public event Action<int, OhlcPrice>? NewOhlc;
+
+    public Task<ExternalConnectionState> Initialize()
     {
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> SubscribeAsync(Security security)
+    public ExternalConnectionState SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown)
     {
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> UnsubscribeAsync(Security security)
+    public Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown)
     {
         throw new NotImplementedException();
-    }
-
-    private void Process()
-    {
-
     }
 }

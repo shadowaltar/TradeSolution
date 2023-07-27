@@ -1,22 +1,34 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
-using TradeDataCore.Quotation;
 
 namespace TradeDataCore.MarketData;
-public class RealTimeMarketDataService : IRealTimeMarketDataService
+public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
 {
-    private readonly IExternalQuotationManagement _quotationEngine;
+    private readonly IExternalQuotationManagement _quotation;
 
-    public RealTimeMarketDataService(IExternalQuotationManagement quotationEngine)
+    public event Action<int, OhlcPrice>? NewOhlc;
+
+    public RealTimeMarketDataService(IExternalQuotationManagement quotation)
     {
-        _quotationEngine = quotationEngine;
+        _quotation = quotation;
+        _quotation.NewOhlc += OnNewOhlc;
     }
 
-    public async Task<ExternalConnectionState> SubscribeOhlcAsync(Security security)
+    private void OnNewOhlc(int securityId, OhlcPrice price)
+    {
+        NewOhlc?.Invoke(securityId, price);
+    }
+
+    public async Task Initialize()
+    {
+        await _quotation.Initialize();
+    }
+
+    public ExternalConnectionState SubscribeOhlc(Security security)
     {
         var externalNames = MarketDataSources.GetExternalNames(security);
         if (externalNames.IsNullOrEmpty())
@@ -32,70 +44,37 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService
             };
         }
 
-        string? aliveExternalName = null;
-        foreach (var externalName in externalNames)
-        {
-            switch (externalName)
-            {
-                case ExternalNames.Futu:
-                    if (!CheckFutuConnectivity())
-                    {
-                        MarkConnectivityFailure(ExternalNames.Futu);
-                        continue;
-                        // initialize Futu's QuotationService.
-                    }
-                    break;
-            }
-        }
-
-        if (!aliveExternalName.IsBlank())
-        {
-            return await _quotationEngine.SubscribeAsync(security);
-        }
-
-        return new ExternalConnectionState
-        {
-            Action = ConnectionActionType.Subscribe,
-            StatusCode = nameof(StatusCodes.NoAliveExternals),
-            ExternalPartyId = security.Exchange,
-            Description = "None of the external quotation data sources are alive.",
-            Type = SubscriptionType.RealTimeMarketData,
-            UniqueConnectionId = "",
-        };
+        return _quotation.SubscribeOhlc(security);
     }
 
-    private bool CheckFutuConnectivity()
+    public Task<ExternalConnectionState> SubscribeTick(Security security)
     {
         throw new NotImplementedException();
     }
 
-    private void MarkConnectivityFailure(string externalName)
+    public Task<ExternalConnectionState> UnsubscribeAllOhlcs()
     {
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> SubscribeTickAsync(Security security)
+    public Task<ExternalConnectionState> UnsubscribeAllTicks()
     {
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> UnsubscribeAllOhlcsAsync()
+    public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security)
+    {
+        return await _quotation.UnsubscribeOhlc(security);
+    }
+
+    public Task<ExternalConnectionState> UnsubscribeTick(Security security)
     {
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> UnsubscribeAllTicksAsync()
+    public void Dispose()
     {
-        throw new NotImplementedException();
-    }
-
-    public Task<ExternalConnectionState> UnsubscribeOhlcAsync(Security security)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<ExternalConnectionState> UnsubscribeTickAsync(Security security)
-    {
-        throw new NotImplementedException();
+        _quotation.NewOhlc -= OnNewOhlc;
+        NewOhlc = null;
     }
 }

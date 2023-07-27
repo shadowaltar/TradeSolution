@@ -1,4 +1,6 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Externals;
@@ -6,9 +8,11 @@ public interface IExternalQuotationManagement
 {
     string Name { get; }
 
-    Task<ExternalConnectionState> InitializeAsync();
+    public event Action<int, OhlcPrice>? NewOhlc;
 
-    Task<ExternalConnectionState> SubscribeAsync(Security security);
+    Task<ExternalConnectionState> Initialize();
 
-    Task<ExternalConnectionState> UnsubscribeAsync(Security security);
+    ExternalConnectionState SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
+
+    Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
 }

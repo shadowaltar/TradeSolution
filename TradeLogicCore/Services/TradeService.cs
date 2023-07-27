@@ -11,7 +11,7 @@ public class TradeService : ITradeService, IDisposable
 
     private readonly IExternalExecutionManagement _execution;
     private readonly IOrderService _orderService;
-    private readonly MessageBroker<IPersistenceTask> _broker = new();
+    private readonly Persistence _persistence;
     private readonly Dictionary<int, Trade> _trades = new();
     private readonly Dictionary<int, int> _tradeToOrderIds = new();
     private readonly object _lock = new();
@@ -22,11 +22,11 @@ public class TradeService : ITradeService, IDisposable
 
     public TradeService(IExternalExecutionManagement execution,
         IOrderService orderService,
-        MessageBroker<IPersistenceTask> broker)
+        Persistence persistence)
     {
         _execution = execution;
         _orderService = orderService;
-        _broker = broker;
+        _persistence = persistence;
 
         _execution.TradeReceived += OnTradeReceived;
     }
@@ -72,7 +72,7 @@ public class TradeService : ITradeService, IDisposable
             Entry = trade,
             DatabaseName = DatabaseNames.ExecutionData
         };
-        _broker.Enqueue(tradeTask);
+        _persistence.Enqueue(tradeTask);
     }
 
     public void Dispose()

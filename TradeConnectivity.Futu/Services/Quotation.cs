@@ -1,7 +1,9 @@
 ﻿using Futu.OpenApi;
 using Futu.OpenApi.Pb;
 using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
@@ -22,6 +24,8 @@ public class Quotation : IExternalQuotationManagement
     private ConnectionProxy _connectionProxy;
     private QuoterProxy _quoterProxy;
 
+    public event Action<int, OhlcPrice>? NewOhlc;
+
     public Quotation()
     {
         var quoter = new FTAPI_Qot();
@@ -29,19 +33,24 @@ public class Quotation : IExternalQuotationManagement
         _quoterProxy = new QuoterProxy(quoter);
     }
 
-    public async Task<ExternalConnectionState> InitializeAsync()
+    public async Task<ExternalConnectionState> Initialize()
     {
         return await _connectionProxy.ConnectAsync("127.0.0.1", 11111, false);
     }
 
-    public async Task<ExternalConnectionState> SubscribeAsync(Security security)
+    public async Task<ExternalConnectionState> Disconnect()
     {
-        return await _quoterProxy.SubscribeSecurityAsync(security);
+        return await _connectionProxy.CloseAsync();
     }
 
-    public async Task<ExternalConnectionState> UnsubscribeAsync(Security security)
+    public ExternalConnectionState SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown)
     {
-        return await _quoterProxy.SubscribeSecurityAsync(security, false);
+        return _quoterProxy.SubscribeSecurity(security, false);
+    }
+
+    public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown)
+    {
+        return _quoterProxy.SubscribeSecurity(security, false);
     }
 
     #region Connection Callbacks
@@ -60,7 +69,7 @@ public class Quotation : IExternalQuotationManagement
         public async Task<ExternalConnectionState> ConnectAsync(string ip, int port, bool isEncryptionEnabled)
         {
             // TODO
-            _api.SetClientInfo("csharp", 1);
+            _api.SetClientInfo("TradingUnicorn", 1);
             _api.InitConnect(ip, (ushort)port, isEncryptionEnabled);
             return await _tcs1.Task;
         }
@@ -106,14 +115,13 @@ public class Quotation : IExternalQuotationManagement
     {
         private FTAPI_Qot _quoter;
 
-        private readonly TaskCompletionSource<ExternalConnectionState> _tcsSubscribeSecurity = new();
-
         public QuoterProxy(FTAPI_Qot quoter)
         {
             _quoter = quoter;
+            _quoter.SetQotCallback(this);
         }
 
-        public async Task<ExternalConnectionState> SubscribeSecurityAsync(Security security, bool isSubscribe = true)
+        public ExternalConnectionState SubscribeSecurity(Security security, bool isSubscribe = true)
         {
             _quoter = _quoter ?? throw new InvalidOperationException("Must initialize quoter before security data subscription.");
 
@@ -136,9 +144,17 @@ public class Quotation : IExternalQuotationManagement
                 .SetIsSubOrUnSub(isSubscribe)
                 .Build();
             var request = QotSub.Request.CreateBuilder().SetC2S(c2s).Build();
-            _quoter.Sub(request);
+            var seqNo = _quoter.Sub(request);
 
-            return await _tcsSubscribeSecurity.Task;
+            return new ExternalConnectionState
+            {
+                Type = SubscriptionType.QuotationService,
+                Action = ConnectionActionType.Connect,
+                StatusCode = nameof(StatusCodes.SubscriptionWaiting),
+                ExternalPartyId = ExternalNames.Futu,
+                UniqueConnectionId = seqNo.ToString(),
+                Description = "",
+            };
         }
 
         public void OnReply_GetBasicQot(FTAPI_Conn client, uint nSerialNo, QotGetBasicQot.Response rsp)
@@ -254,16 +270,6 @@ public class Quotation : IExternalQuotationManagement
         public void OnReply_GetSubInfo(FTAPI_Conn client, uint nSerialNo, QotGetSubInfo.Response rsp)
         {
             // TODO
-            var result = new ExternalConnectionState
-            {
-                Type = SubscriptionType.QuotationService,
-                Action = ConnectionActionType.Subscribe,
-                StatusCode = rsp.ErrCode == 0 ? nameof(StatusCodes.SubscriptionOk) : $"{nameof(StatusCodes.SubscriptionFailed)},{rsp.ErrCode}",
-                ExternalPartyId = ExternalNames.Futu,
-                UniqueConnectionId = nSerialNo.ToString(),
-                Description = rsp.RetMsg,
-            };
-            _tcsSubscribeSecurity.SetResult(result);
         }
 
         public void OnReply_GetTicker(FTAPI_Conn client, uint nSerialNo, QotGetTicker.Response rsp)
@@ -293,7 +299,6 @@ public class Quotation : IExternalQuotationManagement
 
         public void OnReply_Notify(FTAPI_Conn client, uint nSerialNo, Notify.Response rsp)
         {
-            throw new NotImplementedException();
         }
 
         public void OnReply_RegQotPush(FTAPI_Conn client, uint nSerialNo, QotRegQotPush.Response rsp)
@@ -333,7 +338,16 @@ public class Quotation : IExternalQuotationManagement
 
         public void OnReply_Sub(FTAPI_Conn client, uint nSerialNo, QotSub.Response rsp)
         {
-            throw new NotImplementedException();
+            var result = new ExternalConnectionState
+            {
+                Type = SubscriptionType.QuotationService,
+                Action = ConnectionActionType.Subscribe,
+                StatusCode = rsp.ErrCode == 0 ? nameof(StatusCodes.SubscriptionOk) : $"{nameof(StatusCodes.SubscriptionFailed)},{rsp.ErrCode}",
+                ExternalPartyId = ExternalNames.Futu,
+                UniqueConnectionId = nSerialNo.ToString(),
+                Description = rsp.RetMsg,
+            };
+            // TODO
         }
 
         public void OnReply_UpdateBasicQot(FTAPI_Conn client, uint nSerialNo, QotUpdateBasicQot.Response rsp)

@@ -11,7 +11,7 @@ public class OrderService : IOrderService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
-    private readonly MessageBroker<IPersistenceTask> _broker = new();
+    private readonly Persistence _persistence;
     private readonly Dictionary<int, Order> _orders = new();
     private readonly Dictionary<int, Order> _cancelledOrders = new();
     private readonly object _lock = new();
@@ -19,11 +19,10 @@ public class OrderService : IOrderService, IDisposable
     public event Action<Order> OrderCreated;
     public event Action<Order> OrderCancelled;
 
-    public OrderService(IExternalExecutionManagement execution,
-        MessageBroker<IPersistenceTask> broker)
+    public OrderService(IExternalExecutionManagement execution, Persistence persistence)
     {
         _execution = execution;
-        _broker = broker;
+        _persistence = persistence;
 
         _execution.OrderPlaced += OnOrderPlaced;
         _execution.OrderCanceled += OnOrderCancelled;
@@ -75,12 +74,17 @@ public class OrderService : IOrderService, IDisposable
             Entry = order,
             DatabaseName = DatabaseNames.ExecutionData
         };
-        _broker.Enqueue(orderTask);
+        _persistence.Enqueue(orderTask);
     }
 
     public void Dispose()
     {
         _execution.OrderPlaced -= OnOrderPlaced;
         _execution.OrderCanceled -= OnOrderCancelled;
+    }
+
+    public Order? GetOrderByExternalId(string externalOrderId)
+    {
+        throw new NotImplementedException();
     }
 }
