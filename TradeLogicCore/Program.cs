@@ -12,7 +12,7 @@ ILog log = Logger.New();
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 
-Dependencies.Register(ExternalNames.Binance);
+Dependencies.Register(ExternalNames.CryptoSimulator);
 
 var engines = Dependencies.Container!.Resolve<QuotationEngines>();
 await engines.Initialize();

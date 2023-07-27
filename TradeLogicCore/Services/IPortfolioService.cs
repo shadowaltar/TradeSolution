@@ -5,9 +5,13 @@ using TradeCommon.Essentials.Trading;
 namespace TradeLogicCore.Services;
 public interface IPortfolioService
 {
+    event Action<Position>? PositionCreated;
+    event Action<Position>? PositionUpdated;
+    event Action<Position>? PositionClosed;
+
     Task Initialize();
 
-    List<Position> GetAllPositions();
+    List<Position> GetOpenPositions();
 
     List<Position> GetPositions(string externalName, SecurityType securityType);
 
@@ -18,6 +22,4 @@ public interface IPortfolioService
     List<ProfitLoss> GetRealizedPnl(Security security, DateTime rangeStart, DateTime rangeEnd);
 
     ProfitLoss GetUnrealizedPnl(Security security);
-
-    Task Persist();
 }

@@ -1,9 +1,9 @@
 ﻿using Autofac;
 using Common;
 using TradeCommon.Externals;
-using TradeConnectivity.Binance.Services;
+using TradeConnectivity.CryptoSimulator.Services;
 
-namespace TradeConnectivity.Binance;
+namespace TradeConnectivity.CryptoSimulator;
 public class Dependencies : Module
 {
     protected override void Load(ContainerBuilder builder)

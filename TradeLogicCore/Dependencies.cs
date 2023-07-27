@@ -23,6 +23,9 @@ public static class Dependencies
             case ExternalNames.Futu:
                 builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
                 break;
+            case ExternalNames.CryptoSimulator:
+                builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+                break;
         }
 
         Container = builder.Build();

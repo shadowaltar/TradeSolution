@@ -3,7 +3,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using static TradeCommon.Utils.Delegates;
 
-namespace TradeConnectivity.Futu.Services;
+namespace TradeConnectivity.CryptoSimulator.Services;
 public class Execution : IExternalExecutionManagement
 {
     public event OrderPlacedCallback? OrderPlaced;

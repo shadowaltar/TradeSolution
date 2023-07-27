@@ -15,8 +15,9 @@ public interface IExternalExecutionManagement
 
     void CancelAllOrder(Order order);
 
-    event OrderPlacedCallback OrderPlaced;
-    event OrderModifiedCallback OrderModified;
-    event OrderCanceledCallback OrderCanceled;
-    event AllOrderCanceledCallback AllOrderCanceled;
+    event OrderPlacedCallback? OrderPlaced;
+    event OrderModifiedCallback? OrderModified;
+    event OrderCanceledCallback? OrderCanceled;
+    event AllOrderCanceledCallback? AllOrderCanceled;
+    event TradeReceivedCallback? TradeReceived;
 }

@@ -1,7 +1,7 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 
-namespace TradeCommon.Constants;
+namespace TradeCommon.Database;
 
 public static class DatabaseNames
 {

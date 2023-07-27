@@ -6,10 +6,11 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeConnectivity.Binance.Services;
 public class Execution : IExternalExecutionManagement
 {
-    public event OrderPlacedCallback OrderPlaced;
-    public event OrderModifiedCallback OrderModified;
-    public event OrderCanceledCallback OrderCanceled;
-    public event AllOrderCanceledCallback AllOrderCanceled;
+    public event OrderPlacedCallback? OrderPlaced;
+    public event OrderModifiedCallback? OrderModified;
+    public event OrderCanceledCallback? OrderCanceled;
+    public event AllOrderCanceledCallback? AllOrderCanceled;
+    public event TradeReceivedCallback? TradeReceived;
 
     public void CancelAllOrder(Order order)
     {
