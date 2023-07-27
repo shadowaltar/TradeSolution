@@ -3,7 +3,7 @@ using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Importing;
-using TradeDataCore.Database;
+using TradeCommon.Database;
 
 namespace TradeDataCore.Importing.Hkex;
 

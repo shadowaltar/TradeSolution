@@ -8,7 +8,7 @@ using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Prices;
 using TradeCommon.Essentials.Quotes;
-using TradeDataCore.Database;
+using TradeCommon.Database;
 using TradeDataCore.Essentials;
 
 namespace TradeDataCore.Importing.Yahoo;

@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
-using TradeDataCore.Database;
+using TradeCommon.Database;
 
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService

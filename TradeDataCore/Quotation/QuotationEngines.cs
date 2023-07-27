@@ -1,12 +1,6 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using log4net;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Constants;
+using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
 namespace TradeDataCore.Quotation;
@@ -14,33 +8,18 @@ public class QuotationEngines
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IContainer _container;
+    public IExternalQuotationManagement? QuotationEngine { get; private set; }
 
-    public IQuotationEngine? FutuQuotationEngine { get; private set; }
-    public IQuotationEngine? BinanceQuotationEngine { get; private set; }
-
-    public QuotationEngines(IContainer container)
+    public QuotationEngines(IExternalQuotationManagement quotationEngine)
     {
-        _container = container;
+        QuotationEngine = quotationEngine;
     }
 
-    public async Task Initialize(string externalName)
+    public async Task Initialize()
     {
-        ExternalConnectionState state;
+        QuotationEngine = QuotationEngine ?? throw new InvalidOperationException();
 
-        switch (externalName)
-        {
-            case ExternalNames.Futu:
-                FutuQuotationEngine = _container.ResolveKeyed<IQuotationEngine>(ExternalNames.Futu);
-                state = await FutuQuotationEngine.InitializeAsync();
-                break;
-            case ExternalNames.Binance:
-                BinanceQuotationEngine = _container.ResolveKeyed<IQuotationEngine>(ExternalNames.Binance);
-                state = await BinanceQuotationEngine.InitializeAsync();
-                break;
-            default:
-                throw new NotImplementedException();
-        }
-        _log.Info($"Initialized {externalName} quotation engine with state: {state}");
+        await QuotationEngine.InitializeAsync();
+        _log.Info($"Initialized {QuotationEngine.Name} quotation engine.");
     }
 }

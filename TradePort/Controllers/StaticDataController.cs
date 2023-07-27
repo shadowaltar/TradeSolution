@@ -2,7 +2,7 @@
 using System.Xml.Linq;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
-using TradeDataCore.Database;
+using TradeCommon.Database;
 using TradeDataCore.Importing.Yahoo;
 
 namespace TradePort.Controllers;

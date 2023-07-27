@@ -1,0 +1,23 @@
+﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Essentials.Trading;
+
+namespace TradeLogicCore.Services;
+public interface IPortfolioService
+{
+    Task Initialize();
+
+    List<Position> GetAllPositions();
+
+    List<Position> GetPositions(string externalName, SecurityType securityType);
+
+    List<Balance> GetExternalBalances(string externalName);
+
+    List<Balance> GetCurrentBalances();
+
+    List<ProfitLoss> GetRealizedPnl(Security security, DateTime rangeStart, DateTime rangeEnd);
+
+    ProfitLoss GetUnrealizedPnl(Security security);
+
+    Task Persist();
+}

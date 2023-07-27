@@ -8,6 +8,14 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>1701;1702;1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>1701;1702;1591</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="futu-api" Version="7.1.3308" />
@@ -15,6 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
+    <ProjectReference Include="..\TradeConnectivity.Binance\TradeConnectivity.Binance.csproj" />
+    <ProjectReference Include="..\TradeConnectivity.Futu\TradeConnectivity.Futu.csproj" />
     <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
   </ItemGroup>
 

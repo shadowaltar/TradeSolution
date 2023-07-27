@@ -6,7 +6,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
-using TradeDataCore.Database;
+using TradeCommon.Database;
 using TradeDataCore.Essentials;
 using TradeDataCore.MarketData;
 

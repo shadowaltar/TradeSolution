@@ -2,22 +2,23 @@
 using log4net;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Externals;
 
-namespace TradeDataCore.Importing.Binance;
+namespace TradeConnectivity.Binance.Services;
 
-public class DefinitionReader
+public class Reference : IExternalReferenceManagement
 {
     private static readonly ILog _log = Logger.New();
 
-    public async Task<List<Security>?> ReadAndSave(SecurityType type)
+    public async Task<List<Security>> ReadAndPersistSecurities(SecurityType type)
     {
         const string url = "https://data-api.binance.vision/api/v3/exchangeInfo";
 
         var jo = await HttpHelper.ReadJson(url, _log);
         if (jo == null)
-            return null;
+            return new();
         var securities = new List<Security>();
         var symbolsObj = jo["symbols"]!.AsArray();
         foreach (JsonObject symbolObj in symbolsObj.Cast<JsonObject>())

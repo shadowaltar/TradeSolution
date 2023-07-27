@@ -2,12 +2,20 @@
 using Common;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Quotation;
 
 namespace TradeDataCore.MarketData;
 public class RealTimeMarketDataService : IRealTimeMarketDataService
 {
+    private readonly IExternalQuotationManagement _quotationEngine;
+
+    public RealTimeMarketDataService(IExternalQuotationManagement quotationEngine)
+    {
+        _quotationEngine = quotationEngine;
+    }
+
     public async Task<ExternalConnectionState> SubscribeOhlcAsync(Security security)
     {
         var externalNames = MarketDataSources.GetExternalNames(security);
@@ -42,8 +50,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService
 
         if (!aliveExternalName.IsBlank())
         {
-            var engine = Dependencies.Container!.ResolveNamed<IQuotationEngine>(aliveExternalName);
-            return await engine.SubscribeAsync(security);
+            return await _quotationEngine.SubscribeAsync(security);
         }
 
         return new ExternalConnectionState

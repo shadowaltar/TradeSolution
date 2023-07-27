@@ -11,10 +11,11 @@ ILog log = Logger.New();
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
-Dependencies.Register();
+
+Dependencies.Register(ExternalNames.Binance);
 
 var engines = Dependencies.Container!.Resolve<QuotationEngines>();
-engines.Initialize(ExternalNames.Futu);
+await engines.Initialize();
 
-var engine = engines.FutuQuotationEngine!;
+var engine = engines.QuotationEngine!;
 await engine.InitializeAsync();

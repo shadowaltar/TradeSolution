@@ -1,9 +1,8 @@
 ﻿using Autofac;
+using Common;
 using TradeCommon.Constants;
 using TradeCommon.Utils.Common;
-using TradeLogicCore.Execution;
 using TradeLogicCore.Instruments;
-using TradeLogicCore.PortfolioManagement;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
@@ -11,13 +10,20 @@ public static class Dependencies
 {
     public static IComponentContext? Container { get; private set; }
 
-    public static void Register(ContainerBuilder? builder = null)
+    public static void Register(string externalName, ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();
-
         builder.RegisterModule<DependencyModule>();
-        // external dependencies
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
+        switch (externalName)
+        {
+            case ExternalNames.Binance:
+                builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                break;
+            case ExternalNames.Futu:
+                builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
+                break;
+        }
 
         Container = builder.Build();
     }
@@ -26,14 +32,11 @@ public static class Dependencies
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterSingleton<IExecutionEngine, FutuEngine>(ExternalNames.Futu);
-            builder.RegisterSingleton<IExecutionEngine, BinanceEngine>(ExternalNames.Binance);
-
             builder.RegisterSingleton<IStockScreener, StockScreener>();
 
             builder.RegisterSingleton<IOrderService, OrderService>();
             builder.RegisterSingleton<ITradeService, TradeService>();
-            builder.RegisterSingleton<IPortfolioEngine, PortfolioEngine>();
+            builder.RegisterSingleton<IPortfolioService, PortfolioService>();
         }
     }
 }

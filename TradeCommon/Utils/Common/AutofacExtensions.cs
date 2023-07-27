@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TradeCommon.Constants;
 
-namespace TradeCommon.Utils.Common;
+namespace Common;
 public static class AutofacExtensions
 {
     public static void RegisterSingleton<T, TImpl>(this ContainerBuilder builder, object? key = null)
@@ -23,5 +23,11 @@ public static class AutofacExtensions
         where T : notnull
     {
         builder.RegisterType<T>().AsSelf().SingleInstance();
+    }
+
+    public static void RegisterSingleton<T>(this ContainerBuilder builder, object key)
+        where T : notnull
+    {
+        builder.RegisterType<T>().Keyed<T>(key).SingleInstance();
     }
 }
