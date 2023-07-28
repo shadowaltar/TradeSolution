@@ -5,6 +5,8 @@
 /// </summary>
 public class Order
 {
+    public const long DefaultId = 0;
+
     /// <summary>
     /// Unique order id.
     /// </summary>
@@ -14,7 +16,7 @@ public class Order
     /// The order id associated with this trade provided by the broker.
     /// If this is a new order it should be null.
     /// </summary>
-    public string? ExternalOrderId { get; set; }
+    public long ExternalOrderId { get; set; } = DefaultId;
 
     /// <summary>
     /// The id of security to be or already being bought / sold.
@@ -91,6 +93,11 @@ public class Order
     /// Any additional order parameters.
     /// </summary>
     public AdvancedOrderSettings AdvancedOrderSettings { get; set; }
+
+    public override string ToString()
+    {
+        return $"[{Id}][{ExternalOrderId}][{ClientCreateTime:yyMMdd-HHmmss}][{Status}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
+    }
 }
 
 public class AdvancedOrderSettings

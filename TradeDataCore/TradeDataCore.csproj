@@ -19,19 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Database\**" />
-    <Compile Remove="Utils\**" />
-    <EmbeddedResource Remove="Database\**" />
-    <EmbeddedResource Remove="Utils\**" />
-    <None Remove="Database\**" />
-    <None Remove="Utils\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Quotation\FutuQuotationEngine.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="Importing\Binance\ExamplePrices.json" />
   </ItemGroup>
 
@@ -67,10 +54,6 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Quotation\" />
   </ItemGroup>
 
 </Project>

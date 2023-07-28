@@ -28,7 +28,7 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
     public async Task<List<OhlcPrice>?> ReadPrices(string code, DateTime start, DateTime end, IntervalType intervalType)
     {
         static string UpdateTimeFrame(string c, string i, long s, long e) =>
-            $"https://data-api.binance.vision/api/v3/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
+            $"{RootUrls.DefaultHttps}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
 
         var intervalStr = IntervalTypeConverter.ToIntervalString(intervalType);
         if (end > DateTime.UtcNow)

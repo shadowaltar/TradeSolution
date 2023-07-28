@@ -6,9 +6,9 @@
 public enum Side
 {
     /// <summary>
-    /// There is no buy or sell.
+    /// No explicit buy or sell.
     /// </summary>
-    Hold = 0,
+    None = 0,
 
     /// <summary>
     /// Indicates it is a buy or long.

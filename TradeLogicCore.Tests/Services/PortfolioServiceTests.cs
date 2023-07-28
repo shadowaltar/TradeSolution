@@ -3,6 +3,7 @@ using Moq;
 using NUnit.Framework;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Externals;
 
 namespace TradeLogicCore.Services.Tests;
 
@@ -25,7 +26,9 @@ public class PortfolioServiceTests
         const int orderId = 1;
         var idGen = new IdGenerator();
         var trades = new List<Trade>();
-        var service = new PortfolioService(Mock.Of<IOrderService>(),
+        var service = new PortfolioService(
+            Mock.Of<IExternalExecutionManagement>(),
+            Mock.Of<IOrderService>(),
             Mock.Of<ITradeService>(),
             Mock.Of<Persistence>());
         foreach (var input in _fakeTradeInputs)

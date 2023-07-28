@@ -7,7 +7,7 @@ public interface IOrderService
     /// <summary>
     /// Invoked when an order is successfully created.
     /// </summary>
-    event Action<Order>? OrderCreated;
+    event Action<Order>? OrderAcknowledged;
 
     /// <summary>
     /// Invoked when an order is successfully cancelled.
@@ -26,13 +26,13 @@ public interface IOrderService
     /// </summary>
     /// <param name="externalOrderId"></param>
     /// <returns></returns>
-    Order? GetOrderByExternalId(string externalOrderId);
+    Order? GetOrderByExternalId(long externalOrderId);
 
     /// <summary>
     /// Place an order without waiting for the result.
     /// </summary>
     /// <param name="order"></param>
-    void PlaceOrder(Order order);
+    void SendOrder(Order order);
 
     /// <summary>
     /// Cancel an order without waiting for the result.

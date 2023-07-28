@@ -1,6 +1,7 @@
 ﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Externals;
 
 namespace TradeLogicCore.Services;
 public interface IPortfolioService
@@ -8,6 +9,8 @@ public interface IPortfolioService
     event Action<Position>? PositionCreated;
     event Action<Position>? PositionUpdated;
     event Action<Position>? PositionClosed;
+
+    IExternalExecutionManagement ExternalExecution { get; }
 
     Task Initialize();
 

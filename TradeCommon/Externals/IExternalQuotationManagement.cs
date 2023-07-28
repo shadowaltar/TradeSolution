@@ -8,11 +8,19 @@ public interface IExternalQuotationManagement
 {
     string Name { get; }
 
-    public event Action<int, OhlcPrice>? NewOhlc;
+    public event Action<int, OhlcPrice>? NextOhlc;
+
+    public event Action<int, OrderBook>? NextOrderBook;
 
     Task<ExternalConnectionState> Initialize();
 
-    ExternalConnectionState SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
+    Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
 
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
+
+    Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown);
+
+    Task<ExternalConnectionState> UnsubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown);
+
+    Task<OrderBook?> GetCurrentOrderBook(Security security);
 }

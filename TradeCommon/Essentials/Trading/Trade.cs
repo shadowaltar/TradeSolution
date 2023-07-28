@@ -13,6 +13,8 @@ namespace TradeCommon.Essentials.Trading;
 /// </summary>
 public class Trade
 {
+    public const long DefaultId = 0;
+
     /// <summary>
     /// Unique trade id.
     /// </summary>
@@ -31,12 +33,12 @@ public class Trade
     /// <summary>
     /// The trade id associated with this trade provided by the broker.
     /// </summary>
-    public string? ExternalTradeId { get; set; }
+    public long ExternalTradeId { get; set; } = DefaultId;
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// </summary>
-    public string? ExternalOrderId { get; set; }
+    public long ExternalOrderId { get; set; } = DefaultId;
 
     /// <summary>
     /// Trade execution time.
@@ -64,7 +66,14 @@ public class Trade
     public decimal Fee { get; set; }
 
     /// <summary>
-    /// Indicates if the trade is on maker or trader side.
+    /// The trade object is coarse such that we don't have
+    /// info to determine who owns it or which order is this trade being related to.
+    /// Usually it is a trade observed in the market which is
+    /// not related to current user.
     /// </summary>
-    public MakerTaker MakerTaker { get; set; } = MakerTaker.Unknown;
+    public bool IsCoarse { get; set; } = false;
+    public override string ToString()
+    {
+        return $"[{Id}][{ExternalTradeId}][{Time:yyMMdd-HHmmss}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
+    }
 }

@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Essentials.Quotes;
-public class OrderBook
+﻿namespace TradeCommon.Essentials.Quotes;
+public record OrderBook
 {
     public List<OrderBookLevel> Bids { get; } = new();
     public List<OrderBookLevel> Asks { get; } = new();

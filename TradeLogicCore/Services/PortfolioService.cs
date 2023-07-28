@@ -5,6 +5,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Database;
 using TradeDataCore.Instruments;
 using log4net;
+using TradeCommon.Externals;
 
 namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService, IDisposable
@@ -20,16 +21,22 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly Dictionary<int, Position> _closedPositions = new();
     private readonly object _lock = new();
 
+    public IExternalExecutionManagement ExternalExecution { get; }
+
     public event Action<Position>? PositionCreated;
     public event Action<Position>? PositionUpdated;
     public event Action<Position>? PositionClosed;
 
-    public PortfolioService(IOrderService orderService, ITradeService tradeService, Persistence persistence)
+    public PortfolioService(IExternalExecutionManagement externalExecution,
+        IOrderService orderService,
+        ITradeService tradeService,
+        Persistence persistence)
     {
+        ExternalExecution = externalExecution;
         _orderService = orderService;
         _tradeService = tradeService;
         _persistence = persistence;
-        _tradeService.NewTrade += OnNewTrade;
+        _tradeService.NextTrade += OnNewTrade;
     }
 
     private void OnNewTrade(Trade trade)
@@ -209,6 +216,6 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public void Dispose()
     {
-        _tradeService.NewTrade -= OnNewTrade;
+        _tradeService.NextTrade -= OnNewTrade;
     }
 }

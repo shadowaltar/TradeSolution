@@ -1,13 +1,17 @@
 ﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
 namespace TradeDataCore.MarketData;
 public interface IRealTimeMarketDataService
 {
-    event Action<int, OhlcPrice> NewOhlc;
+    event Action<int, OhlcPrice> NextOhlc;
+
+    IExternalQuotationManagement External { get; }
+
     Task Initialize();
-    ExternalConnectionState SubscribeOhlc(Security security);
+    Task<ExternalConnectionState> SubscribeOhlc(Security security);
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security);
     Task<ExternalConnectionState> UnsubscribeAllOhlcs();
 

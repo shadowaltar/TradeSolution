@@ -3,6 +3,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Database;
 using TradeCommon.Externals;
 using log4net;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Services;
 public class TradeService : ITradeService, IDisposable
@@ -18,7 +19,9 @@ public class TradeService : ITradeService, IDisposable
 
     public IReadOnlyDictionary<int, int> TradeToOrderIds => _tradeToOrderIds;
 
-    public event Action<Trade>? NewTrade;
+    public event Action<Trade>? NextTrade;
+
+    public event Action<List<Trade>>? NextTrades;
 
     public TradeService(IExternalExecutionManagement execution,
         IOrderService orderService,
@@ -29,19 +32,44 @@ public class TradeService : ITradeService, IDisposable
         _persistence = persistence;
 
         _execution.TradeReceived += OnTradeReceived;
+        _execution.TradesReceived += OnTradesReceived;
     }
 
     private void OnTradeReceived(Trade trade)
     {
+        InternalOnNextTrade(trade);
+
+        NextTrade?.Invoke(trade);
+
+        Persist(trade);
+    }
+
+    private void OnTradesReceived(List<Trade> trades)
+    {
+        foreach (var trade in trades)
+        {
+            InternalOnNextTrade(trade);
+        }
+
+        NextTrades?.Invoke(trades);
+
+        foreach (var trade in trades)
+        {
+            Persist(trade);
+        }
+    }
+
+    private void InternalOnNextTrade(Trade trade)
+    {
         // When a trade is received from external system execution engine
-        // parser logic, it only has external order id info.
+        // parser logic, it might only have external order id info.
         // Need to associate the order and the trade here.
-        if (trade.ExternalTradeId == null)
+        if (trade.ExternalTradeId == Trade.DefaultId)
         {
             _log.Error("The external system's trade id of a trade must exist.");
             return;
         }
-        if (trade.ExternalOrderId == null)
+        if (trade.ExternalOrderId == Trade.DefaultId)
         {
             _log.Error("The external system's order id of a trade must exist.");
             return;
@@ -60,9 +88,8 @@ public class TradeService : ITradeService, IDisposable
             _trades[trade.Id] = trade;
             _tradeToOrderIds[trade.Id] = trade.OrderId;
         }
-        NewTrade?.Invoke(trade);
 
-        Persist(trade);
+
     }
 
     private void Persist(Trade trade)
@@ -78,5 +105,15 @@ public class TradeService : ITradeService, IDisposable
     public void Dispose()
     {
         _execution.TradeReceived -= OnTradeReceived;
+    }
+
+    public async Task<List<Trade>?> GetMarketTrades(Security security)
+    {
+        return await _execution.GetMarketTrades(security);
+    }
+
+    public Task<List<Trade>?> GetTrades(Security security)
+    {
+        throw new NotImplementedException();
     }
 }

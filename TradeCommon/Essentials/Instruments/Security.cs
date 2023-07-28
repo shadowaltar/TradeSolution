@@ -24,3 +24,12 @@ public class Security
         return $"[{Id}] [{Code} {Exchange}] {Name} ({Type})";
     }
 }
+
+
+public static class SecurityExtensions
+{
+    public static bool IsFrom(this Security security, string externalName)
+    {
+        return security.Exchange.Equals(externalName, StringComparison.OrdinalIgnoreCase);
+    }
+}

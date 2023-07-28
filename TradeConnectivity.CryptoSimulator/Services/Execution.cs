@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using static TradeCommon.Utils.Delegates;
@@ -11,6 +12,7 @@ public class Execution : IExternalExecutionManagement
     public event OrderCanceledCallback? OrderCanceled;
     public event AllOrderCanceledCallback? AllOrderCanceled;
     public event TradeReceivedCallback? TradeReceived;
+    public event TradesReceivedCallback? TradesReceived;
 
     public void CancelAllOrder(Order order)
     {
@@ -18,6 +20,11 @@ public class Execution : IExternalExecutionManagement
     }
 
     public void CancelOrder(Order order)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<List<Trade>?> GetMarketTrades(Security security)
     {
         throw new NotImplementedException();
     }
@@ -32,7 +39,7 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
-    public void PlaceOrder(Order order)
+    public void SendOrder(Order order)
     {
         throw new NotImplementedException();
     }

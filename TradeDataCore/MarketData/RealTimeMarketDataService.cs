@@ -8,27 +8,29 @@ using TradeCommon.Runtime;
 namespace TradeDataCore.MarketData;
 public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
 {
-    private readonly IExternalQuotationManagement _quotation;
+    private readonly IExternalQuotationManagement _external;
 
-    public event Action<int, OhlcPrice>? NewOhlc;
+    public IExternalQuotationManagement External => _external;
 
-    public RealTimeMarketDataService(IExternalQuotationManagement quotation)
+    public event Action<int, OhlcPrice>? NextOhlc;
+
+    public RealTimeMarketDataService(IExternalQuotationManagement external)
     {
-        _quotation = quotation;
-        _quotation.NewOhlc += OnNewOhlc;
+        _external = external;
+        _external.NextOhlc += OnNextOhlc;
     }
 
-    private void OnNewOhlc(int securityId, OhlcPrice price)
+    private void OnNextOhlc(int securityId, OhlcPrice price)
     {
-        NewOhlc?.Invoke(securityId, price);
+        NextOhlc?.Invoke(securityId, price);
     }
 
     public async Task Initialize()
     {
-        await _quotation.Initialize();
+        await _external.Initialize();
     }
 
-    public ExternalConnectionState SubscribeOhlc(Security security)
+    public async Task<ExternalConnectionState> SubscribeOhlc(Security security)
     {
         var externalNames = MarketDataSources.GetExternalNames(security);
         if (externalNames.IsNullOrEmpty())
@@ -44,7 +46,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
             };
         }
 
-        return _quotation.SubscribeOhlc(security);
+        return await _external.SubscribeOhlc(security);
     }
 
     public Task<ExternalConnectionState> SubscribeTick(Security security)
@@ -64,7 +66,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
 
     public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security)
     {
-        return await _quotation.UnsubscribeOhlc(security);
+        return await _external.UnsubscribeOhlc(security);
     }
 
     public Task<ExternalConnectionState> UnsubscribeTick(Security security)
@@ -74,7 +76,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
 
     public void Dispose()
     {
-        _quotation.NewOhlc -= OnNewOhlc;
-        NewOhlc = null;
+        _external.NextOhlc -= OnNextOhlc;
+        NextOhlc = null;
     }
 }

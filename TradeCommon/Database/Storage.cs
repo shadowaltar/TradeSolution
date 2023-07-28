@@ -416,7 +416,40 @@ ON {tableName} (SecurityId);
 
     public static async Task CreateOrderTable(SecurityType securityType)
     {
+        var tableNames = new List<string>
+        {
+            DatabaseNames.GetOrderTableName(securityType),
+            "error_"+DatabaseNames.GetOrderTableName(securityType),
+        };
 
+        // TODO
+        foreach (var tableName in tableNames)
+        {
+            var dropSql =
+@$"
+DROP TABLE IF EXISTS {tableName};
+";
+            var createSql =
+    @$"
+CREATE TABLE IF NOT EXISTS {tableName} (
+    Id INTEGER PRIMARY KEY,
+    UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
+);
+CREATE UNIQUE INDEX idx_code_exchange
+    ON {tableName} (Code, Exchange);
+";
+            using var connection = await Connect(DatabaseNames.ExecutionData);
+
+            using var dropCommand = connection.CreateCommand();
+            dropCommand.CommandText = dropSql;
+            await dropCommand.ExecuteNonQueryAsync();
+
+            using var createCommand = connection.CreateCommand();
+            createCommand.CommandText = createSql;
+            await createCommand.ExecuteNonQueryAsync();
+
+            _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
+        }
     }
 
     public static async Task CreateTradeTable(SecurityType securityType)
