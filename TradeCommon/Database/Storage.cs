@@ -414,29 +414,46 @@ ON {tableName} (SecurityId);
         _log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
     }
 
-    public static async Task CreateOrderTable(SecurityType securityType)
+    public static async Task<List<string>> CreateOrderTable(SecurityType securityType)
     {
         var tableNames = new List<string>
         {
             DatabaseNames.GetOrderTableName(securityType),
-            "error_"+DatabaseNames.GetOrderTableName(securityType),
+            DatabaseNames.GetOrderTableName(securityType, true)
         };
 
-        // TODO
         foreach (var tableName in tableNames)
         {
             var dropSql =
 @$"
 DROP TABLE IF EXISTS {tableName};
+DROP INDEX IF EXISTS idx_{tableName}_securityId;
+DROP INDEX IF EXISTS idx_{tableName}_securityId_createTime;
 ";
             var createSql =
     @$"
 CREATE TABLE IF NOT EXISTS {tableName} (
     Id INTEGER PRIMARY KEY,
-    UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
+    ExternalOrderId INTEGER NOT NULL,
+    SecurityId INTEGER NOT NULL,
+    AccountId INTEGER NOT NULL,
+    Type VARCHAR(40) NOT NULL,
+    Price DOUBLE NOT NULL,
+    Quantity DOUBLE NOT NULL,
+    Side CHAR(1) NOT NULL,
+    StopPrice DOUBLE DEFAULT 0 NOT NULL,
+    CreateTime INT NOT NULL,
+    UpdateTime INT NOT NULL,
+    ExternalCreateTime INT DEFAULT 0,
+    ExternalUpdateTime INT DEFAULT 0,
+    TimeInForce VARCHAR(10),
+    StrategyId INT DEFAULT 0,
+    UNIQUE(Id)
 );
-CREATE UNIQUE INDEX idx_code_exchange
-    ON {tableName} (Code, Exchange);
+CREATE UNIQUE INDEX idx_{tableName}_securityId
+    ON {tableName} (SecurityId);
+CREATE UNIQUE INDEX idx_{tableName}_securityId_createTime
+    ON {tableName} (SecurityId, CreateTime);
 ";
             using var connection = await Connect(DatabaseNames.ExecutionData);
 
@@ -450,14 +467,63 @@ CREATE UNIQUE INDEX idx_code_exchange
 
             _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
         }
+
+        return tableNames;
     }
 
-    public static async Task CreateTradeTable(SecurityType securityType)
+    public static async Task<List<string>> CreateTradeTable(SecurityType securityType)
     {
+        var tableNames = new List<string>
+        {
+            DatabaseNames.GetTradeTableName(securityType),
+            DatabaseNames.GetTradeTableName(securityType, true)
+        };
 
+        foreach (var tableName in tableNames)
+        {
+            var dropSql =
+@$"
+DROP TABLE IF EXISTS {tableName};
+DROP INDEX IF EXISTS idx_{tableName}_securityId;
+DROP INDEX IF EXISTS idx_{tableName}_securityId_createTime;
+";
+            var createSql =
+    @$"
+CREATE TABLE IF NOT EXISTS {tableName} (
+    Id INTEGER PRIMARY KEY,
+    SecurityId INTEGER NOT NULL,
+    ExternalTradeId INTEGER NOT NULL,
+    ExternalOrderId INTEGER NOT NULL,
+    Time INT NOT NULL,
+    Type VARCHAR(40) NOT NULL,
+    Price DOUBLE NOT NULL,
+    Quantity DOUBLE NOT NULL,
+    Side CHAR(1) NOT NULL,
+    Fee DOUBLE NOT NULL,
+    UNIQUE(Id)
+);
+CREATE UNIQUE INDEX idx_{tableName}_securityId
+    ON {tableName} (SecurityId);
+CREATE UNIQUE INDEX idx_{tableName}_securityId_time
+    ON {tableName} (SecurityId, Time);
+";
+            using var connection = await Connect(DatabaseNames.ExecutionData);
+
+            using var dropCommand = connection.CreateCommand();
+            dropCommand.CommandText = dropSql;
+            await dropCommand.ExecuteNonQueryAsync();
+
+            using var createCommand = connection.CreateCommand();
+            createCommand.CommandText = createSql;
+            await createCommand.ExecuteNonQueryAsync();
+
+            _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
+        }
+
+        return tableNames;
     }
 
-    public static async Task CreatePositionTable(SecurityType securityType)
+    public static async Task<List<string>> CreatePositionTable(SecurityType securityType)
     {
 
     }

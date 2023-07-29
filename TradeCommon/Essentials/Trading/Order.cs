@@ -62,20 +62,22 @@ public class Order
     /// <summary>
     /// Order creation time (client-side).
     /// </summary>
-    public DateTime ClientCreateTime { get; set; }
+    public DateTime CreateTime { get; set; }
 
     /// <summary>
     /// Order update / cancel time (client-side).
     /// </summary>
-    public DateTime ClientUpdateTime { get; set; }
+    public DateTime UpdateTime { get; set; }
 
     /// <summary>
     /// Order creation time (external system).
+    /// This is optional (DateTime.MinValue).
     /// </summary>
     public DateTime ExternalCreateTime { get; set; }
 
     /// <summary>
     /// Order update / cancel time (external system).
+    /// This is optional (DateTime.MinValue).
     /// </summary>
     public DateTime ExternalUpdateTime { get; set; }
 
@@ -96,7 +98,7 @@ public class Order
 
     public override string ToString()
     {
-        return $"[{Id}][{ExternalOrderId}][{ClientCreateTime:yyMMdd-HHmmss}][{Status}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
+        return $"[{Id}][{ExternalOrderId}][{CreateTime:yyMMdd-HHmmss}][{Status}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
     }
 }
 

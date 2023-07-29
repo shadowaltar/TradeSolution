@@ -1,8 +1,9 @@
 ﻿using Common;
 using Microsoft.AspNetCore.Mvc;
+using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Database;
 using TradeDataCore.StaticData;
 
 namespace TradePort.Controllers;
@@ -18,8 +19,8 @@ public class AdminController : Controller
     /// WARNING, this will erase all the data. Rebuild all the tables.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("rebuild-static-tables")]
-    public async Task<ActionResult> RebuildStaticTables([FromQuery(Name = "password")] string password)
+    [HttpPost("rebuild-static-tables")]
+    public async Task<ActionResult> RebuildStaticTables([FromForm] string password)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsPasswordCorrect(password)) return BadRequest();
@@ -44,14 +45,14 @@ public class AdminController : Controller
     }
 
     /// <summary>
-    /// WARNING, this will erase all the data. Rebuild all the tables.
+    /// WARNING, this will erase all the data. Rebuild all the price tables.
     /// </summary>
     /// <param name="password">Mandatory</param>
     /// <param name="intervalStr">Must be used along with <paramref name="secTypeStr"/>. Only supports 1m, 1h or 1d. If not set, all will be rebuilt.</param>
     /// <param name="secTypeStr">Must be used along with <paramref name="intervalStr"/>.</param>
     /// <returns></returns>
-    [HttpGet("rebuild-price-tables")]
-    public async Task<ActionResult> RebuildPriceTables([FromQuery(Name = "password")] string password,
+    [HttpPost("rebuild-price-tables")]
+    public async Task<ActionResult> RebuildPriceTables([FromForm] string password,
         [FromQuery(Name = "interval")] string? intervalStr,
         [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
@@ -94,5 +95,83 @@ public class AdminController : Controller
         }
 
         return BadRequest($"Invalid parameter combination: {intervalStr}, {secTypeStr}");
+    }
+
+    /// <summary>
+    /// WARNING, this will erase all the data. Rebuild tables with specific type.
+    /// </summary>
+    /// <param name="password"></param>
+    /// <param name="secTypeStr"></param>
+    /// <param name="tableTypeStr">Order, Trade or Position.</param>
+    /// <returns></returns>
+    [HttpPost("rebuild-tables")]
+    public async Task<ActionResult> RebuildTables([FromForm] string password,
+        [FromQuery(Name = "sec-type")] string? secTypeStr = "equity",
+        [FromQuery(Name = "table-type")] string? tableTypeStr = "order")
+    {
+        if (password.IsBlank()) return BadRequest();
+        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        SecurityType secType = SecurityType.Unknown;
+        if (secTypeStr != null)
+            secType = SecurityTypeConverter.Parse(secTypeStr);
+        DataType dataType = DataType.Unknown;
+        if (tableTypeStr != null)
+            dataType = DataTypeConverter.Parse(tableTypeStr);
+
+        if (secType is SecurityType.Equity or SecurityType.Fx)
+        {
+            List<string> resultTableNames = null;
+            switch (dataType)
+            {
+                case DataType.Order:
+                    resultTableNames = await Storage.CreateOrderTable(secType);
+                    break;
+                case DataType.Trade:
+                    resultTableNames = await Storage.CreateTradeTable(secType);
+                    break;
+                case DataType.Position:
+                    resultTableNames = await Storage.CreatePositionTable(secType);
+                    break;
+            }
+            if (resultTableNames == null)
+                return BadRequest($"Invalid parameters: {tableTypeStr}");
+
+            var results = new Dictionary<string, bool>();
+            foreach (var tn in resultTableNames)
+            {
+                var r = await Storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
+                results[tn] = r;
+            }
+            return Ok(results);
+        }
+
+        return BadRequest($"Invalid parameters: {secTypeStr}");
+    }
+
+    /// <summary>
+    /// WARNING, this will erase all the data. Rebuild all trade tables.
+    /// </summary>
+    /// <param name="password"></param>
+    /// <param name="secTypeStr"></param>
+    /// <returns></returns>
+    [HttpPost("rebuild-trade-tables")]
+    public async Task<ActionResult> RebuildTradeTables([FromForm] string password,
+        [FromQuery(Name = "sec-type")] string? secTypeStr)
+    {
+        if (password.IsBlank()) return BadRequest();
+        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        SecurityType secType = SecurityType.Unknown;
+        if (secTypeStr != null)
+            secType = SecurityTypeConverter.Parse(secTypeStr);
+
+        if (secType is SecurityType.Equity or SecurityType.Fx)
+        {
+            var table = DatabaseNames.GetTradeTableName(secType);
+            await Storage.CreateTradeTable(secType);
+            var r = await Storage.CheckTableExists(table, DatabaseNames.ExecutionData);
+            return Ok(new Dictionary<string, bool> { { table, r } });
+        }
+
+        return BadRequest($"Invalid parameters: {secTypeStr}");
     }
 }

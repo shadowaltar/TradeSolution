@@ -4,9 +4,12 @@ using log4net.Config;
 using OfficeOpenXml;
 using System.Text;
 using TradeCommon.CodeAnalysis;
+using TradeCommon.Utils.Common;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-var summary = BenchmarkRunner.Run<BinaryFunctionsBenchmark>();
+var hash = CryptographyUtils.HashString("abc", "special.trading.unicorn");
+Console.WriteLine(hash);
+//var summary = BenchmarkRunner.Run<BinaryFunctionsBenchmark>();

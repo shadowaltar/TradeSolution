@@ -25,6 +25,12 @@ public static class DatabaseNames
     public const string FxOrderTable = "fx_orders";
     public const string FxTradeTable = "fx_trades";
     public const string FxPositionTable = "fx_positions";
+    public const string ErrorStockOrderTable = "error_stock_orders";
+    public const string ErrorStockTradeTable = "error_stock_trades";
+    public const string ErrorStockPositionTable = "error_stock_positions";
+    public const string ErrorFxOrderTable = "error_fx_orders";
+    public const string ErrorFxTradeTable = "error_fx_trades";
+    public const string ErrorFxPositionTable = "error_fx_positions";
 
     public static string GetDefinitionTableName(SecurityType type)
     {
@@ -36,34 +42,58 @@ public static class DatabaseNames
         };
     }
 
-    public static string GetOrderTableName(SecurityType type)
+    public static string GetOrderTableName(SecurityType type, bool isErrorTable = false)
     {
-        return type switch
-        {
-            SecurityType.Equity => StockOrderTable,
-            SecurityType.Fx => FxOrderTable,
-            _ => throw new NotImplementedException()
-        };
+        if (!isErrorTable)
+            return type switch
+            {
+                SecurityType.Equity => StockOrderTable,
+                SecurityType.Fx => FxOrderTable,
+                _ => throw new NotImplementedException()
+            };
+        else
+            return type switch
+            {
+                SecurityType.Equity => ErrorStockOrderTable,
+                SecurityType.Fx => ErrorFxOrderTable,
+                _ => throw new NotImplementedException()
+            };
     }
 
-    public static string GetTradeTableName(SecurityType type)
+    public static string GetTradeTableName(SecurityType type, bool isErrorTable = false)
     {
-        return type switch
-        {
-            SecurityType.Equity => StockTradeTable,
-            SecurityType.Fx => FxTradeTable,
-            _ => throw new NotImplementedException()
-        };
+        if (!isErrorTable)
+            return type switch
+            {
+                SecurityType.Equity => StockTradeTable,
+                SecurityType.Fx => FxTradeTable,
+                _ => throw new NotImplementedException()
+            };
+        else
+            return type switch
+            {
+                SecurityType.Equity => ErrorStockTradeTable,
+                SecurityType.Fx => ErrorFxTradeTable,
+                _ => throw new NotImplementedException()
+            };
     }
 
-    public static string GetPositionTableName(SecurityType type)
+    public static string GetPositionTableName(SecurityType type, bool isErrorTable = false)
     {
-        return type switch
-        {
-            SecurityType.Equity => StockPositionTable,
-            SecurityType.Fx => FxPositionTable,
-            _ => throw new NotImplementedException()
-        };
+        if (!isErrorTable)
+            return type switch
+            {
+                SecurityType.Equity => StockPositionTable,
+                SecurityType.Fx => FxPositionTable,
+                _ => throw new NotImplementedException()
+            };
+        else
+            return type switch
+            {
+                SecurityType.Equity => ErrorStockPositionTable,
+                SecurityType.Fx => ErrorFxPositionTable,
+                _ => throw new NotImplementedException()
+            };
     }
 
     public static string GetPriceTableName(IntervalType intervalType, SecurityType securityType)
