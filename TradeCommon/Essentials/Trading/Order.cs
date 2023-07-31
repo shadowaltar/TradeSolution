@@ -1,4 +1,8 @@
-﻿namespace TradeCommon.Essentials.Trading;
+﻿using Common;
+using TradeCommon.Constants;
+using TradeCommon.Utils.Attributes;
+
+namespace TradeCommon.Essentials.Trading;
 
 /// <summary>
 /// Action to buy or sell a security.
@@ -10,7 +14,8 @@ public class Order
     /// <summary>
     /// Unique order id.
     /// </summary>
-    public int Id { get; set; }
+    [UpsertConflictKey]
+    public long Id { get; set; }
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
@@ -22,6 +27,14 @@ public class Order
     /// The id of security to be or already being bought / sold.
     /// </summary>
     public int SecurityId { get; set; }
+
+    /// <summary>
+    /// The code / symbol / ticker for execution.
+    /// It caches the value from <see cref="Security"/> object and should not
+    /// be persisted.
+    /// </summary>
+    [UpsertIgnore]
+    public string SecurityCode { get; set; } = "";
 
     /// <summary>
     /// The target account. This embeds the broker info.
@@ -91,10 +104,22 @@ public class Order
     /// </summary>
     public int StrategyId { get; set; }
 
+
+    /// <summary>
+    /// The broker's ID.
+    /// </summary>
+    public int BrokerId { get; set; } = BrokerIds.NameToIds[ExternalNames.Unknown];
+
+    /// <summary>
+    /// The exchange's ID.
+    /// </summary>
+    public int ExchangeId { get; set; } = ExchangeIds.NameToIds[ExternalNames.Unknown];
+
     /// <summary>
     /// Any additional order parameters.
     /// </summary>
-    public AdvancedOrderSettings AdvancedOrderSettings { get; set; }
+    [UpsertIgnore]
+    public AdvancedOrderSettings? AdvancedOrderSettings { get; set; }
 
     public override string ToString()
     {

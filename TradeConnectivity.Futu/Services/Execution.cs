@@ -14,12 +14,12 @@ public class Execution : IExternalExecutionManagement
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
-    public void CancelAllOrder(Order order)
+    public Task CancelAllOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public void CancelOrder(Order order)
+    public Task CancelOrder(Order order)
     {
         throw new NotImplementedException();
     }
@@ -29,17 +29,17 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
-    public bool Initialize(User user)
+    public Task<bool> Initialize(User user)
     {
         throw new NotImplementedException();
     }
 
-    public void ModifyOrder(Order order)
+    public Task ModifyOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public void SendOrder(Order order)
+    public Task SendOrder(Order order)
     {
         throw new NotImplementedException();
     }

@@ -102,7 +102,7 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="password"></param>
     /// <param name="secTypeStr"></param>
-    /// <param name="tableTypeStr">Order, Trade or Position.</param>
+    /// <param name="tableTypeStr">Order, Trade, Position, FinancialStat, or TOP (trade-order-position-relationship).</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables")]
     public async Task<ActionResult> RebuildTables([FromForm] string password,
@@ -120,7 +120,7 @@ public class AdminController : Controller
 
         if (secType is SecurityType.Equity or SecurityType.Fx)
         {
-            List<string> resultTableNames = null;
+            List<string>? resultTableNames = null;
             switch (dataType)
             {
                 case DataType.Order:
@@ -131,6 +131,13 @@ public class AdminController : Controller
                     break;
                 case DataType.Position:
                     resultTableNames = await Storage.CreatePositionTable(secType);
+                    break;
+                case DataType.TradeOrderPositionRelationship:
+                    resultTableNames = new List<string> { await Storage.CreateTradeOrderPositionIdTable(secType) };
+                    break;
+                case DataType.FinancialStat:
+                    await Storage.CreateFinancialStatsTable();
+                    resultTableNames = new List<string> { DatabaseNames.FinancialStatsTable };
                     break;
             }
             if (resultTableNames == null)

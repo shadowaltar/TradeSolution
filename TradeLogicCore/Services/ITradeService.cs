@@ -17,7 +17,7 @@ public interface ITradeService
     /// </summary>    
     event Action<List<Trade>>? NextTrades;
 
-    IReadOnlyDictionary<int, int> TradeToOrderIds { get; }
+    IReadOnlyDictionary<long, long> TradeToOrderIds { get; }
 
     Task<List<Trade>?> GetMarketTrades(Security security);
 

@@ -6,7 +6,7 @@ using TradeCommon.Essentials.Quotes;
 
 namespace TradeDataCore.Importing.Binance;
 
-public class HistoricalPriceReader
+public class HistoricalPriceReader : IHistoricalPriceReader
 {
     private static readonly ILog _log = Logger.New();
 

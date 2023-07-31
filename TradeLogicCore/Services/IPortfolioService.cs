@@ -11,6 +11,11 @@ public interface IPortfolioService
     event Action<Position>? PositionClosed;
 
     IExternalExecutionManagement ExternalExecution { get; }
+    
+    /// <summary>
+    /// Gets the remaining balance which is free to be traded.
+    /// </summary>
+    decimal RemainingBalance { get; }
 
     Task Initialize();
 

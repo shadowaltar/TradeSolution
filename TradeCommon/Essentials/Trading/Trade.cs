@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TradeCommon.Constants;
+using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
 
@@ -18,7 +20,7 @@ public class Trade
     /// <summary>
     /// Unique trade id.
     /// </summary>
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     /// <summary>
     /// Security id.
@@ -28,7 +30,7 @@ public class Trade
     /// <summary>
     /// The order id associated with this trade.
     /// </summary>
-    public int OrderId { get; set; }
+    public long OrderId { get; set; }
 
     /// <summary>
     /// The trade id associated with this trade provided by the broker.
@@ -66,11 +68,22 @@ public class Trade
     public decimal Fee { get; set; }
 
     /// <summary>
+    /// The broker's ID.
+    /// </summary>
+    public int BrokerId { get; set; } = BrokerIds.NameToIds[ExternalNames.Unknown];
+
+    /// <summary>
+    /// The exchange's ID.
+    /// </summary>
+    public int ExchangeId { get; set; } = ExchangeIds.NameToIds[ExternalNames.Unknown];
+
+    /// <summary>
     /// The trade object is coarse such that we don't have
     /// info to determine who owns it or which order is this trade being related to.
     /// Usually it is a trade observed in the market which is
     /// not related to current user.
     /// </summary>
+    [UpsertIgnore]
     public bool IsCoarse { get; set; } = false;
     public override string ToString()
     {

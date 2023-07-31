@@ -10,6 +10,6 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-var hash = CryptographyUtils.HashString("abc", "special.trading.unicorn");
-Console.WriteLine(hash);
+//var hash = CryptographyUtils.HashString("abc", "special.trading.unicorn");
+//Console.WriteLine(hash);
 //var summary = BenchmarkRunner.Run<BinaryFunctionsBenchmark>();

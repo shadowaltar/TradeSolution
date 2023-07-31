@@ -1,6 +1,7 @@
 ﻿using Common;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Portfolios;
 
@@ -17,7 +18,7 @@ public record Position
     /// <summary>
     /// Unique id of this position.
     /// </summary>
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     /// <summary>
     /// The security id of this position.
@@ -64,16 +65,19 @@ public record Position
     /// <summary>
     /// All orders related to this position.
     /// </summary>
+    [UpsertIgnore]
     public List<Order> Orders { get; set; } = new();
 
     /// <summary>
     /// All trades related to this position.
     /// </summary>
+    [UpsertIgnore]
     public List<Trade> Trades { get; set; } = new();
 
     /// <summary>
     /// Whether it is a closed position.
     /// Usually it means (remaining) quantity equals to zero.
     /// </summary>
+    [UpsertIgnore]
     public bool IsClosed => Quantity == 0;
 }

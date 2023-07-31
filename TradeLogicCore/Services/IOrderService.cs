@@ -19,7 +19,7 @@ public interface IOrderService
     /// </summary>
     /// <param name="orderId"></param>
     /// <returns></returns>
-    Order? GetOrder(int orderId);
+    Order? GetOrder(long orderId);
 
     /// <summary>
     /// Get an order from cache by its external id.
@@ -38,5 +38,5 @@ public interface IOrderService
     /// Cancel an order without waiting for the result.
     /// </summary>
     /// <param name="orderId"></param>
-    void CancelOrder(int orderId);
+    void CancelOrder(long orderId);
 }

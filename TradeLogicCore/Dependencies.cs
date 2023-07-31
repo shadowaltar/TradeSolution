@@ -2,6 +2,8 @@
 using Common;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
+using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Instruments;
 using TradeLogicCore.Services;
 
@@ -43,6 +45,12 @@ public static class Dependencies
             builder.RegisterSingleton<IOrderService, OrderService>();
             builder.RegisterSingleton<ITradeService, TradeService>();
             builder.RegisterSingleton<IPortfolioService, PortfolioService>();
+            builder.RegisterSingleton<IAlgorithmService, AlgorithmService>();
+
+            // position sizing
+            builder.RegisterSingleton<EvenPositionSizingLogic>();
+            // algorithms
+            builder.RegisterSingleton<IAlgorithm, Rumi>("Rumi");
         }
     }
 }

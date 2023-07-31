@@ -18,6 +18,7 @@ public enum DataType
     Order,
     Trade,
     Position,
+    TradeOrderPositionRelationship
 }
 
 public class DataTypeConverter
@@ -35,6 +36,8 @@ public class DataTypeConverter
             "ORDER" => DataType.Order,
             "TRADE" => DataType.Trade,
             "POSITION" => DataType.Position,
+            "TRADEORDERPOSITIONRELATIONSHIP" or "TOP" => DataType.TradeOrderPositionRelationship,
+            "FINANCIALSTAT" or "STAT" => DataType.FinancialStat,
             _ => DataType.Unknown,
         };
     }

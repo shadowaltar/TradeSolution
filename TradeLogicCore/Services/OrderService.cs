@@ -12,9 +12,9 @@ public class OrderService : IOrderService, IDisposable
 
     private readonly IExternalExecutionManagement _execution;
     private readonly Persistence _persistence;
-    private readonly Dictionary<int, Order> _orders = new();
+    private readonly Dictionary<long, Order> _orders = new();
     private readonly Dictionary<long, Order> _externalOrderIdToOrders = new();
-    private readonly Dictionary<int, Order> _cancelledOrders = new();
+    private readonly Dictionary<long, Order> _cancelledOrders = new();
     private readonly IdGenerator _idGenerator;
     private readonly object _lock = new();
 
@@ -32,7 +32,7 @@ public class OrderService : IOrderService, IDisposable
         _idGenerator = new IdGenerator();
     }
 
-    public Order? GetOrder(int orderId)
+    public Order? GetOrder(long orderId)
     {
         return _orders.TryGetValue(orderId, out var order) ? order : null;
     }
@@ -51,7 +51,7 @@ public class OrderService : IOrderService, IDisposable
         _log.Info("Sending order: " + order);
     }
 
-    public void CancelOrder(int orderId)
+    public void CancelOrder(long orderId)
     {
         var order = GetOrder(orderId);
         if (order != null)

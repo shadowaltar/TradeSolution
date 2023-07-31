@@ -1,4 +1,5 @@
 ﻿using Common;
+using System.Net.Http;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -24,12 +25,12 @@ public class Execution : IExternalExecutionManagement
         _httpClient = httpClient;
     }
 
-    public void CancelAllOrder(Order order)
+    public async Task CancelAllOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public void CancelOrder(Order order)
+    public async Task CancelOrder(Order order)
     {
         throw new NotImplementedException();
     }
@@ -81,18 +82,24 @@ public class Execution : IExternalExecutionManagement
         return trades;
     }
 
-    public bool Initialize(User user)
+    public async Task<bool> Initialize(User user)
     {
         throw new NotImplementedException();
     }
 
-    public void ModifyOrder(Order order)
+    public async Task ModifyOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public void SendOrder(Order order)
+    public async Task SendOrder(Order order)
     {
-        throw new NotImplementedException();
+        var url = $"{RootUrls.DefaultHttps}/api/v3/order?symbol={order.SecurityCode}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+
+        request.Headers.Add("X-MBX-APIKEY", "");
+
+        await _httpClient.SendAsync(request);
     }
 }

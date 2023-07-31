@@ -10,12 +10,19 @@ using TradeCommon.Essentials.Prices;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Database;
 using TradeDataCore.Essentials;
+using System.Collections.Generic;
 
 namespace TradeDataCore.Importing.Yahoo;
 
-public class HistoricalPriceReader
+public class HistoricalPriceReader : IHistoricalPriceReader
 {
     private static readonly ILog _log = Logger.New();
+
+    public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
+    {
+        IDictionary<int, PricesAndCorporateActions> results = await ReadYahooPrices(securities, intervalType, start, end);
+        return results.ToDictionary(r => r.Key, r => r.Value.Prices);
+    }
 
     /// <summary>
     /// String key here is the yahoo symbol. Format usually look like "xxxxxx.SZ" (or "SS") for SZ/SH exchanges, or "xxxx.HK" for HKEX.

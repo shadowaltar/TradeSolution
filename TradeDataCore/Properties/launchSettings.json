@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TradeDataCore": {
+      "commandName": "Project",
+      //"commandLineArgs": "--mode periodic-price-saver --external Binance"
+    }
+  }
+}

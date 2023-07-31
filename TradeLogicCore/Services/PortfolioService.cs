@@ -16,12 +16,14 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<int, int> _orderToPositionIds = new();
-    private readonly Dictionary<int, Position> _openPositions = new();
-    private readonly Dictionary<int, Position> _closedPositions = new();
+    private readonly Dictionary<long, long> _orderToPositionIds = new();
+    private readonly Dictionary<long, Position> _openPositions = new();
+    private readonly Dictionary<long, Position> _closedPositions = new();
     private readonly object _lock = new();
 
     public IExternalExecutionManagement ExternalExecution { get; }
+
+    public decimal RemainingBalance { get; private set; }
 
     public event Action<Position>? PositionCreated;
     public event Action<Position>? PositionUpdated;
@@ -42,7 +44,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private void OnNewTrade(Trade trade)
     {
         var orderId = trade.OrderId;
-        int positionId;
+        long positionId;
         lock (_lock)
         {
             if (!_orderToPositionIds.TryGetValue(orderId, out positionId))

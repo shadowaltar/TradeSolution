@@ -8,7 +8,7 @@ using System.Diagnostics;
 namespace TradeCommon.Reporting;
 public class ExcelWriter
 {
-    private static readonly ILog _log = Logger.New();
+    private static readonly ILog _log = LogManager.GetLogger(typeof(ExcelWriter));
 
     private readonly string _headerBackground = "#AAAAAA";
     private readonly string _headerForeground = "#000000";
@@ -21,18 +21,32 @@ public class ExcelWriter
 
     public int CurrentWritingSheetIndex => _writtenSheetIndex;
 
-    public ExcelWriter WriteSheet<T>(string columnDefinitionResourcePath, string sheetCaption, List<T> entries)
+    public ExcelWorksheet CreateSheet(string sheetCaption)
+    {
+        if (_isDisposed) throw new InvalidOperationException("The object has been disposed.");
+        _log.Info($"Start creating sheet {sheetCaption}.");
+
+        _package ??= new ExcelPackage(_file);
+        var sheet = _package.Workbook.Worksheets.Add(sheetCaption);
+        return sheet;
+    }
+
+    public ExcelWriter WriteSheet<T>(string columnDefinitionResourcePath,
+                                     string sheetCaption,
+                                     IList<T> entries,
+                                     bool isActivated = false)
     {
         if (_isDisposed) throw new InvalidOperationException("The object has been disposed.");
 
         var columns = ColumnMappingReader.Read(columnDefinitionResourcePath);
+        var sheet = CreateSheet(sheetCaption);
         _log.Info($"Start writing sheet {sheetCaption}, with {columns.Count} columns and {entries.Count} rows.");
-
-        _package = new ExcelPackage(_file);
-        var sheet = _package.Workbook.Worksheets.Add(sheetCaption);
 
         var cursor = WriteHeaders(sheet, columns);
         WriteContents(sheet, columns, entries, cursor);
+
+        if (isActivated)
+            _package!.Workbook.View.ActiveTab = sheet.Index;
 
         _log.Info($"Finished writing sheet {sheetCaption}.");
         _writtenSheetIndex++;
@@ -56,7 +70,7 @@ public class ExcelWriter
         }
         catch (Exception e)
         {
-            _log.Error($"Failed to generate file {outputFilePath}", e);
+            _log.Error(e);
         }
         return this;
     }
@@ -91,7 +105,7 @@ public class ExcelWriter
         return cursor;
     }
 
-    private ExcelRangeBase WriteContents<T>(ExcelWorksheet sheet, List<ColumnDefinition> columns, List<T> entries, ExcelRangeBase? cursor = null)
+    private ExcelRangeBase WriteContents<T>(ExcelWorksheet sheet, List<ColumnDefinition> columns, IList<T> entries, ExcelRangeBase? cursor = null)
     {
         cursor ??= sheet.Cells[1, 1];
 
@@ -121,7 +135,7 @@ public class ExcelWriter
     /// <returns></returns>
     protected virtual object?[] GetRowValuesByReflection<T>(T entry, List<ColumnDefinition> columns, Func<string?, string?>? postProcessFormula = null)
     {
-        var vg = ReflectionUtils.GetValueGetter<T>();
+        var getter = ReflectionUtils.GetValueGetter<T>();
 
         entry = entry ?? throw new ArgumentNullException(nameof(entry));
         var values = new object?[columns.Count];
@@ -135,7 +149,7 @@ public class ExcelWriter
             }
             else
             {
-                var v = vg.Get(entry, cd.FieldName);
+                var v = getter.Get(entry, cd.FieldName);
                 // handle nullable
                 if (v != null && cd.IsNullable)
                 {

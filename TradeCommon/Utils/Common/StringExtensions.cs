@@ -14,6 +14,12 @@ public static class StringExtensions
     /// <returns></returns>
     public static bool IsBlank([NotNullWhen(false)][AllowNull] this string value) => string.IsNullOrWhiteSpace(value);
 
+    public static bool EqualsIgnoreCase(this string @string, string another)
+    {
+        if (@string == null) return Equals(@string, another);
+        return @string.Equals(another, StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool ContainsIgnoreCase(this string @string, string subString)
     {
         if (@string == null) throw new ArgumentNullException(nameof(@string));

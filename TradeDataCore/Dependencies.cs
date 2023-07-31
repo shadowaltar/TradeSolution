@@ -11,7 +11,7 @@ using TradeDataCore.StaticData;
 namespace TradeDataCore;
 public class Dependencies
 {
-    public static IComponentContext? Container { get; private set; }
+    public static IComponentContext Container { get; private set; } 
 
     public static void Register(string externalName, ContainerBuilder? builder = null)
     {

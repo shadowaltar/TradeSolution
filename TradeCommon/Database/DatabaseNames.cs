@@ -12,6 +12,8 @@ public static class DatabaseNames
     public const string StockDefinitionTable = "stock_definitions";
     public const string FxDefinitionTable = "fx_definitions";
 
+    public const string FinancialStatsTable = "financial_stats";
+
     public const string StockPrice1mTable = "stock_prices_1m";
     public const string StockPrice1hTable = "stock_prices_1h";
     public const string StockPrice1dTable = "stock_prices_1d";
@@ -31,6 +33,9 @@ public static class DatabaseNames
     public const string ErrorFxOrderTable = "error_fx_orders";
     public const string ErrorFxTradeTable = "error_fx_trades";
     public const string ErrorFxPositionTable = "error_fx_positions";
+
+    public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
+    public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
 
     public static string GetDefinitionTableName(SecurityType type)
     {
@@ -127,5 +132,14 @@ public static class DatabaseNames
         return tableName;
     }
 
-    public const string FinancialStatsTable = "financial_stats";
+
+    public static string GetTradeOrderPositionIdTable(SecurityType type)
+    {
+        return type switch
+        {
+            SecurityType.Equity => StockTradeToOrderToPositionIdTable,
+            SecurityType.Fx => FxTradeToOrderToPositionIdTable,
+            _ => throw new NotImplementedException()
+        };
+    }
 }

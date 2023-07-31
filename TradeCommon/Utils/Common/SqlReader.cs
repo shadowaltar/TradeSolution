@@ -1,16 +1,16 @@
-﻿using System.Data;
+﻿using Common;
+using System.Data;
 using System.Data.Common;
 using System.Reflection;
-using Common;
 
 namespace Common;
 
-public class SqlHelper<T> : IDisposable where T : new()
+public class SqlReader<T> : IDisposable where T : new()
 {
     private Dictionary<string, PropertyInfo> _properties;
     private ValueSetter<T> _valueSetter;
 
-    public SqlHelper(DbDataReader reader)
+    public SqlReader(DbDataReader reader)
     {
         Reader = reader;
         Columns = reader.GetSchemaTable()!.GetDistinctValues<string>("ColumnName");
@@ -20,8 +20,15 @@ public class SqlHelper<T> : IDisposable where T : new()
 
     public DbDataReader Reader { get; private set; }
 
+    /// <summary>
+    /// Gets the column names from the reader schema.
+    /// </summary>
     public HashSet<string> Columns { get; private set; }
 
+    /// <summary>
+    /// Read an entry and store in <typeparamref name="T"/>.
+    /// </summary>
+    /// <returns></returns>
     public T Read()
     {
         var entry = new T();
@@ -39,6 +46,13 @@ public class SqlHelper<T> : IDisposable where T : new()
         return entry;
     }
 
+    /// <summary>
+    /// Get a value from the <see cref="Reader"/>.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="name"></param>
+    /// <returns></returns>
+    /// <exception cref="NotImplementedException"></exception>
     private object? Get(Type type, string name)
     {
         if (type == typeof(string))
@@ -62,17 +76,17 @@ public class SqlHelper<T> : IDisposable where T : new()
         throw new NotImplementedException("Unsupported type: " + type.Name);
     }
 
+    public TV? GetOrDefault<TV>(string columnName, TV? defaultValue = default)
+    {
+        if (!Columns.Contains(columnName)) return defaultValue;
+        return (TV?)Get(typeof(TV), columnName);
+    }
+
     public void Dispose()
     {
         Columns.Clear();
         Reader = null;
         _properties = null;
         _valueSetter = null;
-    }
-
-    public TV? GetOrDefault<TV>(string columnName, TV? defaultValue = default)
-    {
-        if (!Columns.Contains(columnName)) return defaultValue;
-        return (TV?)Get(typeof(TV), columnName);
     }
 }

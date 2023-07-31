@@ -6,15 +6,15 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeCommon.Externals;
 public interface IExternalExecutionManagement
 {
-    bool Initialize(User user);
+    Task<bool> Initialize(User user);
 
-    void SendOrder(Order order);
+    Task SendOrder(Order order);
 
-    void CancelOrder(Order order);
+    Task CancelOrder(Order order);
 
-    void ModifyOrder(Order order);
+    Task ModifyOrder(Order order);
 
-    void CancelAllOrder(Order order);
+    Task CancelAllOrder(Order order);
 
     /// <summary>
     /// Get all the (recent) trades visible in the market with a given security.

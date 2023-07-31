@@ -13,11 +13,11 @@ public class TradeService : ITradeService, IDisposable
     private readonly IExternalExecutionManagement _execution;
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<int, Trade> _trades = new();
-    private readonly Dictionary<int, int> _tradeToOrderIds = new();
+    private readonly Dictionary<long, Trade> _trades = new();
+    private readonly Dictionary<long, long> _tradeToOrderIds = new();
     private readonly object _lock = new();
 
-    public IReadOnlyDictionary<int, int> TradeToOrderIds => _tradeToOrderIds;
+    public IReadOnlyDictionary<long, long> TradeToOrderIds => _tradeToOrderIds;
 
     public event Action<Trade>? NextTrade;
 
