@@ -7,6 +7,7 @@ using OfficeOpenXml;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using TradeCommon.Constants;
 using TradePort;
 
 var log = Logger.New();
@@ -36,6 +37,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
     .ConfigureContainer<ContainerBuilder>(builder =>
     {
+        // TODO need to use multiple asp.net core instances for different external systems
+        builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
         builder.RegisterModule<TradeLogicCore.Dependencies.DependencyModule>();
     });

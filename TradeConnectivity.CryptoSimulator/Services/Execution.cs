@@ -7,6 +7,8 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeConnectivity.CryptoSimulator.Services;
 public class Execution : IExternalExecutionManagement
 {
+    public bool IsFakeOrderSupported => throw new NotImplementedException();
+
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
     public event OrderCancelledCallback? OrderCancelled;

@@ -7,6 +7,8 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeConnectivity.Futu.Services;
 public class Execution : IExternalExecutionManagement
 {
+    public bool IsFakeOrderSupported => throw new NotImplementedException();
+
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
     public event OrderCancelledCallback? OrderCancelled;

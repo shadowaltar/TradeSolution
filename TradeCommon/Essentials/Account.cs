@@ -17,16 +17,21 @@ public class Account
     /// Unique account id.
     /// </summary>
     public int Id { get; set; }
-
+    
     /// <summary>
-    /// Unique account id from broker.
+    /// Name of account;
     /// </summary>
-    public string BrokerAccountId { get; set; }
+    public string Name { get; set; }
 
     /// <summary>
     /// Account owner.
     /// </summary>
     public int UserId { get; set; }
+
+    /// <summary>
+    /// Unique account id from broker.
+    /// </summary>
+    public string BrokerAccountId { get; set; }
 
     /// <summary>
     /// Name of the broker.

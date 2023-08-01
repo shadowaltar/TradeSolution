@@ -15,6 +15,20 @@ public class ExternalConnectionState
     }
 }
 
+public class ExternalExecutionState
+{
+    public ExecutionActionType Action { get; set; }
+    public int StatusCode { get; set; }
+    public string? ExternalPartyId { get; set; }
+    public string? UniqueConnectionId { get; set; }
+    public string? Description { get; set; }
+
+    public override string ToString()
+    {
+        return $"ExecState action [{Action}] [{StatusCode}][{UniqueConnectionId}]";
+    }
+}
+
 public enum SubscriptionType
 {
     Unknown,
@@ -29,4 +43,11 @@ public enum ConnectionActionType
     Disconnect,
     Subscribe,
     Unsubscribe,
+}
+
+public enum ExecutionActionType
+{
+    Unknown,
+    SendOrder,
+    CancelOrder,
 }

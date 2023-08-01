@@ -1,5 +1,4 @@
-﻿using TradeCommon.Essentials;
-using static TradeCommon.Constants.ExternalNames;
+﻿using static TradeCommon.Constants.ExternalNames;
 
 namespace TradeCommon.Constants;
 
@@ -20,16 +19,20 @@ public static class ExchangeTypeConverter
             _ => ExchangeType.Unknown,
         };
     }
+
     public static string ToString(ExchangeType exchangeType)
     {
         return exchangeType switch
         {
-            ExchangeType.Binance => ExternalNames.Binance,
-            ExchangeType.Hkex => ExternalNames.Hkex,
-            ExchangeType.Okex => ExternalNames.Okex,
-            _ => throw new NotImplementedException(),
+            ExchangeType.Binance => Binance,
+            ExchangeType.Hkex => Hkex,
+            ExchangeType.Okex => Okex,
+            _ => Unknown,
         };
     }
 
-    public static bool Matches(string typeStr, ExchangeType type) => Parse(typeStr) == type;
+    public static bool Matches(string typeStr, ExchangeType type)
+    {
+        return Parse(typeStr) == type;
+    }
 }

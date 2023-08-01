@@ -6,6 +6,8 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeCommon.Externals;
 public interface IExternalExecutionManagement
 {
+    bool IsFakeOrderSupported { get; }
+
     Task<bool> Initialize(User user);
 
     Task SendOrder(Order order);
@@ -21,7 +23,6 @@ public interface IExternalExecutionManagement
     /// </summary>
     /// <returns></returns>
     Task<List<Trade>?> GetMarketTrades(Security security);
-    Task<List<Account>> GetAccountDetails();
 
     event OrderPlacedCallback? OrderPlaced;
     event OrderModifiedCallback? OrderModified;

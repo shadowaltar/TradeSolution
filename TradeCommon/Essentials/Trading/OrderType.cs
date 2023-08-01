@@ -5,6 +5,12 @@ namespace TradeCommon.Essentials.Trading;
 public enum OrderType
 {
     /// <summary>
+    /// Default type if cannot be interpreted.
+    /// </summary>
+    [Description("?")]
+    Unknown,
+
+    /// <summary>
     /// Execute the order using whatever current market price is.
     /// </summary>
     [Description("MARKET")]

@@ -20,6 +20,8 @@ public class OrderService : IOrderService, IDisposable
     private readonly IdGenerator _idGenerator;
     private readonly object _lock = new();
 
+    public bool IsFakeOrderSupported => _execution.IsFakeOrderSupported;
+
     public event Action<Order>? OrderAcknowledged;
     public event Action<Order>? OrderCancelled;
 
@@ -44,12 +46,25 @@ public class OrderService : IOrderService, IDisposable
         throw new NotImplementedException();
     }
 
-    public void SendOrder(Order order)
+    public void SendOrder(Order order, bool isFakeOrder = true)
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
         order.ExternalOrderId = _idGenerator.NewTimeBasedId;
-        _execution.SendOrder(order);
+        if (isFakeOrder && _execution is ISupportFakeOrder fakeOrderEndPoint)
+        {
+            fakeOrderEndPoint.SendFakeOrder(order);
+        }
+        else if (isFakeOrder)
+        {
+            _log.Warn("The external end point does not support fake order. Order will not be sent: " + order);
+            return;
+        }
+        else
+        {
+            _execution.SendOrder(order);
+        }
+
         _log.Info("Sent a new order: " + order);
         Persist(order);
     }
@@ -106,6 +121,7 @@ public class OrderService : IOrderService, IDisposable
     }
 
     public Order CreateManualOrder(Security security,
+                                   int accountId,
                                    decimal price,
                                    decimal quantity,
                                    Side side,
@@ -117,11 +133,11 @@ public class OrderService : IOrderService, IDisposable
         return new Order
         {
             Id = id,
-            AccountId = 0, // TODO
+            AccountId = accountId,
             BrokerId = 0, // TODO
             CreateTime = now,
             UpdateTime = now,
-            ExchangeId = ExchangeIds.NameToIds[security.Exchange],
+            ExchangeId = ExchangeIds.GetId(security.Exchange),
             ExternalOrderId = id,
             Price = price,
             Quantity = quantity,

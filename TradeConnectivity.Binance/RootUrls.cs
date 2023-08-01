@@ -1,12 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TradeCommon.Runtime;
 
 namespace TradeConnectivity.Binance;
 public static class RootUrls
 {
-    public static readonly string DefaultHttps = "https://data-api.binance.vision/api/v3";
-    public static readonly string DefaultWs = "wss://stream.binance.com:9443";
+    public static string DefaultHttps { get; private set; }
+    public static string DefaultWs { get; private set; }
+
+    public static readonly string ProdHttps = "https://api.binance.vision";
+    public static readonly string ProdWs = "wss://stream.binance.com:9443";
+
+    private const string TestHttps = "https://testnet.binance.vision";
+    private const string TestWs = "wss://testnet.binance.vision/ws";
+
+    static RootUrls()
+    {
+        SetEnvironment(EnvironmentType.Test);
+    }
+
+    public static void SetEnvironment(EnvironmentType environment)
+    {
+        switch (environment)
+        {
+            case EnvironmentType.Test:
+            case EnvironmentType.Uat:
+                DefaultHttps = TestHttps;
+                DefaultWs = TestWs;
+                break;
+            case EnvironmentType.Prod:
+                DefaultHttps = ProdHttps;
+                DefaultWs = ProdWs;
+                break;
+            default: throw new ArgumentException(nameof(environment));
+        }
+    }
 }

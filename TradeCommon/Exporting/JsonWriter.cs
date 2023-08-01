@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace TradeCommon.Exporting;
 public static class JsonWriter
 {
-    public static async Task<string> ToJsonFile(object obj, string fileName = "")
+    public static async Task<string> ToJsonFile(object obj, string filePath = "")
     {
         var c = JsonSerializer.Serialize(obj);
-        var tempFileName = fileName.IsBlank() ? Path.GetTempFileName() + ".json" : fileName;
+        var tempFileName = filePath.IsBlank() ? Path.GetTempFileName() + ".json" : filePath;
         await File.WriteAllTextAsync(tempFileName, c);
         return tempFileName;
     }

@@ -1,4 +1,5 @@
 ﻿using Common;
+using log4net;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
 using TradeCommon.Constants;
@@ -7,6 +8,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
+using TradeCommon.Utils.Common;
 using TradeDataCore.Essentials;
 using TradeDataCore.MarketData;
 
@@ -19,6 +21,8 @@ namespace TradePort.Controllers;
 [Route("prices")]
 public class PriceController : Controller
 {
+    private static readonly ILog _log = Logger.New();
+
     /// <summary>
     /// Get prices given exchange, code, interval and start time.
     /// </summary>
@@ -315,10 +319,8 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
-
 
         var securities = await Storage.ReadSecurities(exchange, secType);
         if (symbols != null && symbols.Count > 0)
@@ -331,10 +333,22 @@ public class PriceController : Controller
         var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
             .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
-        var filePath = await JsonWriter.ToJsonFile(extendedResults, $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
-        return System.IO.File.Exists(filePath)
-            ? File(System.IO.File.OpenRead(filePath), "application/octet-stream", Path.GetFileName(filePath))
-            : NotFound();
+        var dataFilePath = Path.Join(Path.GetTempPath(), $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
+
+        try
+        {
+            var filePath = await JsonWriter.ToJsonFile(extendedResults, dataFilePath);
+            var zipFilePath = dataFilePath.Replace(".json", ".zip");
+            Zip.Archive(dataFilePath, zipFilePath);
+            return System.IO.File.Exists(zipFilePath)
+                ? File(System.IO.File.OpenRead(zipFilePath), "application/octet-stream", Path.GetFileName(zipFilePath))
+                : BadRequest();
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to write json, zip or send it.", e);
+            return BadRequest();
+        }
     }
 
     /// <summary>
@@ -365,7 +379,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("metrics/per-security-row-count")]
     public async Task<ActionResult> ReportPriceCount(
-        [FromServices()] IHistoricalMarketDataService dataService,
+        [FromServices] IHistoricalMarketDataService dataService,
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {

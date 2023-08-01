@@ -46,6 +46,7 @@ public static class EnumExtensions
             var enumValueStr = enumValue.ToString()!;
             d2e[enumValueStr] = enumValue;
             d2e[enumValueStr.ToUpperInvariant()] = enumValue;
+            d2e[enumValueStr.ToLowerInvariant()] = enumValue;
             if (Attribute.GetCustomAttribute(field, _descriptionType) is DescriptionAttribute attribute)
             {
                 var descriptions = attribute.Description.Split('|');
@@ -63,6 +64,7 @@ public static class EnumExtensions
             }
         }
         _descriptionToEnumValues[type] = d2e;
+        _enumValueToDescriptions[type] = e2d;
     }
 
     public static T ParseEnum<T>(this string value) where T : struct, Enum

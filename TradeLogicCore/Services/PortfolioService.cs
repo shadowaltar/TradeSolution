@@ -6,6 +6,7 @@ using TradeCommon.Database;
 using TradeDataCore.Instruments;
 using log4net;
 using TradeCommon.Externals;
+using TradeCommon.Essentials;
 
 namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService, IDisposable
@@ -206,11 +207,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         position.Trades.Add(trade);
     }
 
-    private void LoadExternalAccount()
-    {
-        ExternalExecution.GetAccountDetails();
-    }
-
     private void Persist(Position position)
     {
         var task = new PersistenceTask<Position>()
@@ -230,5 +226,11 @@ public class PortfolioService : IPortfolioService, IDisposable
     {
         // TODO
         return true;
+    }
+
+    public Account GetAccountByName(string accountName)
+    {
+        // TODO
+        return new Account { Id = 0, Name = "0" };
     }
 }

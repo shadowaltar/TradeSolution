@@ -75,7 +75,7 @@ public class Trade
     /// <summary>
     /// The exchange's ID.
     /// </summary>
-    public int ExchangeId { get; set; } = ExchangeIds.NameToIds[ExternalNames.Unknown];
+    public int ExchangeId { get; set; } = ExchangeIds.GetId(ExternalNames.Unknown);
 
     /// <summary>
     /// The trade object is coarse such that we don't have

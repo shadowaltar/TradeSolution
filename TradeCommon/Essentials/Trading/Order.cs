@@ -104,7 +104,6 @@ public class Order
     /// </summary>
     public int StrategyId { get; set; }
 
-
     /// <summary>
     /// The broker's ID.
     /// </summary>
@@ -113,7 +112,7 @@ public class Order
     /// <summary>
     /// The exchange's ID.
     /// </summary>
-    public int ExchangeId { get; set; } = ExchangeIds.NameToIds[ExternalNames.Unknown];
+    public int ExchangeId { get; set; } = ExchangeIds.GetId(ExternalNames.Unknown);
 
     /// <summary>
     /// Any additional order parameters.

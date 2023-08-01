@@ -4,6 +4,7 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeDataCore.StaticData;
@@ -42,6 +43,7 @@ public class Dependencies
             builder.RegisterSingleton<MessageBroker<Position>>(nameof(Position));
             builder.RegisterSingleton<MessageBroker<IPersistenceTask>>();
             
+            builder.RegisterSingleton<Environments>();
             builder.RegisterSingleton<Persistence>();
 
             builder.RegisterSingleton<ISecurityService, SecurityService>();

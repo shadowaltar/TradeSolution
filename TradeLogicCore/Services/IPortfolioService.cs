@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
@@ -18,6 +19,8 @@ public interface IPortfolioService
     decimal RemainingBalance { get; }
 
     Task Initialize();
+
+    Account GetAccountByName(string accountName);
 
     List<Position> GetOpenPositions();
 

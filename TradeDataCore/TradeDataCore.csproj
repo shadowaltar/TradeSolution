@@ -41,6 +41,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
     <ProjectReference Include="..\TradeConnectivity.Binance\TradeConnectivity.Binance.csproj" />
+    <ProjectReference Include="..\TradeConnectivity.Futu\TradeConnectivity.Futu.csproj" />
   </ItemGroup>
 
   <ItemGroup>

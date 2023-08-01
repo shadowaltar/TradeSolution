@@ -1,4 +1,5 @@
 ﻿using Common;
+using log4net;
 using System.Net.Http;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
@@ -6,13 +7,18 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeConnectivity.Binance.Services;
-public class Execution : IExternalExecutionManagement
+public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly HttpClient _httpClient;
+
+    public bool IsFakeOrderSupported => true;
 
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
@@ -24,6 +30,49 @@ public class Execution : IExternalExecutionManagement
     public Execution(HttpClient httpClient)
     {
         _httpClient = httpClient;
+    }
+
+    /// <summary>
+    /// Send an order to Binance.
+    /// It is a SIGNED endpoint.
+    /// </summary>
+    /// <param name="order"></param>
+    /// <returns></returns>
+    public async Task SendOrder(Order order)
+    {
+        var url = $"{RootUrls.DefaultHttps}/api/v3/order";
+        await SendOrder(url, order);
+    }
+
+    public async Task SendFakeOrder(Order order)
+    {
+        var url = $"{RootUrls.DefaultHttps}/api/v3/order/test";
+        await SendOrder(url, order);
+    }
+
+    private async Task<ExternalExecutionState> SendOrder(string url, Order order)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+
+        BuildRequest(request, order);
+
+        var response = await _httpClient.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+        if (response.IsSuccessStatusCode)
+        {
+            _log.Info(response);
+        }
+        else
+        {
+            _log.Error(response.StatusCode + ": " + content);
+        }
+        return new ExternalExecutionState
+        {
+            Action = ExecutionActionType.SendOrder,
+            ExternalPartyId = ExternalNames.Binance,
+            StatusCode = (int)response.StatusCode,
+            Description = content,
+        };
     }
 
     public async Task CancelAllOrder(Order order)
@@ -93,28 +142,11 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
-    /// <summary>
-    /// Send an order to Binance.
-    /// It is a SIGNED endpoint.
-    /// </summary>
-    /// <param name="order"></param>
-    /// <returns></returns>
-    public async Task SendOrder(Order order)
-    {
-        var url = $"{RootUrls.DefaultHttps}/api/v3/order?symbol={order.SecurityCode}";
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-
-        BuildRequest(request, order);
-
-        await _httpClient.SendAsync(request);
-    }
-
     private void BuildRequest(HttpRequestMessage request, Order order)
     {
         // add 'signature' to body: an HMAC-SHA256 signature
         // add 'timestamp' and 'receive window'
-        const int receiveWindowMs = 1000;
+        const int receiveWindowMs = 10000;
         var timestamp = DateTime.UtcNow.ToUnixMs();
 
         request.Headers.Add("X-MBX-APIKEY", Keys.ApiKey);
@@ -130,7 +162,7 @@ public class Execution : IExternalExecutionManagement
         parameters["recvWindow"] = receiveWindowMs.ToString();
         parameters["timestamp"] = timestamp.ToString();
         parameters["signature"] = Keys.SecretKey;
-                
+
         request.Content = new StringContent(StringUtils.ToUrlParamString(parameters));
     }
 }
