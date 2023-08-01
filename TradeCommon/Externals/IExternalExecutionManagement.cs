@@ -21,11 +21,12 @@ public interface IExternalExecutionManagement
     /// </summary>
     /// <returns></returns>
     Task<List<Trade>?> GetMarketTrades(Security security);
+    Task<List<Account>> GetAccountDetails();
 
     event OrderPlacedCallback? OrderPlaced;
     event OrderModifiedCallback? OrderModified;
-    event OrderCanceledCallback? OrderCanceled;
-    event AllOrderCanceledCallback? AllOrderCanceled;
+    event OrderCancelledCallback? OrderCancelled;
+    event AllOrderCancelledCallback? AllOrderCancelled;
     event TradeReceivedCallback? TradeReceived;
     event TradesReceivedCallback? TradesReceived;
 }

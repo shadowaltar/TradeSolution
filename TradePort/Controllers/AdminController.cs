@@ -154,31 +154,4 @@ public class AdminController : Controller
 
         return BadRequest($"Invalid parameters: {secTypeStr}");
     }
-
-    /// <summary>
-    /// WARNING, this will erase all the data. Rebuild all trade tables.
-    /// </summary>
-    /// <param name="password"></param>
-    /// <param name="secTypeStr"></param>
-    /// <returns></returns>
-    [HttpPost("rebuild-trade-tables")]
-    public async Task<ActionResult> RebuildTradeTables([FromForm] string password,
-        [FromQuery(Name = "sec-type")] string? secTypeStr)
-    {
-        if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
-        SecurityType secType = SecurityType.Unknown;
-        if (secTypeStr != null)
-            secType = SecurityTypeConverter.Parse(secTypeStr);
-
-        if (secType is SecurityType.Equity or SecurityType.Fx)
-        {
-            var table = DatabaseNames.GetTradeTableName(secType);
-            await Storage.CreateTradeTable(secType);
-            var r = await Storage.CheckTableExists(table, DatabaseNames.ExecutionData);
-            return Ok(new Dictionary<string, bool> { { table, r } });
-        }
-
-        return BadRequest($"Invalid parameters: {secTypeStr}");
-    }
 }

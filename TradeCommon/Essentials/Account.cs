@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TradeCommon.Essentials.Portfolios;
 
 namespace TradeCommon.Essentials;
 
@@ -51,4 +52,6 @@ public class Account
     /// Fee structure of this account. Some brokers may have different levels of feed structure.
     /// </summary>
     public string FeeStructure { get; set; }
+
+    public List<Balance> Balances { get; } = new();
 }

@@ -9,8 +9,8 @@ public class Execution : IExternalExecutionManagement
 {
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
-    public event OrderCanceledCallback? OrderCanceled;
-    public event AllOrderCanceledCallback? AllOrderCanceled;
+    public event OrderCancelledCallback? OrderCancelled;
+    public event AllOrderCancelledCallback? AllOrderCancelled;
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 

@@ -206,6 +206,11 @@ public class PortfolioService : IPortfolioService, IDisposable
         position.Trades.Add(trade);
     }
 
+    private void LoadExternalAccount()
+    {
+        ExternalExecution.GetAccountDetails();
+    }
+
     private void Persist(Position position)
     {
         var task = new PersistenceTask<Position>()
@@ -219,5 +224,11 @@ public class PortfolioService : IPortfolioService, IDisposable
     public void Dispose()
     {
         _tradeService.NextTrade -= OnNewTrade;
+    }
+
+    public bool Validate(Order order)
+    {
+        // TODO
+        return true;
     }
 }

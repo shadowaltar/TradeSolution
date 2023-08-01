@@ -1,6 +1,8 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 
@@ -27,7 +29,7 @@ public class OrderService : IOrderService, IDisposable
         _persistence = persistence;
 
         _execution.OrderPlaced += OnSentOrderAccepted;
-        _execution.OrderCanceled += OnOrderCancelled;
+        _execution.OrderCancelled += OnOrderCancelled;
 
         _idGenerator = new IdGenerator();
     }
@@ -48,7 +50,8 @@ public class OrderService : IOrderService, IDisposable
         // eg. binance uses it
         order.ExternalOrderId = _idGenerator.NewTimeBasedId;
         _execution.SendOrder(order);
-        _log.Info("Sending order: " + order);
+        _log.Info("Sent a new order: " + order);
+        Persist(order);
     }
 
     public void CancelOrder(long orderId)
@@ -99,6 +102,37 @@ public class OrderService : IOrderService, IDisposable
     public void Dispose()
     {
         _execution.OrderPlaced -= OnSentOrderAccepted;
-        _execution.OrderCanceled -= OnOrderCancelled;
+        _execution.OrderCancelled -= OnOrderCancelled;
+    }
+
+    public Order CreateManualOrder(Security security,
+                                   decimal price,
+                                   decimal quantity,
+                                   Side side,
+                                   OrderType orderType = OrderType.Limit,
+                                   OrderTimeInForceType timeInForce = OrderTimeInForceType.GoodTillCancel)
+    {
+        var id = _idGenerator.NewTimeBasedId;
+        var now = DateTime.UtcNow;
+        return new Order
+        {
+            Id = id,
+            AccountId = 0, // TODO
+            BrokerId = 0, // TODO
+            CreateTime = now,
+            UpdateTime = now,
+            ExchangeId = ExchangeIds.NameToIds[security.Exchange],
+            ExternalOrderId = id,
+            Price = price,
+            Quantity = quantity,
+            Type = orderType,
+            SecurityCode = security.Code,
+            SecurityId = security.Id,
+            Side = side,
+            Status = OrderStatus.Placing,
+            StopPrice = 0,
+            StrategyId = Constants.ManualTradingStrategyId,
+            TimeInForce = timeInForce,
+        };
     }
 }

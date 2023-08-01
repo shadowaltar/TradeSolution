@@ -5,15 +5,15 @@ namespace TradeCommon.Utils.Common;
 
 public static class CryptographyUtils
 {
-    public static string HashString(string text, string salt = "")
+    public static string Encrypt(string text, string salt = "")
     {
-        if (String.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text))
         {
-            return String.Empty;
+            return string.Empty;
         }
         var inputs = Encoding.UTF8.GetBytes(text + salt);
         var outputs = SHA512.HashData(inputs);
 
-        return BitConverter.ToString(outputs).Replace("-", String.Empty);
+        return BitConverter.ToString(outputs).Replace("-", string.Empty);
     }
 }

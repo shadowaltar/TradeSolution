@@ -20,3 +20,30 @@ public enum Side
     /// </summary>
     Sell = -1,
 }
+
+public class SideConverter
+{
+    public static Side Parse(string? sideStr)
+    {
+        if (sideStr == null)
+            return Side.None;
+
+        sideStr = sideStr.Trim().ToUpperInvariant();
+        return sideStr switch
+        {
+            "B" or "BUY" or "LONG" or "L" or "BID" or "1" => Side.Buy,
+            "S" or "SELL" or "SHORT" or "OFFER" or "-1" => Side.Sell,
+            _ => Side.None
+        };
+    }
+
+    public static string ToBinance(Side side)
+    {
+        return side switch
+        {
+            Side.Buy => "BUY",
+            Side.Sell => "SELL",
+            _ => ""
+        };
+    }
+}

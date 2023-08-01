@@ -23,11 +23,22 @@ public interface IPortfolioService
 
     List<Position> GetPositions(string externalName, SecurityType securityType);
 
+    /// <summary>
+    /// TODO revise
+    /// </summary>
+    /// <param name="externalName"></param>
+    /// <returns></returns>
     List<Balance> GetExternalBalances(string externalName);
 
+    /// <summary>
+    /// TODO revise
+    /// </summary>
+    /// <returns></returns>
     List<Balance> GetCurrentBalances();
 
     List<ProfitLoss> GetRealizedPnl(Security security, DateTime rangeStart, DateTime rangeEnd);
 
     ProfitLoss GetUnrealizedPnl(Security security);
+
+    bool Validate(Order order);
 }

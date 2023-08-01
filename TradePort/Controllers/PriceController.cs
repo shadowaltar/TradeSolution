@@ -7,7 +7,6 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
-using TradeCommon.Utils.Common;
 using TradeDataCore.Essentials;
 using TradeDataCore.MarketData;
 
@@ -154,6 +153,7 @@ public class PriceController : Controller
     /// </summary>
     /// <param name="secTypeStr"></param>
     /// <param name="intervalStr"></param>
+    /// <param name="concatenatedSymbols"></param>
     /// <param name="startStr"></param>
     /// <param name="endStr">Default is UTC Now.</param>
     /// <returns></returns>
@@ -287,16 +287,18 @@ public class PriceController : Controller
     /// <summary>
     /// Download all prices of all securities as JSON from the given exchange.
     /// </summary>
-    /// <param name="exchange"></param>
-    /// <param name="secTypeStr"></param>
-    /// <param name="intervalStr"></param>
-    /// <param name="rangeStr"></param>
+    /// <param name="exchange">Case-insensitive, binance, hkex etc.</param>
+    /// <param name="secTypeStr">Case-insensitive, fx, equity etc.</param>
+    /// <param name="intervalStr">Case-insensitive, 1m, 1h, 1d etc.</param>
+    /// <param name="concatenatedSymbols">Optional security code filter, case-insensitive, comma-delimited: 00001,00002 or BTCUSDT,BTCTUSD, etc.</param>
+    /// <param name="rangeStr">Case-insensitive, 1mo, 1y, 6mo etc.</param>
     /// <returns></returns>
     [HttpGet("{exchange}/download-json")]
     public async Task<ActionResult> DownloadAll(
         string exchange = ExternalNames.Hkex,
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
         [FromQuery(Name = "interval")] string intervalStr = "1h",
+        [FromQuery(Name = "symbols")] string? concatenatedSymbols = "",
         [FromQuery(Name = "range")] string rangeStr = "2y")
     {
         if (intervalStr.IsBlank())
@@ -313,7 +315,16 @@ public class PriceController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
+
+        var symbols = concatenatedSymbols?.Split(',')
+            .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
+
+
         var securities = await Storage.ReadSecurities(exchange, secType);
+        if (symbols != null && symbols.Count > 0)
+        {
+            securities = securities.Where(s => symbols.ContainsIgnoreCase(s.Code)).ToList();
+        }
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
         var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
 

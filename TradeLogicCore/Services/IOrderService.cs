@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Trading;
+﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Trading;
 
 namespace TradeLogicCore.Services;
 
@@ -39,4 +40,22 @@ public interface IOrderService
     /// </summary>
     /// <param name="orderId"></param>
     void CancelOrder(long orderId);
+
+    /// <summary>
+    /// Create an order without any validation.
+    /// To execute, use <see cref="SendOrder(Order)"/>.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="orderType"></param>
+    /// <param name="price"></param>
+    /// <param name="quantity"></param>
+    /// <param name="side"></param>
+    /// <param name="timeInForce"></param>
+    /// <returns></returns>
+    Order CreateManualOrder(Security security,
+                            decimal price,
+                            decimal quantity,
+                            Side side,
+                            OrderType orderType = OrderType.Limit,
+                            OrderTimeInForceType timeInForce = OrderTimeInForceType.GoodTillCancel)
 }

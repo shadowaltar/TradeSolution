@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Essentials.Trading;
+﻿using BenchmarkDotNet.Attributes;
+
+namespace TradeCommon.Essentials.Trading;
 
 /// <summary>
 /// Status enum for an order.
@@ -18,7 +20,7 @@ public enum OrderStatus
     /// </summary>
     Modifying,
     /// <summary>
-    /// The order is to be canceled and not acknowledged by broker yet.
+    /// The order is to be cancelled and not acknowledged by broker yet.
     /// </summary>
     Canceling,
 
@@ -39,13 +41,17 @@ public enum OrderStatus
     /// </summary>
     PartialFilled,
     /// <summary>
-    /// The order is partially filled and already canceled in exchange.
+    /// The order is partially filled and already cancelled in exchange.
     /// </summary>
-    PartialCanceled,
+    PartialCancelled,
     /// <summary>
-    /// The order is not filled at all and already canceled in exchange.
+    /// The order is filled.
     /// </summary>
-    Canceled,
+    Filled,
+    /// <summary>
+    /// The order is not filled at all and already cancelled in exchange.
+    /// </summary>
+    Cancelled,
     /// <summary>
     /// The order is failed, service denied.
     /// </summary>
@@ -59,7 +65,38 @@ public enum OrderStatus
     /// </summary>
     Expired,
     /// <summary>
-    /// The order is deleted: it never reached exchange and canceled on broker side only.
+    /// The order is deleted: it never reached exchange and cancelled on broker side only.
     /// </summary>
     Deleted,
+}
+
+public static class OrderStatusConverter
+{
+    public static OrderStatus ParseBinance(string? statusStr)
+    {
+        if (statusStr == null)
+            return OrderStatus.Unknown;
+
+        statusStr = statusStr.Trim().ToUpperInvariant();
+        return statusStr switch
+        {
+            "NEW" => OrderStatus.Live,
+            "PARTIALLY_FILLED" => OrderStatus.PartialFilled,
+            "FILLED" => OrderStatus.Filled,
+            "CANCELED" => OrderStatus.Cancelled,
+            "REJECTED" => OrderStatus.Rejected,
+            "EXPIRED" or "EXPIRED_IN_MATCH" => OrderStatus.Expired,
+            _ => OrderStatus.Unknown
+        };
+    }
+
+    public static string ToBinance(Side side)
+    {
+        return side switch
+        {
+            Side.Buy => "BUY",
+            Side.Sell => "SELL",
+            _ => ""
+        };
+    }
 }

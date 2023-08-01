@@ -10,7 +10,7 @@ public class Credential
     public static bool IsPasswordCorrect(string password)
     {
         if (password.IsBlank()) return false;
-        if (CryptographyUtils.HashString(password, Salt) == HashedCredential)
+        if (CryptographyUtils.Encrypt(password, Salt) == HashedCredential)
             return true;
         return false;
     }

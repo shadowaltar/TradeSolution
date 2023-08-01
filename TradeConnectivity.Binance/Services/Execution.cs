@@ -6,6 +6,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Utils.Common;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeConnectivity.Binance.Services;
@@ -15,8 +16,8 @@ public class Execution : IExternalExecutionManagement
 
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
-    public event OrderCanceledCallback? OrderCanceled;
-    public event AllOrderCanceledCallback? AllOrderCanceled;
+    public event OrderCancelledCallback? OrderCancelled;
+    public event AllOrderCancelledCallback? AllOrderCancelled;
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
@@ -92,14 +93,44 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Send an order to Binance.
+    /// It is a SIGNED endpoint.
+    /// </summary>
+    /// <param name="order"></param>
+    /// <returns></returns>
     public async Task SendOrder(Order order)
     {
         var url = $"{RootUrls.DefaultHttps}/api/v3/order?symbol={order.SecurityCode}";
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
 
-        request.Headers.Add("X-MBX-APIKEY", "");
+        BuildRequest(request, order);
 
         await _httpClient.SendAsync(request);
+    }
+
+    private void BuildRequest(HttpRequestMessage request, Order order)
+    {
+        // add 'signature' to body: an HMAC-SHA256 signature
+        // add 'timestamp' and 'receive window'
+        const int receiveWindowMs = 1000;
+        var timestamp = DateTime.UtcNow.ToUnixMs();
+
+        request.Headers.Add("X-MBX-APIKEY", Keys.ApiKey);
+
+        // example: symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559&signature=blablabla
+        var parameters = new Dictionary<string, string>();
+        parameters["symbol"] = order.SecurityCode;
+        parameters["side"] = order.Side.ToString().ToUpperInvariant();
+        parameters["type"] = order.Type.ToString().ToUpperInvariant();
+        parameters["timeInForce"] = order.TimeInForce.ConvertEnumToDescription();
+        parameters["quantity"] = order.Quantity.ToString();
+        parameters["price"] = order.Price.ToString();
+        parameters["recvWindow"] = receiveWindowMs.ToString();
+        parameters["timestamp"] = timestamp.ToString();
+        parameters["signature"] = Keys.SecretKey;
+                
+        request.Content = new StringContent(StringUtils.ToUrlParamString(parameters));
     }
 }
