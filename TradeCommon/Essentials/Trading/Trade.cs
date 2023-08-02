@@ -68,6 +68,11 @@ public class Trade
     public decimal Fee { get; set; }
 
     /// <summary>
+    /// The currency of the fee.
+    /// </summary>
+    public string FeeCurrency { get; set; } = "";
+
+    /// <summary>
     /// The broker's ID.
     /// </summary>
     public int BrokerId { get; set; } = BrokerIds.NameToIds[ExternalNames.Unknown];

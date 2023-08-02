@@ -35,7 +35,7 @@ public class ConnectionProxy : FTSPI_Conn
         var result = new ExternalConnectionState
         {
             Type = SubscriptionType.QuotationService,
-            Action = ConnectionActionType.Connect,
+            Action = ExternalActionType.Connect,
             StatusCode = errCode == 0 ? nameof(StatusCodes.ConnectionOk) : $"{nameof(StatusCodes.ConnectionFailed)},{errCode}",
             ExternalPartyId = ExternalNames.Futu,
             UniqueConnectionId = client.GetConnectID().ToString(),
@@ -49,7 +49,7 @@ public class ConnectionProxy : FTSPI_Conn
         var result = new ExternalConnectionState
         {
             Type = SubscriptionType.QuotationService,
-            Action = ConnectionActionType.Disconnect,
+            Action = ExternalActionType.Disconnect,
             StatusCode = errCode == 0 ? nameof(StatusCodes.DisconnectionOk) : $"{nameof(StatusCodes.DisconnectionFailed)},{errCode}",
             ExternalPartyId = ExternalNames.Futu,
             UniqueConnectionId = client.GetConnectID().ToString()

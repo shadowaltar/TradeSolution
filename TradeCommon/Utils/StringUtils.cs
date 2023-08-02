@@ -1,9 +1,9 @@
 ﻿using System.Text;
 
-namespace TradeCommon.Utils.Common;
+namespace TradeCommon.Utils;
 public static class StringUtils
 {
-    public static string ToUrlParamString(Dictionary<string, string> data)
+    public static string ToUrlParamString(List<(string, string)> data)
     {
         var sb = new StringBuilder();
         foreach (var (key, value) in data)

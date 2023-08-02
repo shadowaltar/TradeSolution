@@ -4,6 +4,7 @@ using TradeCommon.Database;
 using TradeCommon.Externals;
 using log4net;
 using TradeCommon.Essentials.Instruments;
+using System.Drawing;
 
 namespace TradeLogicCore.Services;
 public class TradeService : ITradeService, IDisposable
@@ -109,7 +110,8 @@ public class TradeService : ITradeService, IDisposable
 
     public async Task<List<Trade>?> GetMarketTrades(Security security)
     {
-        return await _execution.GetMarketTrades(security);
+        var state = await _execution.GetMarketTrades(security);
+        return state.Content;
     }
 
     public Task<List<Trade>?> GetTrades(Security security)

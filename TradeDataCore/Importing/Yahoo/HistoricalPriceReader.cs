@@ -173,7 +173,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
                             var contentObj = splitObj.Value;
                             var numerator = contentObj.GetDecimal("numerator");
                             var denominator = contentObj.GetDecimal("denominator");
-                            var exDate = contentObj.GetLocalUnixDateTime("date");
+                            var exDate = contentObj.GetLocalFromUnixMs("date");
                             if (payableDate == default || numerator == default || denominator == default || exDate == default)
                             {
                                 _log.Warn($"Invalid stock split entry. Payable:{payableDate.ToString(Constants.DefaultDateFormat)},Ex:{exDate.ToString(Constants.DefaultDateFormat)},N/D:{numerator}/{denominator}");
@@ -191,7 +191,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
                             var exDate = dividendObj.Key?.ParseLocalUnixDate() ?? default;
                             var contentObj = dividendObj.Value;
                             var amount = contentObj.GetDecimal("amount");
-                            var paymentDate = contentObj.GetLocalUnixDateTime("date");
+                            var paymentDate = contentObj.GetLocalFromUnixMs("date");
                             if (exDate == default || amount == default || paymentDate == default)
                             {
                                 _log.Warn($"Invalid dividend entry. Ex:{exDate:yyyyMMdd},Payment:{paymentDate:yyyyMMdd},Amt:{amount}");
@@ -212,7 +212,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
             }
 
             var missingDataIndexes = new HashSet<int>(); // some items will have missing values
-            var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalUnixDateTime()).ToArray();
+            var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalFromUnixMs()).ToArray();
             var highs = ToDecimalValues(quoteRootObj, "high");
             var lows = ToDecimalValues(quoteRootObj, "low");
             var opens = ToDecimalValues(quoteRootObj, "open");

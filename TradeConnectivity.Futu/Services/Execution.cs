@@ -2,6 +2,7 @@
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeConnectivity.Futu.Services;
@@ -16,17 +17,37 @@ public class Execution : IExternalExecutionManagement
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
-    public Task CancelAllOrder(Order order)
+    public Task<ExternalQueryState<List<Order>>> CancelAllOrder(Security security)
     {
         throw new NotImplementedException();
     }
 
-    public Task CancelOrder(Order order)
+    public Task<ExternalQueryState<Order>> CancelOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public Task<List<Trade>?> GetMarketTrades(Security security)
+    public Task<ExternalQueryState<Account>> GetAccount()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<List<Trade>?>> GetMarketTrades(Security security)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<List<Order>>> GetOpenOrders(Security? security = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<Order>> GetOrder(Security security, long orderId = 0, long externalOrderId = 0)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<int>> GetOrderSpeedLimit()
     {
         throw new NotImplementedException();
     }
@@ -36,12 +57,12 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
-    public Task ModifyOrder(Order order)
+    public Task<ExternalQueryState<Order>> SendOrder(Order order)
     {
         throw new NotImplementedException();
     }
 
-    public Task SendOrder(Order order)
+    public Task<ExternalQueryState<Order>> UpdateOrder(Order order)
     {
         throw new NotImplementedException();
     }

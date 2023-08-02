@@ -138,7 +138,7 @@ public class OrderService : IOrderService, IDisposable
             CreateTime = now,
             UpdateTime = now,
             ExchangeId = ExchangeIds.GetId(security.Exchange),
-            ExternalOrderId = id,
+            ExternalOrderId = id, // it maybe changed later by the exchange/broker
             Price = price,
             Quantity = quantity,
             Type = orderType,

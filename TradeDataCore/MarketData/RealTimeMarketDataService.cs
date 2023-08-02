@@ -37,7 +37,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
         {
             return new ExternalConnectionState
             {
-                Action = ConnectionActionType.Subscribe,
+                Action = ExternalActionType.Subscribe,
                 StatusCode = nameof(StatusCodes.InvalidArgument),
                 ExternalPartyId = security.Exchange,
                 Description = "Unknown combination of security type, sub-type and exchange name: " + security,

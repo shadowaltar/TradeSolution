@@ -2,7 +2,7 @@
 using log4net;
 using System.IO.Compression;
 
-namespace TradeCommon.Utils.Common;
+namespace Common;
 public class Zip
 {
     private static readonly ILog _log = Logger.New();

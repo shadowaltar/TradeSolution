@@ -1,6 +1,7 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeCommon.Externals;
@@ -8,26 +9,34 @@ public interface IExternalExecutionManagement
 {
     bool IsFakeOrderSupported { get; }
 
-    Task<bool> Initialize(User user);
-
-    Task SendOrder(Order order);
-
-    Task CancelOrder(Order order);
-
-    Task ModifyOrder(Order order);
-
-    Task CancelAllOrder(Order order);
-
-    /// <summary>
-    /// Get all the (recent) trades visible in the market with a given security.
-    /// </summary>
-    /// <returns></returns>
-    Task<List<Trade>?> GetMarketTrades(Security security);
-
     event OrderPlacedCallback? OrderPlaced;
     event OrderModifiedCallback? OrderModified;
     event OrderCancelledCallback? OrderCancelled;
     event AllOrderCancelledCallback? AllOrderCancelled;
     event TradeReceivedCallback? TradeReceived;
     event TradesReceivedCallback? TradesReceived;
+
+    Task<bool> Initialize(User user);
+
+    Task<ExternalQueryState<Order>> SendOrder(Order order);
+
+    Task<ExternalQueryState<Order>> CancelOrder(Order order);
+
+    Task<ExternalQueryState<Order>> GetOrder(Security security, long orderId = 0, long externalOrderId = 0);
+
+    Task<ExternalQueryState<List<Order>>> GetOpenOrders(Security? security = null);
+
+    Task<ExternalQueryState<Order>> UpdateOrder(Order order);
+
+    Task<ExternalQueryState<List<Order>>> CancelAllOrder(Security security);
+
+    Task<ExternalQueryState<int>> GetOrderSpeedLimit();
+
+    /// <summary>
+    /// Get all the (recent) trades visible in the market with a given security.
+    /// </summary>
+    /// <returns></returns>
+    Task<ExternalQueryState<List<Trade>?>> GetMarketTrades(Security security);
+
+    Task<ExternalQueryState<Account>> GetAccount();
 }

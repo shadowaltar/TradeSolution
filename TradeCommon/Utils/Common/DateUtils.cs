@@ -1,4 +1,6 @@
-﻿namespace Common;
+﻿using System.Runtime.CompilerServices;
+
+namespace Common;
 public static class DateUtils
 {
     public static int ToUnixSec(this DateTime value)
@@ -11,22 +13,22 @@ public static class DateUtils
         return (long)value.Subtract(DateTime.UnixEpoch).TotalMilliseconds;
     }
 
-    public static DateTime FromLocalUnixSec(int unixSec)
+    public static DateTime FromLocalUnixSec(this int unixSec)
     {
         return DateTimeOffset.FromUnixTimeSeconds(unixSec).ToLocalTime().DateTime;
     }
 
-    public static DateTime FromLocalUnixMs(long unixMs)
+    public static DateTime FromLocalUnixMs(this long unixMs)
     {
         return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).ToLocalTime().DateTime;
     }
 
-    public static DateTime FromUnixSec(int unixSec)
+    public static DateTime FromUnixSec(this int unixSec)
     {
         return DateTimeOffset.FromUnixTimeSeconds(unixSec).DateTime;
     }
 
-    public static DateTime FromUnixMs(long unixMs)
+    public static DateTime FromUnixMs(this long unixMs)
     {
         return DateTimeOffset.FromUnixTimeMilliseconds(unixMs).DateTime;
     }

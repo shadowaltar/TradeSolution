@@ -4,6 +4,8 @@ namespace TradeCommon.Essentials.Trading;
 
 public enum OrderTimeInForceType
 {
+    Unknown,
+
     /// <summary>
     /// (GoodTillDay) Order is valid until today's market close, or a specific date if set.
     /// </summary>

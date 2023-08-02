@@ -10,7 +10,12 @@ public enum OrderStatus
     /// <summary>
     /// Unknown status (usually invalid).
     /// </summary>
-    Unknown,
+    Unknown = 0,
+    /// <summary>
+    /// Unknown status due to unrecognizable message received.
+    /// </summary>
+    UnknownResponse = 0,
+
     /// <summary>
     /// The order is to be placed and not acknowledged by broker yet.
     /// </summary>

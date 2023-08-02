@@ -1,8 +1,9 @@
 ﻿using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Externals;
 
 public interface ISupportFakeOrder
 {
-    Task SendFakeOrder(Order order);
+    Task<ExternalQueryState<Order>> SendFakeOrder(Order order);
 }

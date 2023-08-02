@@ -55,17 +55,22 @@ public class Order
     /// Price of a (limit) order. For a <see cref="OrderType.Market"/> order
     /// this field is meaningless.
     /// </summary>
-    public decimal Price { get; set; }
+    public decimal Price { get; set; } = 0;
 
     /// <summary>
     /// Price of a stop order.
     /// </summary>
-    public decimal StopPrice { get; set; } = decimal.MinValue;
+    public decimal StopPrice { get; set; } = 0;
 
     /// <summary>
     /// Quantity to be traded.
     /// </summary>
-    public decimal Quantity { get; set; } = decimal.MinValue;
+    public decimal Quantity { get; set; } = 0;
+
+    /// <summary>
+    /// Currently filled quantity.
+    /// </summary>
+    public decimal FilledQuantity { get; set; } = 0;
 
     /// <summary>
     /// Status of this order
@@ -119,6 +124,12 @@ public class Order
     /// </summary>
     [UpsertIgnore]
     public AdvancedOrderSettings? AdvancedOrderSettings { get; set; }
+
+    /// <summary>
+    /// Gets if the order is successfully placed (either it is still alive or filled).
+    /// </summary>
+    [UpsertIgnore]
+    public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
 
     public override string ToString()
     {

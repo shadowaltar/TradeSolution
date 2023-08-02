@@ -44,7 +44,7 @@ public class Account
     public string Type { get; set; }
 
     /// <summary>
-    /// Subt-type of the account. Some brokers may contain multiple levels of types.
+    /// Sub-type of the account. Some brokers may contain multiple levels of types.
     /// </summary>
     public string SubType { get; set; }
 

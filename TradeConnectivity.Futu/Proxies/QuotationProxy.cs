@@ -44,7 +44,7 @@ public class QuotationProxy : FTSPI_Qot
         return new ExternalConnectionState
         {
             Type = SubscriptionType.QuotationService,
-            Action = ConnectionActionType.Connect,
+            Action = ExternalActionType.Connect,
             StatusCode = nameof(StatusCodes.SubscriptionWaiting),
             ExternalPartyId = ExternalNames.Futu,
             UniqueConnectionId = seqNo.ToString(),
@@ -236,7 +236,7 @@ public class QuotationProxy : FTSPI_Qot
         var result = new ExternalConnectionState
         {
             Type = SubscriptionType.QuotationService,
-            Action = ConnectionActionType.Subscribe,
+            Action = ExternalActionType.Subscribe,
             StatusCode = rsp.ErrCode == 0 ? nameof(StatusCodes.SubscriptionOk) : $"{nameof(StatusCodes.SubscriptionFailed)},{rsp.ErrCode}",
             ExternalPartyId = ExternalNames.Futu,
             UniqueConnectionId = nSerialNo.ToString(),
