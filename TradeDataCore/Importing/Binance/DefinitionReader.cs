@@ -2,8 +2,8 @@
 using log4net;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeDataCore.Importing.Binance;
 

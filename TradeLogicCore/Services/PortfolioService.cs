@@ -1,19 +1,18 @@
 ﻿using Common;
+using log4net;
+using TradeCommon.Database;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
-using TradeCommon.Database;
-using TradeDataCore.Instruments;
-using log4net;
 using TradeCommon.Externals;
-using TradeCommon.Essentials;
 
 namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService, IDisposable
 {
     private static readonly ILog _log = Logger.New();
 
-    private static readonly IdGenerator _positionIdGenerator = new();
+    private readonly IdGenerator _positionIdGenerator = new("PositionIdGen");
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
     private readonly Persistence _persistence;
@@ -94,6 +93,11 @@ public class PortfolioService : IPortfolioService, IDisposable
             PositionCreated?.Invoke(position);
             Persist(position);
         }
+    }
+
+    public bool SelectUser(User user)
+    {
+        return AsyncHelper.RunSync(() => ExternalExecution.Initialize(user));
     }
 
     public List<Position> GetOpenPositions()
@@ -182,17 +186,17 @@ public class PortfolioService : IPortfolioService, IDisposable
             return;
         }
 
-        var newQuantity = position.Quantity + ((int)trade.Side) * trade.Quantity;
+        var newQuantity = position.Quantity + (((int)trade.Side) * trade.Quantity);
         var oldValue = position.Price * position.Quantity;
         var tradeValue = trade.Price * trade.Quantity;
-        var newValue = oldValue + ((int)trade.Side) * tradeValue;
+        var newValue = oldValue + (((int)trade.Side) * tradeValue);
 
         var newPrice = position.Price;
         var newPnl = 0m;
         if (Math.Sign(position.Quantity) != (int)trade.Side)
         {
             // decreasing the size of position, so the average price should not change
-            newPnl = tradeValue - position.Price * trade.Quantity;
+            newPnl = tradeValue - (position.Price * trade.Quantity);
         }
         else
         {
@@ -228,9 +232,10 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public Account GetAccountByName(string accountName)
+    public async Task<Account> GetAccountByName(string accountName)
     {
+        var state = await ExternalExecution.GetAccount();
         // TODO
-        return new Account { Id = 0, Name = "0" };
+        return state.Content;
     }
 }

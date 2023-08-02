@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
-using TradeCommon.Essentials.Quotes;
 
-namespace Common;
+namespace TradeCommon.Utils.Common;
 
 public class MessageBroker<T> : IDisposable
 {
@@ -35,9 +34,7 @@ public class MessageBroker<T> : IDisposable
 
     public T? Dequeue()
     {
-        if (_queue.TryDequeue(out var item))
-            return item;
-        return default;
+        return _queue.TryDequeue(out var item) ? item : default;
     }
 
     protected virtual void Dispose(bool disposing)

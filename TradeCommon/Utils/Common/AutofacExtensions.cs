@@ -1,10 +1,4 @@
 ﻿using Autofac;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Constants;
 
 namespace Common;
 public static class AutofacExtensions
@@ -23,6 +17,12 @@ public static class AutofacExtensions
         where T : notnull
     {
         builder.RegisterType<T>().AsSelf().SingleInstance();
+    }
+
+    public static void RegisterSingletonInstance<T>(this ContainerBuilder builder, object instance)
+        where T : notnull
+    {
+        builder.RegisterInstance(instance).AsSelf().SingleInstance();
     }
 
     public static void RegisterSingleton<T>(this ContainerBuilder builder, object key)

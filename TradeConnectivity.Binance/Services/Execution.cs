@@ -1,9 +1,8 @@
-﻿using Azure.Core;
-using Common;
+﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
+using Microsoft.Diagnostics.Runtime.Utilities;
 using System.Diagnostics;
-using System.Security.Policy;
+using System.Text;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -12,6 +11,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
+using TradeCommon.Utils.Common;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeConnectivity.Binance.Services;
@@ -25,8 +25,9 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 {
     private static readonly ILog _log = Logger.New();
     private readonly HttpClient _httpClient;
-
-    private static readonly string _receiveWindowMs = (10000).ToString();
+    private readonly KeyManager _keyManager;
+    private IdGenerator _cancelIdGenerator;
+    private static readonly string _receiveWindowMs = 5000.ToString();
 
     public bool IsFakeOrderSupported => true;
 
@@ -37,14 +38,16 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
-    public Execution(HttpClient httpClient)
+    public Execution(HttpClient httpClient, KeyManager keyManager)
     {
         _httpClient = httpClient;
+        _keyManager = keyManager;
+        _cancelIdGenerator = new IdGenerator("CancelOrderIdGen");
     }
 
     public async Task<bool> Initialize(User user)
     {
-        throw new NotImplementedException();
+        return _keyManager.Select(user);
     }
 
     /// <summary>
@@ -71,6 +74,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
     private async Task<ExternalQueryState<Order>> SendOrder(string url, Order order)
     {
+        var isOk = false;
         var swTotal = Stopwatch.StartNew();
         using var request = new HttpRequestMessage();
         var payload = BuildOrderRequest(request, url, order);
@@ -85,15 +89,15 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         List<Trade>? fills = null;
         var json = JsonNode.Parse(responseString);
-        if (json != null)
+        if (json != null && responseString != "" && responseString != "{}")
+        {
             Parse(json, order, out fills);
+            isOk = true;
+        }
         else
+        {
             order.Status = OrderStatus.UnknownResponse;
-
-        // raise events
-        OrderPlaced?.Invoke(order.IsSuccessful, order);
-        if (!fills.IsNullOrEmpty())
-            TradesReceived?.Invoke(fills);
+        }
 
         var state = new ExternalQueryState<Order>
         {
@@ -101,27 +105,38 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             ResponsePayload = payload,
             Action = ExternalActionType.SendOrder,
             ExternalPartyId = ExternalNames.Binance,
-            StatusCode = (int)response.StatusCode,
+            StatusCode = isOk ? StatusCodes.SendOrderOk : StatusCodes.SendOrderFailed,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = responseString,
         };
         swTotal.Stop();
         state.NetworkRoundtripTime = swHttpRoundtrip.ElapsedMilliseconds;
         state.TotalTime = swTotal.ElapsedMilliseconds;
+
+        // raise events
+        OrderPlaced?.Invoke(order.IsSuccessful, state);
+        if (!fills.IsNullOrEmpty())
+            TradesReceived?.Invoke(fills);
+
         return state;
 
         static void Parse(JsonNode json, Order order, out List<Trade>? fills)
         {
+            fills = null;
+
+            var code = json.GetInt("code");
+            if (code is < 0 and not int.MinValue)
+                return;
             order.ExternalOrderId = json.GetLong("orderId");
-            order.Status = json.GetString("status").ConvertDescriptionToEnum<OrderStatus>();
+            order.Status = OrderStatusConverter.ParseBinance(json.GetString("status"));
             order.ExternalCreateTime = json.GetUtcFromUnixMs("transactTime"); // TODO not sure if workingTime is useful or not
             order.FilledQuantity = json.GetDecimal("executedQty");
 
-            fills = null;
-            var fillsObj = json["fills"];
-            if (fillsObj != null)
+            var fillsObj = json["fills"]?.AsArray();
+            if (fillsObj != null && fillsObj?.Count != 0)
             {
                 fills = new List<Trade>();
-                foreach (JsonNode? item in fillsObj.AsArray())
+                foreach (JsonNode? item in fillsObj!)
                 {
                     fills.Add(new Trade
                     {
@@ -150,6 +165,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <returns></returns>
     public async Task<ExternalQueryState<Order>> CancelOrder(Order order)
     {
+        var isOk = false;
         var swTotal = Stopwatch.StartNew();
         var url = $"{RootUrls.DefaultHttps}/api/v3/order";
         using var request = new HttpRequestMessage();
@@ -157,7 +173,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         {
             ("symbol", order.SecurityCode),
             //("orderId", order.ExternalOrderId.ToString()), // the Binance order Id takes precedence
-            ("origClientOrderId", order.Id.ToString())
+            ("origClientOrderId", order.Id.ToString()),
+            ("newClientOrderId", _cancelIdGenerator.NewTimeBasedId.ToString())
         };
         var payload = BuildRequest(request, HttpMethod.Delete, url, true, parameters);
 
@@ -167,18 +184,34 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         var responseString = await CheckContentAndStatus(response);
         CheckResponseHeader(response);
+
+        var rootObj = JsonNode.Parse(responseString)?.AsObject();
+        if (rootObj != null && responseString != "" && responseString != "{}")
+        {
+            // var cancelId = rootObj.GetLong("clientOrderId"); // should be equal to the above newClientOrderId
+            order.ExternalUpdateTime = rootObj.GetUtcFromUnixMs("transactTime");
+            order.Status = OrderStatusConverter.ParseBinance(rootObj.GetString("status"));
+            isOk = true;
+        }
+
         var state = new ExternalQueryState<Order>
         {
-            Content = null, // TODO
+            Content = order,
             ResponsePayload = payload,
             Action = ExternalActionType.CancelOrder,
             ExternalPartyId = ExternalNames.Binance,
-            StatusCode = (int)response.StatusCode,
+            StatusCode = isOk ? StatusCodes.CancelOrderOk : StatusCodes.CancelOrderFailed,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = responseString,
         };
+
         swTotal.Stop();
         state.NetworkRoundtripTime = swHttpRoundtrip.ElapsedMilliseconds;
         state.TotalTime = swTotal.ElapsedMilliseconds;
+
+        // raise events
+        OrderCancelled?.Invoke(isOk, state);
+
         return state;
     }
 
@@ -212,6 +245,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.CancelAllOrders,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = responseString,
         };
         swTotal.Stop();
@@ -251,6 +285,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = $"Got {content?.Count} recent trade entries in the market for {security.Code}.",
         };
         swOuter.Stop();
@@ -349,6 +384,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = $"Got one order for {security.Code}.",
         };
         swOuter.Stop();
@@ -360,9 +396,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         static Order? Parse(string json, Security security)
         {
             var rootObj = JsonNode.Parse(json)?.AsObject();
-            if (rootObj == null)
-                return null;
-            return ParseOrder(rootObj, security.Id);
+            return rootObj == null ? null : ParseOrder(rootObj, security.Id);
         }
     }
 
@@ -403,6 +437,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = $"Got {orders.Count} open orders.",
         };
         swOuter.Stop();
@@ -468,6 +503,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.CheckOrderSpeedLimit,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
+            UniqueConnectionId = GetUniqueConnectionId(response),
             Description = content,
         };
         swOuter.Stop();
@@ -490,16 +526,17 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
         swInner.Stop();
-
-        var content = await CheckContentAndStatus(response);
+        // example json: var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
+        var responseJson = await CheckContentAndStatus(response);
         var ees = new ExternalQueryState<Account>
         {
             Content = null, // TODO
-            ResponsePayload = content,
+            ResponsePayload = responseJson,
             Action = ExternalActionType.GetAccount,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            Description = content,
+            UniqueConnectionId = GetUniqueConnectionId(response),
+            Description = "Get account info",
         };
         swOuter.Stop();
         ees.NetworkRoundtripTime = swInner.ElapsedMilliseconds;
@@ -534,17 +571,25 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <param name="response"></param>
     private static void CheckResponseHeader(HttpResponseMessage response)
     {
-        foreach (var (key, value) in response.Headers)
+        foreach (var (key, valueArray) in response.Headers)
         {
-            if (key.StartsWith("X-MBX-ORDER-COUNT-"))
+            if (key.StartsWithIgnoreCase("X-MBX-ORDER-COUNT-"))
             {
                 // TODO
             }
-            else if (key.StartsWith("X-MBX-USED-WEIGHT-"))
+            else if (key.StartsWithIgnoreCase("X-MBX-USED-WEIGHT-"))
             {
+                if (key.EndsWithIgnoreCase("1s"))
+                {
+                    var value = ((string[])valueArray)[0];
+                }
+                else if (key.EndsWithIgnoreCase("1m"))
+                {
+
+                }
                 // TODO
             }
-            else if (key.StartsWith("Retry-After"))
+            else if (key.StartsWithIgnoreCase("Retry-After"))
             {
                 // TODO
             }
@@ -559,8 +604,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <returns></returns>
     private string BuildOrderRequest(HttpRequestMessage request, string url, Order order)
     {
-        // example: symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559&signature=blablabla
-        var parameters = new List<(string, string)>(6 + 3)
+        var parameters = new List<(string, string)>(7 + 3)
         {
             ("symbol", order.SecurityCode),
             ("side", order.Side.ToString().ToUpperInvariant()),
@@ -585,47 +629,43 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// Append keys and timestamp into query string (for GET)
     /// or payload (for non-GET) if it is a SIGNED endpoint.</param>
     /// <returns></returns>
-    private static string BuildRequest(HttpRequestMessage request,
-                                       HttpMethod method,
-                                       string url,
-                                       bool isSignedEndpoint,
-                                       List<(string key, string value)>? parameters = null)
+    private string BuildRequest(HttpRequestMessage request,
+                                HttpMethod method,
+                                string url,
+                                bool isSignedEndpoint,
+                                List<(string key, string value)>? parameters = null)
     {
         request.Method = method;
 
+        var result = "";
         if (isSignedEndpoint)
         {
             parameters ??= new List<(string, string)>();
-            AppendSignedParameters(request, parameters);
+            result = AppendSignedParameters(request, parameters);
         }
 
-        if (method != HttpMethod.Get)
+        if (method == HttpMethod.Get)
         {
-            var result = "";
-            if (!parameters.IsNullOrEmpty())
-            {
-                result = StringUtils.ToUrlParamString(parameters);
-                request.Content = new StringContent(result);
-            }
-            request.RequestUri = new Uri(url);
-            return result;
+            request.RequestUri = !result.IsBlank()
+                ? new Uri($"{url}?{result}")
+                : new Uri(url);
+            return ""; // payload is empty
         }
         else
         {
-            if (!parameters.IsNullOrEmpty())
+            // if signed, result string is already constructed
+            if (!parameters.IsNullOrEmpty() && result.IsBlank())
             {
-                request.RequestUri = new Uri(url + "?" + StringUtils.ToUrlParamString(parameters!));
+                result = StringUtils.ToUrlParamString(parameters);
             }
-            else
-            {
-                request.RequestUri = new Uri(url);
-            }
-            return "";
+            request.Content = new StringContent(result);
+            request.RequestUri = new Uri(url);
+            return result;
         }
     }
 
-    private static void AppendSignedParameters(HttpRequestMessage request,
-                                               List<(string key, string value)>? parameters)
+    private string AppendSignedParameters(HttpRequestMessage request,
+                                          List<(string key, string value)>? parameters)
     {
         // add 'signature' to POST body (or as GET arguments): an HMAC-SHA256 signature
         // add 'timestamp' and 'receive window'
@@ -635,7 +675,13 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         parameters ??= new();
         parameters.Add(("recvWindow", _receiveWindowMs));
         parameters.Add(("timestamp", timestamp.ToString()));
-        parameters.Add(("signature", Keys.SecretKey));
+
+        var paramString = StringUtils.ToUrlParamString(parameters);
+        var valueBytes = Encoding.UTF8.GetBytes(paramString);
+        var hashedValueBytes = _keyManager.Hasher!.ComputeHash(valueBytes);
+        var trueSecret = Convert.ToHexString(hashedValueBytes);
+
+        return $"{paramString}&signature={trueSecret}";
     }
 
     private static bool ValidateExchange<T>(Security security, out ExternalQueryState<T>? errorState)
@@ -657,6 +703,11 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         return true;
     }
 
+    private static string GetUniqueConnectionId(HttpResponseMessage response)
+    {
+        return response.Headers.TryGetValues("x-mbx-uuid", out var valArray) ?
+            valArray.FirstOrDefault() ?? "" : "";
+    }
 
     private static Order? ParseOrder(JsonObject? rootObj, int? securityId)
     {

@@ -5,6 +5,7 @@ using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Services;
 
@@ -33,7 +34,7 @@ public class OrderService : IOrderService, IDisposable
         _execution.OrderPlaced += OnSentOrderAccepted;
         _execution.OrderCancelled += OnOrderCancelled;
 
-        _idGenerator = new IdGenerator();
+        _idGenerator = new IdGenerator("OrderIdGen");
     }
 
     public Order? GetOrder(long orderId)
@@ -50,7 +51,11 @@ public class OrderService : IOrderService, IDisposable
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
-        order.ExternalOrderId = _idGenerator.NewTimeBasedId;
+        if (order.Id == 0)
+            order.Id = _idGenerator.NewTimeBasedId;
+        if (order.CreateTime == DateTime.MinValue)
+            order.CreateTime = DateTime.UtcNow;
+        order.ExternalOrderId = order.Id.ReverseDigits();
         if (isFakeOrder && _execution is ISupportFakeOrder fakeOrderEndPoint)
         {
             fakeOrderEndPoint.SendFakeOrder(order);
@@ -74,13 +79,28 @@ public class OrderService : IOrderService, IDisposable
         var order = GetOrder(orderId);
         if (order != null)
         {
+            order.UpdateTime = DateTime.UtcNow;
+            order.Status = OrderStatus.Canceling;
+
             _execution.CancelOrder(order);
             _log.Info("Canceling order: " + order);
         }
     }
 
-    private void OnSentOrderAccepted(bool isSuccessful, Order order)
+    private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState<Order> state)
     {
+        if (!isSuccessful)
+        {
+            _log.Warn("Received a sent order action with issue.");
+        }
+
+        var order = state.Content;
+        if (order == null)
+        {
+            _log.Warn("Received a state object without content!");
+            return;
+        }
+
         lock (_lock)
             _orders[order.Id] = order;
 
@@ -90,8 +110,20 @@ public class OrderService : IOrderService, IDisposable
         Persist(order);
     }
 
-    private void OnOrderCancelled(bool isSuccessful, Order order)
+    private void OnOrderCancelled(bool isSuccessful, ExternalQueryState<Order> state)
     {
+        if (!isSuccessful)
+        {
+            _log.Warn("Received a cancel order action with issue.");
+        }
+
+        var order = state.Content;
+        if (order == null)
+        {
+            _log.Warn("Received a state object without content!");
+            return;
+        }
+
         lock (_lock)
         {
             _orders.Remove(order.Id);

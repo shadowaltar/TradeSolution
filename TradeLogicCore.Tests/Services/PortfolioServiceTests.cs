@@ -24,7 +24,7 @@ public class PortfolioServiceTests
     public void MergeTest()
     {
         const int orderId = 1;
-        var idGen = new IdGenerator();
+        var idGen = new IdGenerator("PortfolioServiceTestsIdGen");
         var trades = new List<Trade>();
         var service = new PortfolioService(
             Mock.Of<IExternalExecutionManagement>(),

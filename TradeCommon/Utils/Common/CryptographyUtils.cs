@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace TradeCommon.Utils.Common;
+namespace Common;
 
 public static class CryptographyUtils
 {

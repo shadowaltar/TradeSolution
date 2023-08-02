@@ -339,6 +339,7 @@ public class PriceController : Controller
         {
             var filePath = await JsonWriter.ToJsonFile(extendedResults, dataFilePath);
             var zipFilePath = dataFilePath.Replace(".json", ".zip");
+            System.IO.File.Delete(zipFilePath);
             Zip.Archive(dataFilePath, zipFilePath);
             return System.IO.File.Exists(zipFilePath)
                 ? File(System.IO.File.OpenRead(zipFilePath), "application/octet-stream", Path.GetFileName(zipFilePath))

@@ -4,6 +4,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
+using TradeCommon.Utils.Common;
 
 namespace TradeConnectivity.Binance.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement

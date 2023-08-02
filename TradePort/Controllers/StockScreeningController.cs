@@ -5,8 +5,6 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Utils.Evaluation;
-using TradeDataCore.Instruments;
-using TradeDataCore.MarketData;
 using TradeLogicCore.Indicators;
 using TradeLogicCore.Instruments;
 

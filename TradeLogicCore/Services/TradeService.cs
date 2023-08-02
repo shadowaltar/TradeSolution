@@ -1,10 +1,9 @@
 ﻿using Common;
-using TradeCommon.Essentials.Trading;
-using TradeCommon.Database;
-using TradeCommon.Externals;
 using log4net;
+using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
-using System.Drawing;
+using TradeCommon.Essentials.Trading;
+using TradeCommon.Externals;
 
 namespace TradeLogicCore.Services;
 public class TradeService : ITradeService, IDisposable

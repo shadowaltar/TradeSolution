@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Common;
+﻿namespace Common;
 public class IdGenerator
 {
     private long _longId;
@@ -13,11 +7,18 @@ public class IdGenerator
 
     private readonly object _lock = new();
 
+    public IdGenerator(string name)
+    {
+        Name = name;
+    }
+
+    public string Name { get; }
+
     public long NewLong => Interlocked.Increment(ref _longId);
 
     public int NewInt => Interlocked.Increment(ref _intId);
 
-    public static string NewGuid => System.Guid.NewGuid().ToString();
+    public static string NewGuid => Guid.NewGuid().ToString();
 
     public long NewTimeBasedId
     {
@@ -26,10 +27,15 @@ public class IdGenerator
             lock (_lock)
             {
                 _sequentialSuffix++;
-                if (_sequentialSuffix == 100)
+                if (_sequentialSuffix == 10)
                     _sequentialSuffix = 0;
-                return DateTime.UtcNow.Ticks * 100 + _sequentialSuffix;
+                return DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
             }
         }
+    }
+
+    public override string? ToString()
+    {
+        return Name;
     }
 }

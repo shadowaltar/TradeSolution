@@ -1,7 +1,6 @@
 ﻿using Common;
 using log4net;
 using Microsoft.Data.Sqlite;
-using OfficeOpenXml.Style;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -10,7 +9,6 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
-using TradeDataCore.Essentials;
 
 namespace TradeCommon.Database;
 
@@ -388,26 +386,17 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
 
             for (int i = 0; i < r.FieldCount; i++)
             {
-                switch (typeCodes[i])
+                entries.Rows[j][i] = typeCodes[i] switch
                 {
-                    case TypeCode.Char:
-                    case TypeCode.String:
-                        entries.Rows[j][i] = r.GetString(i); break;
-                    case TypeCode.Decimal:
-                        entries.Rows[j][i] = r.GetDecimal(i); break;
-                    case TypeCode.DateTime:
-                        entries.Rows[j][i] = r.GetDateTime(i); break;
-                    case TypeCode.Int32:
-                        entries.Rows[j][i] = r.GetInt32(i); break;
-                    case TypeCode.Boolean:
-                        entries.Rows[j][i] = r.GetBoolean(i); break;
-                    case TypeCode.Double:
-                        entries.Rows[j][i] = r.GetDouble(i); break;
-                    case TypeCode.Int64:
-                        entries.Rows[j][i] = r.GetInt64(i); break;
-                    default:
-                        throw new NotImplementedException();
-                }
+                    TypeCode.Char or TypeCode.String => r.GetString(i),
+                    TypeCode.Decimal => r.GetDecimal(i),
+                    TypeCode.DateTime => r.GetDateTime(i),
+                    TypeCode.Int32 => r.GetInt32(i),
+                    TypeCode.Boolean => r.GetBoolean(i),
+                    TypeCode.Double => r.GetDouble(i),
+                    TypeCode.Int64 => r.GetInt64(i),
+                    _ => throw new NotImplementedException(),
+                };
             }
 
             j++;
@@ -488,7 +477,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         {
             foreach (var databaseName in databaseNames)
             {
-                var filePath = Path.Combine(DatabaseFolder, (databaseName + ".db"));
+                var filePath = Path.Combine(DatabaseFolder, databaseName + ".db");
                 File.Delete(filePath);
                 _log.Info($"Deleted database file: {filePath}");
             }

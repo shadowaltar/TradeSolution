@@ -1,5 +1,4 @@
-﻿using Common;
-using log4net;
+﻿using log4net;
 using System.IO.Compression;
 
 namespace Common;

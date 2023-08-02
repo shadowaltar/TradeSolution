@@ -32,7 +32,7 @@ public class ExternalQueryState<T> : INetworkTimeState
 
     public override string ToString()
     {
-        return $"ExecState action [{Action}] [{StatusCode}][{UniqueConnectionId}]";
+        return $"ExecState Time[{NetworkRoundtripTime}ms/{TotalTime}ms]Action[{Action}] [{StatusCode}] [{UniqueConnectionId}]";
     }
 }
 

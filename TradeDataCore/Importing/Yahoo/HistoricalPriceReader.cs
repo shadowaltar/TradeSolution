@@ -2,15 +2,14 @@
 using log4net;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Corporates;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Prices;
 using TradeCommon.Essentials.Quotes;
-using TradeCommon.Database;
 using TradeDataCore.Essentials;
-using System.Collections.Generic;
 
 namespace TradeDataCore.Importing.Yahoo;
 

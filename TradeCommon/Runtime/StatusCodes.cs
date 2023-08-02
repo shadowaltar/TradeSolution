@@ -6,6 +6,8 @@ public static class StatusCodes
     public const int DisconnectionOk = 1001;
     public const int SubscriptionOk = 1002;
     public const int UnsubscriptionOk = 1003;
+    public const int SendOrderOk = 1004;
+    public const int CancelOrderOk = 1005;
     
     public const int SubscriptionWaiting = 2002;
     public const int UnsubscriptionWaiting = 2003;
@@ -19,4 +21,6 @@ public static class StatusCodes
     public const int DisconnectionFailed = 5001;
     public const int SubscriptionFailed = 5002;
     public const int UnsubscriptionFailed = 5003;
+    public const int SendOrderFailed = 5004;
+    public const int CancelOrderFailed = 5005;
 }

@@ -20,7 +20,7 @@ public interface IPortfolioService
 
     Task Initialize();
 
-    Account GetAccountByName(string accountName);
+    Task<Account> GetAccountByName(string accountName);
 
     List<Position> GetOpenPositions();
 
@@ -44,4 +44,11 @@ public interface IPortfolioService
     ProfitLoss GetUnrealizedPnl(Security security);
 
     bool Validate(Order order);
+
+    /// <summary>
+    /// Select a user in order to use its account / balance / credentials.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <returns></returns>
+    bool SelectUser(User user);
 }

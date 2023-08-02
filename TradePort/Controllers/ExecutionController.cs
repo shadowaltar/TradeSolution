@@ -1,7 +1,6 @@
 ﻿using Common;
 using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
-using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -98,6 +97,7 @@ public class ExecutionController : Controller
             return BadRequest("Does not support non-positive quantity.");
 
         // TODO account validation
+        portfolioService.SelectUser(null);
         var account = portfolioService.GetAccountByName(accountName);
 
         var order = orderService.CreateManualOrder(security, account.Id, price, quantity, side, orderType);
@@ -110,5 +110,35 @@ public class ExecutionController : Controller
         // as a manual order, no need to go through algorithm position sizing rules
         orderService.SendOrder(order, isFakeOrder);
         return Ok(order);
+    }
+
+    /// <summary>
+    /// Cancel an open order by its id.
+    /// Under construction.
+    /// </summary>
+    /// <returns></returns>
+    [HttpDelete("{exchange}/accounts/{account}/order")]
+    public async Task<ActionResult> CancelOrder()
+    {
+        return Ok();
+    }
+
+    /// <summary>
+    /// Get account's information.
+    /// </summary>
+    /// <returns></returns>
+    [HttpPost("{exchange}/accounts/{account}")]
+    public async Task<ActionResult> GetAccount(
+        [FromServices] IPortfolioService portfolioService,
+        [FromForm] string password,
+        [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
+    {
+        if (password.IsBlank()) return BadRequest();
+        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+
+        // TODO
+        portfolioService.SelectUser(null);
+        var account = await portfolioService.GetAccountByName(accountName);
+        return Ok(account);
     }
 }

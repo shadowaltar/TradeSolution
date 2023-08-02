@@ -245,7 +245,13 @@ public static class ExcelExtensions
         return (Array.IndexOf(columnHeaders, columnHeader) + 1).GetExcelColumnName();
     }
 
-    public static void StyleAsText(this ExcelRange range) => StyleAs(range, "@");
+    public static void StyleAsText(this ExcelRange range)
+    {
+        StyleAs(range, "@");
+    }
 
-    public static void StyleAs(this ExcelRange range, string format) => range.Style.Numberformat.Format = format;
+    public static void StyleAs(this ExcelRange range, string format)
+    {
+        range.Style.Numberformat.Format = format;
+    }
 }

@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Data;
+﻿using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -41,17 +40,13 @@ public static class ReflectionUtils
     public static Func<T, TReturn>? BuildTypedGetter<T, TReturn>(PropertyInfo propertyInfo)
     {
         var getMethod = propertyInfo.GetGetMethod();
-        if (getMethod == null)
-            return null;
-        return (Func<T, TReturn>)Delegate.CreateDelegate(typeof(Func<T, TReturn>), getMethod);
+        return getMethod == null ? null : (Func<T, TReturn>)Delegate.CreateDelegate(typeof(Func<T, TReturn>), getMethod);
     }
 
     public static Action<T, TProperty>? BuildTypedSetter<T, TProperty>(PropertyInfo propertyInfo)
     {
         var setMethod = propertyInfo.GetGetMethod();
-        if (setMethod == null)
-            return null;
-        return (Action<T, TProperty>)Delegate.CreateDelegate(typeof(Action<T, TProperty>), setMethod);
+        return setMethod == null ? null : (Action<T, TProperty>)Delegate.CreateDelegate(typeof(Action<T, TProperty>), setMethod);
     }
 
     public static Action<T, object?>? BuildUntypedSetter<T>(PropertyInfo propertyInfo)
