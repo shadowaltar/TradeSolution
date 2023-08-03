@@ -19,6 +19,8 @@ public class Security
     public StockSecurityInfo? StockInfo { get; set; }
     public OptionSecurityInfo? DerivativeInfo { get; set; }
 
+    public int PriceDecimalPoints { get; set; }
+
     public override string ToString()
     {
         return $"[{Id}] [{Code} {Exchange}] {Name} ({Type})";

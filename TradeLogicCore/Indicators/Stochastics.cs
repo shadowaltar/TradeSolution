@@ -45,11 +45,6 @@ public class Stochastics : PriceSeriesIndicator<decimal[]>
 
     public class StochasticsComponent : PriceSeriesIndicator<decimal>
     {
-        /// <summary>
-        /// Label of the component.
-        /// </summary>
-        public string Label { get; set; }
-
         public StochasticsComponent(int period, string label) : base(period)
         {
             Period = period;

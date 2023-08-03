@@ -187,7 +187,7 @@ WHERE SecurityId = $SecurityId
         return results;
     }
 
-    public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null)
+    public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -214,15 +214,15 @@ WHERE
         var results = new List<OhlcPrice>();
         while (await r.ReadAsync())
         {
-            var close = r.GetDecimal("Close");
+            var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
             (
-                O: r.GetDecimal("Open"),
-                H: r.GetDecimal("High"),
-                L: r.GetDecimal("Low"),
+                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
                 C: close,
-                AC: r.SafeGetDecimal("AdjClose", close),
-                V: r.GetDecimal("Volume"),
+                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
                 T: r.GetDateTime("StartTime")
             );
             results.Add(price);
@@ -231,7 +231,7 @@ WHERE
         return results;
     }
 
-    public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount)
+    public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -257,15 +257,15 @@ LIMIT $EntryCount
         var results = new List<OhlcPrice>();
         while (await r.ReadAsync())
         {
-            var close = r.GetDecimal("Close");
+            var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
             (
-                O: r.GetDecimal("Open"),
-                H: r.GetDecimal("High"),
-                L: r.GetDecimal("Low"),
+                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
                 C: close,
-                AC: r.SafeGetDecimal("AdjClose", close),
-                V: r.GetDecimal("Volume"),
+                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
                 T: r.GetDateTime("StartTime")
             );
             results.Add(price);

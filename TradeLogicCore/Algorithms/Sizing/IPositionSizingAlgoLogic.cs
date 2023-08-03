@@ -5,6 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace TradeLogicCore.Algorithms.Sizing;
-public interface IPositionSizingLogic
+public interface IPositionSizingAlgoLogic
 {
 }

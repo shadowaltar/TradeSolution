@@ -18,4 +18,10 @@ public static class NumericExtensions
         }
         return reverse;
     }
+
+    public static bool IsNaN(this double value) => double.IsNaN(value);
+
+    public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+    public static bool IsValid(this decimal value) => value != decimal.MaxValue && value != decimal.MinValue;
 }

@@ -2,12 +2,12 @@
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Sizing;
-public class EvenPositionSizingLogic : IPositionSizingLogic
+public class EvenPositionSizing : IPositionSizingAlgoLogic
 {
     private readonly IPortfolioService _portfolioService;
     private readonly ISecurityService _securityService;
 
-    public EvenPositionSizingLogic(IPortfolioService portfolioService,
+    public EvenPositionSizing(IPortfolioService portfolioService,
         ISecurityService securityService)
     {
         _portfolioService = portfolioService;

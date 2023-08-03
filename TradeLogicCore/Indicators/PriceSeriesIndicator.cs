@@ -6,6 +6,11 @@ namespace TradeLogicCore.Indicators;
 public abstract class PriceSeriesIndicator<T> : IIndicator
 {
     /// <summary>
+    /// Label of the component.
+    /// </summary>
+    public string Label { get; set; }
+
+    /// <summary>
     /// Lookback period.
     /// </summary>
     public virtual int Period { get; set; }
@@ -39,6 +44,21 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
         Period = period;
         CalculateFromBeginning = calculateFromBeginning;
         ElementSelector = GetPriceElementSelector(elementToUse);
+    }
+
+    public PriceSeriesIndicator(int period): base()
+    {
+        Period = period;
+    }
+
+    public virtual double Next(double value)
+    {
+        return double.NaN;
+    }
+
+    public virtual decimal Next(decimal value)
+    {
+        return decimal.MinValue;
     }
 
     protected virtual Func<OhlcPrice, decimal> GetPriceElementSelector(PriceElementType priceElementType)

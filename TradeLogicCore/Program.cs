@@ -10,12 +10,13 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
+using TradeLogicCore.Algorithms;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
 internal class Program
 {
-    private static int _maxPrintCount = 10;
+    private static readonly int _maxPrintCount = 10;
 
     private static async Task Main(string[] args)
     {
@@ -26,12 +27,12 @@ internal class Program
 
         Dependencies.Register(ExternalNames.Binance);
 
-        await NewOrderDemo();
+        await RunRumiBackTestDemo();
 
         Console.WriteLine("Finished.");
     }
 
-    private async static Task NewSecurityOhlcSubscriptionDemo()
+    private static async Task NewSecurityOhlcSubscriptionDemo()
     {
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
@@ -105,5 +106,17 @@ internal class Program
                 Console.WriteLine(trade);
             }
         }
+    }
+
+    private static async Task RunRumiBackTestDemo()
+    {
+        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+        var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
+        var security = await securityService.GetSecurity("00005", ExchangeType.Hkex, SecurityType.Equity);
+        // TODO hardcode
+        security.PriceDecimalPoints = 2;
+        var algo = new Rumi(mds);
+        algo.StopLossRatio = 0.02m;
+        var entries = await algo.BackTest(security, IntervalType.OneHour, new DateTime(2022, 1, 1), new DateTime(2023, 6, 1), 1000);
     }
 }

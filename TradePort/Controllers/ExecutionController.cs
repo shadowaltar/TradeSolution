@@ -7,11 +7,12 @@ using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
+using Environments = TradeCommon.Runtime.Environments;
 
 namespace TradePort.Controllers;
 
 /// <summary>
-/// Provides static data access.
+/// Provides order execution, portfolio and account management.
 /// </summary>
 [ApiController]
 [Route("execution")]
@@ -25,7 +26,7 @@ public class ExecutionController : Controller
     /// <param name="environment"></param>
     /// <returns></returns>
     [HttpPost("set-environment")]
-    public ActionResult SetEnvironment([FromServices] TradeCommon.Runtime.Environments environments,
+    public ActionResult SetEnvironment([FromServices] Environments environments,
                                        [FromForm] string password,
                                        [FromQuery(Name = "env")] string environment = "Test")
     {
