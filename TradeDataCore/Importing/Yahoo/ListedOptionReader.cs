@@ -3,6 +3,8 @@ using log4net;
 using System.Collections.Concurrent;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using static Futu.OpenApi.Pb.QotCommon;
+using Security = TradeCommon.Essentials.Instruments.Security;
 
 namespace TradeDataCore.Importing.Yahoo;
 
@@ -32,21 +34,28 @@ public class ListedOptionReader
                 var ticker = tuple.Key;
                 var security = tuple.Value;
                 var actualUrl = string.Format(url, ticker);
-                var jo = await HttpHelper.ReadJson(actualUrl, httpClient, _log);
-                if (jo == null)
-                    return;
-
-                var rootObj = jo["optionChain"]?["result"]?.AsArray()[0]?["quote"];
-                if (rootObj == null)
-                    return;
-
-                var stat = new FinancialStat
+                try
                 {
-                    SecurityId = security.Id,
-                    MarketCap = rootObj["marketCap"].GetDecimal(),
-                };
-                lock (results)
-                    results.Add(stat);
+                    var jo = await HttpHelper.ReadJson(actualUrl, httpClient, _log);
+                    if (jo == null)
+                        return;
+
+                    var rootObj = jo["optionChain"]?["result"]?.AsArray()[0]?["quote"];
+                    if (rootObj == null)
+                        return;
+
+                    var stat = new FinancialStat
+                    {
+                        SecurityId = security.Id,
+                        MarketCap = rootObj["marketCap"].GetDecimal(),
+                    };
+                    lock (results)
+                        results.Add(stat);
+                }
+                catch (Exception e)
+                {
+                    _log.Error($"No financial stats data (from option chain) loaded for {ticker}; url: {actualUrl}");
+                }
             });
         }
         return results;

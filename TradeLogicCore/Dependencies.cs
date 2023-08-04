@@ -49,8 +49,6 @@ public static class Dependencies
 
             // position sizing
             builder.RegisterSingleton<EvenPositionSizing>();
-            // algorithms
-            builder.RegisterSingleton<IAlgorithm, Rumi>("Rumi");
         }
     }
 }

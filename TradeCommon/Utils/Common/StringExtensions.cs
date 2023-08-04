@@ -83,7 +83,7 @@ public static class StringExtensions
 
     public static DateTime ParseLocalUnixDate(this string? value, DateTime defaultValue = default)
     {
-        return !value.IsBlank() && int.TryParse(value, CultureInfo.InvariantCulture, out var seconds)
+        return !value.IsBlank() && long.TryParse(value, CultureInfo.InvariantCulture, out var seconds)
             ? seconds.FromLocalUnixSec()
             : defaultValue;
     }

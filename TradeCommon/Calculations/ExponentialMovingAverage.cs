@@ -7,8 +7,8 @@ public class ExponentialMovingAverage : Calculator
     private double _previous = double.NaN;
     private decimal _previousDecimal = decimal.MinValue;
 
-    private readonly LinkedList<double> _cachedValues = new();
-    private readonly LinkedList<decimal> _cachedDecimalValues = new();
+    private List<double>? _cachedValues;
+    private List<decimal>? _cachedDecimalValues;
 
     private double _factor = 0;
     private decimal _factorDecimal = 0;
@@ -27,9 +27,10 @@ public class ExponentialMovingAverage : Calculator
 
     public override double Next(double value)
     {
-        _cachedValues.AddLast(value);
         if (_previous.IsNaN())
         {
+            _cachedValues ??= new();
+            _cachedValues.Add(value);
             if (_cachedValues.Count == Period)
             {
                 var sum = 0d;
@@ -38,6 +39,7 @@ public class ExponentialMovingAverage : Calculator
                     sum += item;
                 }
                 _previous = sum / Period;
+                _cachedValues = null;
                 return _previous;
             }
             else
@@ -47,17 +49,17 @@ public class ExponentialMovingAverage : Calculator
         }
         else
         {
-            _cachedValues.RemoveFirst();
-            _previous = value * _factor +_previous * (1 - _factor);
+            _previous = value * _factor + _previous * (1 - _factor);
             return _previous;
         }
     }
 
     public override decimal Next(decimal value)
     {
-        _cachedDecimalValues.AddLast(value);
-        if (_previousDecimal == decimal.MinValue)
+        if (!_previousDecimal.IsValid())
         {
+            _cachedDecimalValues ??= new();
+            _cachedDecimalValues.Add(value);
             if (_cachedDecimalValues.Count == Period)
             {
                 var sum = 0m;
@@ -66,6 +68,7 @@ public class ExponentialMovingAverage : Calculator
                     sum += item;
                 }
                 _previousDecimal = decimal.Divide(sum, Period);
+                _cachedDecimalValues = null;
                 return _previousDecimal;
             }
             else
@@ -75,7 +78,6 @@ public class ExponentialMovingAverage : Calculator
         }
         else
         {
-            _cachedDecimalValues.RemoveFirst();
             _previousDecimal = value * _factorDecimal + _previousDecimal * (1 - _factorDecimal);
             return _previousDecimal;
         }

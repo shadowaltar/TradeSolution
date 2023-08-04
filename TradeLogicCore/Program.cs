@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Iced.Intel;
 using log4net;
 using log4net.Config;
 using System.Text;
@@ -8,6 +9,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Reporting;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore.Algorithms;
@@ -114,15 +116,41 @@ public class Program
     {
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
-        var security = await securityService.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
-        // TODO hardcode
-        security.PriceDecimalPoints = 6;
-        var algo = new Rumi(mds)
+
+        var securities = await securityService.GetSecurities(ExchangeType.Hkex, SecurityType.Equity);
+
+        //securities = securities.Where(x => x.Code == "00008").ToList();
+
+        var stopLosses = new List<decimal> { 0.01m, 0.02m, 0.03m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneDay, IntervalType.OneHour };
+
+        var resultMatrix = new List<List<object>>();
+
+        // TODO
+        //var x = ColumnMappingReader.Read<RuntimePosition<RumiVariables>>();
+
+        foreach (var security in securities)
         {
-            StopLossRatio = 0.02m
-        };
-        var initCash = 1000;
-        var entries = await algo.BackTest(security, IntervalType.OneDay, new DateTime(2022, 1, 1), new DateTime(2023, 6, 30), initCash);
-        _log.Info($"Balance: {initCash}->{algo.FreeCash}");
+            foreach (var interval in intervalTypes)
+            {
+                foreach (var sl in stopLosses)
+                {
+                    security.PriceDecimalPoints = 6;
+                    var algo = new Rumi(mds) { StopLossRatio = sl };
+                    var initCash = 1000;
+                    var entries = await algo.BackTest(security, interval, new DateTime(2022, 1, 1), new DateTime(2023, 6, 30), initCash);
+                    if (entries.IsNullOrEmpty())
+                        continue;
+
+                    var result = new List<object> { security.Code, interval, sl, algo.FreeCash };
+
+                    _log.Info($"Result: {string.Join('|', result)}");
+                    resultMatrix.Add(result);
+                }
+            }
+        }
+
+        _log.Info("RESULTS ----------");
+        _log.Info(Printer.Print(resultMatrix));
     }
 }

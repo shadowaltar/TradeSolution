@@ -211,7 +211,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
             }
 
             var missingDataIndexes = new HashSet<int>(); // some items will have missing values
-            var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalFromUnixMs()).ToArray();
+            var localStartTimes = timeRootObj!.AsArray().Select(n => n.GetLocalFromUnixSec()).ToArray();
             var highs = ToDecimalValues(quoteRootObj, "high");
             var lows = ToDecimalValues(quoteRootObj, "low");
             var opens = ToDecimalValues(quoteRootObj, "open");

@@ -1,6 +1,7 @@
 ﻿using Common;
 using CsvHelper;
 using log4net;
+using System.Formats.Asn1;
 using System.Globalization;
 using TradeCommon.Utils;
 using TradeCommon.Utils.Excels;
@@ -68,6 +69,87 @@ public class ColumnMappingReader
         return definitions;
     }
 
+    public static List<ColumnDefinition> Read<T>()
+    {
+        var definitions = new List<ColumnDefinition>();
+
+        var type = typeof(T);
+        var properties = ReflectionUtils.GetPropertyToName(type);
+        var count = 0;
+        foreach (var (name, property) in properties)
+        {
+            var t = ParseType(property.PropertyType, out var isNullable);
+            var cd = new ColumnDefinition
+            {
+                Index = count,
+                FieldName = name,
+                Caption = name,
+                Type = t,
+                Format = GetDefaultFormat(t),
+                IsNullable = isNullable,
+                Formula = "",
+                SortIndex = 0,
+                IsAscending = true,
+                IsHidden = false,
+            };
+            count++;
+        }
+
+        //var cd = new ColumnDefinition
+        //{
+        //    Index = csvReader["Index"].ParseInt(-1),
+        //    FieldName = csvReader["Field"] ?? throw new ArgumentNullException("Field column / value missing in definition."),
+        //    Caption = csvReader["Caption"] ?? throw new ArgumentNullException("Caption column / value missing in definition."),
+        //    Type = ParseType(csvReader),
+        //    Format = csvReader["Format"],
+        //    IsNullable = csvReader["Nullable"].ParseBool(),
+        //    Formula = csvReader["Formula"],
+        //    SortIndex = sortIndex,
+        //    IsAscending = isAscending,
+        //    IsHidden = csvReader["Hidden"].ParseBool(),
+        //};
+        //if (cd.IsSpecialObjectColumn)
+        //{
+        //    // will find the exact class which represents the Type value
+        //    var typeName = csvReader["Type"]?.ToString();
+        //    var type = ReflectionUtils.SearchType(typeName);
+        //    if (typeName.IsBlank() || type == null)
+        //    {
+        //        throw new ArgumentException("Invalid object type specified in the column definition file which no concrete class can be matched to it. Type value: " + typeName);
+        //    }
+        //    if (!cd.Format.IsBlank())
+        //    {
+        //        var ctor = type.GetConstructor(new[] { typeof(string) });
+        //        var obj = ctor?.Invoke(new object[] { cd.Format });
+        //        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
+        //    }
+        //    else
+        //    {
+        //        var obj = Activator.CreateInstance(type);
+        //        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
+        //    }
+        //}
+        //definitions.Add(cd);
+        return definitions;
+
+    }
+
+    private static string GetDefaultFormat(TypeCode t)
+    {
+        switch (t)
+        {
+            case TypeCode.Int64:
+            case TypeCode.Int32:
+                return "0";
+            case TypeCode.String:
+            case TypeCode.Boolean:
+                return "@";
+            case TypeCode.DateTime:
+                return "yyyy-MM-dd HH:mm:ss";
+        }
+        return "@";
+    }
+
     private static TypeCode ParseType(CsvReader csvReader)
     {
         var typeString = csvReader["Type"] ?? throw new ArgumentNullException("Type column / value missing in definition.");
@@ -98,5 +180,39 @@ public class ColumnMappingReader
             default:
                 throw new ArgumentNullException($"Type value {csvReader["Type"]} is invalid in definition.");
         }
+    }
+
+    private static TypeCode ParseType(Type type, out bool isNullable)
+    {
+        isNullable = false;
+        if (type == typeof(int))
+            return TypeCode.Int32;
+        if (type == typeof(double))
+            return TypeCode.Double;
+        if (type == typeof(decimal))
+            return TypeCode.Decimal;
+        if (type == typeof(DateTime))
+            return TypeCode.DateTime;
+        if (type == typeof(bool))
+            return TypeCode.Boolean;
+        if (type == typeof(long))
+            return TypeCode.Boolean;
+
+        isNullable = true;
+        if (type == typeof(string))
+            return TypeCode.String;
+        if (type == typeof(int?))
+            return TypeCode.Int32;
+        if (type == typeof(double?))
+            return TypeCode.Double;
+        if (type == typeof(decimal?))
+            return TypeCode.Decimal;
+        if (type == typeof(DateTime?))
+            return TypeCode.DateTime;
+        if (type == typeof(bool?))
+            return TypeCode.Boolean;
+        if (type == typeof(long?))
+            return TypeCode.Boolean;
+        return TypeCode.Object;
     }
 }

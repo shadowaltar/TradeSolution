@@ -17,7 +17,7 @@ public class BackTestingController : Controller
     private static readonly ILog _log = Logger.New();
 
     /// <summary>
-    /// Run RUMI using 100K as initial cash.
+    /// CalculateVariables RUMI using 100K as initial cash.
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="mds"></param>

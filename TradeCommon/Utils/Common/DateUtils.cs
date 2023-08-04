@@ -13,7 +13,7 @@ public static class DateUtils
         return (long)value.Subtract(DateTime.UnixEpoch).TotalMilliseconds;
     }
 
-    public static DateTime FromLocalUnixSec(this int unixSec)
+    public static DateTime FromLocalUnixSec(this long unixSec)
     {
         return DateTimeOffset.FromUnixTimeSeconds(unixSec).ToLocalTime().DateTime;
     }
