@@ -119,8 +119,6 @@ public class Program
 
         var securities = await securityService.GetSecurities(ExchangeType.Hkex, SecurityType.Equity);
 
-        //securities = securities.Where(x => x.Code == "00008").ToList();
-
         var stopLosses = new List<decimal> { 0.01m, 0.02m, 0.03m };
         var intervalTypes = new List<IntervalType> { IntervalType.OneDay, IntervalType.OneHour };
 
