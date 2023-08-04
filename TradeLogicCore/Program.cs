@@ -14,8 +14,10 @@ using TradeLogicCore.Algorithms;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
-internal class Program
+public class Program
 {
+    private static readonly ILog _log = Logger.New();
+
     private static readonly int _maxPrintCount = 10;
 
     private static async Task Main(string[] args)
@@ -112,11 +114,15 @@ internal class Program
     {
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
-        var security = await securityService.GetSecurity("00005", ExchangeType.Hkex, SecurityType.Equity);
+        var security = await securityService.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
         // TODO hardcode
-        security.PriceDecimalPoints = 2;
-        var algo = new Rumi(mds);
-        algo.StopLossRatio = 0.02m;
-        var entries = await algo.BackTest(security, IntervalType.OneHour, new DateTime(2022, 1, 1), new DateTime(2023, 6, 1), 1000);
+        security.PriceDecimalPoints = 6;
+        var algo = new Rumi(mds)
+        {
+            StopLossRatio = 0.02m
+        };
+        var initCash = 1000;
+        var entries = await algo.BackTest(security, IntervalType.OneDay, new DateTime(2022, 1, 1), new DateTime(2023, 6, 30), initCash);
+        _log.Info($"Balance: {initCash}->{algo.FreeCash}");
     }
 }

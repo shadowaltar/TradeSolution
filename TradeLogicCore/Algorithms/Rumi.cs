@@ -1,4 +1,5 @@
 ﻿using Common;
+using log4net;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -11,12 +12,21 @@ using TradeLogicCore.Algorithms.Sizing;
 namespace TradeLogicCore.Algorithms;
 public class Rumi : IAlgorithm
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
 
-    private RumiEntry? _firstEntry;
+    private RumiPosition? _firstPosition;
     private DateTime _backTestStartTime;
 
+    private decimal _freeCash;
+
+    public int FastParam { get; set; } = 3;
+    public int SlowParam { get; set; } = 5;
+    public int RumiParam { get; set; } = 3;
+
     public decimal StopLossRatio { get; set; } = 0;
+    public decimal FreeCash => _freeCash;
 
     public Rumi(IHistoricalMarketDataService historicalMarketDataService)
     {
@@ -33,9 +43,10 @@ public class Rumi : IAlgorithm
 
     public ISecuritySelectionAlgoLogic Screening => throw new NotImplementedException();
 
-    public async Task<List<RumiEntry>> BackTest(Security security, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1)
+    public async Task<List<RumiPosition>> BackTest(Security security, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1)
     {
         _backTestStartTime = start;
+        _freeCash = initialCash;
 
         var ts = IntervalTypeConverter.ToTimeSpan(intervalType).TotalDays;
 
@@ -44,83 +55,105 @@ public class Rumi : IAlgorithm
         var rumiMa = new SimpleMovingAverage(3, "RUMI SMA");
         var prices = await _historicalMarketDataService.Get(security, intervalType, start, end);
 
-        RumiEntry? previousEntry = null;
-        var entries = new List<RumiEntry>(prices.Count);
-        foreach (OhlcPrice? price in prices)
+        RumiPosition? lastPosition = null;
+        var entries = new List<RumiPosition>(prices.Count);
+        OhlcPrice? lastOhlcPrice = null;
+        foreach (OhlcPrice? ohlcPrice in prices)
         {
-            var entry = new RumiEntry();
-            var close = OhlcPrice.PriceElementSelectors[PriceElementType.Close](price);
+            var position = new RumiPosition();
+            var price = OhlcPrice.PriceElementSelectors[PriceElementType.Close](ohlcPrice);
+            var low = ohlcPrice.L;
 
-            var fast = fastMa.Next(close);
-            var slow = slowMa.Next(close);
+            var fast = fastMa.Next(price);
+            var slow = slowMa.Next(price);
             var rumi = (fast.IsValid() && slow.IsValid()) ? rumiMa.Next(fast - slow) : decimal.MinValue;
 
-            entry.Fast = fast;
-            entry.Slow = slow;
-            entry.Rumi = rumi;
-            entry.Price = close;
+            position.Fast = fast;
+            position.Slow = slow;
+            position.Rumi = rumi;
+            position.Price = price;
+            position.FreeCash = _freeCash;
 
-            entries.Add(entry);
+            // copy over most of the states from last to this
+            if (lastPosition != null && !lastPosition.IsClosing)
+            {
+                CopyPosition(position, lastPosition, price);
+            }
 
             // mimic stop loss
-            if (previousEntry != null && price.L <= previousEntry.StopLossPrice)
+            if (position.IsOpened && low <= position.StopLossPrice)
             {
                 // assuming always stopped loss at the triggering market stopLossPrice
-                StopLoss(entry, previousEntry, GetOhlcEndTime(price, intervalType));
+                StopLoss(position, lastPosition!, GetOhlcEndTime(ohlcPrice, intervalType));
             }
-            //if (previousEntry != null)
-            //{
-            //    HoldPosition(entry, previousEntry, close);
-            //}
+
+            if (lastPosition != null && lastPosition.StopLossPrice == 0 && lastPosition.IsOpened)
+            {
+                Console.WriteLine("BUG!");
+            }
+
             // try open or currentPrice a position
             // assuming no margin short-sell is allowed
-            var isJustOpened = false;
-            var isJustClosed = false;
-            if (previousEntry != null && previousEntry.Rumi.IsValid())
+            if (lastPosition != null && lastPosition.Rumi.IsValid())
             {
-                entry.IsLongSignal = previousEntry.Rumi < 0 && entry.Rumi > 0;
-                entry.IsShortSignal = previousEntry.Rumi > 0 && entry.Rumi < 0;
-                if (!previousEntry.HasPosition && entry.IsLongSignal)
+                position.IsLongSignal = lastPosition.Rumi < 0 && position.Rumi > 0;
+                position.IsShortSignal = lastPosition.Rumi > 0 && position.Rumi < 0;
+                if (!position.IsOpened && position.IsLongSignal)
                 {
                     // calculate SL and try to round-up
-                    var stopLossPrice = decimal.Round(close * (1 - StopLossRatio), security.PriceDecimalPoints, MidpointRounding.ToPositiveInfinity);
-                    OpenPosition(entry, previousEntry, close, GetOhlcEndTime(price, intervalType), stopLossPrice);
-                    isJustOpened = true;
+                    OpenPosition(position, lastPosition, price, GetOhlcEndTime(ohlcPrice, intervalType), GetStopLoss(ohlcPrice, security));
                 }
-                if (previousEntry.HasPosition && entry.IsShortSignal)
+                if (position.IsOpened && position.IsShortSignal)
                 {
-                    ClosePosition(entry, previousEntry, close, GetOhlcEndTime(price, intervalType));
-                    isJustClosed = true;
+                    ClosePosition(position, price, GetOhlcEndTime(ohlcPrice, intervalType));
                 }
             }
-            //if (previousEntry != null && !isJustOpened && !isJustClosed)
-            //{
-            //    HoldPosition(entry, previousEntry, close);
-            //}
 
-            var firstEntry = previousEntry == null;
-            previousEntry = entry;
-            if (firstEntry)
+            if (_firstPosition == null)
             {
-                previousEntry.FreeCash = initialCash;
-                previousEntry.Notional = initialCash;
-                _firstEntry = entry;
+                position.FreeCash = initialCash;
+                position.Notional = initialCash;
+                _firstPosition = position;
             }
+            lastPosition = position;
+            lastOhlcPrice = ohlcPrice;
+            entries.Add(position);
         }
+
+        if (lastPosition!=null && lastPosition.IsOpened)
+        {
+            _log.Info("Attempt to close position at the end of back-testing.");
+            ClosePosition(lastPosition, lastOhlcPrice?.C ?? 0, GetOhlcEndTime(lastOhlcPrice, intervalType));
+        }
+
         return entries;
 
-        DateTime GetOhlcEndTime(OhlcPrice price, IntervalType intervalType)
+        DateTime GetOhlcEndTime(OhlcPrice? price, IntervalType intervalType)
         {
+            if (price == null)
+                return DateTime.MinValue;
             return price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
+        }
+
+        decimal GetStopLoss(OhlcPrice price, Security security)
+        {
+            return decimal.Round(price.C * (1 - StopLossRatio), security.PriceDecimalPoints, MidpointRounding.ToPositiveInfinity);
         }
     }
 
-    private void OpenPosition(RumiEntry entry, RumiEntry previousEntry, decimal enterPrice, DateTime tradeTime, decimal stopLossPrice)
+    private void OpenPosition(RumiPosition entry, RumiPosition previousEntry, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
     {
-        entry.HasPosition = true;
-        entry.Quantity = previousEntry.FreeCash / enterPrice;
+        if (previousEntry.FreeCash == 0)
+        {
+            Console.WriteLine("BUG!");
+        }
+
+        entry.IsOpened = true;
+        entry.IsClosing = false;
+        // TODO position sizing happens here
+        entry.Quantity = _freeCash / enterPrice;
         entry.EnterPrice = enterPrice;
-        entry.EnterTime = tradeTime;
+        entry.EnterTime = enterTime;
         entry.ExitPrice = 0;
         entry.ExitTime = DateTime.MinValue;
         entry.StopLossPrice = stopLossPrice;
@@ -131,100 +164,111 @@ public class Rumi : IAlgorithm
         entry.UnrealizedPnl = 0;
         entry.OrderReturn = 0;
         entry.PortfolioAnnualizedReturn = previousEntry.PortfolioAnnualizedReturn;
+
+        _log.Info($"Opened position: [{entry.EnterTime:yyMMdd-HHmm}] [{entry.EnterPrice:F2}*{entry.Quantity:F2}] SL[{entry.StopLossPrice:F2}]");
+        _freeCash = 0;
     }
 
-    private void ClosePosition(RumiEntry entry, RumiEntry previousEntry, decimal exitPrice, DateTime exitTime)
+    private void ClosePosition(RumiPosition current, decimal last, DateTime exitTime)
     {
-        var quantity = previousEntry.Quantity;
-        var enterPrice = previousEntry.EnterPrice;
-
-        entry.HasPosition = false;
-        entry.Quantity = quantity;
-        entry.EnterPrice = enterPrice;
-        entry.EnterTime = previousEntry.EnterTime;
-        entry.ExitPrice = exitPrice;
-        entry.ExitTime = exitTime;
-        entry.StopLossPrice = 0;
-        entry.IsStopLossTriggered = false;
-        entry.RealizedPnl = (exitPrice - enterPrice) * quantity;
-        entry.Notional = quantity * exitPrice;
-        entry.UnrealizedPnl = 0;
-        entry.OrderReturn = (exitPrice - enterPrice) / enterPrice;
-
-        if (entry.OrderReturn < StopLossRatio * -1)
+        if (last == 0 || exitTime == DateTime.MinValue)
         {
-
+            _log.Warn("Invalid arguments.");
+            return;
         }
 
+        current.IsOpened = false;
+        current.IsClosing = true;
+        current.ExitPrice = last;
+        current.ExitTime = exitTime;
+        current.IsStopLossTriggered = false;
+        current.RealizedPnl = (last - current.EnterPrice) * current.Quantity;
+        current.Notional = current.Quantity * last;
+        current.UnrealizedPnl = 0;
+        current.OrderReturn = (last - current.EnterPrice) / current.EnterPrice;
+        current.PortfolioAnnualizedReturn = Math.Pow(decimal.ToDouble(current.Notional / _firstPosition!.Notional), 365 / (exitTime - _backTestStartTime).TotalDays) - 1;
+        current.FreeCash = current.Notional;
+        _log.Info($"Closed position: [{current.EnterTime:yyMMdd-HHmm}] [({current.ExitPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
 
-        entry.PortfolioAnnualizedReturn = Math.Pow(decimal.ToDouble(entry.Notional / _firstEntry!.Notional), 365 / (exitTime - _backTestStartTime).TotalDays) - 1;
-        entry.FreeCash = entry.Notional;
+        if (current.OrderReturn < StopLossRatio * -1)
+        {
+            Console.WriteLine("BUG!");
+        }
+        if (current.FreeCash == 0)
+        {
+            Console.WriteLine("BUG!");
+        }
+
+        _freeCash = current.Notional;
     }
 
-    private void StopLoss(RumiEntry entry, RumiEntry previousEntry, DateTime exitTime)
+    private void StopLoss(RumiPosition current, RumiPosition last, DateTime exitTime)
     {
-        var enterPrice = previousEntry.EnterPrice;
-        var quantity = previousEntry.Quantity;
-        var sl = previousEntry.StopLossPrice;
+        var enterPrice = last.EnterPrice;
+        var quantity = last.Quantity;
+        var sl = last.StopLossPrice;
 
-        entry.HasPosition = false;
-        entry.Quantity = 0;
-        entry.EnterPrice = enterPrice;
-        entry.EnterTime = previousEntry.EnterTime;
-        entry.ExitPrice = sl;
-        entry.ExitTime = exitTime;
-        entry.StopLossPrice = sl;
-        entry.IsStopLossTriggered = true;
-        entry.UnrealizedPnl = 0;
-        entry.RealizedPnl = (sl - enterPrice) * quantity;
-        entry.Notional = previousEntry.Notional + entry.RealizedPnl;
-        entry.OrderReturn = (sl - enterPrice) / enterPrice;
-
-        if (entry.OrderReturn < StopLossRatio * -1)
-        {
-
-        }
-
+        current.IsOpened = false;
+        current.IsClosing = true;
+        current.Quantity = quantity;
+        current.EnterPrice = enterPrice;
+        current.EnterTime = last.EnterTime;
+        current.ExitPrice = sl;
+        current.ExitTime = exitTime;
+        current.StopLossPrice = sl;
+        current.IsStopLossTriggered = true;
+        current.UnrealizedPnl = 0;
+        current.RealizedPnl = (sl - enterPrice) * quantity;
+        current.Notional = last.Notional + current.RealizedPnl;
+        current.OrderReturn = (sl - enterPrice) / enterPrice;
         // (Bt/B0)^(1/(Tt-T0))
-        entry.PortfolioAnnualizedReturn = Math.Pow(decimal.ToDouble(entry.Notional / _firstEntry!.Notional), 365 / (exitTime - _backTestStartTime).TotalDays) - 1;
-        entry.FreeCash = entry.Notional;
+        current.PortfolioAnnualizedReturn = Math.Pow(decimal.ToDouble(current.Notional / _firstPosition!.Notional), 365 / (exitTime - _backTestStartTime).TotalDays) - 1;
+        current.FreeCash = current.Notional;
+        _log.Info($"StopLossed: [{current.EnterTime:yyMMdd-HHmm}] [({current.StopLossPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
+
+        if (current.OrderReturn < StopLossRatio * -1)
+        {
+            Console.WriteLine("BUG!");
+        }
+
+        _freeCash = current.Notional;
     }
 
-    private void HoldPosition(RumiEntry entry, RumiEntry previousEntry, decimal currentPrice)
+    private void CopyPosition(RumiPosition current, RumiPosition last, decimal currentPrice)
     {
-        entry.HasPosition = previousEntry.HasPosition;
-        if (entry.HasPosition)
+        current.IsOpened = last.IsOpened;
+        if (current.IsOpened)
         {
-            entry.Quantity = previousEntry.Quantity;
-            entry.EnterPrice = previousEntry.EnterPrice;
-            entry.EnterTime = previousEntry.EnterTime;
-            entry.ExitPrice = previousEntry.ExitPrice;
-            entry.ExitTime = previousEntry.ExitTime;
-            entry.StopLossPrice = previousEntry.StopLossPrice;
-            entry.IsStopLossTriggered = false;
-            entry.FreeCash = previousEntry.FreeCash;
-            entry.UnrealizedPnl = (currentPrice - entry.EnterPrice) * entry.Quantity;
-            entry.RealizedPnl = 0;
-            entry.Notional = entry.Quantity * entry.EnterPrice + entry.UnrealizedPnl;
+            current.Quantity = last.Quantity;
+            current.EnterPrice = last.EnterPrice;
+            current.EnterTime = last.EnterTime;
+            current.ExitPrice = last.ExitPrice;
+            current.ExitTime = last.ExitTime;
+            current.StopLossPrice = last.StopLossPrice;
+            current.IsStopLossTriggered = false;
+            current.FreeCash = last.FreeCash;
+            current.UnrealizedPnl = (currentPrice - current.EnterPrice) * current.Quantity;
+            current.RealizedPnl = 0;
+            current.Notional = current.Quantity * current.EnterPrice + current.UnrealizedPnl;
         }
         else
         {
-            entry.Quantity = 0;
-            entry.EnterPrice = 0;
-            entry.EnterTime = DateTime.MinValue;
-            entry.ExitPrice = 0;
-            entry.ExitTime = DateTime.MinValue;
-            entry.StopLossPrice = 0;
-            entry.IsStopLossTriggered = false;
-            entry.FreeCash = previousEntry.FreeCash;
-            entry.UnrealizedPnl = 0;
-            entry.RealizedPnl = 0;
-            entry.Notional = entry.FreeCash;
+            current.Quantity = 0;
+            current.EnterPrice = 0;
+            current.EnterTime = DateTime.MinValue;
+            current.ExitPrice = 0;
+            current.ExitTime = DateTime.MinValue;
+            current.StopLossPrice = 0;
+            current.IsStopLossTriggered = false;
+            current.FreeCash = last.FreeCash;
+            current.UnrealizedPnl = 0;
+            current.RealizedPnl = 0;
+            current.Notional = current.FreeCash;
         }
-        entry.PortfolioAnnualizedReturn = previousEntry.PortfolioAnnualizedReturn;
+        current.PortfolioAnnualizedReturn = last.PortfolioAnnualizedReturn;
     }
 
-    public record RumiEntry
+    public record RumiPosition
     {
         public decimal Fast { get; set; } = decimal.MinValue;
         public decimal Slow { get; set; } = decimal.MinValue;
@@ -233,7 +277,8 @@ public class Rumi : IAlgorithm
 
         public bool IsLongSignal { get; set; }
         public bool IsShortSignal { get; set; }
-        public bool HasPosition { get; set; }
+        public bool IsOpened { get; set; }
+        public bool IsClosing { get; set; }
 
         public decimal Quantity { get; set; }
         public decimal EnterPrice { get; set; }

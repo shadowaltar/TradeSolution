@@ -1,4 +1,5 @@
-﻿using static TradeCommon.Constants.ExternalNames;
+﻿using Common;
+using static TradeCommon.Constants.ExternalNames;
 
 namespace TradeCommon.Constants;
 
@@ -11,13 +12,19 @@ public static class ExchangeTypeConverter
 
         str = str.Trim().ToUpperInvariant();
 
-        return str switch
+        if (str.EqualsIgnoreCase(Hkex))
         {
-            Hkex => ExchangeType.Hkex,
-            Binance => ExchangeType.Binance,
-            Okex => ExchangeType.Okex,
-            _ => ExchangeType.Unknown,
-        };
+            return ExchangeType.Hkex;
+        }
+        if (str.EqualsIgnoreCase(Binance))
+        {
+            return ExchangeType.Binance;
+        }
+        if (str.EqualsIgnoreCase(Okex))
+        {
+            return ExchangeType.Okex;
+        }
+        return ExchangeType.Unknown;
     }
 
     public static string ToString(ExchangeType exchangeType)
