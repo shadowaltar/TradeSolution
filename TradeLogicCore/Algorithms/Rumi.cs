@@ -80,7 +80,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
             var price = OhlcPrice.PriceElementSelectors[PriceElementType.Close](ohlcPrice);
             var low = ohlcPrice.L;
 
-            var algorithmVariables = CalculateVariables(price, lastPosition) as RumiVariables;
+            var algorithmVariables = CalculateVariables(price, lastPosition);
             position.Variables = algorithmVariables;
             position.Price = price;
             position.FreeCash = FreeCash;
@@ -157,7 +157,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
     protected override RumiVariables CalculateVariables(decimal price, RuntimePosition<RumiVariables>? last)
     {
         var variables = new RumiVariables();
-        var lastVariables = last == null ? null : last.Variables as RumiVariables;
+        var lastVariables = last == null ? null : last.Variables;
         var fast = _fastMa.Next(price);
         var slow = _slowMa.Next(price);
         var rumi = (fast.IsValid() && slow.IsValid()) ? _rumiMa.Next(fast - slow) : decimal.MinValue;
@@ -173,15 +173,15 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
 
     protected override bool IsLongSignal(RuntimePosition<RumiVariables> current, RuntimePosition<RumiVariables> last, OhlcPrice ohlcPrice)
     {
-        var lastRumi = ((RumiVariables)last.Variables!).Rumi;
-        var rumi = ((RumiVariables)current.Variables!).Rumi;
+        var lastRumi = last.Variables!.Rumi;
+        var rumi = current.Variables!.Rumi;
         return lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0;
     }
 
     protected override bool IsShortSignal(RuntimePosition<RumiVariables> current, RuntimePosition<RumiVariables> last, OhlcPrice ohlcPrice)
     {
-        var lastRumi = ((RumiVariables)last.Variables!).Rumi;
-        var rumi = ((RumiVariables)current.Variables!).Rumi;
+        var lastRumi = last.Variables!.Rumi;
+        var rumi = current.Variables!.Rumi;
         return lastRumi.IsValid() && rumi.IsValid() && lastRumi > 0 && rumi < 0;
     }
 
@@ -205,7 +205,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         current.UnrealizedPnl = 0;
         current.OrderReturn = 0;
 
-        _log.Info($"Opened current: [{current.EnterTime:yyMMdd-HHmm}] [{current.EnterPrice:F2}*{current.Quantity:F2}] SL[{current.StopLossPrice:F2}]");
+        _log.Info($"Open: [{current.EnterTime:yyMMdd-HHmm}] [{current.EnterPrice:F2}*{current.Quantity:F2}] SL[{current.StopLossPrice:F2}]");
         FreeCash -= current.Notional;
     }
 
@@ -227,7 +227,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         current.UnrealizedPnl = 0;
         current.OrderReturn = (exitPrice - current.EnterPrice) / current.EnterPrice;
         current.FreeCash = current.Notional;
-        _log.Info($"Close:[{current.sec}] [{current.EnterTime:yyMMdd-HHmm}] [({current.ExitPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
+        _log.Info($"Close: [{current.EnterTime:yyMMdd-HHmm}] [({current.ExitPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
 
         Assertion.ShallNever(current.OrderReturn < StopLossRatio * -1);
         Assertion.ShallNever(current.FreeCash == 0);

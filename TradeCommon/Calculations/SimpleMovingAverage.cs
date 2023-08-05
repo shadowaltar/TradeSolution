@@ -83,78 +83,76 @@ public class ExponentialMovingAverageV2 : Calculator
     private readonly LinkedList<decimal> _cachedDecimalValues = new();
 
     public int Smoothing { get; }
-    public decimal[] Factors { get; }
+    public double[] Factors { get; }
+    public decimal[] DecimalFactors { get; }
 
     public ExponentialMovingAverageV2(int period, int smoothing = 2, string label = "")
     {
+        if (period < 1)
+            throw new ArgumentException("Period must be at least 1.");
+        if (smoothing < 2)
+            throw new ArgumentException("Smoothing must be at least 2.");
         Period = period;
-        Label = label;
+        Label = label ?? "EMAv2";
         Smoothing = smoothing;
-        Factors = new decimal[period];
+        Factors = new double[period];
         GenerateFactors();
     }
 
     private void GenerateFactors()
     {
-        // = pt*k + k(1-k)p(t-1) + k(1-k)^2*p(t-2) + k(1-k)^3*p(t-3) + k(1-k)^n*p(t-n)
-        throw new NotImplementedException();
+        // = kp(t) + k(1-k)p(t-1) + k(1-k)^2*p(t-2) + k(1-k)^3*p(t-3) + ... + k(1-k)^n*p(t-n)
+        var a = Smoothing / (1d + Period);
+        var residual = 1d;
+        var decimalResidual = 1m;
+        for (int i = 0; i < Period - 1; i++)
+        {
+            var coeff = a * Math.Pow(1 - a, i);
+            var decimalCoeff = Convert.ToDecimal(coeff);
+            residual = 1 - coeff;
+            decimalResidual = 1 - decimalCoeff;
+            Factors[i] = coeff;
+            DecimalFactors[i] = Convert.ToDecimal(coeff);
+        }
+        Factors[Factors.Length - 1] = residual;
+        DecimalFactors[DecimalFactors.Length - 1] = decimalResidual;
     }
 
     public override double Next(double value)
     {
         _cachedValues.AddLast(value);
-        if (_previous.IsNaN())
+        if (_cachedValues.Count != Period)
         {
-            if (_cachedValues.Count == Period)
-            {
-                var sum = 0d;
-                foreach (var item in _cachedValues)
-                {
-                    sum += item;
-                }
-                _previous = sum / Period;
-                return _previous;
-            }
-            else
-            {
-                return double.NaN;
-            }
+            return double.NaN;
         }
-        else
+        var sum = 0d;
+        var i = 0;
+        foreach (var item in _cachedValues)
         {
-            double first = _cachedValues.First!.ValueRef;
-            _cachedValues.RemoveFirst();
-            _previous = (_previous * Period + value - first) / Period;
-            return _previous;
+            sum += (Factors[i] * item);
+            i++;
         }
+        _previous = sum;
+        _cachedValues.RemoveFirst();
+        return _previous;
     }
 
     public override decimal Next(decimal value)
     {
         _cachedDecimalValues.AddLast(value);
-        if (_previousDecimal == decimal.MinValue)
+        if (_cachedDecimalValues.Count != Period)
         {
-            if (_cachedDecimalValues.Count == Period)
-            {
-                var sum = 0m;
-                foreach (var item in _cachedDecimalValues)
-                {
-                    sum += item;
-                }
-                _previousDecimal = decimal.Divide(sum, Period);
-                return _previousDecimal;
-            }
-            else
-            {
-                return decimal.MinValue;
-            }
+            return decimal.MinValue;
         }
-        else
+        var sum = 0m;
+        var i = 0;
+        foreach (var item in _cachedDecimalValues)
         {
-            decimal first = _cachedDecimalValues.First!.ValueRef;
-            _cachedDecimalValues.RemoveFirst();
-            _previousDecimal = (_previousDecimal * Period + value - first) / Period;
-            return _previousDecimal;
+            sum += (DecimalFactors[i] * item);
+            i++;
         }
+        _previousDecimal = sum;
+        _cachedDecimalValues.RemoveFirst();
+        return _previousDecimal;
     }
 }
