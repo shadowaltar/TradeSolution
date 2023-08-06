@@ -77,7 +77,7 @@ public class ColumnMappingReader
         var count = 0;
         foreach (var (name, property) in properties)
         {
-            var t = ParseType(property.PropertyType, out var isNullable);
+            var t = ParseTypeAsDefault(property.PropertyType);
             if (t == TypeCode.Object)
             {
                 var innerColumns = Read(property.PropertyType);
@@ -97,9 +97,9 @@ public class ColumnMappingReader
                     Caption = name,
                     Type = t,
                     Format = GetDefaultFormat(t),
-                    IsNullable = isNullable,
+                    IsNullable = true, // reflection-based definitions are always nullable
                     Formula = "",
-                    SortIndex = 0,
+                    SortIndex = -1,
                     IsAscending = true,
                     IsHidden = false,
                 };
@@ -197,9 +197,8 @@ public class ColumnMappingReader
         }
     }
 
-    private static TypeCode ParseType(Type type, out bool isNullable)
+    private static TypeCode ParseTypeAsDefault(Type type)
     {
-        isNullable = false;
         if (type == typeof(int))
             return TypeCode.Int32;
         if (type == typeof(double))
@@ -212,8 +211,6 @@ public class ColumnMappingReader
             return TypeCode.Boolean;
         if (type == typeof(long))
             return TypeCode.Boolean;
-
-        isNullable = true;
         if (type == typeof(string))
             return TypeCode.String;
         if (type == typeof(int?))

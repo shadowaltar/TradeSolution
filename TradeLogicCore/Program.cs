@@ -119,7 +119,7 @@ public class Program
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
 
         var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
-        securities = securities.Where(s => s.Code is "BTCUSDT" or "BTCTUSD").ToList();
+        securities = securities.Where(s => s.Code is "BTCUSDT" /*or "BTCTUSD"*/).ToList();
 
         var stopLosses = new List<decimal> { 0.02m };
         var intervalTypes = new List<IntervalType> { IntervalType.OneDay, IntervalType.OneHour };
@@ -138,7 +138,7 @@ public class Program
                 foreach (var sl in stopLosses)
                 {
                     security.PriceDecimalPoints = 6;
-                    var algo = new Rumi(mds) { StopLossRatio = sl, FastParam = 2, SlowParam = 5, RumiParam = 1 };
+                    var algo = new Rumi(mds, 5, 10, 1) { StopLossRatio = sl };
                     var initCash = 1000;
                     var entries = await algo.BackTest(security, interval, start, end, initCash);
                     if (entries.IsNullOrEmpty())
@@ -146,26 +146,45 @@ public class Program
 
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     var filePath = Path.Combine(@"C:\Temp", $"Rumi_{security.Code}_{intervalStr}_{start:yyyyMMdd}_{end:yyyyMMdd}_{DateTime.UtcNow:MMddHHmmss}.xlsx");
-                    new ExcelWriter()
-                        .WriteSheet<RuntimePosition<RumiVariables>>("BackTest", entries)
-                        .Save(filePath);
+                    var writer = new ExcelWriter()
+                        .WriteSheet<RuntimePosition<RumiVariables>>("BackTest", entries);
 
+                    if (resultMatrix.Count == 0)
+                    {
+                        resultMatrix.Add(new List<object>
+                        {
+                            "SecurityCode",
+                            "Interval",
+                            "EndFreeCash",
+                            "PositionCount",
+                            "SL Count",
+                            "PositiveRPNL Count",
+                            "FilePath"
+                        });
+                    }
                     var result = new List<object>
                     {
                         security.Code,
                         intervalStr,
                         algo.FreeCash,
+                        entries.Count(e=>e.IsClosing),
+                        entries.Count(e=>e.IsStopLossTriggered),
+                        entries.Where(e=>e.RealizedPnl>0).Count(),
                         filePath,
                     };
 
                     _log.Info($"Result: {string.Join('|', result)}");
                     resultMatrix.Add(result);
+
+                    writer
+                        .Save(filePath)
+                        .Open();
                 }
             }
         }
 
         _log.Info("RESULTS ----------");
         _log.Info(Printer.Print(resultMatrix));
-        
+
     }
 }

@@ -149,79 +149,6 @@ public class ExcelWriter
         return cursor;
     }
 
-    //protected virtual object?[] GetRowValuesByReflection(object entry, List<ColumnDefinition> columns,
-    //    Func<string?, string?>? postProcessFormula = null)
-    //{
-    //    var t = entry.GetType();
-    //    var getter = ReflectionUtils.GetValueGetter(t);
-
-    //    entry = entry ?? throw new ArgumentNullException(nameof(entry));
-    //    var values = new object?[columns.Count];
-
-    //    var innerObjectColumns = columns.Where(c => c.FieldName.Contains(".")).ToList();
-    //    var innerObjectColumnGroups = innerObjectColumns.GroupBy(ifn => ifn.FieldName.Split('.')[0]);
-
-    //    var allInnerObjectValueAndFieldNames = new Dictionary<string, Dictionary<string, object?>>();
-    //    foreach (var innerColumnGroup in innerObjectColumnGroups)
-    //    {
-    //        // eg if original property name is "MyObject X {get;set;}" and "class MyObject { int A {get;set;} }"
-    //        // the field name in column definition is like "X.A"
-    //        // the group key will be "X".
-    //        var innerObjectFieldName = innerColumnGroup.Key;
-    //        var (innerV, innerT) = getter.GetTypeAndValue(entry, innerObjectFieldName);
-    //        if (innerV != null)
-    //        {
-    //            allInnerObjectValueAndFieldNames[innerObjectFieldName] = new();
-    //            var innerColumns = innerColumnGroup.Select(ic => ic with { FieldName = RemoveFirstPart('.', ic.FieldName) }).ToList();
-    //            //var innerValues = GetRowValuesByReflection(innerV, innerColumns, postProcessFormula);
-    //            for (int i = 0; i < innerColumns.Count; i++)
-    //            {
-    //                allInnerObjectValueAndFieldNames[innerObjectFieldName][innerColumns[i].FieldName] = innerValues[i];
-    //            }
-    //        }
-    //    }
-
-    //    static string RemoveFirstPart(char delimiter, string value)
-    //    {
-    //        var i = value.IndexOf(delimiter);
-    //        return value.Substring(i);
-    //    }
-
-    //    for (int i = 0; i < columns.Count; i++)
-    //    {
-    //        var cd = columns[i];
-    //        if (!cd.Formula.IsBlank())
-    //        {
-    //            var f = postProcessFormula?.Invoke(cd.Formula) ?? cd.Formula;
-    //            values[i] = ExcelFormula.NewR1C1(f);
-    //        }
-    //        else
-    //        {
-    //            if (cd.FieldName.Contains("."))
-    //            {
-    //                //var (innerV, innerT) = getter.GetTypeAndValue(entry, cd.FieldName);
-    //                //GetRowValuesByReflection(innerV, columns)
-    //            }
-    //            var v = getter.Get(entry, cd.FieldName);
-    //            // handle nullable
-    //            if (v != null && cd.IsNullable)
-    //            {
-    //                var type = v?.GetType();
-    //                if (type == typeof(decimal))
-    //                {
-    //                    v = ((decimal)v!).NullIfZero()?.NullIfInvalid();
-    //                }
-    //                else if (type == typeof(DateTime))
-    //                {
-    //                    v = ((DateTime)v!).NullIfMin();
-    //                }
-    //            }
-    //            values[i] = v;
-    //        }
-    //    }
-    //    return values;
-    //}
-
     /// <summary>
     /// Fill row values by reflection, from properties defined in columns.
     /// </summary>
@@ -292,23 +219,31 @@ public class ExcelWriter
                 {
                     v = getter.Get(entry, cd.FieldName);
                 }
-                // handle nullable
-                if (v != null && cd.IsNullable)
-                {
-                    var type = v?.GetType();
-                    if (type == typeof(decimal))
-                    {
-                        v = ((decimal)v!).NullIfZero()?.NullIfInvalid();
-                    }
-                    else if (type == typeof(DateTime))
-                    {
-                        v = ((DateTime)v!).NullIfMin();
-                    }
-                }
-                values[i] = v;
+                values[i] = Rectify(v, cd);
             }
         }
         return values;
+
+        static object? Rectify(object value, ColumnDefinition cd)
+        {
+            if (value != null && cd.IsNullable)
+            {
+                var type = value?.GetType();
+                if (type == typeof(decimal))
+                {
+                    return ((decimal)value!).NullIfZero()?.NullIfInvalid();
+                }
+                else if (type == typeof(long))
+                {
+                    return ((long)value!).NullIfInvalid();
+                }
+                else if (type == typeof(DateTime))
+                {
+                    return ((DateTime)value!).NullIfMin();
+                }
+            }
+            return value;
+        }
     }
 
     private static void PostProcessSheet(ExcelWorksheet sheet, List<ColumnDefinition> columns)
@@ -351,10 +286,13 @@ public class ExcelWriter
             if (columns[i].SortIndex == -1) continue;
             sortDefinitions[columns[i].SortIndex] = (i, columns[i].IsAscending);
         }
-        var sortingRange = sheet.Cells[2, 1, wholeRange.End.Row, wholeRange.End.Column];
-        sortingRange.Sort(x => CreateSortingBuilder(x, sortDefinitions.OrderBy(p => p.Key).Select(p => p.Value).ToList()));
-        wholeRange.Calculate();
 
+        if (sortDefinitions.Count != 0)
+        {
+            var sortingRange = sheet.Cells[2, 1, wholeRange.End.Row, wholeRange.End.Column];
+            sortingRange.Sort(x => CreateSortingBuilder(x, sortDefinitions.OrderBy(p => p.Key).Select(p => p.Value).ToList()));
+            wholeRange.Calculate();
+        }
         // hide columns
         for (int i = columns.Count - 1; i >= 0; i--)
         {

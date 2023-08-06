@@ -8,7 +8,12 @@ public static class NumericExtensions
 
     public static decimal? NullIfInvalid(this decimal value)
     {
-        return value.IsValid() ? null : value;
+        return !value.IsValid() ? null : value;
+    }
+
+    public static long? NullIfInvalid(this long value)
+    {
+        return !value.IsValid() ? null : value;
     }
 
     public static long ReverseDigits(this long value)
@@ -29,6 +34,8 @@ public static class NumericExtensions
     public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
     public static bool IsValid(this decimal value) => value != decimal.MaxValue && value != decimal.MinValue;
+    
+    public static bool IsValid(this long value) => value != long.MaxValue && value != long.MinValue;
 
     public static bool ApproxEquals(this decimal value1, decimal value2)
     {

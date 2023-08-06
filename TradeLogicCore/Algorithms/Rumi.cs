@@ -16,9 +16,9 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
 
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
 
-    private readonly SimpleMovingAverage _fastMa;
-    private readonly ExponentialMovingAverageV2 _slowMa;
-    private readonly SimpleMovingAverage _rumiMa;
+    private SimpleMovingAverage _fastMa;
+    private ExponentialMovingAverageV2 _slowMa;
+    private SimpleMovingAverage _rumiMa;
     private Security _security;
     private DateTime _backTestStartTime;
 
@@ -34,13 +34,13 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
     public decimal TotalRealizedPnl { get; private set; }
     public decimal FreeCash { get; private set; }
 
-    public Rumi(IHistoricalMarketDataService historicalMarketDataService)
+    public Rumi(IHistoricalMarketDataService historicalMarketDataService,
+        int fast, int slow, int rumi)
     {
         _historicalMarketDataService = historicalMarketDataService;
-
-        _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
-        _slowMa = new ExponentialMovingAverageV2(SlowParam, 2, "SLOW EMA");
-        _rumiMa = new SimpleMovingAverage(RumiParam, "RUMI SMA");
+        FastParam = fast;
+        SlowParam = slow;
+        RumiParam = rumi;
     }
 
     public IPositionSizingAlgoLogic Sizing => throw new NotImplementedException();
@@ -57,6 +57,10 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
 
     public async Task<List<RuntimePosition<RumiVariables>>> BackTest(Security security, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1)
     {
+        _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
+        _slowMa = new ExponentialMovingAverageV2(SlowParam, 2, "SLOW EMA");
+        _rumiMa = new SimpleMovingAverage(RumiParam, "RUMI SMA");
+
         _security = security;
         _backTestStartTime = start;
 
@@ -71,13 +75,14 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         OhlcPrice? lastOhlcPrice = null;
         foreach (OhlcPrice? ohlcPrice in prices)
         {
-            var position = new RuntimePosition<RumiVariables>();
+            var position = new RuntimePosition<RumiVariables> { Time = ohlcPrice.T };
             var price = OhlcPrice.PriceElementSelectors[PriceElementType.Close](ohlcPrice);
             var low = ohlcPrice.L;
 
             var algorithmVariables = CalculateVariables(price, lastPosition);
             position.Variables = algorithmVariables;
             position.Price = price;
+            position.Low = low;
             position.FreeCash = FreeCash;
 
             // copy over most of the states from exitPrice to this
@@ -128,8 +133,8 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         if (lastPosition != null && lastPosition.IsOpened)
         {
             _log.Info("Attempt to rollback this position at the end of back-testing.");
-            FreeCash += lastPosition.Notional;
-            entries.Remove(lastPosition);
+            FreeCash += lastPosition.EnterPrice * lastPosition.Quantity;
+            // Cancel(position);
 
             //_log.Info("Attempt to close current at the end of back-testing.");
             //ClosePosition(lastPosition, lastOhlcPrice?.C ?? 0, GetOhlcEndTime(lastOhlcPrice, intervalType));
@@ -312,9 +317,12 @@ public class RumiVariables : IAlgorithmVariables
 
 public record RuntimePosition<T>
 {
+    public DateTime Time { get; set; }
+
     public T? Variables { get; set; }
 
     public decimal Price { get; set; } = decimal.MinValue;
+    public decimal Low { get; set; } = decimal.MinValue;
 
     public bool IsLongSignal { get; set; }
     public bool IsShortSignal { get; set; }

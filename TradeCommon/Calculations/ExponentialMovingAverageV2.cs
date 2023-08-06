@@ -72,11 +72,21 @@ public class ExponentialMovingAverageV2 : Calculator
             return decimal.MinValue;
         }
         var sum = 0m;
-        var i = 0;
-        foreach (var item in _cachedDecimalValues)
+        var last = _cachedDecimalValues.Last;
+        if (Period == 1)
         {
-            sum += (DecimalFactors[i] * item);
-            i++;
+            _previousDecimal = last!.Value;
+            _cachedDecimalValues.RemoveFirst();
+            return _previousDecimal;
+        }
+        // factors are from latest to earliest
+        // cached values are from earliest to latest
+        var node = _cachedDecimalValues.Last;
+        for (int i = 0; i < Period; i++)
+        {
+            var v = node!.Value;
+            sum += (DecimalFactors[i] * v);
+            node = node.Previous;
         }
         _previousDecimal = sum;
         _cachedDecimalValues.RemoveFirst();
