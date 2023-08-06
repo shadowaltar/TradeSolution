@@ -1,8 +1,8 @@
 ﻿using Autofac;
 using Common;
-using Iced.Intel;
 using log4net;
 using log4net.Config;
+using OfficeOpenXml;
 using System.Text;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -28,6 +28,7 @@ public class Program
 
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         XmlConfigurator.Configure();
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
         Dependencies.Register(ExternalNames.Binance);
 
@@ -117,16 +118,19 @@ public class Program
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
 
-        var securities = await securityService.GetSecurities(ExchangeType.Hkex, SecurityType.Equity);
+        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
+        securities = securities.Where(s => s.Code is "BTCUSDT" or "BTCTUSD").ToList();
 
-        var stopLosses = new List<decimal> { 0.01m, 0.02m, 0.03m };
+        var stopLosses = new List<decimal> { 0.02m };
         var intervalTypes = new List<IntervalType> { IntervalType.OneDay, IntervalType.OneHour };
 
         var resultMatrix = new List<List<object>>();
 
         // TODO
-        //var x = ColumnMappingReader.Read<RuntimePosition<RumiVariables>>();
+        var x = ColumnMappingReader.Read(typeof(RuntimePosition<RumiVariables>));
 
+        var start = new DateTime(2022, 1, 1);
+        var end = new DateTime(2023, 6, 30);
         foreach (var security in securities)
         {
             foreach (var interval in intervalTypes)
@@ -134,13 +138,25 @@ public class Program
                 foreach (var sl in stopLosses)
                 {
                     security.PriceDecimalPoints = 6;
-                    var algo = new Rumi(mds) { StopLossRatio = sl };
+                    var algo = new Rumi(mds) { StopLossRatio = sl, FastParam = 2, SlowParam = 5, RumiParam = 1 };
                     var initCash = 1000;
-                    var entries = await algo.BackTest(security, interval, new DateTime(2022, 1, 1), new DateTime(2023, 6, 30), initCash);
+                    var entries = await algo.BackTest(security, interval, start, end, initCash);
                     if (entries.IsNullOrEmpty())
                         continue;
 
-                    var result = new List<object> { security.Code, interval, sl, algo.FreeCash };
+                    var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
+                    var filePath = Path.Combine(@"C:\Temp", $"Rumi_{security.Code}_{intervalStr}_{start:yyyyMMdd}_{end:yyyyMMdd}_{DateTime.UtcNow:MMddHHmmss}.xlsx");
+                    new ExcelWriter()
+                        .WriteSheet<RuntimePosition<RumiVariables>>("BackTest", entries)
+                        .Save(filePath);
+
+                    var result = new List<object>
+                    {
+                        security.Code,
+                        intervalStr,
+                        algo.FreeCash,
+                        filePath,
+                    };
 
                     _log.Info($"Result: {string.Join('|', result)}");
                     resultMatrix.Add(result);
@@ -150,5 +166,6 @@ public class Program
 
         _log.Info("RESULTS ----------");
         _log.Info(Printer.Print(resultMatrix));
+        
     }
 }

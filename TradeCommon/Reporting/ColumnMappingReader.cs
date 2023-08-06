@@ -69,30 +69,43 @@ public class ColumnMappingReader
         return definitions;
     }
 
-    public static List<ColumnDefinition> Read<T>()
+    public static List<ColumnDefinition> Read(Type type)
     {
         var definitions = new List<ColumnDefinition>();
 
-        var type = typeof(T);
         var properties = ReflectionUtils.GetPropertyToName(type);
         var count = 0;
         foreach (var (name, property) in properties)
         {
             var t = ParseType(property.PropertyType, out var isNullable);
-            var cd = new ColumnDefinition
+            if (t == TypeCode.Object)
             {
-                Index = count,
-                FieldName = name,
-                Caption = name,
-                Type = t,
-                Format = GetDefaultFormat(t),
-                IsNullable = isNullable,
-                Formula = "",
-                SortIndex = 0,
-                IsAscending = true,
-                IsHidden = false,
-            };
-            count++;
+                var innerColumns = Read(property.PropertyType);
+                foreach (var innerColumn in innerColumns)
+                {
+                    innerColumn.FieldName = $"{name}.{innerColumn.FieldName}";
+                }
+                definitions.AddRange(innerColumns);
+                count += innerColumns.Count;
+            }
+            else
+            {
+                var cd = new ColumnDefinition
+                {
+                    Index = count,
+                    FieldName = name,
+                    Caption = name,
+                    Type = t,
+                    Format = GetDefaultFormat(t),
+                    IsNullable = isNullable,
+                    Formula = "",
+                    SortIndex = 0,
+                    IsAscending = true,
+                    IsHidden = false,
+                };
+                definitions.Add(cd);
+                count++;
+            }
         }
 
         //var cd = new ColumnDefinition
@@ -131,13 +144,15 @@ public class ColumnMappingReader
         //}
         //definitions.Add(cd);
         return definitions;
-
     }
 
     private static string GetDefaultFormat(TypeCode t)
     {
         switch (t)
         {
+            case TypeCode.Decimal:
+            case TypeCode.Double:
+                return "General";
             case TypeCode.Int64:
             case TypeCode.Int32:
                 return "0";

@@ -6,6 +6,11 @@ public static class NumericExtensions
         return value == 0 ? null : value;
     }
 
+    public static decimal? NullIfInvalid(this decimal value)
+    {
+        return value.IsValid() ? null : value;
+    }
+
     public static long ReverseDigits(this long value)
     {
         long reverse = 0;

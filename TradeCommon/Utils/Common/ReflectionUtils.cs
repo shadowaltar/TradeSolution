@@ -151,7 +151,6 @@ public static class ReflectionUtils
         return (ValueGetter<T>)vg;
     }
 
-
     public static ValueSetter<T> GetValueSetter<T>(BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         var t = typeof(T);

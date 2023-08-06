@@ -64,6 +64,18 @@ public static class SqlExtensions
         return result;
     }
 
+    public static string PrintActualSql(this DbCommand cmd)
+    {
+        string result = cmd.CommandText.ToString();
+        foreach (DbParameter p in cmd.Parameters)
+        {
+            if (p?.Value == null) continue;
+            string quotedValue = (p.Value is string) ? $"'{p.Value}'" : p.Value.ToString()!;
+            result = result.Replace(p.ParameterName.ToString(), quotedValue);
+        }
+        return result;
+    }
+
     public static void PrepareSqlBulkCopy<T>(this SqlBulkCopy bulkCopy)
     {
         var names = ReflectionUtils.GetPropertyToName(typeof(T)).Keys;

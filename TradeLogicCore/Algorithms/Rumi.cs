@@ -3,14 +3,11 @@ using log4net;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeDataCore.MarketData;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
-using static Futu.OpenApi.Pb.TrdCommon;
-using static TradeLogicCore.Algorithms.Rumi;
 
 namespace TradeLogicCore.Algorithms;
 public class Rumi : AbstractAlgorithm<RumiVariables>
@@ -20,16 +17,16 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
 
     private readonly SimpleMovingAverage _fastMa;
-    private readonly ExponentialMovingAverage _slowMa;
+    private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
-
+    private Security _security;
     private DateTime _backTestStartTime;
 
 
 
-    public int FastParam { get; set; } = 3;
+    public int FastParam { get; set; } = 2;
     public int SlowParam { get; set; } = 5;
-    public int RumiParam { get; set; } = 3;
+    public int RumiParam { get; set; } = 1;
 
     public decimal StopLossRatio { get; set; } = 0;
 
@@ -42,7 +39,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         _historicalMarketDataService = historicalMarketDataService;
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
-        _slowMa = new ExponentialMovingAverage(SlowParam, 2, "SLOW EMA");
+        _slowMa = new ExponentialMovingAverageV2(SlowParam, 2, "SLOW EMA");
         _rumiMa = new SimpleMovingAverage(RumiParam, "RUMI SMA");
     }
 
@@ -60,17 +57,15 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
 
     public async Task<List<RuntimePosition<RumiVariables>>> BackTest(Security security, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1)
     {
+        _security = security;
         _backTestStartTime = start;
+
         InitialFreeCash = initialCash;
         FreeCash = initialCash;
 
         var ts = IntervalTypeConverter.ToTimeSpan(intervalType).TotalDays;
 
         var prices = await _historicalMarketDataService.Get(security, intervalType, start, end);
-        if (prices.Count == 0)
-        {
-
-        }
         RuntimePosition<RumiVariables>? lastPosition = null;
         var entries = new List<RuntimePosition<RumiVariables>>(prices.Count);
         OhlcPrice? lastOhlcPrice = null;
@@ -132,9 +127,13 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
 
         if (lastPosition != null && lastPosition.IsOpened)
         {
-            _log.Info("Attempt to close current at the end of back-testing.");
-            ClosePosition(lastPosition, lastOhlcPrice?.C ?? 0, GetOhlcEndTime(lastOhlcPrice, intervalType));
-            TotalRealizedPnl += lastPosition.RealizedPnl;
+            _log.Info("Attempt to rollback this position at the end of back-testing.");
+            FreeCash += lastPosition.Notional;
+            entries.Remove(lastPosition);
+
+            //_log.Info("Attempt to close current at the end of back-testing.");
+            //ClosePosition(lastPosition, lastOhlcPrice?.C ?? 0, GetOhlcEndTime(lastOhlcPrice, intervalType));
+            //TotalRealizedPnl += lastPosition.RealizedPnl;
         }
 
         Assertion.Shall((InitialFreeCash + TotalRealizedPnl).ApproxEquals(FreeCash));
@@ -205,8 +204,15 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         current.UnrealizedPnl = 0;
         current.OrderReturn = 0;
 
-        _log.Info($"Open: [{current.EnterTime:yyMMdd-HHmm}] [{current.EnterPrice:F2}*{current.Quantity:F2}] SL[{current.StopLossPrice:F2}]");
+        _log.Info($"Open: [{current.EnterTime:yyMMdd-HHmm}][{FormatPrice(current.Variables.Fast)}/{FormatPrice(current.Variables.Slow)}/{FormatPrice(current.Variables.Rumi)}/{FormatPrice(current.Variables.LastRumi)}] [{current.EnterPrice:F2}*{current.Quantity:F2}] SL[{current.StopLossPrice:F2}]");
         FreeCash -= current.Notional;
+    }
+
+    private decimal FormatPrice(decimal value)
+    {
+        if (_security != null)
+            return decimal.Round(value, _security.PriceDecimalPoints);
+        return value;
     }
 
     protected override void ClosePosition(RuntimePosition<RumiVariables> current, decimal exitPrice, DateTime exitTime)
@@ -227,7 +233,13 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         current.UnrealizedPnl = 0;
         current.OrderReturn = (exitPrice - current.EnterPrice) / current.EnterPrice;
         current.FreeCash = current.Notional;
-        _log.Info($"Close: [{current.EnterTime:yyMMdd-HHmm}] [({current.ExitPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
+
+        if (current.EnterTime == current.ExitTime)
+        {
+
+        }
+
+        _log.Info($"Close: [{current.ExitTime:yyMMdd-HHmm}][{FormatPrice(current.Variables.Fast)}/{FormatPrice(current.Variables.Slow)}/{FormatPrice(current.Variables.Rumi)}/{FormatPrice(current.Variables.LastRumi)}] [({current.ExitPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
 
         Assertion.ShallNever(current.OrderReturn < StopLossRatio * -1);
         Assertion.ShallNever(current.FreeCash == 0);
@@ -247,7 +259,7 @@ public class Rumi : AbstractAlgorithm<RumiVariables>
         current.Notional = current.Quantity * current.StopLossPrice;
         current.OrderReturn = (current.StopLossPrice - current.EnterPrice) / current.EnterPrice;
         current.FreeCash = current.Notional;
-        _log.Info($"StopLossed: [{current.EnterTime:yyMMdd-HHmm}] [({current.StopLossPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
+        _log.Info($"StopLossed: [{current.ExitTime:yyMMdd-HHmm}][{FormatPrice(current.Variables.Fast)}/{FormatPrice(current.Variables.Slow)}/{FormatPrice(current.Variables.Rumi)}/{FormatPrice(current.Variables.LastRumi)}] [({current.StopLossPrice:F2}-{current.EnterPrice:F2})*{current.Quantity:F2}={current.RealizedPnl:F2}][{current.OrderReturn:P2}] SL[{current.StopLossPrice:F2}]");
 
         Assertion.ShallNever(current.OrderReturn < StopLossRatio * -1);
 

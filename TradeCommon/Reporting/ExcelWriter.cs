@@ -4,6 +4,7 @@ using log4net;
 using OfficeOpenXml;
 using OfficeOpenXml.Sorting;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace TradeCommon.Reporting;
 public class ExcelWriter
@@ -31,6 +32,16 @@ public class ExcelWriter
         return sheet;
     }
 
+    public ExcelWriter WriteSheet<T>(string sheetCaption,
+                                     IList<T> entries,
+                                     bool isActivated = false)
+    {
+        if (_isDisposed) throw new InvalidOperationException("The object has been disposed.");
+
+        var columns = ColumnMappingReader.Read(typeof(T));
+        return WriteSheet<T>(columns, sheetCaption, entries, isActivated);
+    }
+
     public ExcelWriter WriteSheet<T>(string columnDefinitionResourcePath,
                                      string sheetCaption,
                                      IList<T> entries,
@@ -39,6 +50,17 @@ public class ExcelWriter
         if (_isDisposed) throw new InvalidOperationException("The object has been disposed.");
 
         var columns = ColumnMappingReader.Read(columnDefinitionResourcePath);
+        return WriteSheet<T>(columns, sheetCaption, entries, isActivated);
+    }
+
+    public ExcelWriter WriteSheet<T>(List<ColumnDefinition> columns,
+                                     string sheetCaption,
+                                     IList<T> entries,
+                                     bool isActivated = false)
+    {
+        if (columns == null) throw new ArgumentNullException(nameof(columns));
+        if (_isDisposed) throw new InvalidOperationException("The object has been disposed.");
+
         var sheet = CreateSheet(sheetCaption);
         _log.Info($"Start writing sheet {sheetCaption}, with {columns.Count} columns and {entries.Count} rows.");
 
@@ -127,6 +149,79 @@ public class ExcelWriter
         return cursor;
     }
 
+    //protected virtual object?[] GetRowValuesByReflection(object entry, List<ColumnDefinition> columns,
+    //    Func<string?, string?>? postProcessFormula = null)
+    //{
+    //    var t = entry.GetType();
+    //    var getter = ReflectionUtils.GetValueGetter(t);
+
+    //    entry = entry ?? throw new ArgumentNullException(nameof(entry));
+    //    var values = new object?[columns.Count];
+
+    //    var innerObjectColumns = columns.Where(c => c.FieldName.Contains(".")).ToList();
+    //    var innerObjectColumnGroups = innerObjectColumns.GroupBy(ifn => ifn.FieldName.Split('.')[0]);
+
+    //    var allInnerObjectValueAndFieldNames = new Dictionary<string, Dictionary<string, object?>>();
+    //    foreach (var innerColumnGroup in innerObjectColumnGroups)
+    //    {
+    //        // eg if original property name is "MyObject X {get;set;}" and "class MyObject { int A {get;set;} }"
+    //        // the field name in column definition is like "X.A"
+    //        // the group key will be "X".
+    //        var innerObjectFieldName = innerColumnGroup.Key;
+    //        var (innerV, innerT) = getter.GetTypeAndValue(entry, innerObjectFieldName);
+    //        if (innerV != null)
+    //        {
+    //            allInnerObjectValueAndFieldNames[innerObjectFieldName] = new();
+    //            var innerColumns = innerColumnGroup.Select(ic => ic with { FieldName = RemoveFirstPart('.', ic.FieldName) }).ToList();
+    //            //var innerValues = GetRowValuesByReflection(innerV, innerColumns, postProcessFormula);
+    //            for (int i = 0; i < innerColumns.Count; i++)
+    //            {
+    //                allInnerObjectValueAndFieldNames[innerObjectFieldName][innerColumns[i].FieldName] = innerValues[i];
+    //            }
+    //        }
+    //    }
+
+    //    static string RemoveFirstPart(char delimiter, string value)
+    //    {
+    //        var i = value.IndexOf(delimiter);
+    //        return value.Substring(i);
+    //    }
+
+    //    for (int i = 0; i < columns.Count; i++)
+    //    {
+    //        var cd = columns[i];
+    //        if (!cd.Formula.IsBlank())
+    //        {
+    //            var f = postProcessFormula?.Invoke(cd.Formula) ?? cd.Formula;
+    //            values[i] = ExcelFormula.NewR1C1(f);
+    //        }
+    //        else
+    //        {
+    //            if (cd.FieldName.Contains("."))
+    //            {
+    //                //var (innerV, innerT) = getter.GetTypeAndValue(entry, cd.FieldName);
+    //                //GetRowValuesByReflection(innerV, columns)
+    //            }
+    //            var v = getter.Get(entry, cd.FieldName);
+    //            // handle nullable
+    //            if (v != null && cd.IsNullable)
+    //            {
+    //                var type = v?.GetType();
+    //                if (type == typeof(decimal))
+    //                {
+    //                    v = ((decimal)v!).NullIfZero()?.NullIfInvalid();
+    //                }
+    //                else if (type == typeof(DateTime))
+    //                {
+    //                    v = ((DateTime)v!).NullIfMin();
+    //                }
+    //            }
+    //            values[i] = v;
+    //        }
+    //    }
+    //    return values;
+    //}
+
     /// <summary>
     /// Fill row values by reflection, from properties defined in columns.
     /// </summary>
@@ -135,9 +230,44 @@ public class ExcelWriter
     /// <returns></returns>
     protected virtual object?[] GetRowValuesByReflection<T>(T entry, List<ColumnDefinition> columns, Func<string?, string?>? postProcessFormula = null)
     {
+        entry = entry ?? throw new ArgumentNullException(nameof(entry));
         var getter = ReflectionUtils.GetValueGetter<T>();
 
-        entry = entry ?? throw new ArgumentNullException(nameof(entry));
+        var innerObjectColumns = columns.Where(c => c.FieldName.Contains('.')).ToList();
+        var innerObjectColumnGroups = innerObjectColumns.GroupBy(ifn => ifn.FieldName.Split('.')[0]);
+
+        var allInnerObjectValueAndFieldNames = new Dictionary<string, Dictionary<string, object?>>();
+        foreach (var innerColumnGroup in innerObjectColumnGroups)
+        {
+            // eg if original property name is "MyObject X {get;set;}" and "class MyObject { int A {get;set;} }"
+            // the field name in column definition is like "X.A"
+            // the group key will be "X".
+            var innerObjectFieldName = innerColumnGroup.Key;
+            var (innerV, innerT) = getter.GetTypeAndValue(entry, innerObjectFieldName);
+            if (innerV != null)
+            {
+                allInnerObjectValueAndFieldNames[innerObjectFieldName] = new();
+                var innerColumns = innerColumnGroup.Select(ic => ic with { FieldName = RemoveFirstPart('.', ic.FieldName) }).ToList();
+                Dictionary<string, PropertyInfo> mapping = ReflectionUtils.GetPropertyToName(innerT);
+
+                // use slow reflection
+                for (int i = 0; i < innerColumns.Count; i++)
+                {
+                    var fn = innerColumns[i].FieldName;
+                    var pi = mapping[fn];
+                    var value = pi.GetValue(innerV);
+                    allInnerObjectValueAndFieldNames[innerObjectFieldName][fn] = value;
+                }
+            }
+        }
+
+        static string RemoveFirstPart(char delimiter, string value)
+        {
+            var i = value.IndexOf(delimiter);
+            return value.Substring(i + 1);
+        }
+
+
         var values = new object?[columns.Count];
         for (int i = 0; i < columns.Count; i++)
         {
@@ -149,14 +279,26 @@ public class ExcelWriter
             }
             else
             {
-                var v = getter.Get(entry, cd.FieldName);
+                object? v;
+                if (cd.FieldName.Contains("."))
+                {
+                    var parts = cd.FieldName.Split('.');
+                    var outerName = parts[0];
+                    var innerName = parts[1];
+                    var value = allInnerObjectValueAndFieldNames[outerName][innerName];
+                    v = value;
+                }
+                else
+                {
+                    v = getter.Get(entry, cd.FieldName);
+                }
                 // handle nullable
                 if (v != null && cd.IsNullable)
                 {
                     var type = v?.GetType();
                     if (type == typeof(decimal))
                     {
-                        v = ((decimal)v!).NullIfZero();
+                        v = ((decimal)v!).NullIfZero()?.NullIfInvalid();
                     }
                     else if (type == typeof(DateTime))
                     {

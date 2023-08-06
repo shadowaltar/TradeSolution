@@ -29,6 +29,9 @@ public class SqlWriter<T> : IDisposable where T : new()
         tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
         databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
         databaseName = databaseName ?? throw new ArgumentNullException(nameof(databaseName));
+        
+        if (!Directory.Exists(_databasePath))
+            Directory.CreateDirectory(_databasePath);
 
         Sql = sql;
 

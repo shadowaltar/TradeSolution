@@ -227,6 +227,10 @@ WHERE
             );
             results.Add(price);
         }
+        if (results.Count == 0)
+        {
+            var x = command.PrintActualSql();
+        }
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }

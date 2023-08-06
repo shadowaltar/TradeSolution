@@ -24,7 +24,6 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="futu-api" Version="7.1.3308" />
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.23326.1" />
   </ItemGroup>
 
   <ItemGroup>

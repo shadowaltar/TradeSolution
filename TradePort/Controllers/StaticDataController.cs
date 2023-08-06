@@ -15,7 +15,7 @@ namespace TradePort.Controllers;
 public class StaticDataController : Controller
 {
     /// <summary>
-    /// Get the count of price entries in database.
+    /// Get the count of security entries in database.
     /// </summary>
     /// <returns></returns>
     [HttpGet("securities/count")]

@@ -20,8 +20,17 @@ internal class Program
     /// <param name="external">External system name. Supported values: Binance, Yahoo.</param>
     /// <param name="interval">Price interval. Supported values: OneMinute, OneHour, OneDay. Or leave this optional arg in order to run all three intervals.</param>
     /// <returns></returns>
-    private static async Task Main(string mode, string external, string interval)
+    public static async Task Main(string[] args)
     {
+        if (args.Length != 3)
+        {
+            await Console.Out.WriteLineAsync("Requires Mode, External and Interval arguments.");
+            return;
+        }
+        string mode = args[0];
+        string external = args[1];
+        string interval = args[2];
+
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
