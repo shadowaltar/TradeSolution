@@ -84,6 +84,7 @@ public class ColumnMappingReader
                 foreach (var innerColumn in innerColumns)
                 {
                     innerColumn.FieldName = $"{name}.{innerColumn.FieldName}";
+                    innerColumn.Caption = $"{name}.{innerColumn.FieldName}";
                 }
                 definitions.AddRange(innerColumns);
                 count += innerColumns.Count;
@@ -107,42 +108,6 @@ public class ColumnMappingReader
                 count++;
             }
         }
-
-        //var cd = new ColumnDefinition
-        //{
-        //    Index = csvReader["Index"].ParseInt(-1),
-        //    FieldName = csvReader["Field"] ?? throw new ArgumentNullException("Field column / value missing in definition."),
-        //    Caption = csvReader["Caption"] ?? throw new ArgumentNullException("Caption column / value missing in definition."),
-        //    Type = ParseType(csvReader),
-        //    Format = csvReader["Format"],
-        //    IsNullable = csvReader["Nullable"].ParseBool(),
-        //    Formula = csvReader["Formula"],
-        //    SortIndex = sortIndex,
-        //    IsAscending = isAscending,
-        //    IsHidden = csvReader["Hidden"].ParseBool(),
-        //};
-        //if (cd.IsSpecialObjectColumn)
-        //{
-        //    // will find the exact class which represents the Type value
-        //    var typeName = csvReader["Type"]?.ToString();
-        //    var type = ReflectionUtils.SearchType(typeName);
-        //    if (typeName.IsBlank() || type == null)
-        //    {
-        //        throw new ArgumentException("Invalid object type specified in the column definition file which no concrete class can be matched to it. Type value: " + typeName);
-        //    }
-        //    if (!cd.Format.IsBlank())
-        //    {
-        //        var ctor = type.GetConstructor(new[] { typeof(string) });
-        //        var obj = ctor?.Invoke(new object[] { cd.Format });
-        //        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
-        //    }
-        //    else
-        //    {
-        //        var obj = Activator.CreateInstance(type);
-        //        cd.ConcreteSpecialObject = obj as ISpecialCellObject;
-        //    }
-        //}
-        //definitions.Add(cd);
         return definitions;
     }
 

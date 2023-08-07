@@ -3,7 +3,9 @@ using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
+using System.Diagnostics;
 using System.Text;
+using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -118,73 +120,98 @@ public class Program
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
 
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
-        securities = securities.Where(s => s.Code is "BTCUSDT" /*or "BTCTUSD"*/).ToList();
+        var securities = await securityService.GetSecurities(ExchangeType.Hkex, SecurityType.Equity);
+        var stopLosses = new List<decimal> { 0.05m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneHour /*, IntervalType.OneHour */};
 
-        var stopLosses = new List<decimal> { 0.02m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneDay, IntervalType.OneHour };
+        var summaryRows = new List<List<object>>();
 
-        var resultMatrix = new List<List<object>>();
-
-        // TODO
-        var x = ColumnMappingReader.Read(typeof(RuntimePosition<RumiVariables>));
-
+        var fast = 26;
+        var slow = 51;
+        var rumi = 1;
         var start = new DateTime(2022, 1, 1);
-        var end = new DateTime(2023, 6, 30);
-        foreach (var security in securities)
+        var end = new DateTime(2023, 7, 1);
+        var now = DateTime.Now;
+
+        var rootFolder = @"C:\Temp";
+        var subFolder = $"AlgorithmEngine-{fast},{slow},{rumi}-{now:yyyyMMdd-HHmmss}";
+        var zipFileName = $"Result-AlgorithmEngine-{fast},{slow},{rumi}-{now:yyyyMMdd-HHmmss}.zip";
+        var folder = Path.Combine(rootFolder, subFolder);
+        var zipFilePath = Path.Combine(rootFolder, zipFileName);
+        var summaryFilePath = Path.Combine(folder, $"!Summary-{fast},{slow},{rumi}-{now:yyyyMMdd-HHmmss}.csv");
+
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
+
+        await Parallel.ForEachAsync(securities, async (security, t) =>
         {
             foreach (var interval in intervalTypes)
             {
                 foreach (var sl in stopLosses)
                 {
                     security.PriceDecimalPoints = 6;
-                    var algo = new Rumi(mds, 5, 10, 1) { StopLossRatio = sl };
+                    var engine = new AlgorithmEngine<RumiVariables>(mds);
+                    var algo = new Rumi(engine, fast, slow, rumi, sl);
+                    engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+
                     var initCash = 1000;
-                    var entries = await algo.BackTest(security, interval, start, end, initCash);
+                    var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
                     if (entries.IsNullOrEmpty())
                         continue;
 
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
-                    var filePath = Path.Combine(@"C:\Temp", $"Rumi_{security.Code}_{intervalStr}_{start:yyyyMMdd}_{end:yyyyMMdd}_{DateTime.UtcNow:MMddHHmmss}.xlsx");
-                    var writer = new ExcelWriter()
-                        .WriteSheet<RuntimePosition<RumiVariables>>("BackTest", entries);
+                    var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
 
-                    if (resultMatrix.Count == 0)
-                    {
-                        resultMatrix.Add(new List<object>
-                        {
-                            "SecurityCode",
-                            "Interval",
-                            "EndFreeCash",
-                            "PositionCount",
-                            "SL Count",
-                            "PositiveRPNL Count",
-                            "FilePath"
-                        });
-                    }
+                    Csv.Write(entries, filePath);
+
                     var result = new List<object>
                     {
                         security.Code,
+                        security.Name,
                         intervalStr,
-                        algo.FreeCash,
-                        entries.Count(e=>e.IsClosing),
-                        entries.Count(e=>e.IsStopLossTriggered),
-                        entries.Where(e=>e.RealizedPnl>0).Count(),
+                        engine.Portfolio.FreeCash,
+                        Metrics.GetAnnualizedReturn(initCash, engine.Portfolio.Notional.ToDouble(), start, end).ToString("P4"),
+                        entries.Count(e => e.IsClosing),
+                        entries.Count(e => e.IsStopLossTriggered),
+                        entries.Where(e => e.RealizedPnl > 0).Count(),
                         filePath,
                     };
 
                     _log.Info($"Result: {string.Join('|', result)}");
-                    resultMatrix.Add(result);
-
-                    writer
-                        .Save(filePath)
-                        .Open();
+                    summaryRows.Add(result);
                 }
             }
+        });
+
+        var headers = new List<string> {
+            "SecurityCode",
+            "SecurityName",
+            "Interval",
+            "EndFreeCash",
+            "AnnualizedReturn",
+            "PositionCount",
+            "SL Count",
+            "PositiveRPNL Count",
+            "FilePath"
+        };
+
+        Csv.Write(headers, summaryRows, summaryFilePath);
+        Zip.Archive(folder, zipFilePath);
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = summaryFilePath,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Failed to open output file: {summaryFilePath}", ex);
         }
 
         _log.Info("RESULTS ----------");
-        _log.Info(Printer.Print(resultMatrix));
-
+        _log.Info(Printer.Print(summaryRows));
     }
 }

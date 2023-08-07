@@ -1,8 +1,9 @@
-﻿using TradeDataCore.Instruments;
+﻿using TradeCommon.Essentials.Portfolios;
+using TradeDataCore.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Sizing;
-public class EvenPositionSizing : IPositionSizingAlgoLogic
+public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
 {
     private readonly IPortfolioService _portfolioService;
     private readonly ISecurityService _securityService;
@@ -25,6 +26,11 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
             return LotRounding(securityId, freeBalance / availableNewPositionCount);
 
         return 0;
+    }
+
+    public decimal GetSize(decimal availableCash, AlgoEntry<T> current, AlgoEntry<T> last, decimal price, DateTime time)
+    {
+        throw new NotImplementedException();
     }
 
     private decimal LotRounding(int securityId, decimal proposedSize)

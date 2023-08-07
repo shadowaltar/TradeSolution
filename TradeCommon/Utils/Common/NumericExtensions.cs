@@ -34,7 +34,7 @@ public static class NumericExtensions
     public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
     public static bool IsValid(this decimal value) => value != decimal.MaxValue && value != decimal.MinValue;
-    
+
     public static bool IsValid(this long value) => value != long.MaxValue && value != long.MinValue;
 
     public static bool ApproxEquals(this decimal value1, decimal value2)
@@ -45,4 +45,6 @@ public static class NumericExtensions
         if (diff < 0 && diff > -0.00000000000000000001m) return true;
         return false;
     }
+
+    public static double ToDouble(this decimal value) => decimal.ToDouble(value);
 }

@@ -3,13 +3,14 @@ using CsvHelper.Configuration;
 using System.Globalization;
 using System.Linq.Expressions;
 using TradeCommon.Constants;
+using TradeCommon.Reporting;
 
 namespace Common;
 public static class Csv
 {
-    public static Dictionary<string, TV?> ReadAsDictionary<TV>(string fileName, Func<string[], TV>? converter = null) where TV : class
+    public static Dictionary<string, TV?> ReadAsDictionary<TV>(string filePath, Func<string[], TV>? converter = null) where TV : class
     {
-        using var reader = new StreamReader(fileName);
+        using var reader = new StreamReader(filePath);
         using var csvReader = new CsvReader(reader, CultureInfo.InvariantCulture);
         var results = new Dictionary<string, TV?>();
         csvReader.Read();
@@ -68,11 +69,11 @@ public static class Csv
         return results;
     }
 
-    public static Dictionary<string, T> Read<T>(string fileName, Func<T, string> keySelector, bool robustBooleanConversion = false)
+    public static Dictionary<string, T> Read<T>(string filePath, Func<T, string> keySelector, bool robustBooleanConversion = false)
     {
         // key is Id, value is CustodianAccountSetting
         var records = new Dictionary<string, T>();
-        using var reader = new StreamReader(fileName);
+        using var reader = new StreamReader(filePath);
         using var csvReader = new CsvReader(reader, CultureInfo.InvariantCulture);
         if (robustBooleanConversion)
         {
@@ -90,11 +91,11 @@ public static class Csv
         return records;
     }
 
-    public static List<T> Read<T>(string fileName)
+    public static List<T> Read<T>(string filePath)
     {
         // key is Id, value is CustodianAccountSetting
         var records = new List<T>();
-        using var reader = new StreamReader(fileName);
+        using var reader = new StreamReader(filePath);
         using var csvReader = new CsvReader(reader, CultureInfo.InvariantCulture);
         csvReader.Read();
         csvReader.ReadHeader();
@@ -106,6 +107,53 @@ public static class Csv
             records.Add(record);
         }
         return records;
+    }
+
+    public static void Write<T>(List<T> entries, string filePath)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        csv.WriteRecords(entries);
+    }
+
+    public static void Write(List<string> headers, List<List<object>> entries, string filePath)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        foreach (var header in headers)
+        {
+            csv.WriteField(header);
+        }
+        foreach (var entry in entries)
+        {
+            csv.NextRecord();
+            foreach (var value in entry)
+            {
+                var value2 = Rectify(value);
+                csv.WriteField(value2);
+            }
+        }
+
+        static object? Rectify(object value)
+        {
+            if (value != null)
+            {
+                var type = value?.GetType();
+                if (type == typeof(decimal))
+                {
+                    return ((decimal)value!).NullIfZero()?.NullIfInvalid();
+                }
+                else if (type == typeof(long))
+                {
+                    return ((long)value!).NullIfInvalid();
+                }
+                else if (type == typeof(DateTime))
+                {
+                    return ((DateTime)value!).NullIfMin();
+                }
+            }
+            return value;
+        }
     }
 }
 

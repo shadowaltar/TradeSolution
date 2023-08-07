@@ -1,15 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Essentials.Portfolios;
+﻿namespace TradeCommon.Essentials.Portfolios;
 
 /// <summary>
-/// Portfolio is an aggregation of positions.
+/// Portfolio is an aggregation of positions including cash-position (uninvested/free cash).
 /// </summary>
-public class Portfolio
+public record Portfolio
 {
+    public Portfolio(decimal initialCash)
+    {
+        InitialFreeCash = initialCash;
+        FreeCash = initialCash;
+        Notional = initialCash;
+    }
 
+    public decimal InitialFreeCash { get; set; }
+    public decimal FreeCash { get; set; }
+    public decimal Notional { get; set; }
+    public decimal TotalRealizedPnl { get; set; }
 }

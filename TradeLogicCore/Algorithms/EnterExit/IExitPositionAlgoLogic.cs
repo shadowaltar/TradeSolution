@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeLogicCore.Algorithms.EnterExit;
-public interface IExitPositionAlgoLogic
+﻿namespace TradeLogicCore.Algorithms.EnterExit;
+public interface IExitPositionAlgoLogic<T>
 {
+    decimal StopLossRatio { get; }
+
+    void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
+
+    void StopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
 }

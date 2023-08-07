@@ -6,11 +6,23 @@ public class Zip
 {
     private static readonly ILog _log = Logger.New();
 
-    public static void Archive(string filePath, string zipFilePath)
+    /// <summary>
+    /// Archive one file or a directory to target zip file path.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="zipFilePath"></param>
+    public static void Archive(string path, string zipFilePath)
     {
-        using var a = ZipFile.Open(zipFilePath, ZipArchiveMode.Create);
-        a.CreateEntryFromFile(filePath, Path.GetFileName(filePath), CompressionLevel.Optimal);
-        _log.Info($"Zipped file {filePath} into {zipFilePath}.");
+        if (Directory.Exists(path))
+        {
+            ZipFile.CreateFromDirectory(path, zipFilePath);
+        }
+        else
+        {
+            using var a = ZipFile.Open(zipFilePath, ZipArchiveMode.Create);
+            a.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.Optimal);
+        }
+        _log.Info($"Zipped file/folder {path} into {zipFilePath}.");
     }
 }
 

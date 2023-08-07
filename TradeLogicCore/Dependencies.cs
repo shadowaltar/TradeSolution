@@ -46,9 +46,6 @@ public static class Dependencies
             builder.RegisterSingleton<ITradeService, TradeService>();
             builder.RegisterSingleton<IPortfolioService, PortfolioService>();
             builder.RegisterSingleton<IAlgorithmService, AlgorithmService>();
-
-            // position sizing
-            builder.RegisterSingleton<EvenPositionSizing>();
         }
     }
 }
