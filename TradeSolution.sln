@@ -30,13 +30,19 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UI", "UI", "{0750EA06-2FD4-
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeLogicCore.Tests", "TradeLogicCore.Tests\TradeLogicCore.Tests.csproj", "{A95F5743-1CC4-440B-9E2A-1E8CDDA9C5A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeConnectivity.Binance", "TradeConnectivity.Binance\TradeConnectivity.Binance.csproj", "{BB375E5E-4476-40F0-A34B-0E151D04DA9C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeConnectivity.Binance", "TradeConnectivity.Binance\TradeConnectivity.Binance.csproj", "{BB375E5E-4476-40F0-A34B-0E151D04DA9C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Connectivity", "Connectivity", "{4B23263B-215B-4182-8F3B-EA2AC193BE78}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeConnectivity.Futu", "TradeConnectivity.Futu\TradeConnectivity.Futu.csproj", "{5A8FAA5F-45DA-4DC0-B715-117433D14E60}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeConnectivity.CryptoSimulator", "TradeConnectivity.CryptoSimulator\TradeConnectivity.CryptoSimulator.csproj", "{611A5F43-39BE-496D-8040-DEEFC72A6E97}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zipped", "Zipped", "{48EE3B1A-2680-48DC-8CF0-6C2F9D9D53B6}"
+	ProjectSection(SolutionItems) = preProject
+		Zipped\AllPrices_1d_20210808_binance.zip = Zipped\AllPrices_1d_20210808_binance.zip
+		Zipped\AllPrices_1h_20210808_binance.zip = Zipped\AllPrices_1h_20210808_binance.zip
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

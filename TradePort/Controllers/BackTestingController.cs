@@ -192,7 +192,7 @@ public class BackTestingController : Controller
             "application/octet-stream", Path.GetFileName(finalZipFilePath));
     }
 
-    public async Task<string> RunRumi(IHistoricalMarketDataService mds,
+    private async Task<string> RunRumi(IHistoricalMarketDataService mds,
                                       List<Security> securities,
                                       int f,
                                       int s,
