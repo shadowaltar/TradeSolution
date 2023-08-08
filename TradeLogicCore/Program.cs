@@ -13,6 +13,7 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
+using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
@@ -67,6 +68,8 @@ public class Program
 
     private static async Task NewOrderDemo()
     {
+        var engine = Dependencies.ComponentContext.Resolve<BinanceExecutionEngine>();
+
         var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
         var orderService = Dependencies.ComponentContext.Resolve<IOrderService>();
         var tradeService = Dependencies.ComponentContext.Resolve<ITradeService>();

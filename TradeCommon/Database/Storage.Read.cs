@@ -6,6 +6,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeDataCore.Essentials;
 
 namespace TradeCommon.Database;
@@ -338,4 +339,8 @@ WHERE
         return results;
     }
 
+    public static async Task<List<Order>> ReadOpenOrders(ExchangeType exchangeType)
+    {
+        throw new NotImplementedException();
+    }
 }

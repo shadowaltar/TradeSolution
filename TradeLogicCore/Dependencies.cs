@@ -22,6 +22,7 @@ public static class Dependencies
         {
             case ExternalNames.Binance:
                 builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                builder.RegisterSingleton<BinanceExecutionEngine>();
                 break;
             case ExternalNames.Futu:
                 builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
