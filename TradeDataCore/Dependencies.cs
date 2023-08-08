@@ -13,18 +13,20 @@ using TradeDataCore.StaticData;
 namespace TradeDataCore;
 public class Dependencies
 {
-    public static IComponentContext Container { get; private set; } 
+    public static IComponentContext Container { get; private set; }
 
-    public static void Register(string externalName, ContainerBuilder? builder = null)
+    public static void Register(string? externalName = null, ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();
         builder.RegisterModule<DependencyModule>();
-
-        switch (externalName)
+        if (externalName != null)
         {
-            case ExternalNames.Binance:
-                builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
-                break;
+            switch (externalName)
+            {
+                case ExternalNames.Binance:
+                    builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                    break;
+            }
         }
 
         Container = builder.Build();
@@ -43,7 +45,7 @@ public class Dependencies
             builder.RegisterSingleton<MessageBroker<Trade>>(nameof(Trade));
             builder.RegisterSingleton<MessageBroker<Position>>(nameof(Position));
             builder.RegisterSingleton<MessageBroker<IPersistenceTask>>();
-            
+
             builder.RegisterSingleton<Environments>();
             builder.RegisterSingleton<Persistence>();
 

@@ -22,6 +22,19 @@ internal class Program
     /// <returns></returns>
     public static async Task Main(string[] args)
     {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        XmlConfigurator.Configure();
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        Dependencies.Register();
+
+        //await PeriodicDataImporting(args);
+        var ss = Dependencies.Container.Resolve<ISecurityService>();
+        var reader = new JsonPriceReader(ss);
+        var results = await reader.Import(@"C:\Temp\AllPrices_1h_20210808_binance\AllPrices_1h_20210808_binance.json");
+    }
+
+    private static async Task PeriodicDataImporting(string[] args)
+    {
         if (args.Length != 3)
         {
             await Console.Out.WriteLineAsync("Requires Mode, External and Interval arguments.");
@@ -30,10 +43,6 @@ internal class Program
         string mode = args[0];
         string external = args[1];
         string interval = args[2];
-
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        XmlConfigurator.Configure();
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
         var intervals = new List<IntervalType> { IntervalType.OneMinute, IntervalType.OneHour, IntervalType.OneDay };
         var intervalType = IntervalTypeConverter.Parse(interval);

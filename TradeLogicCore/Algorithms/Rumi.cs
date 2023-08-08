@@ -67,18 +67,32 @@ public class Rumi : IAlgorithm<RumiVariables>
         return variables;
     }
 
-    public bool IsLongSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice ohlcPrice)
+    public int IsBuySignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         var lastRumi = last.Variables!.Rumi;
         var rumi = current.Variables!.Rumi;
-        return lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0;
+        var isSignal = (lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0);
+
+        if (isSignal && current.Variables.Fast < currentPrice.C)
+        {
+            return -1;
+        }
+
+        return isSignal ? 1 : -1;
     }
 
-    public bool IsShortSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice ohlcPrice)
+    public int IsSellCloseSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         var lastRumi = last.Variables!.Rumi;
         var rumi = current.Variables!.Rumi;
-        return lastRumi.IsValid() && rumi.IsValid() && lastRumi > 0 && rumi < 0;
+        var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi > 0 && rumi < 0;
+        return isSignal ? 1 : -1;
+    }
+
+    public void ValidateSignal(int signal1, int signal2)
+    {
+        Assertion.ShallNever(signal1 == 1 && signal2 == 1);
+        Assertion.ShallNever(signal1 == -1 && signal2 == -1);
     }
 }
 

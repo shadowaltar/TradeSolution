@@ -1,5 +1,6 @@
 ﻿using Common;
 using Microsoft.AspNetCore.Mvc;
+using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -57,7 +58,7 @@ public class StockScreeningController : Controller
         var excludedCodes = excludedCodeStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
         var elementType = PriceElementTypeConverter.Parse(ohlcStr);
 
-        var stdevIndicator = new StandardDeviationEvaluator(lookBackPeriod);
+        var stdev = new StandardDeviation(lookBackPeriod);
         var criteria = new OhlcPriceScreeningCriteria
         {
             IntervalType = interval,
@@ -66,7 +67,7 @@ public class StockScreeningController : Controller
             EndTime = end,
             LookBackPeriod = lookBackPeriod,
             RankingSortingType = SortingType.Descending,
-            Aggregator = new Func<IList<double>, double>((returns) => stdevIndicator.Calculate(returns)),
+            Calculator = new Func<IList<double>, double>(stdev.Calculate),
             RankingType = rankType,
             RankingCount = count,
         };

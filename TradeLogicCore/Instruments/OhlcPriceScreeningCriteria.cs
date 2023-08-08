@@ -11,7 +11,7 @@ public class OhlcPriceScreeningCriteria : ScreeningCriteria
 
     public override double CalculateValue(IDataServices dataServices, Security security)
     {
-        double Selector(OhlcPrice d) => decimal.ToDouble(OhlcPrice.PriceElementSelectors[ElementType](d));
+        double Selector(OhlcPrice d) => OhlcPrice.PriceElementSelectors[ElementType](d).ToDouble();
 
         IList<double>? values = null;
         if (StartTime != null)
@@ -28,7 +28,7 @@ public class OhlcPriceScreeningCriteria : ScreeningCriteria
         }
         if (values != null)
         {
-            return Aggregator?.Invoke(values) ?? double.NaN;
+            return Calculator?.Invoke(values) ?? double.NaN;
         }
         return double.NaN;
     }

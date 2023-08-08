@@ -41,8 +41,17 @@ public static class NumericExtensions
     {
         var diff = value1 - value2;
         if (diff == 0) return true;
-        if (diff > 0 && diff < 0.00000000000000000001m) return true;
-        if (diff < 0 && diff > -0.00000000000000000001m) return true;
+        if (diff > 0 && diff < 1E-20m) return true;
+        if (diff < 0 && diff > -1E-20m) return true;
+        return false;
+    }
+
+    public static bool ApproxEquals(this double value1, double value2)
+    {
+        var diff = value1 - value2;
+        if (diff == 0) return true;
+        if (diff > 0 && diff < 1E-14) return true;
+        if (diff < 0 && diff > -1E-14) return true;
         return false;
     }
 

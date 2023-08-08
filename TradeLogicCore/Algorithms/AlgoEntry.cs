@@ -6,9 +6,9 @@ public record AlgoEntry<T>
 {
     public long Id { get; set; }
 
-    public DateTime Time { get; set; }
+    public required DateTime Time { get; set; }
 
-    public T? Variables { get; set; }
+    public required T Variables { get; set; }
 
     /// <summary>
     /// Current price.
@@ -22,9 +22,14 @@ public record AlgoEntry<T>
     /// Return vs previous OHLC price using two close prices.
     /// </summary>
     public decimal Return { get; set; } = 0;
-
-    public bool IsLongSignal { get; set; }
-    public bool IsShortSignal { get; set; }
+    /// <summary>
+    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
+    /// </summary>
+    public int BuyOpenCloseSignal { get; set; }
+    /// <summary>
+    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
+    /// </summary>
+    public int SellOpenCloseSignal { get; set; }
     public bool IsOpened { get; set; }
     public bool IsClosing { get; set; }
     public bool IsStopLossTriggered { get; set; }

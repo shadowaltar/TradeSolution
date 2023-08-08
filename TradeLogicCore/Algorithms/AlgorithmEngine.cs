@@ -8,6 +8,7 @@ using TradeDataCore.MarketData;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
+using static Futu.OpenApi.Pb.TrdCommon;
 
 namespace TradeLogicCore.Algorithms;
 public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> where T : IAlgorithmVariables
@@ -75,21 +76,21 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             var prices = await _historicalMarketDataService.Get(security, intervalType, start, end);
             foreach (OhlcPrice? ohlcPrice in prices)
             {
-                var entry = new AlgoEntry<T> { Id = openCount, Time = ohlcPrice.T };
-
-                var price = OhlcPrice.PriceElementSelectors[PriceElementType.Close](ohlcPrice);
-                var low = ohlcPrice.L;
-
-                var algorithmVariables = Algorithm.CalculateVariables(price, lastEntry);
-                entry.Variables = algorithmVariables;
+                var price = ohlcPrice.C;
+                var entry = new AlgoEntry<T>
+                {
+                    Id = openCount,
+                    Time = ohlcPrice.T,
+                    Variables = Algorithm.CalculateVariables(price, lastEntry)
+                };
                 entry.Price = price;
-                entry.Low = low;
+                entry.Low = ohlcPrice.L;
+
                 if (lastEntry == null)
                 {
                     lastEntry = entry;
                     lastOhlcPrice = ohlcPrice;
                     entry.Portfolio = Portfolio with { };
-                    FirstEntry = entry;
                     entries.Add(entry);
                     continue;
                 }
@@ -104,8 +105,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                 }
 
                 // mimic stop loss
-                if (entry.IsOpened && low <= entry.StopLossPrice)
+                if (entry.IsOpened && entry.Low <= entry.StopLossPrice)
                 {
+                    Algorithm.BeforeBuyStopLoss(entry);
+
                     // assuming always stopped loss at the stopLossPrice
                     ExitLogic.StopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
 
@@ -113,16 +116,26 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                     Portfolio.FreeCash += entry.Notional;
 
                     OpenedEntries.Remove(entry.Id);
+
+                    Algorithm.AfterBuyStopLoss(entry);
                 }
 
                 Assertion.ShallNever(lastEntry.StopLossPrice == 0 && lastEntry.IsOpened);
 
                 // try open or currentPrice a current
                 // assuming no margin short-sell is allowed
-                entry.IsLongSignal = Algorithm.IsLongSignal(entry, lastEntry, ohlcPrice);
-                entry.IsShortSignal = Algorithm.IsShortSignal(entry, lastEntry, ohlcPrice);
-                if (!entry.IsOpened && !entry.IsStopLossTriggered && entry.IsLongSignal)
+                var signal1 = Algorithm.IsBuySignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
+                var signal2 = Algorithm.IsSellCloseSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
+                // assuming no multiple opened orders for one security
+                Assertion.ShallNever(signal1 == 1 && signal2 == 1);
+                Assertion.ShallNever(signal1 == -1 && signal2 == -1);
+
+                entry.BuyOpenCloseSignal = signal1 == 1 ? 1 : signal2 == 1 ? -1 : 0;
+
+                if (!entry.IsOpened && !entry.IsStopLossTriggered && entry.BuyOpenCloseSignal == 1)
                 {
+                    Algorithm.BeforeBuy(entry);
+
                     openCount++;
                     entry.Id = openCount;
 
@@ -132,15 +145,21 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                     Portfolio.FreeCash -= entry.Notional;
 
                     OpenedEntries[entry.Id] = entry;
+
+                    Algorithm.AfterBuy(entry);
                 }
-                if (entry.IsOpened && entry.IsShortSignal)
+                if (entry.IsOpened && entry.BuyOpenCloseSignal == -1)
                 {
+                    Algorithm.BeforeSellClose(entry);
+
                     ExitLogic.Close(entry, price, GetOhlcEndTime(ohlcPrice, intervalType));
 
                     Portfolio.Notional = GetPortfolioNotional();
                     Portfolio.FreeCash += entry.Notional;
 
                     OpenedEntries.Remove(entry.Id);
+
+                    Algorithm.AfterSellClose(entry);
                 }
 
                 lastEntry = entry;

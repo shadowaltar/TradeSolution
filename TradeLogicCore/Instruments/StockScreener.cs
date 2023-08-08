@@ -158,7 +158,7 @@ public abstract class ScreeningCriteria
     /// <summary>
     /// When checking values for a past period of time, values are aggregated into a single value for checking.
     /// </summary>
-    public Func<IList<double>, double>? Aggregator { get; set; }
+    public Func<IList<double>, double>? Calculator { get; set; }
 
     /// <summary>
     /// The operator to compare the value for checking vs the benchmark value.

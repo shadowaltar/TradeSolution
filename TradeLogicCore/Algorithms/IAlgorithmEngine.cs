@@ -5,8 +5,6 @@ using TradeLogicCore.Algorithms.Sizing;
 namespace TradeLogicCore.Algorithms;
 public abstract class IAlgorithmEngine<T> where T : IAlgorithmVariables
 {
-    protected AlgoEntry<T>? FirstEntry { get; set; }
-
     public IAlgorithm<T> Algorithm { get; }
 
     public IPositionSizingAlgoLogic<T> Sizing { get; }

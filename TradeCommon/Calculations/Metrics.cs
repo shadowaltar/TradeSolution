@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common;
 
 namespace TradeCommon.Calculations;
 public class Metrics
@@ -11,5 +7,25 @@ public class Metrics
     {
         var years = 365 / (endTime - startTime).TotalDays;
         return Math.Pow(((end - start) / start + 1), years) - 1;
+    }
+
+    public static double GetStandardDeviation(IList<double> values, bool isSample = true, bool ignoreInvalid = true)
+    {
+        var sum = 0d;
+        foreach (var item in values)
+        {
+            if (ignoreInvalid)
+                if (!item.IsValid())
+                    continue;
+            sum += item;
+        }
+        var x = sum / values.Count;
+
+        var squaredSum = 0d;
+        foreach (var item in values)
+        {
+            squaredSum += (item - x) * (item - x);
+        }
+        return (double)Math.Sqrt(squaredSum / (values.Count - (isSample ? 1 : 0)));
     }
 }

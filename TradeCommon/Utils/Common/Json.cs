@@ -9,6 +9,11 @@ public static class Json
         return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(obj));
     }
 
+    public static async Task<T?> Deserialize<T>(string content)
+    {
+        return JsonSerializer.Deserialize<T>(content);
+    }
+
     public static string ToJson(object obj)
     {
         return JsonSerializer.Serialize(obj);
