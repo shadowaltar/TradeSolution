@@ -22,6 +22,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly object _lock = new();
 
     public IExternalExecutionManagement ExternalExecution { get; }
+    public IExternalAccountManagement ExternalAccountManagement { get; }
 
     public decimal RemainingBalance { get; private set; }
 
@@ -30,11 +31,13 @@ public class PortfolioService : IPortfolioService, IDisposable
     public event Action<Position>? PositionClosed;
 
     public PortfolioService(IExternalExecutionManagement externalExecution,
-        IOrderService orderService,
-        ITradeService tradeService,
-        Persistence persistence)
+                            IExternalAccountManagement externalAccountManagement,
+                            IOrderService orderService,
+                            ITradeService tradeService,
+                            Persistence persistence)
     {
         ExternalExecution = externalExecution;
+        ExternalAccountManagement = externalAccountManagement;
         _orderService = orderService;
         _tradeService = tradeService;
         _persistence = persistence;

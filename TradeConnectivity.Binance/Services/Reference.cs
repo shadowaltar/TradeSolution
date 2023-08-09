@@ -20,16 +20,20 @@ public class Reference : IExternalReferenceManagement
         if (jo == null)
             return new();
         var securities = new List<Security>();
+        var assetNames = new HashSet<string>();
         var symbolsObj = jo["symbols"]!.AsArray();
         foreach (JsonObject symbolObj in symbolsObj.Cast<JsonObject>())
         {
             if (symbolObj!["status"].ParseString() != "TRADING")
                 continue;
 
+            var baseAsset = symbolObj["baseAsset"].ParseString();
+            var quoteAsset = symbolObj["quoteAsset"].ParseString();
+            var symbol = symbolObj["symbol"].ParseString();
             var security = new Security
             {
-                Code = symbolObj["symbol"].ParseString(),
-                Name = symbolObj["symbol"].ParseString(),
+                Code = symbol,
+                Name = symbol,
                 Exchange = ExternalNames.Binance.ToUpperInvariant(),
                 Type = SecurityTypes.Fx,
                 SubType = SecurityTypes.Crypto,
@@ -37,15 +41,46 @@ public class Reference : IExternalReferenceManagement
                 Currency = "",
                 FxInfo = new FxSecurityInfo
                 {
-                    BaseCurrency = symbolObj["baseAsset"].ParseString(),
-                    QuoteCurrency = symbolObj["quoteAsset"].ParseString(),
+                    BaseCurrency = baseAsset,
+                    QuoteCurrency = quoteAsset,
                 }
             };
             securities.Add(security);
+
+            if (assetNames.Add(baseAsset))
+            {
+                var asset = CreateAsset(baseAsset);
+                securities.Add(asset);
+            }
+
+            if (assetNames.Add(quoteAsset))
+            {
+                var asset = CreateAsset(quoteAsset);
+                securities.Add(asset);
+            }
         }
 
         securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, type)).ToList();
         await Storage.InsertFxDefinitions(securities);
         return securities;
+    }
+
+    private static Security CreateAsset(string assetName)
+    {
+        return new Security
+        {
+            Code = assetName,
+            Name = assetName,
+            Exchange = ExternalNames.Binance.ToUpperInvariant(),
+            Type = SecurityTypes.Fx,
+            SubType = SecurityTypes.Crypto,
+            LotSize = 0,
+            Currency = "",
+            FxInfo = new FxSecurityInfo
+            {
+                BaseCurrency = assetName,
+                QuoteCurrency = "",
+            }
+        };
     }
 }

@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using TradeCommon.Essentials;
+using TradeCommon.Utils;
 
 namespace TradeConnectivity.Binance.Services;
 public class KeyManager

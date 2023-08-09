@@ -9,6 +9,9 @@ public static class DatabaseNames
     public const string MarketData = "market_data";
     public const string ExecutionData = "execution_data";
 
+    public const string AccountTable = "accounts";
+    public const string BalanceTable = "balances";
+
     public const string StockDefinitionTable = "stock_definitions";
     public const string FxDefinitionTable = "fx_definitions";
 

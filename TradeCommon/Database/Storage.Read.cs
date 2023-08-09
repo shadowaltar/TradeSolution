@@ -12,6 +12,11 @@ using TradeDataCore.Essentials;
 namespace TradeCommon.Database;
 public partial class Storage
 {
+    public static async Task<Account> ReadAccount(string accountName)
+    {
+        throw new NotImplementedException();
+    }
+
     public static async Task<Security> ReadSecurity(string exchange, string code, SecurityType type)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);

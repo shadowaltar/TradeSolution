@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Trading;
 using TradeDataCore.Instruments;
 using TradeLogicCore.Services;
@@ -31,12 +32,23 @@ public class BinanceExecutionEngine
 
     public async Task Start(string accountName)
     {
-        ConsolidateAccountAndBalance(accountName);
-
-        ConsolidateOpenOrders();
+        await CheckAccountAndBalance(accountName);
+        await CheckOpenOrders();
+        CheckTradeHistory();
+        SubscribeToMarketData();
+        StartAlgorithmEngine();
     }
 
-    private async Task ConsolidateOpenOrders()
+    private async Task CheckAccountAndBalance(string accountName)
+    {
+        // retrieve account state
+        var externalAccount = await _portfolioService.GetAccountByName(accountName);
+        var internalAccount = await Storage.ReadAccount(accountName);
+        
+
+    }
+
+    private async Task CheckOpenOrders()
     {
         // retrieve previously opened order state, verify with 
         if (TryRetrieveOpenedOrders(out var orders) && !orders.IsNullOrEmpty())
@@ -69,14 +81,18 @@ public class BinanceExecutionEngine
         throw new NotImplementedException();
     }
 
-    private void ConsolidateAccountAndBalance(string accountName)
+    private void StartAlgorithmEngine()
     {
-        // retrieve account state
-        RetrieveAccount(accountName);
+        throw new NotImplementedException();
+    }
 
-        void RetrieveAccount(string accountName)
-        {
+    private void SubscribeToMarketData()
+    {
+        throw new NotImplementedException();
+    }
 
-        }
+    private void CheckTradeHistory()
+    {
+        throw new NotImplementedException();
     }
 }

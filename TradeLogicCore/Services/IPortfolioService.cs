@@ -11,8 +11,9 @@ public interface IPortfolioService
     event Action<Position>? PositionUpdated;
     event Action<Position>? PositionClosed;
 
+    IExternalAccountManagement ExternalAccountManagement { get; }
     IExternalExecutionManagement ExternalExecution { get; }
-    
+
     /// <summary>
     /// Gets the remaining balance which is free to be traded.
     /// </summary>

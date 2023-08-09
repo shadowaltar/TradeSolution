@@ -1,15 +1,63 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials;
 
 namespace TradeCommon.Database;
 
 public partial class Storage
 {
+    public static async Task CreateAccountTable()
+    {
+        const string dropSql =
+@$"
+DROP TABLE IF EXISTS {DatabaseNames.AccountTable};
+DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_name_exchange;
+";
+        const string createSql =
+@$"
+CREATE TABLE IF NOT EXISTS {DatabaseNames.AccountTable} (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name VARCHAR(100) NOT NULL,
+    Exchange VARCHAR(100) NOT NULL,
+    UpdateTime DATE,
+    UNIQUE(Name, Exchange)
+);
+CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_name_exchange
+    ON {DatabaseNames.AccountTable} (Name, Exchange);
+";
+
+        await DropThenCreate(dropSql, createSql, DatabaseNames.AccountTable, DatabaseNames.StaticData);
+    }
+
+    public static async Task CreateBalanceTable()
+    {
+        const string dropSql =
+@$"
+DROP TABLE IF EXISTS {DatabaseNames.BalanceTable};
+DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId;
+DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_assetId;
+DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId_assetId;
+";
+        const string createSql =
+@$"
+CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
+    AssetId INTEGER NOT NULL,
+    AccountId INTEGER NOT NULL,
+    FreeBalance REAL DEFAULT 0 NOT NULL,
+    FrozenBalance REAL DEFAULT 0 NOT NULL,
+    UpdateTime DATE,
+    UNIQUE(AssetId, AccountId)
+);
+CREATE UNIQUE INDEX idx_{DatabaseNames.BalanceTable}_accountId_assetId
+    ON {DatabaseNames.BalanceTable} (AssetId, AccountId);
+CREATE INDEX idx_{DatabaseNames.BalanceTable}_accountId
+    ON {DatabaseNames.BalanceTable} (AccountId);
+CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
+    ON {DatabaseNames.BalanceTable} (AssetId);
+";
+
+        await DropThenCreate(dropSql, createSql, DatabaseNames.BalanceTable, DatabaseNames.StaticData);
+    }
+
     public static async Task CreateSecurityTable(SecurityType type)
     {
         if (type == SecurityType.Equity)
@@ -56,17 +104,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.StockDefinitionTable} (
 CREATE UNIQUE INDEX idx_code_exchange
     ON {DatabaseNames.StockDefinitionTable} (Code, Exchange);
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
-
-        using var dropCommand = connection.CreateCommand();
-        dropCommand.CommandText = dropSql;
-        await dropCommand.ExecuteNonQueryAsync();
-
-        using var createCommand = connection.CreateCommand();
-        createCommand.CommandText = createSql;
-        await createCommand.ExecuteNonQueryAsync();
-
-        _log.Info($"Created {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
+        await DropThenCreate(dropSql, createSql, DatabaseNames.StockDefinitionTable, DatabaseNames.StaticData);
     }
 
     private static async Task CreateFxDefinitionTable()
@@ -97,20 +135,11 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.FxDefinitionTable} (
 CREATE UNIQUE INDEX idx_code_exchange
     ON {DatabaseNames.FxDefinitionTable} (Code, Exchange);
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
 
-        using var dropCommand = connection.CreateCommand();
-        dropCommand.CommandText = dropSql;
-        await dropCommand.ExecuteNonQueryAsync();
-
-        using var createCommand = connection.CreateCommand();
-        createCommand.CommandText = createSql;
-        await createCommand.ExecuteNonQueryAsync();
-
-        _log.Info($"Created {DatabaseNames.FxDefinitionTable} table in {DatabaseNames.StaticData}.");
+        await DropThenCreate(dropSql, createSql, DatabaseNames.FxDefinitionTable, DatabaseNames.StaticData);
     }
 
-    public static async Task CreatePriceTable(IntervalType interval, SecurityType securityType)
+    public static async Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         string dropSql =
@@ -138,17 +167,9 @@ ON {tableName} (SecurityId, StartTime);
 CREATE INDEX idx_{tableName}_sec
 ON {tableName} (SecurityId);
 ";
-        using var connection = await Connect(DatabaseNames.MarketData);
 
-        using var dropCommand = connection.CreateCommand();
-        dropCommand.CommandText = dropSql;
-        await dropCommand.ExecuteNonQueryAsync();
-
-        using var createCommand = connection.CreateCommand();
-        createCommand.CommandText = createSql;
-        await createCommand.ExecuteNonQueryAsync();
-
-        _log.Info($"Created {tableName} table in {DatabaseNames.MarketData}.");
+        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.MarketData);
+        return tableName;
     }
 
     public static async Task<List<string>> CreateOrderTable(SecurityType securityType)
@@ -200,17 +221,8 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId_createTime
 CREATE INDEX idx_{tableName}_externalOrderId
     ON {tableName} (ExternalOrderId);
 ";
-            using var connection = await Connect(DatabaseNames.ExecutionData);
 
-            using var dropCommand = connection.CreateCommand();
-            dropCommand.CommandText = dropSql;
-            await dropCommand.ExecuteNonQueryAsync();
-
-            using var createCommand = connection.CreateCommand();
-            createCommand.CommandText = createSql;
-            await createCommand.ExecuteNonQueryAsync();
-
-            _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
+            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
         }
 
         return tableNames;
@@ -256,17 +268,8 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId
 CREATE UNIQUE INDEX idx_{tableName}_securityId_time
     ON {tableName} (SecurityId, Time);
 ";
-            using var connection = await Connect(DatabaseNames.ExecutionData);
 
-            using var dropCommand = connection.CreateCommand();
-            dropCommand.CommandText = dropSql;
-            await dropCommand.ExecuteNonQueryAsync();
-
-            using var createCommand = connection.CreateCommand();
-            createCommand.CommandText = createSql;
-            await createCommand.ExecuteNonQueryAsync();
-
-            _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
+            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
         }
 
         return tableNames;
@@ -306,17 +309,8 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId
 CREATE UNIQUE INDEX idx_{tableName}_securityId_startTime
     ON {tableName} (SecurityId, StartTime);
 ";
-            using var connection = await Connect(DatabaseNames.ExecutionData);
 
-            using var dropCommand = connection.CreateCommand();
-            dropCommand.CommandText = dropSql;
-            await dropCommand.ExecuteNonQueryAsync();
-
-            using var createCommand = connection.CreateCommand();
-            createCommand.CommandText = createSql;
-            await createCommand.ExecuteNonQueryAsync();
-
-            _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
+            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
         }
 
         return tableNames;
@@ -360,18 +354,8 @@ CREATE UNIQUE INDEX idx_{tableName}_externalTradeId
 CREATE UNIQUE INDEX idx_{tableName}_externalOrderId
     ON {tableName} (ExternalOrderId);
 ";
-        using var connection = await Connect(DatabaseNames.ExecutionData);
 
-        using var dropCommand = connection.CreateCommand();
-        dropCommand.CommandText = dropSql;
-        await dropCommand.ExecuteNonQueryAsync();
-
-        using var createCommand = connection.CreateCommand();
-        createCommand.CommandText = createSql;
-        await createCommand.ExecuteNonQueryAsync();
-
-        _log.Info($"Created {tableName} table in {DatabaseNames.ExecutionData}.");
-
+        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
 
         return tableName;
     }
@@ -391,7 +375,13 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.FinancialStatsTable}_securityId;
 CREATE UNIQUE INDEX idx_{DatabaseNames.FinancialStatsTable}_securityId
 ON {DatabaseNames.FinancialStatsTable} (SecurityId);
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
+
+        await DropThenCreate(dropSql, createSql, DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData);
+    }
+
+    private static async Task DropThenCreate(string dropSql, string createSql, string tableName, string databaseName)
+    {
+        using var connection = await Connect(databaseName);
 
         using var dropCommand = connection.CreateCommand();
         dropCommand.CommandText = dropSql;
@@ -401,6 +391,6 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         createCommand.CommandText = createSql;
         await createCommand.ExecuteNonQueryAsync();
 
-        _log.Info($"Created {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        _log.Info($"Created {tableName} table in {databaseName}.");
     }
 }

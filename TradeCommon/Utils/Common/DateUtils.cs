@@ -38,10 +38,9 @@ public static class DateUtils
         return value == DateTime.MinValue ? null : value;
     }
 
-    public static DateTime AddBusinessDays(
-        this DateTime current,
-        int days,
-        IList<DateTime>? holidays = null)
+    public static DateTime AddBusinessDays(this DateTime current,
+                                           int days,
+                                           IList<DateTime>? holidays = null)
     {
         var sign = Math.Sign(days);
         var unsignedDays = Math.Abs(days);
@@ -57,4 +56,6 @@ public static class DateUtils
         }
         return current;
     }
+
+    public static bool IsWeekend(this DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 }

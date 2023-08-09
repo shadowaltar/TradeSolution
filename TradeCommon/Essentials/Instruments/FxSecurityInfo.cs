@@ -1,7 +1,14 @@
-﻿namespace TradeCommon.Essentials.Instruments;
+﻿using Common;
+
+namespace TradeCommon.Essentials.Instruments;
 
 public class FxSecurityInfo
 {
+    /// <summary>
+    /// Indicates it is not an FX pair but the currency asset itself.
+    /// </summary>
+    public bool IsAsset => QuoteCurrency.IsBlank();
+
     public string? BaseCurrency { get; set; }
     public string? QuoteCurrency { get; set; }
 
