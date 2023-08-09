@@ -105,7 +105,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.SendOrder,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = isOk ? StatusCodes.SendOrderOk : StatusCodes.SendOrderFailed,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = responseString,
         };
         swTotal.Stop();
@@ -200,7 +200,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.CancelOrder,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = isOk ? StatusCodes.CancelOrderOk : StatusCodes.CancelOrderFailed,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = responseString,
         };
 
@@ -220,7 +220,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <param name="order"></param>
     /// <returns></returns>
     /// <exception cref="NotImplementedException"></exception>
-    public async Task<ExternalQueryState<List<Order>>> CancelAllOrder(Security security)
+    public async Task<ExternalQueryState<List<Order>>> CancelAllOrders(Security security)
     {
         if (!ValidateExchange<List<Order>>(security, out var errorState))
             return errorState!;
@@ -244,7 +244,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.CancelAllOrders,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = responseString,
         };
         swTotal.Stop();
@@ -284,7 +284,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = $"Got {content?.Count} recent trade entries in the market for {security.Code}.",
         };
         swOuter.Stop();
@@ -383,7 +383,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = $"Got one order for {security.Code}.",
         };
         swOuter.Stop();
@@ -407,7 +407,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <param name="orderId">Our order id, aka Binance's client order id.</param>
     /// <param name="externalOrderId">Binance's order id, aka our external order id.</param>
     /// <returns></returns>
-    public async Task<ExternalQueryState<List<Order>>> GetOpenOrders(Security? security = null)
+    public async Task<ExternalQueryState<List<Order>?>> GetOpenOrders(Security? security = null)
     {
         if (security != null && !ValidateExchange<List<Order>>(security, out var errorState))
             return errorState!;
@@ -436,7 +436,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.GetTrades,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = $"Got {orders.Count} open orders.",
         };
         swOuter.Stop();
@@ -455,15 +455,19 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             foreach (JsonNode? node in rootObj)
             {
                 var obj = node?.AsObject();
-                if (obj == null) continue;
-                {
-                    var order = ParseOrder(obj, security?.Id);
-                    if (order == null) continue;
-                    orders.Add(order);
-                }
+                if (obj == null)
+                    continue;
+                var order = ParseOrder(obj, security?.Id);
+                if (order == null) continue;
+                orders.Add(order);
             }
             return orders;
         }
+    }
+
+    public async Task<ExternalQueryState<List<Order>?>> GetOrderHistory(DateTime start, DateTime end)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -502,7 +506,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = ExternalActionType.CheckOrderSpeedLimit,
             ExternalPartyId = ExternalNames.Binance,
             StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
+            UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
             Description = content,
         };
         swOuter.Stop();
@@ -511,37 +515,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         return ees;
     }
 
-    /// <summary>
-    /// Get the account information [SIGNED].
-    /// </summary>
-    /// <returns></returns>
-    public async Task<ExternalQueryState<Account>> GetAccount()
-    {
-        var swOuter = Stopwatch.StartNew();
-        var url = $"{RootUrls.DefaultHttps}/api/v3/account";
-        using var request = new HttpRequestMessage();
-        _requestBuilder.Build(request, HttpMethod.Get, url, true);
-
-        var swInner = Stopwatch.StartNew();
-        var response = await _httpClient.SendAsync(request);
-        swInner.Stop();
-        // example json: var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
-        var responseJson = await CheckContentAndStatus(response);
-        var ees = new ExternalQueryState<Account>
-        {
-            Content = null, // TODO
-            ResponsePayload = responseJson,
-            Action = ExternalActionType.GetAccount,
-            ExternalPartyId = ExternalNames.Binance,
-            StatusCode = (int)response.StatusCode,
-            UniqueConnectionId = GetUniqueConnectionId(response),
-            Description = "Get account info",
-        };
-        swOuter.Stop();
-        ees.NetworkRoundtripTime = swInner.ElapsedMilliseconds;
-        ees.TotalTime = swOuter.ElapsedMilliseconds;
-        return ees;
-    }
 
     /// <summary>
     /// Check the <see cref="HttpResponseMessage"/> responseString and status.
@@ -558,7 +531,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         }
         else
         {
-            _log.Error(response.StatusCode + ": " + content);
+            _log.Error($"{response.StatusCode} {response.ReasonPhrase}; Content: {content}");
         }
         return content;
     }
@@ -670,11 +643,11 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         return true;
     }
 
-    private static string GetUniqueConnectionId(HttpResponseMessage response)
-    {
-        return response.Headers.TryGetValues("x-mbx-uuid", out var valArray) ?
-            valArray.FirstOrDefault() ?? "" : "";
-    }
+    //private static string ResponseHandler.GetUniqueConnectionId(HttpResponseMessage response)
+    //{
+    //    return response.Headers.TryGetValues("x-mbx-uuid", out var valArray) ?
+    //        valArray.FirstOrDefault() ?? "" : "";
+    //}
 
     private static Order? ParseOrder(JsonObject? rootObj, int? securityId)
     {

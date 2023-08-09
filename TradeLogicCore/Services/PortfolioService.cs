@@ -237,7 +237,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task<Account> GetAccountByName(string accountName)
     {
-        var state = await ExternalExecution.GetAccount();
+        var state = await ExternalAccountManagement.GetAccount();
         // TODO
         return state.Content;
     }

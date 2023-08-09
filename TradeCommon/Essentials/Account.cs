@@ -29,9 +29,9 @@ public class Account
     public int UserId { get; set; }
 
     /// <summary>
-    /// Unique account id from broker.
+    /// External account id from broker.
     /// </summary>
-    public string BrokerAccountId { get; set; }
+    public long ExternalAccountId { get; set; }
 
     /// <summary>
     /// Name of the broker.

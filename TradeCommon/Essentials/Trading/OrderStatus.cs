@@ -19,60 +19,76 @@ public enum OrderStatus
     /// <summary>
     /// The order is to be placed and not acknowledged by broker yet.
     /// </summary>
-    Placing,
+    Placing = 1,
     /// <summary>
     /// The order is to be modified and not acknowledged by broker yet.
     /// </summary>
-    Modifying,
+    Modifying = 2,
     /// <summary>
     /// The order is to be cancelled and not acknowledged by broker yet.
     /// </summary>
-    Canceling,
+    Canceling = 3,
 
     /// <summary>
     /// Broker is pending for submitting to exchange.
     /// </summary>
-    WaitingSubmit,
+    WaitingSubmit = 4,
     /// <summary>
     /// Broker submitted the order to exchange and waiting for feedback.
     /// </summary>
-    Submitting,
+    Submitting = 5,
+    /// <summary>
+    /// The order is submitted in exchange. Alias of <see cref="Live"/>.
+    /// Used by:
+    ///     Binance
+    /// </summary>
+    New = 10,
     /// <summary>
     /// The order is submitted and alive in exchange.
     /// </summary>
-    Live,
+    Live = 10,
     /// <summary>
     /// The order is partially filled and still alive in exchange.
+    /// Used by:
+    ///     Binance
     /// </summary>
-    PartialFilled,
+    PartialFilled = 20,
+    /// <summary>
+    /// The order is filled.
+    /// Used by:
+    ///     Binance
+    /// </summary>
+    Filled = 30,
+    /// <summary>
+    /// The order is not filled at all and already cancelled in exchange.
+    /// Used by:
+    ///     Binance
+    /// </summary>
+    Cancelled = 40,
     /// <summary>
     /// The order is partially filled and already cancelled in exchange.
     /// </summary>
-    PartialCancelled,
-    /// <summary>
-    /// The order is filled.
-    /// </summary>
-    Filled,
-    /// <summary>
-    /// The order is not filled at all and already cancelled in exchange.
-    /// </summary>
-    Cancelled,
+    PartialCancelled = 41,
     /// <summary>
     /// The order is failed, service denied.
     /// </summary>
-    Failed,
+    Failed = 50,
     /// <summary>
     /// Synonym of <see cref="Failed"/>.
+    /// Used by:
+    ///     Binance
     /// </summary>
-    Rejected,
+    Rejected = 50,
     /// <summary>
-    /// The order is expired due to <see cref="OrderTimeInForceType"/> and / or <see cref="OrderTimeInForceType"/> setting.
+    /// The order is expired due to <see cref="OrderTimeInForceType"/> and / or its settings.
+    /// Used by:
+    ///     Binance
     /// </summary>
-    Expired,
+    Expired = 51,
     /// <summary>
     /// The order is deleted: it never reached exchange and cancelled on broker side only.
     /// </summary>
-    Deleted,
+    Deleted = 52,
 }
 
 public static class OrderStatusConverter

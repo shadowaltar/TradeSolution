@@ -1,18 +1,10 @@
-﻿using Azure;
-using Common;
+﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
-using TradeCommon.Essentials.Trading;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeConnectivity.Binance.Utils;
@@ -33,7 +25,82 @@ public class AccountManager : IExternalAccountManagement
     }
 
     /// <summary>
-    /// Get the account detailed info [SIGNED]
+    /// Get the account information [SIGNED].
+    /// </summary>
+    /// <returns></returns>
+    public async Task<ExternalQueryState<Account?>> GetAccount()
+    {
+        var swOuter = Stopwatch.StartNew();
+        var url = $"{RootUrls.DefaultHttps}/api/v3/account";
+        using var request = new HttpRequestMessage();
+        _requestBuilder.Build(request, HttpMethod.Get, url, true);
+
+        var swInner = Stopwatch.StartNew();
+        var response = await _httpClient.SendAsync(request);
+        swInner.Stop();
+        // example json: var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
+        var responseString = await CheckContentAndStatus(response);
+
+        Account? account = null;
+        var json = JsonNode.Parse(responseString);
+        if (json != null && responseString != "" && responseString != "{}")
+        {
+            account = new();
+            var accountType = json.GetString("accountType");
+            var externalAccountId = json.GetLong("uid");
+            account.Type = accountType;
+            account.ExternalAccountId = externalAccountId;
+            var balanceArray = json["balances"]?.AsArray();
+            if (balanceArray != null)
+            {
+                foreach (var balanceObj in balanceArray)
+                {
+                    var asset = balanceObj.GetString("asset");
+                    var free = balanceObj.GetDecimal("free");
+                    var locked = balanceObj.GetDecimal("locked");
+                    var balance = new Balance { AssetName = asset, FreeAmount = free, LockedAmount = locked };
+                    account.Balances.Add(balance);
+                }
+            }
+        }
+        if (account != null)
+        {
+            var state = new ExternalQueryState<Account?>
+            {
+                Content = account,
+                ResponsePayload = responseString,
+                Action = ExternalActionType.GetAccount,
+                ExternalPartyId = ExternalNames.Binance,
+                StatusCode = StatusCodes.GetAccountOk,
+                UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
+                Description = "Get account info",
+                NetworkRoundtripTime = swInner.ElapsedMilliseconds,
+            };
+            swOuter.Stop();
+            state.TotalTime = swOuter.ElapsedMilliseconds;
+            return state;
+        }
+        else
+        {
+            var state = new ExternalQueryState<Account?>
+            {
+                Content = null,
+                ResponsePayload = responseString,
+                Action = ExternalActionType.GetAccount,
+                ExternalPartyId = ExternalNames.Binance,
+                StatusCode = StatusCodes.GetAccountFailed,
+                UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
+                Description = "Failed to get account info",
+                NetworkRoundtripTime = swInner.ElapsedMilliseconds,
+            };
+            swOuter.Stop();
+            state.TotalTime = swOuter.ElapsedMilliseconds;
+            return state;
+        }
+    }
+
+    /// <summary>
+    /// Get the account detailed info [SIGNED] [PROD ONLY].
     /// </summary>
     /// <returns></returns>
     public async Task<ExternalQueryState<List<Account>>> GetAccounts()
@@ -51,9 +118,9 @@ public class AccountManager : IExternalAccountManagement
             var parameters = new List<(string, string)>
             {
                 ("type", accountType),
-                ("limit", 1.ToString()), // the api returns a history list of account statuses, only get the latest one here
+                ("limit", 7.ToString()), // the api returns a history list of account statuses; min is 7
             };
-            var payload = _requestBuilder.Build(request, HttpMethod.Delete, url, true, parameters);
+            var payload = _requestBuilder.Build(request, HttpMethod.Get, url, true, parameters);
             payloads.Add(payload);
             var swHttpRoundtrip = Stopwatch.StartNew();
             var response = await _httpClient.SendAsync(request);
@@ -97,10 +164,7 @@ public class AccountManager : IExternalAccountManagement
 
         return state;
 
-        Account Parse(JsonObject rootObj)
-        {
-            throw new NotImplementedException();
-        }
+        Account Parse(JsonObject rootObj) => throw new NotImplementedException();
     }
 
     /// <summary>

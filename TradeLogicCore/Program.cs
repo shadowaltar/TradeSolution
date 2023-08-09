@@ -34,7 +34,11 @@ public class Program
 
         Dependencies.Register(ExternalNames.Binance);
 
-        await RunMACBackTestDemo();
+        await NewOrderDemo();
+        //await RunMACBackTestDemo();
+
+        var engine = Dependencies.ComponentContext.Resolve<Core>();
+        await engine.Start("0");
 
         Console.WriteLine("Finished.");
     }
@@ -68,13 +72,15 @@ public class Program
 
     private static async Task NewOrderDemo()
     {
-        var engine = Dependencies.ComponentContext.Resolve<BinanceExecutionEngine>();
+        var engine = Dependencies.ComponentContext.Resolve<Core>();
 
         var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
         var orderService = Dependencies.ComponentContext.Resolve<IOrderService>();
         var tradeService = Dependencies.ComponentContext.Resolve<ITradeService>();
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        orderService.OrderAcknowledged += OnOrderAck;
+
+        orderService.AfterOrderSent += AfterOrderSent;
+        orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
         portfolioService.SelectUser(new User());
@@ -101,9 +107,12 @@ public class Program
             Thread.Sleep(100);
         }
 
-        void OnOrderAck(Order order)
+        async void AfterOrderSent(Order order)
         {
             Console.WriteLine(order);
+            var orders = await orderService.GetOpenOrders();
+
+            orderService.CancelAllOrders();
 
             orderService.CancelOrder(order.Id);
         }

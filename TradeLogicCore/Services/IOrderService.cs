@@ -10,7 +10,7 @@ public interface IOrderService
     /// <summary>
     /// Invoked when an order is successfully created.
     /// </summary>
-    event Action<Order>? OrderAcknowledged;
+    event Action<Order>? AfterOrderSent;
 
     /// <summary>
     /// Invoked when an order is successfully cancelled.
@@ -23,6 +23,23 @@ public interface IOrderService
     /// <param name="orderId"></param>
     /// <returns></returns>
     Order? GetOrder(long orderId);
+
+    /// <summary>
+    /// Get all orders given by a time range, and optional security name.
+    /// </summary>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security? security = null, bool requestExternal = false);
+    
+    /// <summary>
+    /// Get all open orders with an optional security name.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="requestExternal"></param>
+    /// <returns></returns>
+    Task<List<Order>?> GetOpenOrders(Security? security = null, bool requestExternal = false);
 
     /// <summary>
     /// Get an order from cache by its external id.
@@ -43,6 +60,11 @@ public interface IOrderService
     /// </summary>
     /// <param name="orderId"></param>
     void CancelOrder(long orderId);
+
+    /// <summary>
+    /// Cancel all open orders.
+    /// </summary>
+    void CancelAllOrders();
 
     /// <summary>
     /// Create an order without any validation.

@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
 
@@ -14,6 +15,7 @@ public class OrderService : IOrderService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
+    private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
     private readonly Dictionary<long, Order> _externalOrderIdToOrders = new();
@@ -23,12 +25,15 @@ public class OrderService : IOrderService, IDisposable
 
     public bool IsFakeOrderSupported => _execution.IsFakeOrderSupported;
 
-    public event Action<Order>? OrderAcknowledged;
+    public event Action<Order>? AfterOrderSent;
     public event Action<Order>? OrderCancelled;
 
-    public OrderService(IExternalExecutionManagement execution, Persistence persistence)
+    public OrderService(IExternalExecutionManagement execution,
+        ISecurityService securityService,
+        Persistence persistence)
     {
         _execution = execution;
+        _securityService = securityService;
         _persistence = persistence;
 
         _execution.OrderPlaced += OnSentOrderAccepted;
@@ -45,6 +50,18 @@ public class OrderService : IOrderService, IDisposable
     public Order? GetOrderByExternalId(long externalOrderId)
     {
         throw new NotImplementedException();
+    }
+
+    public async Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security? security = null, bool requestExternal = false)
+    {
+        var state = await _execution.GetOrderHistory(start, end);
+        return state.Content;
+    }
+
+    public async Task<List<Order>?> GetOpenOrders(Security? security = null, bool requestExternal = false)
+    {
+        var state = await _execution.GetOpenOrders(security);
+        return state.Content;
     }
 
     public void SendOrder(Order order, bool isFakeOrder = true)
@@ -87,6 +104,15 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
+    public void CancelAllOrders()
+    {
+        var securityIds = _orders.Values.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
+            .Select(o => o.SecurityId).ToList();
+        _securityService.GetSecurities();
+        _execution.CancelAllOrders();
+        _log.Info("Canceling all open orders.");
+    }
+
     private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState<Order> state)
     {
         if (!isSuccessful)
@@ -106,7 +132,7 @@ public class OrderService : IOrderService, IDisposable
 
         _log.Info("Sent order: " + order);
 
-        OrderAcknowledged?.Invoke(order);
+        AfterOrderSent?.Invoke(order);
         Persist(order);
     }
 

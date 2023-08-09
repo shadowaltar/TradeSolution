@@ -34,20 +34,17 @@ WHERE
             if (type == SecurityType.Equity)
                 sql += $" AND Type IN ('{string.Join("','", SecurityTypes.StockTypes)}')";
         }
-        else if (type == SecurityType.Fx)
+        else
         {
-            sql =
-@$"
+            sql = type == SecurityType.Fx
+                ? @$"
 SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency
 FROM {tableName}
 WHERE
     Code = $Code AND
     Exchange = $Exchange
-";
-        }
-        else
-        {
-            throw new NotImplementedException();
+"
+                : throw new NotImplementedException();
         }
 
         using var connection = await Connect(DatabaseNames.StaticData);
@@ -98,21 +95,18 @@ WHERE
             if (type == SecurityType.Equity)
                 sql += $" AND Type IN ('{string.Join("','", SecurityTypes.StockTypes)}')";
         }
-        else if (type == SecurityType.Fx)
+        else
         {
-            sql =
-@$"
+            sql = type == SecurityType.Fx
+                ? @$"
 SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency
 FROM {tableName}
 WHERE
     IsEnabled = true AND
     LocalEndDate > $LocalEndDate AND
     Exchange = $Exchange
-";
-        }
-        else
-        {
-            throw new NotImplementedException();
+"
+                : throw new NotImplementedException();
         }
 
         using var connection = await Connect(DatabaseNames.StaticData);
@@ -347,5 +341,16 @@ WHERE
     public static async Task<List<Order>> ReadOpenOrders(ExchangeType exchangeType)
     {
         throw new NotImplementedException();
+    }
+
+    public static async Task<User> ReadUser(string userName)
+    {
+        // TODO
+        return new User
+        {
+            Name = userName,
+            Accounts = new List<Account> { new Account() { Name = "0" } }
+        };
+        //throw new NotImplementedException();
     }
 }

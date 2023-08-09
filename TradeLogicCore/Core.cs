@@ -4,11 +4,12 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
-public class BinanceExecutionEngine
+public class Core
 {
     private static readonly ILog _log = Logger.New();
 
@@ -19,10 +20,10 @@ public class BinanceExecutionEngine
 
     public ExchangeType ExchangeType => ExchangeType.Binance;
 
-    public BinanceExecutionEngine(IPortfolioService portfolioService,
-                                  IOrderService orderService,
-                                  ITradeService tradeService,
-                                  ISecurityService securityService)
+    public Core(IPortfolioService portfolioService,
+                IOrderService orderService,
+                ITradeService tradeService,
+                ISecurityService securityService)
     {
         _portfolioService = portfolioService;
         _orderService = orderService;
@@ -30,20 +31,29 @@ public class BinanceExecutionEngine
         _securityService = securityService;
     }
 
-    public async Task Start(string accountName)
+    public async Task Start(string userName)
     {
-        await CheckAccountAndBalance(accountName);
-        await CheckOpenOrders();
-        CheckTradeHistory();
-        SubscribeToMarketData();
-        StartAlgorithmEngine();
+        await CheckAccountAndBalance(userName);
+        //await CheckOpenOrders();
+        //CheckTradeHistory();
+        //SubscribeToMarketData();
+        //StartAlgorithmEngine();
     }
 
-    private async Task CheckAccountAndBalance(string accountName)
+    private async Task CheckAccountAndBalance(string userName)
     {
         // retrieve account state
-        var externalAccount = await _portfolioService.GetAccountByName(accountName);
-        var internalAccount = await Storage.ReadAccount(accountName);
+        var user = await Storage.ReadUser(userName);
+        if (!_portfolioService.SelectUser(user))
+        {
+            Environment.Exit(StatusCodes.GetUserFailed);
+            return;
+        }
+        foreach (var account in user.Accounts)
+        {
+            var externalAccount = await _portfolioService.GetAccountByName(account.Name);
+            //var internalAccount = await Storage.ReadAccount(account.Name);
+        }
         
 
     }

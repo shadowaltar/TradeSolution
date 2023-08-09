@@ -7,9 +7,17 @@ public static class JsonExtensions
 {
     public static long GetLong(this JsonNode? node, string? fieldName = null, long defaultValue = long.MinValue)
     {
-        if (fieldName == null)
-            return node?.AsValue().GetValue<long>() ?? default;
-        return node?[fieldName]?.AsValue().GetValue<long>() ?? defaultValue;
+        var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
+        if (kind == JsonValueKind.Undefined || jsonValue == null)
+        {
+            return defaultValue;
+        }
+        return kind switch
+        {
+            JsonValueKind.Number => jsonValue.GetValue<long>(),
+            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
+            _ => defaultValue
+        };
     }
 
     public static int GetInt(this JsonNode? node, string? fieldName = null, int defaultValue = int.MinValue)
@@ -43,7 +51,7 @@ public static class JsonExtensions
         return kind switch
         {
             JsonValueKind.Number => jsonValue.GetValue<decimal>(),
-            JsonValueKind.String => decimal.Parse(jsonValue.GetValue<string>()),
+            JsonValueKind.String => decimal.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
             _ => defaultValue
         };
     }
@@ -59,7 +67,7 @@ public static class JsonExtensions
         return kind switch
         {
             JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixSec(),
-            JsonValueKind.String => long.Parse(jsonValue.GetValue<string>()).FromLocalUnixSec(),
+            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixSec() : default,
             _ => defaultValue,
         };
     }
@@ -75,7 +83,7 @@ public static class JsonExtensions
         return kind switch
         {
             JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixMs(),
-            JsonValueKind.String => long.Parse(jsonValue.GetValue<string>()).FromLocalUnixMs(),
+            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixMs() : default,
             _ => defaultValue,
         };
     }
@@ -91,7 +99,7 @@ public static class JsonExtensions
         return kind switch
         {
             JsonValueKind.Number => jsonValue.GetValue<long>().FromUnixMs(),
-            JsonValueKind.String => long.Parse(jsonValue.GetValue<string>()).FromUnixMs(),
+            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromUnixMs() : default,
             _ => defaultValue,
         };
     }

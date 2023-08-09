@@ -24,11 +24,13 @@ public interface IExternalExecutionManagement
 
     Task<ExternalQueryState<Order>> GetOrder(Security security, long orderId = 0, long externalOrderId = 0);
 
-    Task<ExternalQueryState<List<Order>>> GetOpenOrders(Security? security = null);
+    Task<ExternalQueryState<List<Order>?>> GetOpenOrders(Security? security = null);
+
+    Task<ExternalQueryState<List<Order>?>> GetOrderHistory(DateTime start, DateTime end);
 
     Task<ExternalQueryState<Order>> UpdateOrder(Order order);
 
-    Task<ExternalQueryState<List<Order>>> CancelAllOrder(Security security);
+    Task<ExternalQueryState<List<Order>>> CancelAllOrders(Security security);
 
     Task<ExternalQueryState<int>> GetOrderSpeedLimit();
 
@@ -37,6 +39,4 @@ public interface IExternalExecutionManagement
     /// </summary>
     /// <returns></returns>
     Task<ExternalQueryState<List<Trade>?>> GetMarketTrades(Security security);
-
-    Task<ExternalQueryState<Account>> GetAccount();
 }

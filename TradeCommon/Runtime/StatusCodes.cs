@@ -8,6 +8,7 @@ public static class StatusCodes
     public const int UnsubscriptionOk = 1003;
     public const int SendOrderOk = 1004;
     public const int CancelOrderOk = 1005;
+    public const int GetUserOk = 1010;
     public const int GetAccountOk = 1010;
     
     public const int SubscriptionWaiting = 2002;
@@ -24,5 +25,6 @@ public static class StatusCodes
     public const int UnsubscriptionFailed = 5003;
     public const int SendOrderFailed = 5004;
     public const int CancelOrderFailed = 5005;
+    public const int GetUserFailed = 5010;
     public const int GetAccountFailed = 5010;
 }
