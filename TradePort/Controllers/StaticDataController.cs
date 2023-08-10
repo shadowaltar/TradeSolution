@@ -4,6 +4,7 @@ using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
 using TradeDataCore.Importing.Yahoo;
+using Common;
 
 namespace TradePort.Controllers;
 
@@ -25,8 +26,11 @@ public class StaticDataController : Controller
         var secType = SecurityTypeConverter.Parse(secTypeStr);
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
+        var tableName = DatabaseNames.GetDefinitionTableName(secType);
+        if (tableName.IsBlank())
+            return BadRequest();
 
-        var resultSet = await Storage.Query("SELECT COUNT(Id) FROM " + DatabaseNames.GetDefinitionTableName(secType), DatabaseNames.StaticData);
+        var resultSet = await Storage.Query("SELECT COUNT(Id) FROM " + tableName, DatabaseNames.StaticData);
         if (resultSet != null)
         {
             return Ok(resultSet.Rows[0][0]);
@@ -153,7 +157,7 @@ public class StaticDataController : Controller
         if (stats == null)
             return BadRequest("Failed to download or parse HK security stats.");
 
-        var count = await Storage.InsertSecurityFinancialStats(stats);
+        var count = await Storage.UpsertSecurityFinancialStats(stats);
 
         return Ok(count);
     }

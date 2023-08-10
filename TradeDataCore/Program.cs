@@ -101,7 +101,7 @@ internal class Program
             {
                 if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
                 {
-                    var (securityId, count) = await Storage.InsertPrices(security.Id, i, SecurityType.Fx, list);
+                    var (securityId, count) = await Storage.UpsertPrices(security.Id, i, SecurityType.Fx, list);
                     results.Add((i, securityId, count));
                 }
             }

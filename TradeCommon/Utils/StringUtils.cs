@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Common;
+using System.Text;
 
 namespace TradeCommon.Utils;
 public static class StringUtils
@@ -10,7 +11,7 @@ public static class StringUtils
         {
             sb.Append(key).Append('=').Append(value).Append('&');
         }
-        sb.Remove(sb.Length - 1, 1);
+        sb.RemoveLast();
         return sb.ToString();
     }
 }

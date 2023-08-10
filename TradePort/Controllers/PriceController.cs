@@ -145,7 +145,7 @@ public class PriceController : Controller
         {
             if (allPrices.TryGetValue(security.Id, out var tuple))
             {
-                await Storage.InsertPrices(security.Id, interval, secType, tuple.Prices);
+                await Storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
             }
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
@@ -206,7 +206,7 @@ public class PriceController : Controller
         {
             if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
             {
-                await Storage.InsertPrices(security.Id, interval, secType, list);
+                await Storage.UpsertPrices(security.Id, interval, secType, list);
             }
         }
         return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
@@ -281,7 +281,7 @@ public class PriceController : Controller
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {
-            await Storage.InsertPrices(security.Id, interval, secType, tuple.Prices);
+            await Storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
             var count = await Storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
             Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
@@ -395,6 +395,8 @@ public class PriceController : Controller
 
         var priceTableName = DatabaseNames.GetPriceTableName(interval, secType);
         var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
+        if (definitionTableName.IsBlank())
+            return BadRequest();
         var dt1 = await Storage.Query($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
         var dt2 = await Storage.Query($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
         if (dt1 != null && dt2 != null)

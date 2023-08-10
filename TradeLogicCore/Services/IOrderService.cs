@@ -39,7 +39,7 @@ public interface IOrderService
     /// <param name="security"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Order>?> GetOpenOrders(Security? security = null, bool requestExternal = false);
+    Task<List<Order>> GetOpenOrders(Security? security = null, bool requestExternal = false);
 
     /// <summary>
     /// Get an order from cache by its external id.

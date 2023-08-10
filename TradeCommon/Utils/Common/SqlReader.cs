@@ -2,6 +2,8 @@
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
+using System.Text;
+using TradeCommon.Utils.Attributes;
 
 namespace Common;
 
@@ -9,6 +11,8 @@ public class SqlReader<T> : IDisposable where T : new()
 {
     private Dictionary<string, PropertyInfo> _properties;
     private ValueSetter<T> _valueSetter;
+
+    private static Dictionary<Type, string> _selectClauses = new();
 
     public SqlReader(DbDataReader reader)
     {
@@ -80,6 +84,28 @@ public class SqlReader<T> : IDisposable where T : new()
     {
         if (!Columns.Contains(columnName)) return defaultValue;
         return (TV?)Get(typeof(TV), columnName);
+    }
+
+    public static string GetSelectClause()
+    {
+        if (!_selectClauses.TryGetValue(typeof(T), out var clause))
+        {
+            var properties = ReflectionUtils.GetPropertyToName(typeof(T));
+            var selectIgnoreFieldNames = properties.Where(pair => pair.Value.GetCustomAttribute<SelectIgnoreAttribute>() != null)
+                .Select(pair => pair.Key).ToList();
+
+            var sb = new StringBuilder("SELECT ");
+            foreach (var propertyName in properties.Keys)
+            {
+                if (selectIgnoreFieldNames.Contains(propertyName))
+                    continue;
+                sb.Append(propertyName).Append(',');
+            }
+            sb.RemoveLast();
+            clause = sb.ToString();
+            _selectClauses[typeof(T)] = clause;
+        }
+        return clause;
     }
 
     public void Dispose()

@@ -11,6 +11,7 @@ public static class DatabaseNames
 
     public const string AccountTable = "accounts";
     public const string BalanceTable = "balances";
+    public const string UserTable = "users";
 
     public const string StockDefinitionTable = "stock_definitions";
     public const string FxDefinitionTable = "fx_definitions";
@@ -46,7 +47,7 @@ public static class DatabaseNames
         {
             SecurityType.Equity => StockDefinitionTable,
             SecurityType.Fx => FxDefinitionTable,
-            _ => throw new NotImplementedException()
+            _ => "",
         };
     }
 

@@ -1,4 +1,4 @@
-﻿using TradeCommon.Essentials;
+﻿using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -21,7 +21,7 @@ public interface IPortfolioService
 
     Task Initialize();
 
-    Task<Account> GetAccountByName(string accountName);
+    Task<Account?> GetAccountByName(string accountName, bool isExternal = false);
 
     List<Position> GetOpenPositions();
 
@@ -52,4 +52,8 @@ public interface IPortfolioService
     /// <param name="user"></param>
     /// <returns></returns>
     bool SelectUser(User user);
+
+    Task<bool> Deposit(int accountId, int assetId, decimal value);
+
+    Task<bool> Withdraw(int accountId, int assetId, decimal value);
 }

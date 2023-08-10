@@ -112,12 +112,12 @@ public class Order
     /// <summary>
     /// The broker's ID.
     /// </summary>
-    public int BrokerId { get; set; } = BrokerIds.NameToIds[ExternalNames.Unknown];
+    public int BrokerId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
     /// The exchange's ID.
     /// </summary>
-    public int ExchangeId { get; set; } = ExchangeIds.GetId(ExternalNames.Unknown);
+    public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
     /// Any additional order parameters.

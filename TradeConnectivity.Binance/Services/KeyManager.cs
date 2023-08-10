@@ -1,7 +1,7 @@
 ﻿using Common;
 using System.Security.Cryptography;
 using System.Text;
-using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Utils;
 
 namespace TradeConnectivity.Binance.Services;

@@ -1,16 +1,17 @@
 ﻿using Autofac;
+using Autofac.Builder;
 
 namespace Common;
 public static class AutofacExtensions
 {
-    public static void RegisterSingleton<T, TImpl>(this ContainerBuilder builder, object? key = null)
+    public static IRegistrationBuilder<TImpl, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton<T, TImpl>(this ContainerBuilder builder, object? key = null)
         where TImpl : notnull, T
         where T : notnull
     {
         if (key != null)
-            builder.RegisterType<TImpl>().Keyed<T>(key).SingleInstance();
+            return builder.RegisterType<TImpl>().Keyed<T>(key).SingleInstance();
         else
-            builder.RegisterType<TImpl>().As<T>().SingleInstance();
+            return builder.RegisterType<TImpl>().As<T>().SingleInstance();
     }
 
     public static void RegisterSingleton<T>(this ContainerBuilder builder)

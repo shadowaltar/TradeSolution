@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net.Mail;
+using System.Text;
 using TradeCommon.Constants;
 
 namespace Common;
@@ -187,5 +189,26 @@ public static class StringExtensions
     public static bool ParseBool(this string? value, bool defaultValue = false)
     {
         return string.IsNullOrWhiteSpace(value) ? defaultValue : bool.TryParse(value, out var result) ? result : defaultValue;
+    }
+
+    public static bool IsValidEmail(this string email)
+    {
+        if (email.IsBlank()) return false;
+
+        var trimmedEmail = email.Trim();
+
+        if (trimmedEmail.EndsWith(".") || trimmedEmail.Contains(' '))
+        {
+            return false;
+        }
+
+        return MailAddress.TryCreate(email, out var addr) && addr.Address == trimmedEmail;
+    }
+
+    public static StringBuilder RemoveLast(this StringBuilder sb)
+    {
+        if (sb.Length > 0)
+            return sb.Remove(sb.Length - 2, 1);
+        return sb;
     }
 }

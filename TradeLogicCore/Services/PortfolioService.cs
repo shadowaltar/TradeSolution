@@ -1,7 +1,7 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Database;
-using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -235,10 +235,31 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public async Task<Account> GetAccountByName(string accountName)
+    public async Task<Account?> GetAccountByName(string accountName, bool isExternal = false)
     {
-        var state = await ExternalAccountManagement.GetAccount();
-        // TODO
-        return state.Content;
+        if (isExternal)
+        {
+            var state = await ExternalAccountManagement.GetAccount();
+            // TODO
+            return state.Content;
+        }
+        else
+        {
+            var account = await Storage.ReadAccount(accountName);
+
+            Storage.ReadBalances(account.Id);
+
+            return account;
+        }
+    }
+
+    public Task<bool> Deposit(int accountId, int assetId, decimal value)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<bool> Withdraw(int accountId, int assetId, decimal value)
+    {
+        throw new NotImplementedException();
     }
 }

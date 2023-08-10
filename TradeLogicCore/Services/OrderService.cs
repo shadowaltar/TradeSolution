@@ -15,6 +15,7 @@ public class OrderService : IOrderService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
+    private readonly IServices _services;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
@@ -29,11 +30,12 @@ public class OrderService : IOrderService, IDisposable
     public event Action<Order>? OrderCancelled;
 
     public OrderService(IExternalExecutionManagement execution,
-        ISecurityService securityService,
+        IServices services,
         Persistence persistence)
     {
         _execution = execution;
-        _securityService = securityService;
+        _services = services;
+        _securityService = services.Security;
         _persistence = persistence;
 
         _execution.OrderPlaced += OnSentOrderAccepted;
@@ -101,6 +103,7 @@ public class OrderService : IOrderService, IDisposable
 
             _execution.CancelOrder(order);
             _log.Info("Canceling order: " + order);
+            Persist(order);
         }
     }
 
@@ -108,8 +111,16 @@ public class OrderService : IOrderService, IDisposable
     {
         var securityIds = _orders.Values.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
             .Select(o => o.SecurityId).ToList();
-        _securityService.GetSecurities();
-        _execution.CancelAllOrders();
+        Task.Run(async () =>
+        {
+            var securities = await _securityService.GetSecurities(_services.ExchangeType, securityIds);
+            if (securities == null)
+                return;
+            foreach (var security in securities)
+            {
+                await _execution.CancelAllOrders(security);
+            }
+        });
         _log.Info("Canceling all open orders.");
     }
 
@@ -192,7 +203,7 @@ public class OrderService : IOrderService, IDisposable
         {
             Id = id,
             AccountId = accountId,
-            BrokerId = 0, // TODO
+            BrokerId = _services.Context.BrokerId,
             CreateTime = now,
             UpdateTime = now,
             ExchangeId = ExchangeIds.GetId(security.Exchange),

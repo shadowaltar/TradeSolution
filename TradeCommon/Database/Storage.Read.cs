@@ -1,25 +1,114 @@
 ﻿using Common;
+using Iced.Intel;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Data.Sqlite;
+using Microsoft.Identity.Client;
+using Microsoft.IdentityModel.Tokens;
 using System.Data;
+using System.Xml;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeDataCore.Essentials;
+using Utilities;
 
 namespace TradeCommon.Database;
 public partial class Storage
 {
-    public static async Task<Account> ReadAccount(string accountName)
+    public static async Task<User?> ReadUser(string userName = "", string email = "")
     {
-        throw new NotImplementedException();
+        var un = userName.ToLowerInvariant().Trim();
+        var em = email.ToLowerInvariant().Trim();
+        if (un.IsBlank() && em.IsBlank())
+        {
+            return null;
+        }
+        if (!un.IsBlank() && !em.IsBlank())
+        {
+            return null;
+        }
+        var selectClause = SqlReader<User>.GetSelectClause();
+        var nameWhereClause = !un.IsBlank() ? "Name = $Name" : "";
+        var emailWhereClause = !em.IsBlank() ? "Email = $Email" : "";
+        var tableName = DatabaseNames.UserTable;
+        var sql =
+@$"
+{selectClause}
+FROM {tableName}
+WHERE
+    {nameWhereClause}{emailWhereClause}
+";
+        using var connection = await Connect(DatabaseNames.StaticData);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$Name", un);
+        command.Parameters.AddWithValue("$Email", em);
+
+        using var r = await command.ExecuteReaderAsync();
+        using var sqlHelper = new SqlReader<User>(r);
+        while (await r.ReadAsync())
+        {
+            var user = sqlHelper.Read();
+            _log.Info($"Read user with name {un} or email {em} from {DatabaseNames.UserTable} table in {DatabaseNames.StaticData}.");
+            return user;
+        }
+        return null;
     }
 
-    public static async Task<Security> ReadSecurity(string exchange, string code, SecurityType type)
+    public static async Task<Account?> ReadAccount(string accountName)
+    {
+        var sqlPart = SqlReader<Account>.GetSelectClause();
+        var tableName = DatabaseNames.AccountTable;
+        var dbName = DatabaseNames.StaticData;
+        var sql =
+@$"
+{sqlPart} FROM {tableName} WHERE Account = $Account
+";
+        var account = await ReadOne<Account>(sql, tableName, dbName, ("$Account", accountName));
+        if (account != null)
+            _log.Info($"Read account with name {accountName} from {tableName} table in {dbName}.");
+        return account;
+    }
+
+    public static async Task<List<Balance>> ReadBalances(int accountId)
+    {
+        var sqlPart = SqlReader<Balance>.GetSelectClause();
+        var tableName = DatabaseNames.BalanceTable;
+        var dbName = DatabaseNames.StaticData;
+        var sql =
+@$"
+{sqlPart} FROM {tableName} WHERE AccountId = $AccountId
+";
+        var results = await ReadMany<Balance>(sql, tableName, dbName, ("$AccountId", accountId));
+        _log.Info($"Read balances with account id {accountId} from {tableName} table in {dbName}.");
+        return results;
+    }
+
+    public static async Task<List<Order>> ReadOpenOrders(SecurityType securityType)
+    {
+        var sqlPart = SqlReader<Order>.GetSelectClause();
+        var tableName = DatabaseNames.GetOrderTableName(securityType);
+        var dbName = DatabaseNames.ExecutionData;
+        var sql =
+@$"
+{sqlPart} FROM {tableName} WHERE AccountId = $AccountId
+";
+        var results = await ReadMany<Order>(sql, tableName, dbName, ("$AccountId", accountId));
+        _log.Info($"Read balances with account id {accountId} from {tableName} table in {dbName}.");
+        return results;
+    }
+
+    public static async Task<Security?> ReadSecurity(string exchange, string code, SecurityType type)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
+        if (tableName.IsBlank())
+            return null;
         string sql;
         if (type == SecurityType.Equity)
         {
@@ -75,11 +164,32 @@ WHERE
         return null;
     }
 
-    public static async Task<List<Security>> ReadSecurities(string exchange, SecurityType type)
+    public static async Task<List<Security>> ReadSecurities(string exchange, List<int> ids)
+    {
+        var results = new List<Security>();
+        foreach (var type in Enum.GetValues<SecurityType>())
+        {
+            if (type == SecurityType.Unknown) continue;
+            var partialResults = await ReadSecurities(exchange, type, ids);
+            if (partialResults == null)
+                continue;
+            results.AddRange(partialResults);
+        }
+        return results;
+    }
+
+    public static async Task<List<Security>?> ReadSecurities(string exchange, SecurityType type, List<int>? ids = null)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
+        if (tableName.IsBlank())
+            return null;
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         exchange = exchange.ToUpperInvariant();
+        var idClause = ids == null
+            ? ""
+            : ids.Count == 1
+            ? $"Id = {ids[0]} AND"
+            : $"Id IN ({string.Join(',', ids)}) AND";
         string sql;
         if (type == SecurityType.Equity)
         {
@@ -88,6 +198,7 @@ WHERE
 SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,YahooTicker,IsShortable
 FROM {tableName}
 WHERE
+    {idClause}
     IsEnabled = true AND
     LocalEndDate > $LocalEndDate AND
     Exchange = $Exchange
@@ -170,19 +281,8 @@ SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 WHERE SecurityId = $SecurityId
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.Add("$SecurityId", SqliteType.Text).Value = secId;
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<FinancialStat>(r);
-        var results = new List<FinancialStat>();
-        while (await r.ReadAsync())
-        {
-            var stats = sqlHelper.Read();
-            results.Add(stats);
-        }
+        var results = await ReadMany<FinancialStat>(sql, DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, ("$SecurityId", secId));
         _log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
         return results;
     }
@@ -338,19 +438,44 @@ WHERE
         return results;
     }
 
-    public static async Task<List<Order>> ReadOpenOrders(ExchangeType exchangeType)
+    private static async Task<List<T>> ReadMany<T>(string sql, string tableName, string databaseName, params (string, object)[] parameters) where T : new()
     {
-        throw new NotImplementedException();
+        using var connection = await Connect(DatabaseNames.StaticData);
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (key, value) in parameters)
+        {
+            command.Parameters.AddWithValue(key, value);
+        }
+
+        using var r = await command.ExecuteReaderAsync();
+        using var sqlHelper = new SqlReader<T>(r);
+        var results = new List<T>();
+        while (await r.ReadAsync())
+        {
+            var t = sqlHelper.Read();
+            results.Add(t);
+        }
+        return results;
     }
 
-    public static async Task<User> ReadUser(string userName)
+    private static async Task<T?> ReadOne<T>(string sql, string tableName, string databaseName, params (string, object)[] parameters) where T : new()
     {
-        // TODO
-        return new User
+        using var connection = await Connect(DatabaseNames.StaticData);
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (key, value) in parameters)
         {
-            Name = userName,
-            Accounts = new List<Account> { new Account() { Name = "0" } }
-        };
-        //throw new NotImplementedException();
+            command.Parameters.AddWithValue(key, value);
+        }
+
+        using var r = await command.ExecuteReaderAsync();
+        using var sqlHelper = new SqlReader<T>(r);
+        T? t = default;
+        while (await r.ReadAsync())
+        {
+            t = sqlHelper.Read();
+        }
+        return t;
     }
 }

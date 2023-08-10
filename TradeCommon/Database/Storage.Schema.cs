@@ -5,6 +5,34 @@ namespace TradeCommon.Database;
 
 public partial class Storage
 {
+    public static async Task CreateUserTable()
+    {
+        const string dropSql =
+@$"
+DROP TABLE IF EXISTS {DatabaseNames.UserTable};
+DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_name;
+DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_email;
+";
+        const string createSql =
+@$"
+CREATE TABLE IF NOT EXISTS {DatabaseNames.UserTable} (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name VARCHAR(100) NOT NULL,
+    Email VARCHAR(100) NOT NULL,
+    EncryptedPassword VARCHAR(512) NOT NULL,
+    CreateTime DATE NOT NULL,
+    UpdateTime DATE,
+    UNIQUE(Name)
+);
+CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_name
+    ON {DatabaseNames.UserTable} (Name);
+CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email
+    ON {DatabaseNames.UserTable} (Email);
+";
+
+        await DropThenCreate(dropSql, createSql, DatabaseNames.UserTable, DatabaseNames.StaticData);
+    }
+
     public static async Task CreateAccountTable()
     {
         const string dropSql =
@@ -16,10 +44,16 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_name_exchange;
 @$"
 CREATE TABLE IF NOT EXISTS {DatabaseNames.AccountTable} (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    OwnerId INT NOT NULL,
     Name VARCHAR(100) NOT NULL,
-    Exchange VARCHAR(100) NOT NULL,
+    BrokerId INT NOT NULL,
+    ExternalAccountId INT,
+    Type VARCHAR(100),
+    SubType VARCHAR(100),
+    Environment VARCHAR(10) NOT NULL,
+    CreateTime DATE NOT NULL,
     UpdateTime DATE,
-    UNIQUE(Name, Exchange)
+    UNIQUE(Name, Exchange, Environment)
 );
 CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_name_exchange
     ON {DatabaseNames.AccountTable} (Name, Exchange);
@@ -40,10 +74,11 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId_assetId;
         const string createSql =
 @$"
 CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
-    AssetId INTEGER NOT NULL,
-    AccountId INTEGER NOT NULL,
-    FreeBalance REAL DEFAULT 0 NOT NULL,
-    FrozenBalance REAL DEFAULT 0 NOT NULL,
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    AssetId INT NOT NULL,
+    AccountId INT NOT NULL,
+    FreeAmount REAL DEFAULT 0 NOT NULL,
+    LockedAmount REAL DEFAULT 0 NOT NULL,
     UpdateTime DATE,
     UNIQUE(AssetId, AccountId)
 );
@@ -198,14 +233,16 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     SecurityId INTEGER NOT NULL,
     AccountId INTEGER NOT NULL,
     Type VARCHAR(40) NOT NULL,
-    Price DOUBLE NOT NULL,
-    Quantity DOUBLE NOT NULL,
+    Price REAL NOT NULL,
+    Quantity REAL NOT NULL,
+    FilledQuantity REAL NOT NULL,
+    Status VARCHAR(10) NOT NULL,
     Side CHAR(1) NOT NULL,
-    StopPrice DOUBLE DEFAULT 0 NOT NULL,
-    CreateTime INT NOT NULL,
-    UpdateTime INT NOT NULL,
-    ExternalCreateTime INT DEFAULT 0,
-    ExternalUpdateTime INT DEFAULT 0,
+    StopPrice REAL DEFAULT 0 NOT NULL,
+    CreateTime DATE NOT NULL,
+    UpdateTime DATE NOT NULL,
+    ExternalCreateTime DATE DEFAULT 0,
+    ExternalUpdateTime DATE DEFAULT 0,
     TimeInForce VARCHAR(10),
     StrategyId INT DEFAULT 0,
     BrokerId INT DEFAULT 0,

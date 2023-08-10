@@ -8,6 +8,7 @@ using System.Text;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -26,19 +27,17 @@ public class Program
 
     private static async Task Main(string[] args)
     {
-        ILog log = Logger.New();
-
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
         Dependencies.Register(ExternalNames.Binance);
 
-        await NewOrderDemo();
+        //await NewOrderDemo();
         //await RunMACBackTestDemo();
 
         var engine = Dependencies.ComponentContext.Resolve<Core>();
-        await engine.Start("0");
+        await engine.Start("mars", "???");
 
         Console.WriteLine("Finished.");
     }
@@ -123,6 +122,10 @@ public class Program
             {
                 Console.WriteLine(trade);
             }
+        }
+        static void OnOrderCancelled(Order order)
+        {
+            throw new NotImplementedException();
         }
     }
 

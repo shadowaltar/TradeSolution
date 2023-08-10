@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
@@ -15,7 +16,7 @@ namespace TradeCommon.Database;
 public partial class Storage
 {
     private static readonly ILog _log = Logger.New();
-    private static readonly Dictionary<DataType, string> _upsertSqls = new();
+    private static readonly Dictionary<DataType, ISqlWriter> _writers = new();
 
     public static readonly string DatabaseFolder = @"c:\temp";
 
@@ -23,7 +24,7 @@ public partial class Storage
     {
         if (task is PersistenceTask<OhlcPrice> priceTask)
         {
-            await InsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
+            await UpsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
         }
         else if (task is PersistenceTask<Order> orderTask)
         {
@@ -43,17 +44,17 @@ public partial class Storage
         else if (task is PersistenceTask<Security> securityTask)
         {
             if (securityTask.SecurityType == SecurityType.Equity)
-                await InsertStockDefinitions(securityTask.Entries);
+                await UpsertStockDefinitions(securityTask.Entries);
             if (securityTask.SecurityType == SecurityType.Fx)
-                await InsertFxDefinitions(securityTask.Entries);
+                await UpsertFxDefinitions(securityTask.Entries);
         }
         else if (task is PersistenceTask<FinancialStat> financialStatsTask)
         {
-            await InsertSecurityFinancialStats(financialStatsTask.Entries);
+            await UpsertSecurityFinancialStats(financialStatsTask.Entries);
         }
     }
 
-    public static async Task InsertStockDefinitions(List<Security> entries)
+    public static async Task UpsertStockDefinitions(List<Security> entries)
     {
         const string sql =
 @$"
@@ -122,7 +123,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public static async Task InsertFxDefinitions(List<Security> entries)
+    public static async Task UpsertFxDefinitions(List<Security> entries)
     {
         const string sql =
 @$"
@@ -185,7 +186,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public static async Task<(int securityId, int count)> InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
+    public static async Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -250,7 +251,7 @@ DO UPDATE SET
         return (securityId, count);
     }
 
-    public static async Task<int> InsertSecurityFinancialStats(List<FinancialStat> stats)
+    public static async Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats)
     {
         var count = 0;
         var tableName = DatabaseNames.FinancialStatsTable;
@@ -296,13 +297,37 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return count;
     }
 
+    public static async Task<int> InsertUser(User user)
+    {
+        var tableName = DatabaseNames.UserTable;
+        if (!_writers.TryGetValue(DataType.Account, out var writer))
+        {
+            writer = new SqlWriter<User>(tableName, DatabaseFolder, DatabaseNames.StaticData);
+            _writers[DataType.User] = writer;
+        }
+        return await writer.InsertOne(user, false);
+    }
+
+    public static async Task InsertAccount(Account account)
+    {
+        var tableName = DatabaseNames.AccountTable;
+        if (!_writers.TryGetValue(DataType.Account, out var writer))
+        {
+            writer = new SqlWriter<Account>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            _writers[DataType.Account] = writer;
+        }
+        await writer.InsertOne(account, true);
+    }
+
     public static async Task InsertOrder(Order order, SecurityType securityType)
     {
         var tableName = DatabaseNames.GetOrderTableName(securityType);
-        var sql = _upsertSqls!.GetValueOrDefault(DataType.Order, null);
-        var writer = new SqlWriter<Order>(tableName, DatabaseFolder, DatabaseNames.ExecutionData, sql);
-        _upsertSqls[DataType.Order] = writer.Sql;
-        await writer.InsertOne(order);
+        if (!_writers.TryGetValue(DataType.Order, out var writer))
+        {
+            writer = new SqlWriter<Order>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            _writers[DataType.Order] = writer;
+        }
+        await writer.InsertOne(order, true);
 
         //        string sql =
         //@$"
@@ -332,19 +357,23 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public static async Task InsertTrade(Trade trade, SecurityType securityType)
     {
         var tableName = DatabaseNames.GetTradeTableName(securityType);
-        var sql = _upsertSqls!.GetValueOrDefault(DataType.Trade, null);
-        var writer = new SqlWriter<Trade>(tableName, DatabaseFolder, DatabaseNames.ExecutionData, sql);
-        _upsertSqls[DataType.Trade] = writer.Sql;
-        await writer.InsertOne(trade);
+        if (!_writers.TryGetValue(DataType.Trade, out var writer))
+        {
+            writer = new SqlWriter<Trade>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            _writers[DataType.Trade] = writer;
+        }
+        await writer.InsertOne(trade, false);
     }
 
     public static async Task InsertPosition(Position position, SecurityType securityType)
     {
         var tableName = DatabaseNames.GetPositionTableName(securityType);
-        var sql = _upsertSqls!.GetValueOrDefault(DataType.Position, null);
-        var writer = new SqlWriter<Position>(tableName, DatabaseFolder, DatabaseNames.ExecutionData, sql);
-        _upsertSqls[DataType.Position] = writer.Sql;
-        await writer.InsertOne(position);
+        if (!_writers.TryGetValue(DataType.Position, out var writer))
+        {
+            writer = new SqlWriter<Position>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            _writers[DataType.Position] = writer;
+        }
+        await writer.InsertOne(position, true);
     }
 
     /// <summary>

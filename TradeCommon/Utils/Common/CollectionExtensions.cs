@@ -66,4 +66,9 @@ public static class CollectionExtensions
         }
         return value;
     }
+
+    public static Dictionary<T, TV> ShallowCopy<T, TV>(this IDictionary<T, TV> dictionary) where T : notnull
+    {
+        return dictionary.ToDictionary(p => p.Key, p => p.Value);
+    }
 }

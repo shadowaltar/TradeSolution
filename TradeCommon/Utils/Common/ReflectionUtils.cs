@@ -154,11 +154,11 @@ public static class ReflectionUtils
     public static ValueSetter<T> GetValueSetter<T>(BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         var t = typeof(T);
-        if (!_typeToValueGetters.TryGetValue(t, out var vg))
+        if (!_typeToValueSetters.TryGetValue(t, out var vg))
         {
             var properties = GetPropertyToName(t, flags).Values;
             vg = new ValueSetter<T>(properties);
-            _typeToValueGetters[t] = vg;
+            _typeToValueSetters[t] = vg;
         }
         return (ValueSetter<T>)vg;
     }

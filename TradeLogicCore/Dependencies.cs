@@ -18,11 +18,14 @@ public static class Dependencies
         builder ??= new ContainerBuilder();
         builder.RegisterModule<DependencyModule>();
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
+        builder.RegisterSingleton<IServices, TradeLogicCore.Services.Services>()
+            .WithParameter(new TypedParameter(typeof(string), externalName));
+        builder.RegisterSingleton<Context>();
+        builder.RegisterSingleton<Core>();
         switch (externalName)
         {
             case ExternalNames.Binance:
                 builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
-                builder.RegisterSingleton<Core>();
                 break;
             case ExternalNames.Futu:
                 builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
@@ -47,6 +50,7 @@ public static class Dependencies
             builder.RegisterSingleton<ITradeService, TradeService>();
             builder.RegisterSingleton<IPortfolioService, PortfolioService>();
             builder.RegisterSingleton<IAlgorithmService, AlgorithmService>();
+            builder.RegisterSingleton<IAdminService, AdminService>();
         }
     }
 }

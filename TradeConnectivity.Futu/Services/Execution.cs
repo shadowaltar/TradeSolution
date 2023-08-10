@@ -1,4 +1,4 @@
-﻿using TradeCommon.Essentials;
+﻿using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
@@ -17,7 +17,7 @@ public class Execution : IExternalExecutionManagement
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
-    public Task<ExternalQueryState<List<Order>>> CancelAllOrder(Security security)
+    public Task<ExternalQueryState<List<Order>>> CancelAllOrders(Security security)
     {
         throw new NotImplementedException();
     }
@@ -37,12 +37,17 @@ public class Execution : IExternalExecutionManagement
         throw new NotImplementedException();
     }
 
-    public Task<ExternalQueryState<List<Order>>> GetOpenOrders(Security? security = null)
+    public Task<ExternalQueryState<List<Order>?>> GetOpenOrders(Security? security = null)
     {
         throw new NotImplementedException();
     }
 
     public Task<ExternalQueryState<Order>> GetOrder(Security security, long orderId = 0, long externalOrderId = 0)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<List<Order>?>> GetOrderHistory(DateTime start, DateTime end)
     {
         throw new NotImplementedException();
     }

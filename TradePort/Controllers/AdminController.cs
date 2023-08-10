@@ -5,6 +5,7 @@ using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeDataCore.StaticData;
+using TradeLogicCore.Services;
 
 namespace TradePort.Controllers;
 
@@ -15,6 +16,53 @@ namespace TradePort.Controllers;
 [Route("admin")]
 public class AdminController : Controller
 {
+    [HttpPost("users/{user}")]
+    public async Task<ActionResult> CreateUser([FromServices] IAdminService adminService,
+                                               [FromForm] UserCreationModel model,
+                                               [FromRoute(Name = "user")] string userName)
+    {
+        if (userName.IsBlank()) return BadRequest();
+        if (model == null) return BadRequest();
+        if (model.UserPassword.IsBlank()) return BadRequest();
+        if (model.AdminPassword.IsBlank()) return BadRequest();
+        if (model.Email.IsBlank() || !model.Email.IsValidEmail()) return BadRequest();
+        if (!Credential.IsPasswordCorrect(model.AdminPassword)) return BadRequest();
+
+        if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
+        if (model.UserPassword.Length < 6) return BadRequest("User name should at least have 6 chars.");
+
+        var user = await adminService.ReadUser(userName);
+        if (user != null)
+        {
+            return BadRequest();
+        }
+
+        var result = await adminService.CreateUser(userName, model.Email, model.UserPassword);
+        model.UserPassword = "";
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get details of a user.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    [HttpGet("users/{user}")]
+    public async Task<ActionResult> GetUser([FromServices] IAdminService adminService,
+                                            [FromRoute(Name = "user")] string userName)
+    {
+        if (userName.IsBlank()) return BadRequest();
+
+        var user = await adminService.ReadUser(userName);
+        if (user == null)
+        {
+            return NotFound();
+        }
+        return Ok(user);
+    }
+
     /// <summary>
     /// WARNING, this will erase all the data. Rebuild all the tables.
     /// </summary>
@@ -118,9 +166,30 @@ public class AdminController : Controller
         if (tableTypeStr != null)
             dataType = DataTypeConverter.Parse(tableTypeStr);
 
+        List<string>? resultTableNames = null;
+
+        switch (dataType)
+        {
+            case DataType.FinancialStat:
+                await Storage.CreateFinancialStatsTable();
+                resultTableNames = new List<string> { DatabaseNames.FinancialStatsTable };
+                break;
+            case DataType.Account:
+                await Storage.CreateAccountTable();
+                resultTableNames = new List<string> { DatabaseNames.AccountTable };
+                break;
+            case DataType.Balance:
+                await Storage.CreateBalanceTable();
+                resultTableNames = new List<string> { DatabaseNames.BalanceTable };
+                break;
+            case DataType.User:
+                await Storage.CreateUserTable();
+                resultTableNames = new List<string> { DatabaseNames.UserTable };
+                break;
+        }
+
         if (secType is SecurityType.Equity or SecurityType.Fx)
         {
-            List<string>? resultTableNames = null;
             switch (dataType)
             {
                 case DataType.Order:
@@ -135,10 +204,6 @@ public class AdminController : Controller
                 case DataType.TradeOrderPositionRelationship:
                     resultTableNames = new List<string> { await Storage.CreateTradeOrderPositionIdTable(secType) };
                     break;
-                case DataType.FinancialStat:
-                    await Storage.CreateFinancialStatsTable();
-                    resultTableNames = new List<string> { DatabaseNames.FinancialStatsTable };
-                    break;
             }
             if (resultTableNames == null)
                 return BadRequest($"Invalid parameters: {tableTypeStr}");
@@ -147,11 +212,28 @@ public class AdminController : Controller
             foreach (var tn in resultTableNames)
             {
                 var r = await Storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
+                if (!r)
+                    r = await Storage.CheckTableExists(tn, DatabaseNames.StaticData);
+                if (!r)
+                    r = await Storage.CheckTableExists(tn, DatabaseNames.MarketData);
                 results[tn] = r;
             }
             return Ok(results);
         }
 
         return BadRequest($"Invalid parameters: {secTypeStr}");
+    }
+
+
+    public class UserCreationModel
+    {
+        [FromForm(Name = "adminPassword")]
+        public string AdminPassword { get; set; }
+
+        [FromForm(Name = "userPassword")]
+        public string UserPassword { get; set; }
+
+        [FromForm(Name = "email")]
+        public string Email { get; set; }
     }
 }

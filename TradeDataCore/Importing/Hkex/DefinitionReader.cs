@@ -18,7 +18,7 @@ public class DefinitionReader
             return null;
 
         securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, type)).ToList();
-        await Storage.InsertStockDefinitions(securities);
+        await Storage.UpsertStockDefinitions(securities);
         return securities;
     }
 

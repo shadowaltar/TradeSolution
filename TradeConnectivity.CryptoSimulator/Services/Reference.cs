@@ -45,7 +45,7 @@ public class Reference : IExternalReferenceManagement
         }
 
         securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, type)).ToList();
-        await Storage.InsertFxDefinitions(securities);
+        await Storage.UpsertFxDefinitions(securities);
         return securities;
     }
 }

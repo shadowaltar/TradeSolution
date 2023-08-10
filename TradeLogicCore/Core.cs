@@ -3,6 +3,7 @@ using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -13,73 +14,77 @@ public class Core
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IPortfolioService _portfolioService;
-    private readonly IOrderService _orderService;
-    private readonly ITradeService _tradeService;
-    private readonly ISecurityService _securityService;
+    private readonly IServices _services;
+    private IPortfolioService PortfolioService => _services.Portfolio;
+    private IOrderService OrderService => _services.Order;
+    private ITradeService TradeService => _services.Trade;
+    private ISecurityService SecurityService => _services.Security;
 
     public ExchangeType ExchangeType => ExchangeType.Binance;
 
-    public Core(IPortfolioService portfolioService,
-                IOrderService orderService,
-                ITradeService tradeService,
-                ISecurityService securityService)
+    public Core(IServices services)
     {
-        _portfolioService = portfolioService;
-        _orderService = orderService;
-        _tradeService = tradeService;
-        _securityService = securityService;
+        _services = services;
     }
 
-    public async Task Start(string userName)
+    public async Task Start(string userName, string adminPassword)
     {
-        await CheckAccountAndBalance(userName);
-        //await CheckOpenOrders();
-        //CheckTradeHistory();
+        var user = await _services.Admin.ReadUser(userName);
+        if (user == null)
+            throw new InvalidOperationException("The user does not exist.");
+
+        await CheckAccountAndBalance(user);
+        await CheckOpenOrders();
+        await CheckRecentOrderHistory();
+        await CheckRecentTradeHistory();
+
         //SubscribeToMarketData();
         //StartAlgorithmEngine();
     }
 
-    private async Task CheckAccountAndBalance(string userName)
+    private Task CheckRecentOrderHistory()
     {
-        // retrieve account state
-        var user = await Storage.ReadUser(userName);
-        if (!_portfolioService.SelectUser(user))
+        throw new NotImplementedException();
+    }
+
+    private Task CheckRecentTradeHistory()
+    {
+        throw new NotImplementedException();
+    }
+
+    private async Task CheckAccountAndBalance(User user)
+    {
+        if (!PortfolioService.SelectUser(user))
         {
             Environment.Exit(StatusCodes.GetUserFailed);
             return;
         }
         foreach (var account in user.Accounts)
         {
-            var externalAccount = await _portfolioService.GetAccountByName(account.Name);
-            //var internalAccount = await Storage.ReadAccount(account.Name);
+            var externalAccount = await PortfolioService.GetAccountByName(account.Name, true);
+            var internalAccount = await PortfolioService.GetAccountByName(account.Name);
         }
-        
-
     }
 
     private async Task CheckOpenOrders()
     {
-        // retrieve previously opened order state, verify with 
-        if (TryRetrieveOpenedOrders(out var orders) && !orders.IsNullOrEmpty())
-        {
-            // there are opened orders in the exchange, consolidate with those stored in db
-        }
-        var storedOpenOrders = await Storage.ReadOpenOrders(ExchangeType);
+        var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
+        var internalOpenOrders = await _services.Order.GetOpenOrders(null);
+
         var notStoredOpenOrders = new List<Order>();
 
         // a stored one does not exist on external side
-        foreach (var storedOpenOrder in storedOpenOrders)
+        foreach (var order in internalOpenOrders)
         {
-            if (!orders.Exists(o => o.ExternalOrderId == storedOpenOrder.ExternalOrderId))
+            if (!externalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
             {
 
             }
         }
         // an external one does not exist in storage
-        foreach (var order in orders)
+        foreach (var order in externalOpenOrders)
         {
-            if (!storedOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
+            if (!internalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
             {
 
             }

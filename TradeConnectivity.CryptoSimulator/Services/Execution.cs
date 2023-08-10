@@ -1,4 +1,4 @@
-﻿using TradeCommon.Essentials;
+﻿using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
@@ -63,6 +63,16 @@ public class Execution : IExternalExecutionManagement
     }
 
     public Task<ExternalQueryState<Account>> GetAccount()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<List<Order>?>> GetOrderHistory(DateTime start, DateTime end)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalQueryState<List<Order>>> CancelAllOrders(Security security)
     {
         throw new NotImplementedException();
     }

@@ -7,7 +7,6 @@ using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
-using Environments = TradeCommon.Runtime.Environments;
 
 namespace TradePort.Controllers;
 
@@ -19,14 +18,14 @@ namespace TradePort.Controllers;
 public class ExecutionController : Controller
 {
     /// <summary>
-    /// Set execution environment.
+    /// Set application environment.
     /// </summary>
-    /// <param name="environments"></param>
+    /// <param name="context"></param>
     /// <param name="password"></param>
     /// <param name="environment"></param>
     /// <returns></returns>
     [HttpPost("set-environment")]
-    public ActionResult SetEnvironment([FromServices] Environments environments,
+    public ActionResult SetEnvironment([FromServices] Context context,
                                        [FromForm] string password,
                                        [FromQuery(Name = "env")] string environment = "Test")
     {
@@ -37,7 +36,7 @@ public class ExecutionController : Controller
         if (type == EnvironmentType.Unknown)
             return BadRequest("Invalid environment string. It is case sensitive.");
 
-        environments.SetEnvironment(type);
+        context.SetEnvironment(type);
         return Ok(type);
     }
 

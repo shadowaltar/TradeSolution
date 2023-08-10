@@ -29,7 +29,7 @@ public class JsonPriceReader
             var secType = exchange == ExchangeType.Binance ? SecurityType.Fx : SecurityType.Equity;
             var security = await _securityService.GetSecurity(code, exchange, secType);
             var interval = IntervalTypeConverter.Parse(intervalStr);
-            var i = await Storage.InsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
+            var i = await Storage.UpsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
             results[group.Key] = i;
         }
         return results;
