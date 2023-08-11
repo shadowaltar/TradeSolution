@@ -98,17 +98,17 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         if (lastPrice == null)
             return;
 
-        if (ValueCrossing.TryCheck(lastPrice.C, currentPrice.C, last.Variables.Fast, current.Variables.Fast, out var pxf))
+        if (TryCheck(lastPrice.C, currentPrice.C, last.Variables.Fast, current.Variables.Fast, out var pxf))
         {
             current.Variables.PriceXFast = pxf;
         }
 
-        if (ValueCrossing.TryCheck(lastPrice.C, currentPrice.C, last.Variables.Slow, current.Variables.Slow, out var pxs))
+        if (TryCheck(lastPrice.C, currentPrice.C, last.Variables.Slow, current.Variables.Slow, out var pxs))
         {
             current.Variables.PriceXSlow = pxs;
         }
 
-        if (ValueCrossing.TryCheck(last.Variables.Fast, current.Variables.Fast, last.Variables.Slow, current.Variables.Slow, out var fxs))
+        if (TryCheck(last.Variables.Fast, current.Variables.Fast, last.Variables.Slow, current.Variables.Slow, out var fxs))
         {
             current.Variables.FastXSlow = fxs;
         }
@@ -118,6 +118,24 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     {
         entry.Variables.PriceXFast = 0;
         entry.Variables.PriceXSlow = 0;
+    }
+
+    public static bool TryCheck(decimal last1, decimal current1, decimal last2, decimal current2, out int crossing)
+    {
+        if (last1 < last2 && current1 > current2)
+        {
+            // 1 cross above 2
+            crossing = 1;
+            return true;
+        }
+        else if (last1 > last2 && current1 < current2)
+        {
+            // 1 cross below 2
+            crossing = -1;
+            return true;
+        }
+        crossing = 0;
+        return false;
     }
 }
 

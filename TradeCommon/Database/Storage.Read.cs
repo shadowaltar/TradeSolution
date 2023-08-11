@@ -97,10 +97,10 @@ WHERE
         var dbName = DatabaseNames.ExecutionData;
         var sql =
 @$"
-{sqlPart} FROM {tableName} WHERE AccountId = $AccountId
+{sqlPart} FROM {tableName} WHERE Status = 'LIVE'
 ";
-        var results = await ReadMany<Order>(sql, tableName, dbName, ("$AccountId", accountId));
-        _log.Info($"Read balances with account id {accountId} from {tableName} table in {dbName}.");
+        var results = await ReadMany<Order>(sql, tableName, dbName);
+        _log.Info($"Read open orders with security type {securityType} from {tableName} table in {dbName}.");
         return results;
     }
 

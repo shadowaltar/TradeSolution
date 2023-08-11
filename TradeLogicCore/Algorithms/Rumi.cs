@@ -71,12 +71,12 @@ public class Rumi : IAlgorithm<RumiVariables>
     {
         var lastRumi = last.Variables!.Rumi;
         var rumi = current.Variables!.Rumi;
-        var isSignal = (lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0);
+        var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0;
 
-        if (isSignal && current.Variables.Fast < currentPrice.C)
-        {
-            return -1;
-        }
+        //if (isSignal && current.Variables.Fast < currentPrice.C)
+        //{
+        //    return -1;
+        //}
 
         return isSignal ? 1 : -1;
     }

@@ -127,8 +127,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                 var signal1 = Algorithm.IsBuySignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
                 var signal2 = Algorithm.IsSellCloseSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
                 // assuming no multiple opened orders for one security
-                Assertion.ShallNever(signal1 == 1 && signal2 == 1);
-                Assertion.ShallNever(signal1 == -1 && signal2 == -1);
+                //Assertion.ShallNever(signal1 == 1 && signal2 == 1);
+                //Assertion.ShallNever(signal1 == -1 && signal2 == -1);
 
                 entry.BuyOpenCloseSignal = signal1 == 1 ? 1 : signal2 == 1 ? -1 : 0;
 

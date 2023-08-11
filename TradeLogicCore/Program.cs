@@ -34,12 +34,17 @@ public class Program
         Dependencies.Register(ExternalNames.Binance);
 
         //await NewOrderDemo();
-        //await RunMACBackTestDemo();
-
-        var engine = Dependencies.ComponentContext.Resolve<Core>();
-        await engine.Start("mars", "???");
+        //await RunRumiBackTestDemo();
+        await RunMACBackTestDemo();
+        //await RunCore();
 
         Console.WriteLine("Finished.");
+    }
+
+    private static async Task RunCore()
+    {
+        var engine = Dependencies.ComponentContext.Resolve<Core>();
+        await engine.Start("mars", "???");
     }
 
     private static async Task NewSecurityOhlcSubscriptionDemo()
@@ -138,15 +143,15 @@ public class Program
 
         var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
 
-        //securities = securities.Where(s => s.Code is "00001" or "00002" or "00005").ToList();
+        securities = securities.Where(s => s.Code is "ETHUSDT" or "BTCUSDT" or "BTCTUSD").ToList();
 
-        var stopLosses = new List<decimal> { 0.05m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneHour };
+        var stopLosses = new List<decimal> { 0.015m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneDay };
 
         var summaryRows = new List<List<object>>();
 
-        var fast = 2;
-        var slow = 5;
+        var fast = 5;
+        var slow = 10;
         var rumi = 1;
         var start = new DateTime(2022, 1, 1);
         var end = new DateTime(2023, 7, 1);
@@ -261,19 +266,21 @@ public class Program
         var filter = "";
         var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
 
-        var securities = await securityService.GetSecurities(ExchangeType.Hkex, SecurityType.Equity);
+        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
         //var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
-        securities = filterCodes.Count == 0 ? securities : securities.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
+        //securities = filterCodes.Count == 0 ? securities : securities.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
 
-        var stopLosses = new List<decimal> { 0.05m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneHour };
+        securities = securities.Where(s => s.Code is "ETHUSDT" or "BTCUSDT" or "BTCTUSD").ToList();
+
+        var stopLosses = new List<decimal> { 0.02m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
 
-        var fast = 2;
-        var slow = 5;
+        var fast = 26;
+        var slow = 51;
         var start = new DateTime(2022, 1, 1);
-        var end = new DateTime(2023, 8, 1);
+        var end = new DateTime(2023, 7, 1);
         var now = DateTime.Now;
 
         var rootFolder = @"C:\Temp";
