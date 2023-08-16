@@ -200,16 +200,49 @@ public class PriceController : Controller
         var securities = await Storage.ReadSecurities(ExternalNames.Binance, secType);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         var priceReader = new TradeDataCore.Importing.Binance.HistoricalPriceReader();
-        var allPrices = await priceReader.ReadPrices(securities, start, end, interval);
 
-        foreach (var security in securities)
+        if (interval != IntervalType.OneMinute)
         {
-            if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
+            var allPrices = await priceReader.ReadPrices(securities, start, end, interval);
+
+            foreach (var security in securities)
             {
-                await Storage.UpsertPrices(security.Id, interval, secType, list);
+                if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
+                {
+                    await Storage.UpsertPrices(security.Id, interval, secType, list);
+                }
             }
+            return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
         }
-        return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
+        else if (interval == IntervalType.OneMinute)
+        {
+            var summary = new Dictionary<string, int>();
+            var tempEnd = start;
+            do
+            {
+                tempEnd = tempEnd.AddDays(1);
+                tempEnd = end < tempEnd ? end : tempEnd;
+                var prices = await priceReader.ReadPrices(securities, tempEnd.AddDays(-1), tempEnd, interval);
+
+                foreach (var security in securities)
+                {
+                    if (prices?.TryGetValue(security.Id, out var list) ?? false)
+                    {
+                        var result = await Storage.UpsertPrices(security.Id, interval, secType, list);
+                        var oldCount = summary.GetOrCreate(security.Code);
+                        summary[security.Code] = oldCount + result.count;
+                    }
+                }
+                _log.Info($"Finished inserting from {tempEnd.AddDays(-1)} to {tempEnd}");
+            }
+            while (tempEnd < end);
+
+            return Ok(summary);
+        }
+        else
+        {
+            return BadRequest();
+        }
     }
 
     /// <summary>
@@ -333,6 +366,7 @@ public class PriceController : Controller
         var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
             .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
+
         var dataFilePath = Path.Join(Path.GetTempPath(), $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
 
         try

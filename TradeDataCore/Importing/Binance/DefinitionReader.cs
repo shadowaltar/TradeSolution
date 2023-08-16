@@ -24,26 +24,43 @@ public class DefinitionReader
         {
             if (symbolObj!["status"].ParseString() != "TRADING")
                 continue;
-
+            var code = symbolObj.GetString("symbol");
+            var exchange = ExternalNames.Binance.ToUpperInvariant();
+            var filterArray = symbolObj["filters"]?.AsArray();
+            double? lotSize = null;
+            double? maxLotSize = null;
+            double? minNotional = null;
+            var lotSizeFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "LOT_SIZE")?.AsObject();
+            var notionalFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "NOTIONAL")?.AsObject();
+            lotSize = lotSizeFilterObj?.GetDouble("minQty");
+            maxLotSize = lotSizeFilterObj?.GetDouble("maxQty");
+            minNotional = notionalFilterObj?.GetDouble("minNotional");
             var security = new Security
             {
-                Code = symbolObj["symbol"].ParseString(),
-                Name = symbolObj["symbol"].ParseString(),
-                Exchange = ExternalNames.Binance.ToUpperInvariant(),
+                Code = code,
+                Name = code,
+                Exchange = exchange,
                 Type = SecurityTypes.Fx,
                 SubType = SecurityTypes.Crypto,
-                LotSize = 0,
+                LotSize = lotSize ?? 0,
+                PricePrecision = symbolObj.GetInt("quotePrecision"),
+                QuantityPrecision = symbolObj.GetInt("baseAssetPrecision"),
                 Currency = "",
                 FxInfo = new FxSecurityInfo
                 {
-                    BaseCurrency = symbolObj["baseAsset"].ParseString(),
-                    QuoteCurrency = symbolObj["quoteAsset"].ParseString(),
+                    BaseCurrency = symbolObj.GetString("baseAsset").ToUpperInvariant(),
+                    QuoteCurrency = symbolObj.GetString("quoteAsset").ToUpperInvariant(),
+                    MaxLotSize = maxLotSize,
+                    MinNotional = minNotional,
+                    IsMarginTradingAllowed = symbolObj.GetBoolean("isMarginTradingAllowed"),
                 }
             };
             securities.Add(security);
         }
 
-        securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, type)).ToList();
+        // find assets
+        var assetNames = securities.Select(s => s.FxInfo!.BaseCurrency).Union(securities.Select(s => s.FxInfo!.QuoteCurrency)).Distinct().ToList();
+
         await Storage.UpsertFxDefinitions(securities);
         return securities;
     }

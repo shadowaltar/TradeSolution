@@ -1,8 +1,10 @@
 ﻿using Autofac;
+using Common;
 using DevExpress.Xpf.Docking;
 using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Controls;
 using TradeApp.Utils;
 using TradeApp.ViewModels;
 using DockLayoutManager = DevExpress.Xpf.Docking.DockLayoutManager;
@@ -50,18 +52,34 @@ namespace TradeApp.UX
             var path = "/TradeApp;component/" + attr.ResourcePath;
             BaseLayoutItem? view = null;
 
-            if (Application.LoadComponent(new Uri(path, UriKind.Relative)) is LayoutPanel panel)
+            var component = Application.LoadComponent(new Uri(path, UriKind.Relative));
+            if (component is LayoutPanel panel)
             {
                 _dockController.Dock(panel);
                 view = panel;
             }
-            else if (Application.LoadComponent(new Uri(path, UriKind.Relative)) is LayoutGroup group)
+            else if (component is LayoutGroup group)
             {
                 _dockController.Dock(group);
                 view = group;
             }
+            else if (component is UserControl userControl)
+            {
+                var controlType = component.GetType();
+                var wrapperPanel = new LayoutPanel
+                {
+                    Content = userControl,
+                    Name = controlType.Name + "LayoutPanel"
+                };
+                _dockController.Dock(wrapperPanel);
+                view = wrapperPanel;
+            }
 
-            if (view?.Name == null)
+            if (view == null)
+            {
+                throw new InvalidOperationException("View is not found. Resource path: " + path);
+            }
+            if (view.Name.IsBlank())
             {
                 throw new InvalidOperationException("Must add x:Name to preset layout panels/groups!");
             }

@@ -58,4 +58,54 @@ public static class DateUtils
     }
 
     public static bool IsWeekend(this DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+
+    public static DateTime Min(DateTime date1, DateTime date2)
+    {
+        return date1 < date2 ? date1 : date2;
+    }
+
+    /// <summary>
+    /// Create series of DateTime with equal gap in between.
+    /// The last output can be either equal to or smaller than the
+    /// specified <paramref name="end"/> time.
+    /// </summary>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <param name="interval"></param>
+    /// <returns></returns>
+    public static List<(DateTime start, DateTime end)> CreateEqualLengthTimeIntervals(DateTime start, DateTime end, TimeSpan interval)
+    {
+        var oneMs = TimeSpan.FromMilliseconds(1);
+        var segments = new List<(DateTime start, DateTime end)>();
+        while (start < end)
+        {
+            var segmentEnd = Min(start + interval - oneMs, end);
+            var segment = (start, segmentEnd);
+            segments.Add(segment);
+            start += interval;
+        }
+        return segments;
+    }
+
+    /// <summary>
+    /// Create series of DateTime with equal gap in between.
+    /// The given <paramref name="start"/> time is excluded.
+    /// The last output can be either equal to or smaller than the
+    /// specified <paramref name="end"/> time.
+    /// </summary>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <param name="interval"></param>
+    /// <returns></returns>
+    public static List<DateTime> CreateEqualGapTimePoints(DateTime start, DateTime end, TimeSpan interval, bool endInclusive = true)
+    {
+        var results = new List<DateTime>();
+        var nextEnd = start + interval;
+        while (endInclusive ? (nextEnd <= end) : (nextEnd < end))
+        {
+            results.Add(nextEnd);
+            nextEnd += interval;
+        }
+        return results;
+    }
 }

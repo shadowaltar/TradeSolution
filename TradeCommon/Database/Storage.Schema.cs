@@ -158,13 +158,17 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.FxDefinitionTable} (
     Exchange VARCHAR(100) NOT NULL,
     Type VARCHAR(100) NOT NULL,
     SubType VARCHAR(200),
-    LotSize DOUBLE DEFAULT 1 NOT NULL,
-    Currency VARCHAR(20) NOT NULL,
+    LotSize DOUBLE NOT NULL,
     BaseCurrency VARCHAR(10) NOT NULL,
     QuoteCurrency VARCHAR(10) NOT NULL,
     IsEnabled BOOLEAN DEFAULT TRUE,
+    IsMarginTradingAllowed BOOLEAN DEFAULT TRUE,
     LocalStartDate DATE NOT NULL DEFAULT 0, 
     LocalEndDate DATE NOT NULL,
+    MaxLotSize DOUBLE,
+    MinNotional DOUBLE,
+    PricePrecision DOUBLE,
+    QuotePrecision DOUBLE,
     UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
 );
 CREATE UNIQUE INDEX idx_code_exchange

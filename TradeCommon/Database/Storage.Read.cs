@@ -1,11 +1,5 @@
 ﻿using Common;
-using Iced.Intel;
-using Microsoft.CodeAnalysis.Text;
-using Microsoft.Data.Sqlite;
-using Microsoft.Identity.Client;
-using Microsoft.IdentityModel.Tokens;
 using System.Data;
-using System.Xml;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -15,7 +9,6 @@ using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeDataCore.Essentials;
-using Utilities;
 
 namespace TradeCommon.Database;
 public partial class Storage
@@ -127,9 +120,10 @@ WHERE
         {
             sql = type == SecurityType.Fx
                 ? @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,BaseCurrency,QuoteCurrency
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuotePrecision
 FROM {tableName}
 WHERE
+    IsEnabled = true AND
     Code = $Code AND
     Exchange = $Exchange
 "
@@ -148,16 +142,7 @@ WHERE
         while (await r.ReadAsync())
         {
             var security = sqlHelper.Read();
-            var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
-            var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
-            if (baseCcy != null && quoteCcy != null)
-            {
-                security.FxInfo = new FxSecurityInfo
-                {
-                    BaseCurrency = baseCcy,
-                    QuoteCurrency = quoteCcy
-                };
-            }
+            security.FxInfo = ReadFxSecurityInfo(sqlHelper);
             _log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
             return security;
         }
@@ -210,7 +195,7 @@ WHERE
         {
             sql = type == SecurityType.Fx
                 ? @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuotePrecision
 FROM {tableName}
 WHERE
     IsEnabled = true AND
@@ -234,20 +219,33 @@ WHERE
         while (await r.ReadAsync())
         {
             var security = sqlHelper.Read();
-            var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
-            var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
-            if (baseCcy != null && quoteCcy != null)
-            {
-                security.FxInfo = new FxSecurityInfo
-                {
-                    BaseCurrency = baseCcy,
-                    QuoteCurrency = quoteCcy
-                };
-            }
+            security.FxInfo = ReadFxSecurityInfo(sqlHelper);
             results.Add(security);
         }
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.StaticData}.");
         return results;
+    }
+
+    private static FxSecurityInfo? ReadFxSecurityInfo(SqlReader<Security> sqlHelper)
+    {
+        var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
+        var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
+        var isMarginTradingAllowed = sqlHelper.GetOrDefault<bool>("IsMarginTradingAllowed");
+        var maxLotSize = sqlHelper.GetOrDefault<double?>("MaxLotSize");
+        var minNotional = sqlHelper.GetOrDefault<double?>("MinNotional");
+        if (baseCcy != null && quoteCcy != null)
+        {
+            var fxInfo = new FxSecurityInfo
+            {
+                BaseCurrency = baseCcy,
+                QuoteCurrency = quoteCcy,
+                IsMarginTradingAllowed = isMarginTradingAllowed,
+                MaxLotSize = maxLotSize,
+                MinNotional = minNotional,
+            };
+            return fxInfo;
+        }
+        return null;
     }
 
     public static async Task<List<FinancialStat>> ReadFinancialStats()
@@ -334,6 +332,52 @@ WHERE
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }
+
+
+    public static async IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
+    {
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
+        string sql =
+@$"
+SELECT SecurityId, Open, High, Low, Close, {dailyPriceSpecificColumn} Volume, StartTime
+FROM {tableName}
+WHERE
+    SecurityId = $SecurityId AND
+    StartTime > $StartTime
+";
+        if (end != null)
+            sql += $" AND StartTime <= $EndTime";
+
+        using var connection = await Connect(DatabaseNames.MarketData);
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$SecurityId", securityId);
+        command.Parameters.AddWithValue("$StartTime", start);
+        command.Parameters.AddWithValue("$EndTime", end);
+
+        using var r = await command.ExecuteReaderAsync();
+        var count = 0;
+        while (await r.ReadAsync())
+        {
+            var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
+            var price = new OhlcPrice
+            (
+                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
+                C: close,
+                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
+                T: r.GetDateTime("StartTime")
+            );
+            count++;
+            yield return price;
+        }
+        _log.Info($"Read {count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+    }
+
 
     public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
     {
@@ -432,6 +476,10 @@ WHERE
                 I: intervalStr,
                 T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
             );
+            if (price.T.Year == 2023 && price.T.Month == 1)
+            {
+
+            }
             list.Add(price);
         }
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");

@@ -13,16 +13,24 @@ public class Zip
     /// <param name="zipFilePath"></param>
     public static void Archive(string path, string zipFilePath)
     {
-        if (Directory.Exists(path))
+        try
         {
-            ZipFile.CreateFromDirectory(path, zipFilePath);
+            if (Directory.Exists(path))
+            {
+
+                ZipFile.CreateFromDirectory(path, zipFilePath);
+            }
+            else
+            {
+                using var a = ZipFile.Open(zipFilePath, ZipArchiveMode.Create);
+                a.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.Optimal);
+            }
+            _log.Info($"Zipped file/folder {path} into {zipFilePath}.");
         }
-        else
+        catch (Exception e)
         {
-            using var a = ZipFile.Open(zipFilePath, ZipArchiveMode.Create);
-            a.CreateEntryFromFile(path, Path.GetFileName(path), CompressionLevel.Optimal);
+            _log.Info($"Failed to archive the zip file: {zipFilePath}, from path: {path}", e);
         }
-        _log.Info($"Zipped file/folder {path} into {zipFilePath}.");
     }
 }
 

@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Common;
+﻿namespace Common;
 public static class Assertion
 {
     public static void ShallNever(bool condition)
     {
-        if (condition) throw new InvalidOperationException();
+        if (condition)
+            throw new InvalidOperationException();
     }
 
     public static void Shall(bool condition)
     {
-        if (!condition) throw new InvalidOperationException();
+        if (!condition)
+            throw new InvalidOperationException();
     }
 }

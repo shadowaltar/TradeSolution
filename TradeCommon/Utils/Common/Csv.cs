@@ -116,7 +116,7 @@ public static class Csv
         csv.WriteRecords(entries);
     }
 
-    public static void Write(List<string> headers, List<List<object>> entries, string filePath)
+    public static void Write(IEnumerable<string> headers, List<List<object>> entries, string filePath)
     {
         using var writer = new StreamWriter(filePath);
         using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
@@ -153,6 +153,21 @@ public static class Csv
                 }
             }
             return value;
+        }
+    }
+
+    public static void Write<T>(IList<ColumnDefinition> columns, List<T> entries, string filePath)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        foreach (var header in columns.Select(c => c.Caption))
+        {
+            csv.WriteField(header);
+        }
+        foreach (var entry in entries)
+        {
+            csv.NextRecord();
+            csv.WriteRecord(entry);
         }
     }
 }

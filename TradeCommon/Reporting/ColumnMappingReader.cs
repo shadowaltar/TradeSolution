@@ -78,16 +78,22 @@ public class ColumnMappingReader
         foreach (var (name, property) in properties)
         {
             var t = ParseTypeAsDefault(property.PropertyType);
-            if (t == TypeCode.Object)
+            if (t == TypeCode.Object && !property.PropertyType.IsEnum)
             {
+                var prefix = name[0] + ".";
                 var innerColumns = Read(property.PropertyType);
-                foreach (var innerColumn in innerColumns)
+                for (int i = 0; i < innerColumns.Count; i++)
                 {
-                    innerColumn.FieldName = $"{name}.{innerColumn.FieldName}";
-                    innerColumn.Caption = $"{name}.{innerColumn.FieldName}";
+                    ColumnDefinition? innerColumn = innerColumns[i];
+                    if (!innerColumn.FieldName.StartsWith(prefix))
+                    {
+                        innerColumn.FieldName = $"{prefix}{innerColumn.FieldName}";
+                    }
+                    innerColumn.Caption = innerColumn.FieldName;
+                    innerColumn.Index = count;
+                    definitions.Add(innerColumn);
+                    count++;
                 }
-                definitions.AddRange(innerColumns);
-                count += innerColumns.Count;
             }
             else
             {
@@ -172,10 +178,12 @@ public class ColumnMappingReader
             return TypeCode.Decimal;
         if (type == typeof(DateTime))
             return TypeCode.DateTime;
+        if (type == typeof(TimeSpan))
+            return TypeCode.DateTime;
         if (type == typeof(bool))
             return TypeCode.Boolean;
         if (type == typeof(long))
-            return TypeCode.Boolean;
+            return TypeCode.Int64;
         if (type == typeof(string))
             return TypeCode.String;
         if (type == typeof(int?))
@@ -186,10 +194,15 @@ public class ColumnMappingReader
             return TypeCode.Decimal;
         if (type == typeof(DateTime?))
             return TypeCode.DateTime;
+        if (type == typeof(TimeSpan?))
+            return TypeCode.DateTime;
         if (type == typeof(bool?))
             return TypeCode.Boolean;
         if (type == typeof(long?))
-            return TypeCode.Boolean;
+            return TypeCode.Int64;
+        if (type.IsEnum)
+            return TypeCode.Object;
+        
         return TypeCode.Object;
     }
 }

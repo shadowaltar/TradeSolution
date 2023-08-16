@@ -10,6 +10,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeDataCore;
 using TradeDataCore.Importing;
 using TradeDataCore.Instruments;
+using TradeDataCore.Utils;
 
 internal class Program
 {
@@ -27,10 +28,22 @@ internal class Program
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         Dependencies.Register();
 
+        await CheckMissingPrices();
+
         //await PeriodicDataImporting(args);
+        //var ss = Dependencies.Container.Resolve<ISecurityService>();
+        //var reader = new JsonPriceReader(ss);
+        //var results = await reader.Import(@"C:\Temp\AllPrices_1h_20210808_binance\AllPrices_1h_20210808_binance.json");
+    }
+
+    private static async Task CheckMissingPrices()
+    {
         var ss = Dependencies.Container.Resolve<ISecurityService>();
-        var reader = new JsonPriceReader(ss);
-        var results = await reader.Import(@"C:\Temp\AllPrices_1h_20210808_binance\AllPrices_1h_20210808_binance.json");
+        var security = await ss.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
+        // 2020-11-30 06:00:00~06:59:00 missing
+        var missingOnes = await PriceIntegrityChecker.CheckMissingPrices(security, new DateTime(2020, 1, 1), new DateTime(2023, 7, 1), IntervalType.OneMinute);
+        await Console.Out.WriteLineAsync(   $"Missings:" + missingOnes.Count);
+        var missingDays = missingOnes.Select(datum => datum.Date).Distinct().ToList();
     }
 
     private static async Task PeriodicDataImporting(string[] args)

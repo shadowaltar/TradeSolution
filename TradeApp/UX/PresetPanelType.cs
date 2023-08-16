@@ -9,6 +9,10 @@ namespace TradeApp.UX
         Welcome,
         [ViewResource("Views/Widgets/DepthView.xaml", typeof(DepthViewModel))]
         Depth,
+
+        [ViewResource("Views/Widgets/PriceAndIndicatorsView.xaml", typeof(PriceAndIndicatorsViewModel))]
+        BackTesting,
+
         CandlestickPrice,
         TickPrice,
     }

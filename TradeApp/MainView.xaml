@@ -36,6 +36,8 @@
                 <dxb:BarButtonItem Content="Standard Exchange Market View" />
                 <dxb:BarButtonItem Content="Standard Portfolio Breakdown View" />
                 <dxb:BarItemLinkSeparator />
+                <dxb:BarButtonItem Content="New Price View" Command="{Binding NewPanelCommand}" CommandParameter="{x:Static ux:PresetPanelType.BackTesting}" />
+                <dxb:BarItemLinkSeparator />
                 <dxb:BarButtonItem Content="New Candlestick Chart" />
                 <dxb:BarButtonItem Content="New Tick Chart" />
                 <dxb:BarButtonItem Content="New Simple Price Chart" />

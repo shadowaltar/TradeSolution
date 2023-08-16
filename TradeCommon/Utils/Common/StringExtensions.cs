@@ -134,14 +134,17 @@ public static class StringExtensions
             : defaultValue;
     }
 
-    public static decimal ParseDecimal(this string? value, decimal defaultValue = default, string cultureInfoName = "")
+    public static decimal ParseDecimal(this string? value, int precision = int.MaxValue, decimal defaultValue = default, string cultureInfoName = "")
     {
         if (string.IsNullOrWhiteSpace(value)) return defaultValue;
-        return decimal.TryParse(value,
+        var r = decimal.TryParse(value,
             string.IsNullOrEmpty(cultureInfoName) ? CultureInfo.InvariantCulture :
             CultureInfo.GetCultureInfo(cultureInfoName), out decimal result)
             ? result
             : defaultValue;
+        if (r != defaultValue && precision!= int.MaxValue)
+            r = decimal.Round(r, precision);
+        return r;
     }
 
     public static decimal ParsePercentage(this string? value, decimal defaultValue = default, string cultureInfoName = "")

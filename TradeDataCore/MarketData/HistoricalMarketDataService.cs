@@ -5,11 +5,31 @@ using TradeCommon.Essentials.Quotes;
 
 namespace TradeDataCore.MarketData;
 
-public class HistoricalMarketDataService : IHistoricalMarketDataService
+public class HistoricalMarketDataService : IHistoricalMarketDataService, IPriceProvider
 {
+    public event Action<int, IntervalType, OhlcPrice>? NextPrice;
+
     public async Task<List<OhlcPrice>> Get(Security security, IntervalType intervalType, DateTime start, DateTime end)
     {
-        return await Storage.ReadPrices(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PriceDecimalPoints);
+        return await Storage.ReadPrices(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+    }
+
+    public IAsyncEnumerable<OhlcPrice> GetAsync(Security security, IntervalType intervalType, DateTime start, DateTime end)
+    {
+        return Storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+    }
+
+    public Task StartGet(Security security, IntervalType intervalType, DateTime start, DateTime end)
+    {
+        var id = security.Id;
+        var asyncEnumerable = Storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+        return Task.Run(async () =>
+        {
+            await foreach (var p in asyncEnumerable)
+            {
+                NextPrice?.Invoke(id, intervalType, p);
+            }
+        });
     }
 
     Task<OhlcPrice> IHistoricalMarketDataService.Get(Security security, IntervalType intervalType, DateTime at)

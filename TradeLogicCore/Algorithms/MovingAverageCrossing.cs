@@ -5,6 +5,7 @@ using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
+using static Futu.OpenApi.Pb.TrdCommon;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -14,6 +15,8 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
     private readonly SimpleMovingAverage _fastMa;
     private readonly SimpleMovingAverage _slowMa;
+    private AlgoEntry<MacVariables> _last1;
+    private AlgoEntry<MacVariables> _last0;
 
     public IAlgorithemContext<MacVariables> Context { get; set; }
 
@@ -65,45 +68,48 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         return variables;
     }
 
-    public int IsBuySignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsOpenLongSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         if (lastPrice == null)
-            return 0;
+            return false;
 
-        ProcessSignal(current, last, currentPrice, lastPrice);
+        ProcessSignal(current, last);
 
-        if (current.Variables.PriceXFast == 1 && current.Variables.PriceXSlow == 1 && current.Variables.FastXSlow == 1)
-            return 1;
-        return 0;
+        _last1 = last;
+        _last0 = current;
+
+        return current.Variables.PriceXFast > 0
+               && current.Variables.PriceXSlow > 0
+               && current.Variables.FastXSlow > 0;
     }
 
-    public int IsSellCloseSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsCloseLongSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         if (lastPrice == null)
-            return 0;
+            return true;
 
-        ProcessSignal(current, last, currentPrice, lastPrice);
+        ProcessSignal(current, last);
 
-        if (current.Variables.PriceXFast == -1 && current.Variables.PriceXSlow == -1)
-            return 1;
-        return 0;
+        _last1 = last;
+        _last0 = current;
+
+        return current.Variables.PriceXFast < 0
+               && current.Variables.PriceXSlow < 0
+               && current.Variables.FastXSlow < 0;
     }
 
-    public void AfterSellClose(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
+    public void AfterLongClosed(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
 
-    public void AfterBuyStopLoss(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
+    public void AfterStopLossLong(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
 
-    private static void ProcessSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    private void ProcessSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last)
     {
-        if (lastPrice == null)
-            return;
-
-        if (TryCheck(lastPrice.C, currentPrice.C, last.Variables.Fast, current.Variables.Fast, out var pxf))
+        if (TryCheck(last.Price, current.Price, last.Variables.Fast, current.Variables.Fast, out var pxf))
         {
             current.Variables.PriceXFast = pxf;
         }
 
-        if (TryCheck(lastPrice.C, currentPrice.C, last.Variables.Slow, current.Variables.Slow, out var pxs))
+        if (TryCheck(last.Price, current.Price, last.Variables.Slow, current.Variables.Slow, out var pxs))
         {
             current.Variables.PriceXSlow = pxs;
         }
@@ -118,22 +124,45 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     {
         entry.Variables.PriceXFast = 0;
         entry.Variables.PriceXSlow = 0;
+        entry.Variables.FastXSlow = 0;
     }
 
     public static bool TryCheck(decimal last1, decimal current1, decimal last2, decimal current2, out int crossing)
     {
+        if (!last1.IsValid() || !last2.IsValid() || !current1.IsValid() || !current2.IsValid())
+        {
+            crossing = 0;
+            return false;
+        }
+
         if (last1 < last2 && current1 > current2)
         {
-            // 1 cross above 2
+            // ASC: 1 cross from below to above 2
             crossing = 1;
             return true;
         }
         else if (last1 > last2 && current1 < current2)
         {
-            // 1 cross below 2
+            // DESC: 1 cross from above to below 2
             crossing = -1;
             return true;
         }
+        else if (last1 == last2 && current1 > current2)
+        {
+            // Half-ASC: was equal, then 1 goes above 2
+            crossing = 2;
+            return true;
+        }
+        else if (last1 == last2 && current1 < current2)
+        {
+            // Half-DESC: was equal, then 1 goes below 2
+            crossing = 2;
+            return true;
+        }
+
+        // case == & == is treated as no-change
+        // case > & >, < & < are treated as no-change
+        // case > & =, < & = are treated as no-change
         crossing = 0;
         return false;
     }

@@ -8,28 +8,29 @@ public interface IAlgorithm<T> where T : IAlgorithmVariables
 
     T CalculateVariables(decimal price, AlgoEntry<T>? last);
 
-    int IsBuySignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return 0; }
+    bool IsOpenLongSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    int IsSellCloseSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return 0; }
+    bool IsCloseLongSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    int IsSellSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return 0; }
+    bool IsShortSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    int IsBuyCoverSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return 0; }
+    bool IsCloseShortSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
     void BeforeSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
     void AfterSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
-    void BeforeBuy(AlgoEntry<T> entry) { }
-    void BeforeSellClose(AlgoEntry<T> entry) { }
-    void BeforeBuyStopLoss(AlgoEntry<T> entry) { }
-    void AfterBuy(AlgoEntry<T> entry) { }
-    void AfterSellClose(AlgoEntry<T> entry) { }
-    void AfterBuyStopLoss(AlgoEntry<T> entry) { }
+    void BeforeOpeningLong(AlgoEntry<T> entry) { }
+    void AfterLongOpened(AlgoEntry<T> entry) { }
+    void BeforeClosingLong(AlgoEntry<T> entry) { }
+    void AfterLongClosed(AlgoEntry<T> entry) { }
+    void BeforeStopLossLong(AlgoEntry<T> entry) { }
+    void AfterStopLossLong(AlgoEntry<T> entry) { }
 
-    void BeforeSell(AlgoEntry<T> entry) { }
-    void BeforeBuyCover(AlgoEntry<T> entry) { }
-    void BeforeSellStopLoss(AlgoEntry<T> entry) { }
-    void AfterSell(AlgoEntry<T> entry) { }
-    void AfterBuyCover(AlgoEntry<T> entry) { }
-    void AfterSellStopLoss(AlgoEntry<T> entry) { }
+
+    void BeforeOpeningShort(AlgoEntry<T> entry) { }
+    void AfterShortOpened(AlgoEntry<T> entry) { }
+    void BeforeClosingShort(AlgoEntry<T> entry) { }
+    void AfterShortClosed(AlgoEntry<T> entry) { }
+    void BeforeStopLossShort(AlgoEntry<T> entry) { }
+    void AfterStopLossShort(AlgoEntry<T> entry) { }
 }

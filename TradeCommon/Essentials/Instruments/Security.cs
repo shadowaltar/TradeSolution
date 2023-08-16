@@ -9,7 +9,7 @@ public class Security
     public string Exchange { get; set; }
     public string Type { get; set; }
     public string? SubType { get; set; }
-    public int LotSize { get; set; }
+    public double LotSize { get; set; }
     public string Currency { get; set; } = ForexNames.Usd;
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
@@ -19,7 +19,8 @@ public class Security
     public StockSecurityInfo? StockInfo { get; set; }
     public OptionSecurityInfo? DerivativeInfo { get; set; }
 
-    public int PriceDecimalPoints { get; set; }
+    public int PricePrecision { get; set; }
+    public int QuantityPrecision { get; set; }
 
     public override string ToString()
     {

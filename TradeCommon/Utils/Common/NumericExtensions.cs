@@ -29,6 +29,20 @@ public static class NumericExtensions
         return reverse;
     }
 
+    public static int GetDecimalPlaces(decimal n)
+    {
+        n = Math.Abs(n); //make sure it is positive.
+        n -= (int)n;     //remove the integer part of the number.
+        var decimalPlaces = 0;
+        while (n > 0)
+        {
+            decimalPlaces++;
+            n *= 10;
+            n -= (int)n;
+        }
+        return decimalPlaces;
+    }
+
     public static bool IsNaN(this double value) => double.IsNaN(value);
 
     public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);

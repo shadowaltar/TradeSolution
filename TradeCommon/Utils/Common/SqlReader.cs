@@ -63,6 +63,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.SafeGetString(name);
         else if (type == typeof(decimal))
             return Reader.GetDecimal(name);
+        else if (type == typeof(double))
+            return Reader.GetDouble(name);
         else if (type == typeof(DateTime))
             return Reader.GetDateTime(name);
         else if (type == typeof(int))
@@ -71,6 +73,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.GetBoolean(name);
         else if (type == typeof(decimal?))
             return Reader.SafeGetDecimal(name);
+        else if (type == typeof(double?))
+            return Reader.SafeGetDouble(name);
         else if (type == typeof(DateTime?))
             return Reader.SafeGetDateTime(name);
         else if (type == typeof(int?))

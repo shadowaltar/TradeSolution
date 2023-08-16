@@ -56,6 +56,21 @@ public static class JsonExtensions
         };
     }
 
+    public static double GetDouble(this JsonNode? node, string? fieldName = null, double defaultValue = double.NaN)
+    {
+        var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
+        if (kind == JsonValueKind.Undefined || jsonValue == null)
+        {
+            return defaultValue;
+        }
+        return kind switch
+        {
+            JsonValueKind.Number => jsonValue.GetValue<double>(),
+            JsonValueKind.String => double.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
+            _ => defaultValue
+        };
+    }
+
     public static DateTime GetLocalFromUnixSec(this JsonNode? node, string? fieldName = null, DateTime defaultValue = default)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);

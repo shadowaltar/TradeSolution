@@ -35,6 +35,7 @@ public partial class MainView : ThemedWindow
         builder.RegisterType<StandardTradingViewModel>();
         builder.RegisterType<CandlePriceViewModel>();
         builder.RegisterType<DepthViewModel>();
+        builder.RegisterType<PriceAndIndicatorsViewModel>();
         builder.RegisterType<SimplePriceViewModel>();
 
         var container = builder.Build();

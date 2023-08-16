@@ -12,6 +12,7 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Reporting;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore;
@@ -143,15 +144,15 @@ public class Program
 
         var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
 
-        securities = securities.Where(s => s.Code is "ETHUSDT" or "BTCUSDT" or "BTCTUSD").ToList();
+        securities = securities.Where(s => s.Code is "BTCUSDT").ToList();
 
         var stopLosses = new List<decimal> { 0.015m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneDay };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
 
-        var fast = 5;
-        var slow = 10;
+        var fast = 26;
+        var slow = 51;
         var rumi = 1;
         var start = new DateTime(2022, 1, 1);
         var end = new DateTime(2023, 7, 1);
@@ -173,7 +174,7 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-                    security.PriceDecimalPoints = 6;
+                    security.PricePrecision = 6;
                     var engine = new AlgorithmEngine<RumiVariables>(mds);
                     var algo = new Rumi(engine, fast, slow, rumi, sl);
                     engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
@@ -198,7 +199,7 @@ public class Program
 
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
-                    var tradeCount = entries.Count(e => e.IsClosing);
+                    var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
                     var positiveCount = entries.Where(e => e.RealizedPnl > 0).Count();
                     var result = new List<object>
                     {
@@ -209,7 +210,7 @@ public class Program
                         Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
                         annualizedReturn.ToString("P4"),
                         tradeCount,
-                        entries.Count(e => e.IsStopLossTriggered),
+                        entries.Count(e => e.LongCloseType == CloseType.StopLoss),
                         positiveCount,
                         positiveCount / (double)tradeCount,
                         filePath,
@@ -260,113 +261,137 @@ public class Program
 
     private static async Task RunMACBackTestDemo()
     {
-        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
-
-        var filter = "";
-        var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
-        //var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
-        //securities = filterCodes.Count == 0 ? securities : securities.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
-
-        securities = securities.Where(s => s.Code is "ETHUSDT" or "BTCUSDT" or "BTCTUSD").ToList();
-
-        var stopLosses = new List<decimal> { 0.02m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
-
-        var summaryRows = new List<List<object>>();
-
-        var fast = 26;
-        var slow = 51;
-        var start = new DateTime(2022, 1, 1);
-        var end = new DateTime(2023, 7, 1);
-        var now = DateTime.Now;
-
-        var rootFolder = @"C:\Temp";
-        var subFolder = $"MAC-{fast},{slow}-{now:yyyyMMdd-HHmmss}";
-        var zipFileName = $"Result-MAC-{fast},{slow}-{now:yyyyMMdd-HHmmss}.zip";
-        var folder = Path.Combine(rootFolder, subFolder);
-        var zipFilePath = Path.Combine(rootFolder, zipFileName);
-        var summaryFilePath = Path.Combine(folder, $"!Summary-{fast},{slow}-{now:yyyyMMdd-HHmmss}.csv");
-
-        if (!Directory.Exists(folder))
-            Directory.CreateDirectory(folder);
-
-        await Parallel.ForEachAsync(securities, async (security, t) =>
-        {
-            foreach (var interval in intervalTypes)
-            {
-                foreach (var sl in stopLosses)
-                {
-                    security.PriceDecimalPoints = 6;
-                    var engine = new AlgorithmEngine<MacVariables>(mds);
-                    var algo = new MovingAverageCrossing(engine, fast, slow, sl);
-                    engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
-
-                    var initCash = 1000;
-                    var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
-                    if (entries.IsNullOrEmpty())
-                        continue;
-
-                    if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
-                    {
-                        _log.Info($"No trades at all: {security.Code} {security.Name}");
-                        continue;
-                    }
-
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(initCash, engine.Portfolio.Notional.ToDouble(), start, end);
-                    if (annualizedReturn == 0)
-                    {
-                        _log.Info($"No trades at all: {security.Code}");
-                        continue;
-                    }
-
-                    var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
-                    var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
-                    var tradeCount = entries.Count(e => e.IsClosing);
-                    var positiveCount = entries.Where(e => e.RealizedPnl > 0).Count();
-                    var result = new List<object>
-                    {
-                        security.Code,
-                        security.Name,
-                        intervalStr,
-                        engine.Portfolio.FreeCash,
-                        Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
-                        annualizedReturn.ToString("P4"),
-                        tradeCount,
-                        entries.Count(e => e.IsStopLossTriggered),
-                        positiveCount,
-                        positiveCount / (double)tradeCount,
-                        filePath,
-                    };
-                    Csv.Write(entries, filePath);
-
-                    _log.Info($"Result: {string.Join('|', result)}");
-                    lock (summaryRows)
-                        summaryRows.Add(result);
-                }
-            }
-        });
-
-        summaryRows = summaryRows.OrderBy(r => r[0]).ToList();
-        var headers = new List<string> {
-            "SecurityCode",
-            "SecurityName",
+        List<string> headers = new List<string> {
+            "Start",
+            "End",
             "Interval",
+            "StopLoss",
+            "Code",
+            "Name",
             "EndFreeCash",
             "Stdev(All)",
             "AnnualizedReturn",
             "TradeCount",
             "SL Cnt",
-            "+ve PNL Cnt",
-            "+ve/Total Cnt",
+            "PNL>0 Cnt",
+            "PNL>0/Total Cnt",
             "FilePath"
         };
+        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+        var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
+
+        var filter = "ETHUSDT";
+        var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
+        securities = securities!.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
+
+        var stopLosses = new List<decimal> { 0.0003m, 0.0002m, 0.00015m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
+
+        var summaryRows = new List<List<object>>();
+
+        var fast = 3;
+        var slow = 7;
+        //var fast = 2;
+        //var slow = 5;
+        var periodTuples = new List<(DateTime start, DateTime end)>
+        {
+            //(new DateTime(2020, 1, 1), new DateTime(2021, 1, 1)),
+            //(new DateTime(2021, 1, 1), new DateTime(2022, 1, 1)),
+            //(new DateTime(2022, 1, 1), new DateTime(2023, 1, 1)),
+            (new DateTime(2023, 1, 1), new DateTime(2023, 7, 1)),
+            //(new DateTime(2022, 1, 1), new DateTime(2023, 7, 1)),
+            //(new DateTime(2020, 1, 1), new DateTime(2023, 7, 1)),
+        };
+        //var start = new DateTime(2022, 1, 1);
+        //var end = new DateTime(2023, 1, 1);
+        var now = DateTime.Now;
+
+        var rootFolder = @"C:\Temp";
+
+        var columns = ColumnMappingReader.Read(typeof(AlgoEntry<MacVariables>));
+
+        var folder = Path.Combine(rootFolder, $"MAC-{fast},{slow},{now:yyyyMMdd-HHmmss}");
+        var zipFilePath = Path.Combine(folder, $"Result-MAC-{fast},{slow},{now:yyyyMMdd-HHmmss}.zip");
+        var summaryFilePath = Path.Combine(folder, $"!Summary-{fast},{slow},{now:yyyyMMdd-HHmmss}.csv");
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
+
+        await Parallel.ForEachAsync(securities, async (security, t) =>
+        {
+            security.PricePrecision = 6;
+            await Parallel.ForEachAsync(periodTuples, async (tuple, t) =>
+            {
+                (DateTime start, DateTime end) = tuple;
+                foreach (var interval in intervalTypes)
+                {
+                    var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
+                    foreach (var sl in stopLosses)
+                    {
+                        var engine = new AlgorithmEngine<MacVariables>(mds);
+                        var algo = new MovingAverageCrossing(engine, fast, slow, sl);
+                        engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+
+                        var initCash = 1000;
+                        var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
+                        if (entries.IsNullOrEmpty())
+                            continue;
+
+                        if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
+                        {
+                            _log.Info($"No trades at all: {security.Code} {security.Name}");
+                            continue;
+                        }
+                        var endNotional = engine.Portfolio.Notional.ToDouble();
+                        var annualizedReturn = Metrics.GetAnnualizedReturn(initCash, endNotional, start, end);
+                        if (annualizedReturn == 0)
+                        {
+                            _log.Info($"No trades at all: {security.Code}");
+                            continue;
+                        }
+                        // write detail file
+                        var detailFilePath = Path.Combine(folder, $"{security.Code}-{start:yyyyMMdd}-{end:yyyyMMdd}-{endNotional}-{intervalStr}.csv");
+                        Csv.Write(columns, entries, detailFilePath);
+
+                        var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
+                        var positiveCount = entries.Where(e => e.RealizedPnl > 0).Count();
+                        var summary = new List<object>
+                        {
+                            start,
+                            end,
+                            intervalStr,
+                            sl,
+                            security.Code,
+                            security.Name,
+                            engine.Portfolio.FreeCash,
+                            Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
+                            annualizedReturn.ToString("P4"),
+                            tradeCount,
+                            entries.Count(e => e.LongCloseType == CloseType.StopLoss),
+                            positiveCount,
+                            positiveCount / (double)tradeCount,
+                            detailFilePath,
+                        };
+                        _log.Info($"Result: {string.Join('|', summary)}");
+                        lock (summaryRows)
+                            summaryRows.Add(summary);
+
+                        _log.Info("----------------");
+                        _log.Info(Printer.Print(headers));
+                        _log.Info(Printer.Print(summaryRows));
+                        _log.Info("----------------");
+                    }
+                }
+
+            });
+        });
+
+        // write summary file
+        summaryRows = summaryRows.OrderBy(r => r[0]).ToList();
 
         Csv.Write(headers, summaryRows, summaryFilePath);
         Zip.Archive(folder, zipFilePath);
-
         try
         {
             Process.Start(new ProcessStartInfo
@@ -379,8 +404,5 @@ public class Program
         {
             _log.Error($"Failed to open output file: {summaryFilePath}", ex);
         }
-
-        _log.Info("RESULTS ----------");
-        _log.Info(Printer.Print(summaryRows));
     }
 }

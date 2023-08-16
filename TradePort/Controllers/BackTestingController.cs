@@ -231,8 +231,8 @@ public class BackTestingController : Controller
                 intervalStr,
                 engine.Portfolio.FreeCash,
                 Metrics.GetAnnualizedReturn(initCash, engine.Portfolio.Notional.ToDouble(), start, end).ToString("P4"),
-                entries.Count(e => e.IsClosing),
-                entries.Count(e => e.IsStopLossTriggered),
+                entries.Max(e => e.Id),
+                entries.Count(e => e.LongCloseType == CloseType.StopLoss),
                 entries.Where(e => e.RealizedPnl > 0).Count(),
                 filePath,
             };

@@ -11,35 +11,38 @@ public record AlgoEntry<T>
     public required T Variables { get; set; }
 
     /// <summary>
-    /// Current price.
+    /// Current price. Usually the close of OHLC price object.
     /// </summary>
     public decimal Price { get; set; } = decimal.MinValue;
+
     /// <summary>
-    /// The low price in the OHLC price, to verify if StopLoss is hit.
+    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
     /// </summary>
-    public decimal Low { get; set; } = decimal.MinValue;
+    public SignalType LongSignal { get; set; }
+
+    /// <summary>
+    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
+    /// </summary>
+    public SignalType ShortSignal { get; set; }
+
+    public bool IsLong { get; set; }
+    public CloseType LongCloseType { get; set; }
+    public bool IsShort { get; set; }
+    public CloseType ShortCloseType { get; set; }
+    //public bool IsLongStopLossTriggered { get; set; }
+    //public bool IsShortStopLossTriggered { get; set; }
+    public decimal Quantity { get; set; }
+
     /// <summary>
     /// Return vs previous OHLC price using two close prices.
     /// </summary>
     public decimal Return { get; set; } = 0;
-    /// <summary>
-    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
-    /// </summary>
-    public int BuyOpenCloseSignal { get; set; }
-    /// <summary>
-    /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
-    /// </summary>
-    public int SellOpenCloseSignal { get; set; }
-    public bool IsOpened { get; set; }
-    public bool IsClosing { get; set; }
-    public bool IsStopLossTriggered { get; set; }
 
-    public decimal Quantity { get; set; }
-    public decimal EnterPrice { get; set; }
-    public DateTime EnterTime { get; set; }
-    public decimal ExitPrice { get; set; }
-    public DateTime ExitTime { get; set; }
-    public decimal StopLossPrice { get; set; }
+    public decimal? EnterPrice { get; set; }
+    public decimal? ExitPrice { get; set; }
+    public decimal? SLPrice { get; set; }
+    public DateTime? EnterTime { get; set; }
+    public TimeSpan? Elapsed { get; set; }
 
     /// <summary>
     /// Notional value of this entry. Current Price * Quantity being hold.
@@ -62,4 +65,20 @@ public record AlgoEntry<T>
     /// Gets / sets the portfolio snapshot related to current entry.
     /// </summary>
     public Portfolio? Portfolio { get; set; }
+}
+
+public enum SignalType
+{
+    Close = -1,
+    Hold = 0,
+    None = 0,
+    Open = 1,
+}
+
+public enum CloseType
+{
+    None,
+    Normal,
+    StopLoss,
+    TakeProfit,
 }

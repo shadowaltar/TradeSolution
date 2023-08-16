@@ -3,18 +3,5 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:dxe="http://schemas.devexpress.com/winfx/2008/xaml/editors"
                   x:Name="CandlestickPriceLayoutPanel">
     <Grid Margin="5,-25,5,5">
-        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        TextBlock.Foreground="Gray">
-            <TextBlock Text="Welcome!"></TextBlock>
-            <TextBlock Text="As a first step, you can launch a standard view by:" />
-            <DockPanel TextBlock.FontWeight="Black">
-                <TextBlock Text="View" VerticalAlignment="Center"/>
-                <TextBlock Text=" > " VerticalAlignment="Center"/>
-                <dxe:HyperlinkEdit Text="Standard Trading View"
-                                   AllowAutoNavigate="True"
-                                   Margin="0" Padding="0"
-                                   VerticalAlignment="Center"/>
-            </DockPanel>
-        </StackPanel>
     </Grid>
 </dxdo:LayoutPanel>

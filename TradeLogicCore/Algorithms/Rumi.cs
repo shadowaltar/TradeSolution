@@ -67,7 +67,7 @@ public class Rumi : IAlgorithm<RumiVariables>
         return variables;
     }
 
-    public int IsBuySignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsLongSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         var lastRumi = last.Variables!.Rumi;
         var rumi = current.Variables!.Rumi;
@@ -78,15 +78,15 @@ public class Rumi : IAlgorithm<RumiVariables>
         //    return -1;
         //}
 
-        return isSignal ? 1 : -1;
+        return isSignal;
     }
 
-    public int IsSellCloseSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsCloseLongSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         var lastRumi = last.Variables!.Rumi;
         var rumi = current.Variables!.Rumi;
         var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi > 0 && rumi < 0;
-        return isSignal ? 1 : -1;
+        return isSignal;
     }
 
     public void ValidateSignal(int signal1, int signal2)

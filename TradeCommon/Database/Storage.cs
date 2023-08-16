@@ -128,16 +128,15 @@ DO UPDATE SET
         const string sql =
 @$"
 INSERT INTO {DatabaseNames.FxDefinitionTable}
-    (Code, Name, Exchange, Type, SubType, LotSize, Currency, BaseCurrency, QuoteCurrency, IsEnabled, LocalStartDate, LocalEndDate)
+    (Code, Name, Exchange, Type, SubType, LotSize, BaseCurrency, QuoteCurrency, IsEnabled, IsMarginTradingAllowed, LocalStartDate, LocalEndDate, MaxLotSize, MinNotional, PricePrecision, QuotePrecision)
 VALUES
-    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$BaseCurrency,$QuoteCurrency,$IsEnabled,$LocalStartDate,$LocalEndDate)
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$BaseCurrency,$QuoteCurrency,$IsEnabled,$IsMarginTradingAllowed,$LocalStartDate,$LocalEndDate,$MaxLotSize,$MinNotional,$PricePrecision,$QuotePrecision)
 ON CONFLICT (Code, BaseCurrency, QuoteCurrency, Exchange)
 DO UPDATE SET
     Name = excluded.Name,
     Type = excluded.Type,
     SubType = excluded.SubType,
     LotSize = excluded.LotSize,
-    Currency = excluded.Currency,
     IsEnabled = excluded.IsEnabled,
     LocalEndDate = excluded.LocalEndDate
 ;
@@ -161,10 +160,14 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$Type", entry.Type.ToUpperInvariant());
                 command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$LotSize", entry.LotSize);
-                command.Parameters.AddWithValue("$Currency", entry.Currency.ToUpperInvariant());
-                command.Parameters.AddWithValue("$BaseCurrency", entry.FxInfo!.BaseCurrency.ToUpperInvariant());
-                command.Parameters.AddWithValue("$QuoteCurrency", entry.FxInfo!.QuoteCurrency.ToUpperInvariant());
+                command.Parameters.AddWithValue("$BaseCurrency", entry.FxInfo!.BaseCurrency);
+                command.Parameters.AddWithValue("$QuoteCurrency", entry.FxInfo!.QuoteCurrency);
+                command.Parameters.AddWithValue("$PricePrecision", entry.PricePrecision);
+                command.Parameters.AddWithValue("$QuotePrecision", entry.QuantityPrecision);
                 command.Parameters.AddWithValue("$IsEnabled", true);
+                command.Parameters.AddWithValue("$IsMarginTradingAllowed", entry.FxInfo!.IsMarginTradingAllowed);
+                command.Parameters.AddWithValue("$MaxLotSize", entry.FxInfo!.MaxLotSize);
+                command.Parameters.AddWithValue("$MinNotional", entry.FxInfo!.MinNotional);
                 command.Parameters.AddWithValue("$LocalStartDate", 0);
                 command.Parameters.AddWithValue("$LocalEndDate", DateTime.MaxValue.ToString("yyyy-MM-dd HH:mm:ss"));
 
