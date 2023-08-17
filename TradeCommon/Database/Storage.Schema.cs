@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.FxDefinitionTable} (
     MaxLotSize DOUBLE,
     MinNotional DOUBLE,
     PricePrecision DOUBLE,
-    QuotePrecision DOUBLE,
+    QuantityPrecision DOUBLE,
     UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
 );
 CREATE UNIQUE INDEX idx_code_exchange

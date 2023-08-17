@@ -128,9 +128,9 @@ DO UPDATE SET
         const string sql =
 @$"
 INSERT INTO {DatabaseNames.FxDefinitionTable}
-    (Code, Name, Exchange, Type, SubType, LotSize, BaseCurrency, QuoteCurrency, IsEnabled, IsMarginTradingAllowed, LocalStartDate, LocalEndDate, MaxLotSize, MinNotional, PricePrecision, QuotePrecision)
+    (Code, Name, Exchange, Type, SubType, LotSize, BaseCurrency, QuoteCurrency, IsEnabled, IsMarginTradingAllowed, LocalStartDate, LocalEndDate, MaxLotSize, MinNotional, PricePrecision, QuantityPrecision)
 VALUES
-    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$BaseCurrency,$QuoteCurrency,$IsEnabled,$IsMarginTradingAllowed,$LocalStartDate,$LocalEndDate,$MaxLotSize,$MinNotional,$PricePrecision,$QuotePrecision)
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$BaseCurrency,$QuoteCurrency,$IsEnabled,$IsMarginTradingAllowed,$LocalStartDate,$LocalEndDate,$MaxLotSize,$MinNotional,$PricePrecision,$QuantityPrecision)
 ON CONFLICT (Code, BaseCurrency, QuoteCurrency, Exchange)
 DO UPDATE SET
     Name = excluded.Name,
@@ -163,7 +163,7 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$BaseCurrency", entry.FxInfo!.BaseCurrency);
                 command.Parameters.AddWithValue("$QuoteCurrency", entry.FxInfo!.QuoteCurrency);
                 command.Parameters.AddWithValue("$PricePrecision", entry.PricePrecision);
-                command.Parameters.AddWithValue("$QuotePrecision", entry.QuantityPrecision);
+                command.Parameters.AddWithValue("$QuantityPrecision", entry.QuantityPrecision);
                 command.Parameters.AddWithValue("$IsEnabled", true);
                 command.Parameters.AddWithValue("$IsMarginTradingAllowed", entry.FxInfo!.IsMarginTradingAllowed);
                 command.Parameters.AddWithValue("$MaxLotSize", entry.FxInfo!.MaxLotSize);

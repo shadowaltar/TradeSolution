@@ -5,16 +5,12 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeDataCore.MarketData;
-using TradeLogicCore.Algorithms.EnterExit;
-using TradeLogicCore.Algorithms.Screening;
-using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
 public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> where T : IAlgorithmVariables
 {
     private static readonly ILog _log = Logger.New();
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
-    private DateTime _backTestStartTime;
     private IntervalType _intervalType;
     private TimeSpan _interval;
 
@@ -26,14 +22,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
 
     public IAlgorithm<T> Algorithm { get; private set; }
 
-    public IPositionSizingAlgoLogic<T> Sizing { get; private set; }
-
-    public IEnterPositionAlgoLogic<T> EnterLogic { get; private set; }
-
-    public IExitPositionAlgoLogic<T> ExitLogic { get; private set; }
-
-    public ISecurityScreeningAlgoLogic<T> Screening { get; private set; }
-
     public IPriceProvider PriceProvider { get; private set; }
 
     public AlgorithmEngine(IHistoricalMarketDataService historicalMarketDataService)
@@ -41,17 +29,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
         _historicalMarketDataService = historicalMarketDataService;
     }
 
-    public void SetAlgorithm(IAlgorithm<T> algorithm,
-        IPositionSizingAlgoLogic<T> sizingLogic,
-        IEnterPositionAlgoLogic<T> enterLogic,
-        IExitPositionAlgoLogic<T> exitLogic,
-        ISecurityScreeningAlgoLogic<T> screeningLogic)
+    public void SetAlgorithm(IAlgorithm<T> algorithm)
     {
         Algorithm = algorithm;
-        Sizing = sizingLogic;
-        EnterLogic = enterLogic;
-        ExitLogic = exitLogic;
-        Screening = screeningLogic;
+        Sizing = algorithm.Sizing;
+        EnterLogic = algorithm.Entering;
+        ExitLogic = algorithm.Exiting;
+        Screening = algorithm.Screening;
     }
 
     public void ListenTo(List<Security> securityPool, IntervalType intervalType)
@@ -61,10 +45,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
 
     public async Task<List<AlgoEntry<T>>> BackTest(List<Security> securityPool, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1000)
     {
+        Algorithm.BeforeAlgoExecution(this);
         Portfolio = new Portfolio(initialCash);
 
         SecurityPool = securityPool;
-        _backTestStartTime = start;
         _intervalType = intervalType;
         _interval = IntervalTypeConverter.ToTimeSpan(_intervalType);
 
@@ -73,6 +57,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
 
         foreach (var security in securities)
         {
+            Algorithm.BeforeProcessingSecurity(this, security);
+
             AlgoEntry<T>? lastEntry = null;
             OhlcPrice? lastOhlcPrice = null;
             var sequenceNum = 0;
@@ -84,9 +70,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                 {
                     Id = sequenceNum,
                     Time = ohlcPrice.T,
-                    Variables = Algorithm.CalculateVariables(price, lastEntry)
+                    Variables = Algorithm.CalculateVariables(price, lastEntry),
+                    Price = price
                 };
-                entry.Price = price;
 
                 if (lastEntry == null)
                 {
@@ -149,9 +135,12 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
                 throw new NotImplementedException();
             }
 
-            Assertion.Shall((Portfolio.InitialFreeCash + Portfolio.TotalRealizedPnl).ApproxEquals(Portfolio.FreeCash));
+            //Assertion.Shall((Portfolio.InitialFreeCash + Portfolio.TotalRealizedPnl).ApproxEquals(Portfolio.FreeCash));
+            
+            Algorithm.AfterProcessingSecurity(this, security);
         }
 
+        Algorithm.AfterAlgoExecution(this);
         return entries;
     }
 
@@ -162,7 +151,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             Algorithm.BeforeStopLossLong(entry);
 
             // assuming always stopped loss at the stopLossPrice
-            ExitLogic.StopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
+            ExitLogic.StopLoss(this, entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
             Portfolio.Notional = GetPortfolioNotional();
             Portfolio.FreeCash += entry.Notional;
             OpenedEntries.Remove(entry.Id);
@@ -180,7 +169,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             Algorithm.BeforeStopLossLong(entry);
 
             // assuming always stopped loss at the stopLossPrice
-            ExitLogic.StopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
+            ExitLogic.StopLoss(this, entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
             Portfolio.Notional = GetPortfolioNotional();
             Portfolio.FreeCash += entry.Notional;
 
@@ -199,9 +188,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             Algorithm.BeforeOpeningLong(entry);
 
             sequenceNum++;
-
-            EnterLogic.Open(entry, lastEntry, ohlcPrice.C,
-                GetOhlcEndTime(ohlcPrice, intervalType), GetStopLoss(ohlcPrice, security));
+            var endTimeOfBar = GetOhlcEndTime(ohlcPrice, intervalType);
+            var sl = GetStopLoss(ohlcPrice, security);
+            EnterLogic.Open(this, entry, lastEntry, ohlcPrice.C, endTimeOfBar, sl);
             entry.Id = sequenceNum;
             Portfolio.FreeCash -= entry.Notional;
 
@@ -219,7 +208,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
         {
             Algorithm.BeforeClosingLong(entry);
 
-            ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            ExitLogic.Close(this, entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
 
             Portfolio.Notional = GetPortfolioNotional();
             Portfolio.FreeCash += entry.Notional;
@@ -240,7 +229,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
 
             sequenceNum++;
 
-            EnterLogic.Open(entry, lastEntry, ohlcPrice.C,
+            EnterLogic.Open(this, entry, lastEntry, ohlcPrice.C,
                 GetOhlcEndTime(ohlcPrice, intervalType), GetStopLoss(ohlcPrice, security));
             entry.Id = sequenceNum;
             Portfolio.FreeCash -= entry.Notional;
@@ -259,7 +248,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
         {
             Algorithm.BeforeClosingShort(entry);
 
-            ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            ExitLogic.Close(this, entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
 
             Portfolio.Notional = GetPortfolioNotional();
             Portfolio.FreeCash += entry.Notional;
@@ -284,9 +273,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
 
     private DateTime GetOhlcEndTime(OhlcPrice? price, IntervalType intervalType)
     {
-        if (price == null)
-            return DateTime.MinValue;
-        return price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
+        return price == null ? DateTime.MinValue : price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
     }
 
     protected override void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, decimal currentPrice)

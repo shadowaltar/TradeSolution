@@ -120,7 +120,7 @@ WHERE
         {
             sql = type == SecurityType.Fx
                 ? @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuotePrecision
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuantityPrecision
 FROM {tableName}
 WHERE
     IsEnabled = true AND
@@ -195,7 +195,7 @@ WHERE
         {
             sql = type == SecurityType.Fx
                 ? @$"
-SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuotePrecision
+SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuantityPrecision
 FROM {tableName}
 WHERE
     IsEnabled = true AND

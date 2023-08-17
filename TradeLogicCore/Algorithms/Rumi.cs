@@ -28,12 +28,12 @@ public class Rumi : IAlgorithm<RumiVariables>
     public IExitPositionAlgoLogic<RumiVariables> Exiting { get; }
     public ISecurityScreeningAlgoLogic<RumiVariables> Screening { get; }
 
-    public Rumi(AlgorithmEngine<RumiVariables> engine, int fast, int slow, int rumi, decimal stopLossRatio)
+    public Rumi(int fast, int slow, int rumi, decimal stopLossRatio)
     {
         Sizing = new SimplePositionSizing<RumiVariables>();
         Screening = new SingleSecurityScreeningAlgoLogic<RumiVariables>();
-        Entering = new SimpleEnterPositionAlgoLogic<RumiVariables>(engine, Sizing);
-        Exiting = new SimpleExitPositionAlgoLogic<RumiVariables>(engine, stopLossRatio);
+        Entering = new SimpleEnterPositionAlgoLogic<RumiVariables>(Sizing);
+        Exiting = new SimpleExitPositionAlgoLogic<RumiVariables>(stopLossRatio);
 
         FastParam = fast;
         SlowParam = slow;

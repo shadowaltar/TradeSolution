@@ -76,8 +76,8 @@ public class BackTestingController : Controller
 
         var initCash = 100000;
         var engine = new AlgorithmEngine<RumiVariables>(mds);
-        var algo = new Rumi(engine, fastParam, slowParam, rumiParam, stopLossRatio);
-        engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+        var algo = new Rumi(fastParam, slowParam, rumiParam, stopLossRatio);
+        engine.SetAlgorithm(algo);
         var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
 
         return Ok(entries);
@@ -95,9 +95,9 @@ public class BackTestingController : Controller
     /// <param name="secTypeStr">Security type like Equity/Fx.</param>
     /// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
     /// <param name="stopLossRatio">Checks the SLPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the SLPrice.</param>
-    /// <param name="fastParam">Fast SMA param.</param>
-    /// <param name="slowParam">Slow EMA param.</param>
-    /// <param name="rumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
+    /// <param name="concatenatedFastParam">Fast SMA param.</param>
+    /// <param name="concatenatedSlowParam">Slow EMA param.</param>
+    /// <param name="concatenatedRumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
     /// <returns></returns>
     [HttpGet("rumi/multiple")]
     public async Task<IActionResult> RunMultipleRumi([FromServices] ISecurityService securityService,
@@ -213,8 +213,8 @@ public class BackTestingController : Controller
         await Parallel.ForEachAsync(securities, async (security, t) =>
         {
             var engine = new AlgorithmEngine<RumiVariables>(mds);
-            var algo = new Rumi(engine, f, s, r, stopLossRatio);
-            engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+            var algo = new Rumi(f, s, r, stopLossRatio);
+            engine.SetAlgorithm(algo);
             var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
             if (entries.IsNullOrEmpty())
                 return;

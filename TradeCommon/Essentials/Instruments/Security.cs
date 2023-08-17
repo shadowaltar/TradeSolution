@@ -10,7 +10,7 @@ public class Security
     public string Type { get; set; }
     public string? SubType { get; set; }
     public double LotSize { get; set; }
-    public string Currency { get; set; } = ForexNames.Usd;
+    public string? Currency { get; set; }
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }

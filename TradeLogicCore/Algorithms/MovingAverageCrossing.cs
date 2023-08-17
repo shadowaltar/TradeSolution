@@ -1,11 +1,13 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Calculations;
+using TradeCommon.Constants;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
+using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
-using static Futu.OpenApi.Pb.TrdCommon;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -17,6 +19,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     private readonly SimpleMovingAverage _slowMa;
     private AlgoEntry<MacVariables> _last1;
     private AlgoEntry<MacVariables> _last0;
+    private readonly QuantityPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
 
     public IAlgorithemContext<MacVariables> Context { get; set; }
 
@@ -29,12 +32,14 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public IExitPositionAlgoLogic<MacVariables> Exiting { get; }
     public ISecurityScreeningAlgoLogic<MacVariables> Screening { get; }
 
-    public MovingAverageCrossing(AlgorithmEngine<MacVariables> engine, int fast, int slow, decimal stopLossRatio)
+    public MovingAverageCrossing(int fast, int slow, decimal stopLossRatio)
     {
+        _upfrontFeeLogic = new QuantityPercentageFeeLogic<MacVariables>();
+
         Sizing = new SimplePositionSizing<MacVariables>();
         Screening = new SingleSecurityScreeningAlgoLogic<MacVariables>();
-        Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(engine, Sizing);
-        Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(engine, stopLossRatio);
+        Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(Sizing);
+        Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(stopLossRatio);
 
         FastParam = fast;
         SlowParam = slow;
@@ -44,10 +49,18 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
     }
 
-    public decimal GetSize(decimal availableCash, AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, decimal price, DateTime time)
+    public void BeforeProcessingSecurity(IAlgorithemContext<MacVariables> context, Security security)
     {
-        return Sizing.GetSize(availableCash, current, last, price, time);
-    }
+        if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
+        {
+            _upfrontFeeLogic.PercentageOfQuantity = 0.001m;
+            Entering.UpfrontFeeLogic = _upfrontFeeLogic;
+        }
+        else
+        {
+            Entering.UpfrontFeeLogic = null;
+        }
+    } 
 
     public MacVariables CalculateVariables(decimal price, AlgoEntry<MacVariables>? last)
     {
@@ -98,9 +111,15 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
                && current.Variables.FastXSlow < 0;
     }
 
-    public void AfterLongClosed(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
+    public void AfterLongClosed(AlgoEntry<MacVariables> entry)
+    {
+        ResetInheritedVariables(entry);
+    }
 
-    public void AfterStopLossLong(AlgoEntry<MacVariables> entry) => ResetInheritedVariables(entry);
+    public void AfterStopLossLong(AlgoEntry<MacVariables> entry)
+    {
+        ResetInheritedVariables(entry);
+    }
 
     private void ProcessSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last)
     {

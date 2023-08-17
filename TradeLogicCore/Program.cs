@@ -174,10 +174,9 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-                    security.PricePrecision = 6;
                     var engine = new AlgorithmEngine<RumiVariables>(mds);
-                    var algo = new Rumi(engine, fast, slow, rumi, sl);
-                    engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+                    var algo = new Rumi(fast, slow, rumi, sl);
+                    engine.SetAlgorithm(algo);
 
                     var initCash = 1000;
                     var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
@@ -280,13 +279,13 @@ public class Program
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
 
-        var filter = "ETHUSDT";
+        var filter = "BTCUSDT";
         var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
 
         var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
         securities = securities!.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
 
-        var stopLosses = new List<decimal> { 0.0003m, 0.0002m, 0.00015m };
+        var stopLosses = new List<decimal> { /*0.0025m, 0.001m,*/ 0.0002m, 0.00015m };
         var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
@@ -297,15 +296,12 @@ public class Program
         //var slow = 5;
         var periodTuples = new List<(DateTime start, DateTime end)>
         {
-            //(new DateTime(2020, 1, 1), new DateTime(2021, 1, 1)),
-            //(new DateTime(2021, 1, 1), new DateTime(2022, 1, 1)),
-            //(new DateTime(2022, 1, 1), new DateTime(2023, 1, 1)),
+            (new DateTime(2020, 1, 1), new DateTime(2021, 1, 1)),
+            (new DateTime(2021, 1, 1), new DateTime(2022, 1, 1)),
+            (new DateTime(2022, 1, 1), new DateTime(2023, 1, 1)),
             (new DateTime(2023, 1, 1), new DateTime(2023, 7, 1)),
-            //(new DateTime(2022, 1, 1), new DateTime(2023, 7, 1)),
-            //(new DateTime(2020, 1, 1), new DateTime(2023, 7, 1)),
+            (new DateTime(2020, 1, 1), new DateTime(2023, 7, 1)),
         };
-        //var start = new DateTime(2022, 1, 1);
-        //var end = new DateTime(2023, 1, 1);
         var now = DateTime.Now;
 
         var rootFolder = @"C:\Temp";
@@ -320,18 +316,16 @@ public class Program
 
         await Parallel.ForEachAsync(securities, async (security, t) =>
         {
-            security.PricePrecision = 6;
-            await Parallel.ForEachAsync(periodTuples, async (tuple, t) =>
+            foreach ((DateTime start, DateTime end) in periodTuples)
             {
-                (DateTime start, DateTime end) = tuple;
                 foreach (var interval in intervalTypes)
                 {
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     foreach (var sl in stopLosses)
                     {
                         var engine = new AlgorithmEngine<MacVariables>(mds);
-                        var algo = new MovingAverageCrossing(engine, fast, slow, sl);
-                        engine.SetAlgorithm(algo, algo.Sizing, algo.Entering, algo.Exiting, algo.Screening);
+                        var algo = new MovingAverageCrossing(fast, slow, sl);
+                        engine.SetAlgorithm(algo);
 
                         var initCash = 1000;
                         var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
@@ -383,8 +377,7 @@ public class Program
                         _log.Info("----------------");
                     }
                 }
-
-            });
+            }
         });
 
         // write summary file

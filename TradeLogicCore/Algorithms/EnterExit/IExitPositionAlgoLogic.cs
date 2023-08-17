@@ -3,7 +3,7 @@ public interface IExitPositionAlgoLogic<T>
 {
     decimal StopLossRatio { get; }
 
-    void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
+    void Close(IAlgorithemContext<T> context, AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
 
-    void StopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
+    void StopLoss(IAlgorithemContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
 }
