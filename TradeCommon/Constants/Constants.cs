@@ -9,5 +9,5 @@ public static class Constants
 
     public const int ManualTradingStrategyId = 0;
 
-    public static readonly string DatabaseFolder = @"C:\TradeData";
+    public static readonly string DatabaseFolder = @"C:\Temp\Data";
 }

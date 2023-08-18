@@ -50,25 +50,51 @@ public static class ExternalNames
 
     public static ExchangeType ConvertToExchange(string externalName)
     {
-        return externalName.ToUpperInvariant() switch
+        externalName = externalName.ToUpperInvariant();
+        if (externalName == Futu.ToUpperInvariant())
         {
-            Futu => ExchangeType.Hkex,
-            Hkex => ExchangeType.Hkex,
-            Binance => ExchangeType.Binance,
-            Okex => ExchangeType.Okex,
-            _ => ExchangeType.Unknown,
-        };
+            return ExchangeType.Hkex;
+        }
+        else if (externalName == Hkex.ToUpperInvariant())
+        {
+            return ExchangeType.Hkex;
+        }
+        else if (externalName == Binance.ToUpperInvariant())
+        {
+            return ExchangeType.Binance;
+        }
+        else if (externalName == Okex.ToUpperInvariant())
+        {
+            return ExchangeType.Okex;
+        }
+        return ExchangeType.Unknown;
     }
 
     public static BrokerType ConvertToBroker(string externalName)
     {
-        return externalName.ToUpperInvariant() switch
+        externalName = externalName.ToUpperInvariant();
+        if (externalName == Futu.ToUpperInvariant())
         {
-            Futu => BrokerType.Futu,
-            Hkex => BrokerType.Futu,
-            Binance => BrokerType.Binance,
-            Okex => BrokerType.Okex,
-            _ => BrokerType.Unknown,
-        };
+            return BrokerType.Futu;
+        }
+        else if (externalName == Hkex.ToUpperInvariant())
+        {
+            return BrokerType.Futu;
+        }
+        else if (externalName == Binance.ToUpperInvariant())
+        {
+            return BrokerType.Binance;
+        }
+        else if (externalName == Okex.ToUpperInvariant())
+        {
+            return BrokerType.Okex;
+        }
+        return BrokerType.Unknown;
+    }
+
+    public static int GetBrokerId(string externalName)
+    {
+        var type = ConvertToBroker(externalName);
+        return BrokerTypeToIds.GetValueOrDefault(type, BrokerTypeToIds[BrokerType.Unknown]);
     }
 }

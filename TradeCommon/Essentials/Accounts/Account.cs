@@ -1,4 +1,6 @@
 ﻿using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Runtime;
+using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Accounts;
 
@@ -11,11 +13,13 @@ public class Account
     /// <summary>
     /// Unique account id.
     /// </summary>
+    [InsertIgnore]
     public int Id { get; set; }
 
     /// <summary>
     /// Name of account;
     /// </summary>
+    [UpsertConflictKey]
     public string Name { get; set; } = "";
 
     /// <summary>
@@ -26,7 +30,7 @@ public class Account
     /// <summary>
     /// External account id from broker.
     /// </summary>
-    public long ExternalAccountId { get; set; }
+    public string ExternalAccount { get; set; }
 
     /// <summary>
     /// Name of the broker.
@@ -46,7 +50,8 @@ public class Account
     /// <summary>
     /// Trading environment like production or paper trading.
     /// </summary>
-    public string? Environment { get; set; }
+    [UpsertConflictKey]
+    public EnvironmentType Environment { get; set; }
 
     /// <summary>
     /// Fee structure of this account. Some brokers may have different levels of feed structure.
@@ -57,5 +62,7 @@ public class Account
 
     public DateTime UpdateTime { get; set; }
 
+    [InsertIgnore]
+    [UpsertIgnore]
     public List<Balance> Balances { get; } = new();
 }

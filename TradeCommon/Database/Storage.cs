@@ -315,7 +315,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         var tableName = DatabaseNames.AccountTable;
         if (!_writers.TryGetValue(DataType.Account, out var writer))
         {
-            writer = new SqlWriter<Account>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            writer = new SqlWriter<Account>(tableName, DatabaseFolder, DatabaseNames.StaticData);
             _writers[DataType.Account] = writer;
         }
         return await writer.InsertOne(account, true);

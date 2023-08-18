@@ -1,4 +1,5 @@
 ﻿using Common;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Runtime;
@@ -16,13 +17,14 @@ public class AdminService : IAdminService
         userName = userName.Trim().ToLowerInvariant();
         userPassword = userPassword.Trim().ToLowerInvariant();
         email = email.Trim().ToLowerInvariant();
-
+        var now = DateTime.UtcNow;
         var user = new User
         {
             Name = userName,
             Email = email,
-            CreateTime = DateTime.UtcNow,
-            UpdateTime = DateTime.UtcNow
+            CreateTime = now,
+            UpdateTime = now,
+            Environment = Environments.ToString(environment),
         };
         Credential.EncryptUserPassword(user, ref userPassword);
 

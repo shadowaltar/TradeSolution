@@ -41,7 +41,7 @@ WHERE
     {nameWhereClause}{emailWhereClause} AND Environment = $Environment";
 
         return await SqlReader.ReadOne<User>(tableName, DatabaseNames.StaticData, sql,
-            ("$Name", un), ("$Email", em), ("$Environment", environment));
+            ("$Name", un), ("$Email", em), ("$Environment", Environments.ToString(environment)));
     }
 
     public static async Task<Account?> ReadAccount(string accountName, EnvironmentType environment)

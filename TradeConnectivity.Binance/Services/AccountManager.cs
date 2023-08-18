@@ -47,9 +47,9 @@ public class AccountManager : IExternalAccountManagement
         {
             account = new();
             var accountType = json.GetString("accountType");
-            var externalAccountId = json.GetLong("uid");
+            var externalAccount = json.GetLong("uid").ToString();
             account.Type = accountType;
-            account.ExternalAccountId = externalAccountId;
+            account.ExternalAccount = externalAccount;
             var balanceArray = json["balances"]?.AsArray();
             if (balanceArray != null)
             {

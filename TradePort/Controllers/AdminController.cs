@@ -38,7 +38,7 @@ public class AdminController : Controller
         if (!Credential.IsPasswordCorrect(model.AdminPassword)) return BadRequest();
 
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
-        if (model.UserPassword.Length < 6) return BadRequest("User name should at least have 6 chars.");
+        if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
 
         var user = await adminService.ReadUser(userName, model.Environment);
         if (user != null)
@@ -52,6 +52,13 @@ public class AdminController : Controller
         return Ok(result);
     }
 
+    /// <summary>
+    /// Create a new account.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="model"></param>
+    /// <param name="accountName"></param>
+    /// <returns></returns>
     [HttpPost("accounts/{accountName}")]
     public async Task<ActionResult> CreateAccount([FromServices] IAdminService adminService,
                                                   [FromForm] AccountCreationModel model,
@@ -64,14 +71,23 @@ public class AdminController : Controller
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
         var user = await adminService.ReadUser(model.OwnerName, model.Environment);
-        if (user == null)
-        {
-            return BadRequest("Invalid owner.");
-        }
+        if (user == null) return BadRequest("Invalid owner.");
+        var brokerId = ExternalNames.GetBrokerId(model.Broker);
+        if (brokerId == ExternalNames.BrokerTypeToIds[BrokerType.Unknown]) return BadRequest("Invalid broker.");
+
+        var now = DateTime.UtcNow;
         var account = new Account
         {
             OwnerId = user.Id,
             Name = accountName,
+            Type = model.Type,
+            SubType = model.SubType,
+            Environment = model.Environment,
+            BrokerId = brokerId,
+            CreateTime = now,
+            UpdateTime = now,
+            ExternalAccount = model.ExternalAccount,
+            FeeStructure = model.FeeStructure,
         };
         var result = await adminService.CreateAccount(account);
         return Ok(result);
@@ -295,10 +311,10 @@ public class AdminController : Controller
         public string Type { get; set; }
 
         [FromForm(Name = "subType")]
-        public string SubType { get; set; }
+        public string? SubType { get; set; }
 
         [FromForm(Name = "feeStructure")]
-        public string FeeStructure { get; set; }
+        public string? FeeStructure { get; set; }
 
         [FromForm(Name = "environment")]
         public EnvironmentType Environment { get; set; }

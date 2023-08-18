@@ -75,6 +75,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                 {
                     var placeholder = _targetFieldNamePlaceHolders[fn];
                     var value = _valueGetter.Get(entry.Cast<T>(), fn);
+                    value ??= DBNull.Value;
                     command.Parameters.AddWithValue(placeholder, value);
                 }
                 count++;
@@ -119,6 +120,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
                 var placeholder = _targetFieldNamePlaceHolders[fn];
                 var value = _valueGetter.Get(entry.Cast<T>(), fn);
+                value ??= DBNull.Value;
                 command.Parameters.AddWithValue(placeholder, value);
             }
             count++;
@@ -165,6 +167,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             .Select(pair => pair.Key).ToList();
         var upsertConflictValueFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertConflictKeyAttribute>() == null)
             .Select(pair => pair.Key).ToList();
+        var upsertConflictExcludeValueFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertIgnoreAttribute>() != null)
+            .Select(pair => pair.Key).ToList();
 
         // INSERT INTO (...)
         var sb = new StringBuilder()
@@ -173,7 +177,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         {
             if (insertIgnoreFieldNames.Contains(name))
                 continue;
-            sb.Append(name).Append(", ");
+            sb.Append(name).Append(",");
         }
         sb.RemoveLast();
         sb.Append(')').AppendLine();
@@ -184,18 +188,18 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         {
             if (insertIgnoreFieldNames.Contains(name))
                 continue;
-            sb.Append(_targetFieldNamePlaceHolders[name]).Append(", ");
+            sb.Append(_targetFieldNamePlaceHolders[name]).Append(",");
         }
         sb.RemoveLast();
         sb.Append(')').AppendLine();
 
-        if (isUpsert)
+        if (isUpsert && !upsertConflictKeyFieldNames.IsNullOrEmpty())
         {
             // ON CONFLICT (...)
             sb.Append("ON CONFLICT (");
             foreach (var fn in upsertConflictKeyFieldNames)
             {
-                sb.Append(fn).Append(", ");
+                sb.Append(fn).Append(",");
             }
             sb.RemoveLast();
             sb.Append(')').AppendLine();
@@ -204,6 +208,9 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             sb.Append("DO UPDATE SET ");
             foreach (var fn in upsertConflictValueFieldNames)
             {
+                if (upsertConflictExcludeValueFieldNames.Contains(fn))
+                    continue;
+
                 sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
             }
             sb.RemoveLast();
