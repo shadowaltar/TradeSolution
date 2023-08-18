@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
 
@@ -16,6 +18,13 @@ namespace TradePort.Controllers;
 [Route("admin")]
 public class AdminController : Controller
 {
+    /// <summary>
+    /// Create a new user.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="model"></param>
+    /// <param name="userName"></param>
+    /// <returns></returns>
     [HttpPost("users/{user}")]
     public async Task<ActionResult> CreateUser([FromServices] IAdminService adminService,
                                                [FromForm] UserCreationModel model,
@@ -31,15 +40,40 @@ public class AdminController : Controller
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < 6) return BadRequest("User name should at least have 6 chars.");
 
-        var user = await adminService.ReadUser(userName);
+        var user = await adminService.ReadUser(userName, model.Environment);
         if (user != null)
         {
             return BadRequest();
         }
 
-        var result = await adminService.CreateUser(userName, model.Email, model.UserPassword);
+        var result = await adminService.CreateUser(userName, model.Email, model.UserPassword, model.Environment);
         model.UserPassword = "";
 
+        return Ok(result);
+    }
+
+    [HttpPost("accounts/{accountName}")]
+    public async Task<ActionResult> CreateAccount([FromServices] IAdminService adminService,
+                                                  [FromForm] AccountCreationModel model,
+                                                  [FromRoute] string accountName)
+    {
+        if (accountName.IsBlank()) return BadRequest();
+        if (model == null) return BadRequest();
+        if (!Credential.IsPasswordCorrect(model.AdminPassword)) return BadRequest();
+
+        if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
+
+        var user = await adminService.ReadUser(model.OwnerName, model.Environment);
+        if (user == null)
+        {
+            return BadRequest("Invalid owner.");
+        }
+        var account = new Account
+        {
+            OwnerId = user.Id,
+            Name = accountName,
+        };
+        var result = await adminService.CreateAccount(account);
         return Ok(result);
     }
 
@@ -48,14 +82,16 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="adminService"></param>
     /// <param name="userName"></param>
+    /// <param name="environment"></param>
     /// <returns></returns>
     [HttpGet("users/{user}")]
     public async Task<ActionResult> GetUser([FromServices] IAdminService adminService,
-                                            [FromRoute(Name = "user")] string userName)
+                                            [FromRoute(Name = "user")] string userName,
+                                            [FromQuery(Name = "environment")] EnvironmentType environment)
     {
         if (userName.IsBlank()) return BadRequest();
 
-        var user = await adminService.ReadUser(userName);
+        var user = await adminService.ReadUser(userName, environment);
         if (user == null)
         {
             return NotFound();
@@ -235,5 +271,36 @@ public class AdminController : Controller
 
         [FromForm(Name = "email")]
         public string Email { get; set; }
+
+        [FromForm(Name = "environment")]
+        public EnvironmentType Environment { get; set; }
+    }
+
+
+    public class AccountCreationModel
+    {
+        [FromForm(Name = "adminPassword")]
+        public string AdminPassword { get; set; }
+
+        [FromForm(Name = "ownerName")]
+        public string OwnerName { get; set; }
+
+        [FromForm(Name = "brokerType")]
+        public string Broker { get; set; }
+
+        [FromForm(Name = "externalAccount")]
+        public string ExternalAccount { get; set; }
+
+        [FromForm(Name = "type")]
+        public string Type { get; set; }
+
+        [FromForm(Name = "subType")]
+        public string SubType { get; set; }
+
+        [FromForm(Name = "feeStructure")]
+        public string FeeStructure { get; set; }
+
+        [FromForm(Name = "environment")]
+        public EnvironmentType Environment { get; set; }
     }
 }

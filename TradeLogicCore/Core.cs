@@ -1,8 +1,7 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using log4net;
 using TradeCommon.Constants;
-using TradeCommon.Database;
-using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -14,7 +13,9 @@ public class Core
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IServices _services;
+    private readonly IComponentContext _componentContext;
+    private IServices _services;
+
     private IPortfolioService PortfolioService => _services.Portfolio;
     private IOrderService OrderService => _services.Order;
     private ITradeService TradeService => _services.Trade;
@@ -22,14 +23,18 @@ public class Core
 
     public ExchangeType ExchangeType => ExchangeType.Binance;
 
-    public Core(IServices services)
+    public Core(IComponentContext componentContext)
     {
-        _services = services;
+        _componentContext = componentContext;
     }
 
-    public async Task Start(string userName, string adminPassword)
+    public async Task Start(string userName, string adminPassword, EnvironmentType environment)
     {
-        var user = await _services.Admin.ReadUser(userName);
+        // TODO admin password is not used here
+
+        _services = _componentContext.Resolve<IServices>();
+
+        var user = await _services.Admin.ReadUser(userName, environment);
         if (user == null)
             throw new InvalidOperationException("The user does not exist.");
 

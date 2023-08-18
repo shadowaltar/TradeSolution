@@ -13,6 +13,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IdGenerator _positionIdGenerator = new("PositionIdGen");
+    private readonly Context _context;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
     private readonly Persistence _persistence;
@@ -32,12 +33,14 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public PortfolioService(IExternalExecutionManagement externalExecution,
                             IExternalAccountManagement externalAccountManagement,
+                            Context context,
                             IOrderService orderService,
                             ITradeService tradeService,
                             Persistence persistence)
     {
         ExternalExecution = externalExecution;
         ExternalAccountManagement = externalAccountManagement;
+        _context = context;
         _orderService = orderService;
         _tradeService = tradeService;
         _persistence = persistence;
@@ -245,10 +248,21 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
         else
         {
-            var account = await Storage.ReadAccount(accountName);
-
-            Storage.ReadBalances(account.Id);
-
+            var account = await Storage.ReadAccount(accountName, _context.EnvironmentType);
+            if (account == null)
+            {
+                _log.Error($"Failed to read account by name {accountName} from database.");
+                return null;
+            }
+            var balances = await Storage.ReadBalances(account.Id);
+            if (balances.IsNullOrEmpty())
+            {
+                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database.");
+            }
+            else
+            {
+                account.Balances.AddRange(balances);
+            }
             return account;
         }
     }

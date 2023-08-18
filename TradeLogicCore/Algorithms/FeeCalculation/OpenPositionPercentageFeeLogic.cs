@@ -1,6 +1,6 @@
 ﻿namespace TradeLogicCore.Algorithms.FeeCalculation;
 
-public class QuantityPercentageFeeLogic<T> : IUpfrontFeeLogic<T> where T : IAlgorithmVariables
+public class OpenPositionPercentageFeeLogic<T> : ITransactionFeeLogic<T> where T : IAlgorithmVariables
 {
     private decimal _percentageOfQuantity;
 
@@ -19,6 +19,7 @@ public class QuantityPercentageFeeLogic<T> : IUpfrontFeeLogic<T> where T : IAlgo
     {
         var fee = current.Quantity * PercentageOfQuantity;
         current.Quantity -= fee;
+        current.Fee += fee;
         return fee;
     }
 }

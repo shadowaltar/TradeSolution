@@ -16,7 +16,7 @@ public class Account
     /// <summary>
     /// Name of account;
     /// </summary>
-    public string Name { get; set; }
+    public string Name { get; set; } = "";
 
     /// <summary>
     /// Account owner.
@@ -36,22 +36,22 @@ public class Account
     /// <summary>
     /// Type of the account, for example it indicates if it is a sport or margin trading one.
     /// </summary>
-    public string Type { get; set; }
+    public string? Type { get; set; }
 
     /// <summary>
     /// Sub-type of the account. Some brokers may contain multiple levels of types.
     /// </summary>
-    public string SubType { get; set; }
+    public string? SubType { get; set; }
 
     /// <summary>
     /// Trading environment like production or paper trading.
     /// </summary>
-    public string Environment { get; set; }
+    public string? Environment { get; set; }
 
     /// <summary>
     /// Fee structure of this account. Some brokers may have different levels of feed structure.
     /// </summary>
-    public string FeeStructure { get; set; }
+    public string? FeeStructure { get; set; }
 
     public DateTime CreateTime { get; set; }
 

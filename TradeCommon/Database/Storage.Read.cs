@@ -1,4 +1,5 @@
 ﻿using Common;
+using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -8,12 +9,14 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Integrity;
+using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 
 namespace TradeCommon.Database;
 public partial class Storage
 {
-    public static async Task<User?> ReadUser(string userName = "", string email = "")
+    public static async Task<User?> ReadUser(string userName, string email, EnvironmentType environment)
     {
         var un = userName.ToLowerInvariant().Trim();
         var em = email.ToLowerInvariant().Trim();
@@ -23,6 +26,7 @@ public partial class Storage
         }
         if (!un.IsBlank() && !em.IsBlank())
         {
+            // can only use one of the filter criteria
             return null;
         }
         var selectClause = SqlReader<User>.GetSelectClause();
@@ -34,39 +38,23 @@ public partial class Storage
 {selectClause}
 FROM {tableName}
 WHERE
-    {nameWhereClause}{emailWhereClause}
-";
-        using var connection = await Connect(DatabaseNames.StaticData);
+    {nameWhereClause}{emailWhereClause} AND Environment = $Environment";
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$Name", un);
-        command.Parameters.AddWithValue("$Email", em);
-
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<User>(r);
-        while (await r.ReadAsync())
-        {
-            var user = sqlHelper.Read();
-            _log.Info($"Read user with name {un} or email {em} from {DatabaseNames.UserTable} table in {DatabaseNames.StaticData}.");
-            return user;
-        }
-        return null;
+        return await SqlReader.ReadOne<User>(tableName, DatabaseNames.StaticData, sql,
+            ("$Name", un), ("$Email", em), ("$Environment", environment));
     }
 
-    public static async Task<Account?> ReadAccount(string accountName)
+    public static async Task<Account?> ReadAccount(string accountName, EnvironmentType environment)
     {
         var sqlPart = SqlReader<Account>.GetSelectClause();
         var tableName = DatabaseNames.AccountTable;
         var dbName = DatabaseNames.StaticData;
         var sql =
 @$"
-{sqlPart} FROM {tableName} WHERE Account = $Account
+{sqlPart} FROM {tableName} WHERE Account = $Account AND Environment = $Environment
 ";
-        var account = await ReadOne<Account>(sql, tableName, dbName, ("$Account", accountName));
-        if (account != null)
-            _log.Info($"Read account with name {accountName} from {tableName} table in {dbName}.");
-        return account;
+        return await SqlReader.ReadOne<Account>(tableName, dbName, sql,
+            ("$Account", accountName), ("$Environment", Environments.ToString(environment)));
     }
 
     public static async Task<List<Balance>> ReadBalances(int accountId)
@@ -78,9 +66,7 @@ WHERE
 @$"
 {sqlPart} FROM {tableName} WHERE AccountId = $AccountId
 ";
-        var results = await ReadMany<Balance>(sql, tableName, dbName, ("$AccountId", accountId));
-        _log.Info($"Read balances with account id {accountId} from {tableName} table in {dbName}.");
-        return results;
+        return await SqlReader.Read<Balance>(tableName, dbName, sql, ("$AccountId", accountId));
     }
 
     public static async Task<List<Order>> ReadOpenOrders(SecurityType securityType)
@@ -92,9 +78,7 @@ WHERE
 @$"
 {sqlPart} FROM {tableName} WHERE Status = 'LIVE'
 ";
-        var results = await ReadMany<Order>(sql, tableName, dbName);
-        _log.Info($"Read open orders with security type {securityType} from {tableName} table in {dbName}.");
-        return results;
+        return await SqlReader.Read<Order>(tableName, dbName, sql);
     }
 
     public static async Task<Security?> ReadSecurity(string exchange, string code, SecurityType type)
@@ -130,23 +114,17 @@ WHERE
                 : throw new NotImplementedException();
         }
 
-        using var connection = await Connect(DatabaseNames.StaticData);
+        SqlReader<Security>? sqlHelper = null;
+        return await SqlReader.ReadOne(tableName, DatabaseNames.StaticData, sql, Transform,
+            ("$Code", code.ToUpperInvariant()), ("$Exchange", exchange.ToUpperInvariant()));
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$Code", code.ToUpperInvariant());
-        command.Parameters.AddWithValue("$Exchange", exchange.ToUpperInvariant());
-
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<Security>(r);
-        while (await r.ReadAsync())
+        Security Transform(SqliteDataReader r)
         {
+            sqlHelper ??= new SqlReader<Security>(r);
             var security = sqlHelper.Read();
             security.FxInfo = ReadFxSecurityInfo(sqlHelper);
-            _log.Info($"Read security with code {code} and exchange {exchange} from {DatabaseNames.StockDefinitionTable} table in {DatabaseNames.StaticData}.");
             return security;
         }
-        return null;
     }
 
     public static async Task<List<Security>> ReadSecurities(string exchange, List<int> ids)
@@ -205,25 +183,17 @@ WHERE
                 : throw new NotImplementedException();
         }
 
-        using var connection = await Connect(DatabaseNames.StaticData);
+        SqlReader<Security>? sqlHelper = null;
+        return await SqlReader.Read(tableName, DatabaseNames.StaticData, sql, Transform,
+            ("$LocalEndDate", now), ("$Exchange", exchange), ("$Type", type));
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$LocalEndDate", now);
-        command.Parameters.AddWithValue("$Exchange", exchange);
-        command.Parameters.AddWithValue("$Type", type);
-
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<Security>(r);
-        var results = new List<Security>();
-        while (await r.ReadAsync())
+        Security Transform(SqliteDataReader r)
         {
+            sqlHelper ??= new SqlReader<Security>(r);
             var security = sqlHelper.Read();
             security.FxInfo = ReadFxSecurityInfo(sqlHelper);
-            results.Add(security);
+            return security;
         }
-        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.StaticData}.");
-        return results;
     }
 
     private static FxSecurityInfo? ReadFxSecurityInfo(SqlReader<Security> sqlHelper)
@@ -255,20 +225,22 @@ WHERE
 SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
+        return await SqlReader.Read<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql);
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<FinancialStat>(r);
-        var results = new List<FinancialStat>();
-        while (await r.ReadAsync())
-        {
-            var stats = sqlHelper.Read();
-            results.Add(stats);
-        }
-        _log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
-        return results;
+        //using var connection = await Connect(DatabaseNames.StaticData);
+
+        //using var command = connection.CreateCommand();
+        //command.CommandText = sql;
+        //using var r = await command.ExecuteReaderAsync();
+        //using var sqlHelper = new SqlReader<FinancialStat>(r);
+        //var results = new List<FinancialStat>();
+        //while (await r.ReadAsync())
+        //{
+        //    var stats = sqlHelper.Read();
+        //    results.Add(stats);
+        //}
+        //_log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
+        //return results;
     }
 
     public static async Task<List<FinancialStat>> ReadFinancialStats(int secId)
@@ -279,10 +251,30 @@ SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 WHERE SecurityId = $SecurityId
 ";
+        return await SqlReader.Read<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql, ("$SecurityId", secId));
+    }
 
-        var results = await ReadMany<FinancialStat>(sql, DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, ("$SecurityId", secId));
-        _log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
-        return results;
+    public static async Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType)
+    {
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var sql = $@"SELECT * FROM (SELECT COUNT(StartTime) as Count, DATE(StartTime) as Date, SecurityId FROM {tableName}
+GROUP BY DATE(startTime), SecurityId)";
+        return await SqlReader.Read(tableName, DatabaseNames.MarketData, sql, Transform);
+        MissingPriceSituation Transform(SqliteDataReader r) => new MissingPriceSituation(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
+
+        //using var connection = await Connect(DatabaseNames.MarketData);
+
+        //using var command = connection.CreateCommand();
+        //command.CommandText = sql;
+        //using var r = await command.ExecuteReaderAsync();
+        //var results = new List<MissingPriceSituation>();
+        //while (await r.ReadAsync())
+        //{
+        //    var entry = new MissingPriceSituation(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
+        //    results.Add(entry);
+        //}
+        //_log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        //return results;
     }
 
     public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
@@ -300,17 +292,15 @@ WHERE
         if (end != null)
             sql += $" AND StartTime <= $EndTime";
 
-        using var connection = await Connect(DatabaseNames.MarketData);
+        var parameters = new (string, object?)[]
+        {
+            ("$SecurityId", securityId),
+            ("$StartTime", start),
+            ("$EndTime", end),
+        };
+        return await SqlReader.Read(tableName, DatabaseNames.MarketData, sql, Transform, parameters);
 
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddWithValue("$SecurityId", securityId);
-        command.Parameters.AddWithValue("$StartTime", start);
-        command.Parameters.AddWithValue("$EndTime", end);
-
-        using var r = await command.ExecuteReaderAsync();
-        var results = new List<OhlcPrice>();
-        while (await r.ReadAsync())
+        OhlcPrice Transform(SqliteDataReader r)
         {
             var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
@@ -323,16 +313,36 @@ WHERE
                 V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
                 T: r.GetDateTime("StartTime")
             );
-            results.Add(price);
+            return price;
         }
-        if (results.Count == 0)
-        {
-            var x = command.PrintActualSql();
-        }
-        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
-        return results;
-    }
 
+        //using var connection = await Connect(DatabaseNames.MarketData);
+
+        //using var command = connection.CreateCommand();
+        //command.CommandText = sql;
+        //("$SecurityId", securityId);
+        //command.Parameters.AddWithValue("$StartTime", start);
+        //command.Parameters.AddWithValue("$EndTime", end);
+
+        //using SqliteDataReader? r = await command.ExecuteReaderAsync();
+        //while (await r.ReadAsync())
+        //{
+        //    var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
+        //    var price = new OhlcPrice
+        //    (
+        //        O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+        //        H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+        //        L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
+        //        C: close,
+        //        AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+        //        V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
+        //        T: r.GetDateTime("StartTime")
+        //    );
+        //    results.Add(price);
+        //}
+        //_log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        //return results;
+    }
 
     public static async IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
     {
@@ -377,7 +387,6 @@ WHERE
         }
         _log.Info($"Read {count} entries from {tableName} table in {DatabaseNames.MarketData}.");
     }
-
 
     public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
     {
@@ -483,27 +492,6 @@ WHERE
             list.Add(price);
         }
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
-        return results;
-    }
-
-    private static async Task<List<T>> ReadMany<T>(string sql, string tableName, string databaseName, params (string, object)[] parameters) where T : new()
-    {
-        using var connection = await Connect(DatabaseNames.StaticData);
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        foreach (var (key, value) in parameters)
-        {
-            command.Parameters.AddWithValue(key, value);
-        }
-
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<T>(r);
-        var results = new List<T>();
-        while (await r.ReadAsync())
-        {
-            var t = sqlHelper.Read();
-            results.Add(t);
-        }
         return results;
     }
 

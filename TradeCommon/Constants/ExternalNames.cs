@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Constants;
+﻿using OfficeOpenXml.Style;
+
+namespace TradeCommon.Constants;
 public static class ExternalNames
 {
     public const string Futu = "Futu";
@@ -43,6 +45,30 @@ public static class ExternalNames
             BrokerType.Binance => ExchangeType.Binance,
             BrokerType.Okex => ExchangeType.Okex,
             _ => ExchangeType.Unknown,
+        };
+    }
+
+    public static ExchangeType ConvertToExchange(string externalName)
+    {
+        return externalName.ToUpperInvariant() switch
+        {
+            Futu => ExchangeType.Hkex,
+            Hkex => ExchangeType.Hkex,
+            Binance => ExchangeType.Binance,
+            Okex => ExchangeType.Okex,
+            _ => ExchangeType.Unknown,
+        };
+    }
+
+    public static BrokerType ConvertToBroker(string externalName)
+    {
+        return externalName.ToUpperInvariant() switch
+        {
+            Futu => BrokerType.Futu,
+            Hkex => BrokerType.Futu,
+            Binance => BrokerType.Binance,
+            Okex => BrokerType.Okex,
+            _ => BrokerType.Unknown,
         };
     }
 }

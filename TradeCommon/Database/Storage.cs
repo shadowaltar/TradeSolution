@@ -10,6 +10,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using static TradeCommon.Constants.Constants;
 
 namespace TradeCommon.Database;
 
@@ -17,8 +18,6 @@ public partial class Storage
 {
     private static readonly ILog _log = Logger.New();
     private static readonly Dictionary<DataType, ISqlWriter> _writers = new();
-
-    public static readonly string DatabaseFolder = @"c:\temp";
 
     public static async Task Insert(IPersistenceTask task)
     {
@@ -311,7 +310,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return await writer.InsertOne(user, false);
     }
 
-    public static async Task InsertAccount(Account account)
+    public static async Task<int> InsertAccount(Account account)
     {
         var tableName = DatabaseNames.AccountTable;
         if (!_writers.TryGetValue(DataType.Account, out var writer))
@@ -319,7 +318,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             writer = new SqlWriter<Account>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Account] = writer;
         }
-        await writer.InsertOne(account, true);
+        return await writer.InsertOne(account, true);
     }
 
     public static async Task InsertOrder(Order order, SecurityType securityType)

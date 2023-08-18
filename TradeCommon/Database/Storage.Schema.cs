@@ -10,8 +10,8 @@ public partial class Storage
         const string dropSql =
 @$"
 DROP TABLE IF EXISTS {DatabaseNames.UserTable};
-DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_name;
-DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_email;
+DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_name_environment;
+DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_email_environment;
 ";
         const string createSql =
 @$"
@@ -19,15 +19,16 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.UserTable} (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     Name VARCHAR(100) NOT NULL,
     Email VARCHAR(100) NOT NULL,
+    Environment VARCHAR(100) NOT NULL,
     EncryptedPassword VARCHAR(512) NOT NULL,
     CreateTime DATE NOT NULL,
     UpdateTime DATE,
-    UNIQUE(Name)
+    UNIQUE(Name, Environment)
 );
-CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_name
-    ON {DatabaseNames.UserTable} (Name);
-CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email
-    ON {DatabaseNames.UserTable} (Email);
+CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_name_environment
+    ON {DatabaseNames.UserTable} (Name, Environment);
+CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email_environment
+    ON {DatabaseNames.UserTable} (Email, Environment);
 ";
 
         await DropThenCreate(dropSql, createSql, DatabaseNames.UserTable, DatabaseNames.StaticData);
@@ -38,7 +39,8 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email
         const string dropSql =
 @$"
 DROP TABLE IF EXISTS {DatabaseNames.AccountTable};
-DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_name_exchange;
+DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_name_brokerId;
+DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_ownerId;
 ";
         const string createSql =
 @$"
@@ -47,16 +49,19 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.AccountTable} (
     OwnerId INT NOT NULL,
     Name VARCHAR(100) NOT NULL,
     BrokerId INT NOT NULL,
-    ExternalAccountId INT,
+    ExternalAccount VARCHAR(100) NOT NULL,
     Type VARCHAR(100),
     SubType VARCHAR(100),
+    FeeStructure VARCHAR(100),
     Environment VARCHAR(10) NOT NULL,
     CreateTime DATE NOT NULL,
     UpdateTime DATE,
-    UNIQUE(Name, Exchange, Environment)
+    UNIQUE(Name, Environment)
 );
-CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_name_exchange
-    ON {DatabaseNames.AccountTable} (Name, Exchange);
+CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_name_environment
+    ON {DatabaseNames.AccountTable} (Name, Environment);
+CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_ownerId
+    ON {DatabaseNames.AccountTable} (OwnerId);
 ";
 
         await DropThenCreate(dropSql, createSql, DatabaseNames.AccountTable, DatabaseNames.StaticData);

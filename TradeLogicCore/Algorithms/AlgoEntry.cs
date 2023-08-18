@@ -60,6 +60,10 @@ public record AlgoEntry<T>
     /// Unrealized PNL of this entry which is still opened. (Exit Price - Current Price) * Quantity held.
     /// </summary>
     public decimal UnrealizedPnl { get; set; }
+    /// <summary>
+    /// Fee incurred when enter and/or exit a position.
+    /// </summary>
+    public decimal Fee { get; set; }
 
     /// <summary>
     /// Gets / sets the portfolio snapshot related to current entry.

@@ -1,18 +1,26 @@
 ﻿using Common;
+using log4net;
+using log4net.Util;
+using Microsoft.Data.Sqlite;
+using Microsoft.Diagnostics.Runtime.Utilities;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using TradeCommon.Utils.Attributes;
+using static TradeCommon.Constants.Constants;
 
 namespace Common;
 
 public class SqlReader<T> : IDisposable where T : new()
 {
+    private static readonly ILog _log = Logger.New();
+
     private Dictionary<string, PropertyInfo> _properties;
     private ValueSetter<T> _valueSetter;
 
-    private static Dictionary<Type, string> _selectClauses = new();
+    private static readonly Dictionary<Type, string> _selectClauses = new();
 
     public SqlReader(DbDataReader reader)
     {
@@ -118,5 +126,188 @@ public class SqlReader<T> : IDisposable where T : new()
         Reader = null;
         _properties = null;
         _valueSetter = null;
+    }
+}
+
+
+public static class SqlReader
+{
+    private static readonly ILog _log = Logger.New();
+
+    /// <summary>
+    /// Read a table and parse the results into a list by a given transformation function.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="tableName"></param>
+    /// <param name="databaseName"></param>
+    /// <param name="sql"></param>
+    /// <param name="transformFunc"></param>
+    /// <param name="parameterValues"></param>
+    /// <returns></returns>
+    public static async Task<List<T>> Read<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
+    {
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            using var connection = await Connect(databaseName);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach ((string key, object? value) in parameterValues)
+            {
+                command.Parameters.AddWithValue(key, value);
+            }
+            var results = new List<T>();
+            using var r = await command.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                var entry = transformFunc(r);
+                results.Add(entry);
+            }
+            sw.Stop();
+            _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
+            await connection.CloseAsync();
+            return results;
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to read one.", e);
+            return new();
+        }
+    }
+
+    /// <summary>
+    /// Read a table and parse the results into a list automatically.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="tableName"></param>
+    /// <param name="databaseName"></param>
+    /// <param name="sql"></param>
+    /// <param name="parameterValues"></param>
+    /// <returns></returns>
+    public static async Task<List<T>> Read<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    {
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            using var connection = await Connect(databaseName);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach ((string key, object? value) in parameterValues)
+            {
+                command.Parameters.AddWithValue(key, value);
+            }
+            var results = new List<T>();
+            using var r = await command.ExecuteReaderAsync();
+            using var sqlHelper = new SqlReader<T>(r);
+            while (await r.ReadAsync())
+            {
+                var entry = sqlHelper.Read();
+                results.Add(entry);
+            }
+            _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
+            await connection.CloseAsync();
+            return results;
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to read one.", e);
+            return new();
+        }
+    }
+
+
+    /// <summary>
+    /// Read a table and parse the results into a list by a given transformation function.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="tableName"></param>
+    /// <param name="databaseName"></param>
+    /// <param name="sql"></param>
+    /// <param name="transformFunc"></param>
+    /// <param name="parameterValues"></param>
+    /// <returns></returns>
+    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
+    {
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            using var connection = await Connect(databaseName);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach ((string key, object? value) in parameterValues)
+            {
+                command.Parameters.AddWithValue(key, value);
+            }
+            var results = new List<T>();
+            using var r = await command.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                var entry = transformFunc(r);
+                _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
+                await connection.CloseAsync();
+                return entry;
+            }
+            return default;
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to read one.", e);
+            return default;
+        }
+    }
+
+    /// <summary>
+    /// Read a table and parse the results into a list automatically.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="tableName"></param>
+    /// <param name="databaseName"></param>
+    /// <param name="sql"></param>
+    /// <param name="parameterValues"></param>
+    /// <returns></returns>
+    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    {
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            using var connection = await Connect(databaseName);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            foreach ((string key, object? value) in parameterValues)
+            {
+                command.Parameters.AddWithValue(key, value);
+            }
+            using var r = await command.ExecuteReaderAsync();
+            using var sqlHelper = new SqlReader<T>(r);
+            while (await r.ReadAsync())
+            {
+                var entry = sqlHelper.Read();
+                _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
+                await connection.CloseAsync();
+                return entry;
+            }
+            return default;
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to read one.", e);
+            return default;
+        }
+    }
+
+    private static string? GetConnectionString(string databaseName)
+    {
+        return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
+    }
+
+    private static async Task<SqliteConnection> Connect(string database)
+    {
+        var conn = new SqliteConnection(GetConnectionString(database));
+        await conn.OpenAsync();
+        return conn;
     }
 }

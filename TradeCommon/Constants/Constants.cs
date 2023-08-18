@@ -8,4 +8,6 @@ public static class Constants
     public static readonly string[] NoStrings = { "FALSE", "false", "False", "No", "no", "NO", "F", "N", "f", "n", "0" };
 
     public const int ManualTradingStrategyId = 0;
+
+    public static readonly string DatabaseFolder = @"C:\TradeData";
 }

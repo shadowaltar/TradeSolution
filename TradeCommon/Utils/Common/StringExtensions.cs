@@ -211,7 +211,7 @@ public static class StringExtensions
     public static StringBuilder RemoveLast(this StringBuilder sb)
     {
         if (sb.Length > 0)
-            return sb.Remove(sb.Length - 2, 1);
+            return sb.Remove(sb.Length - 1, 1);
         return sb;
     }
 }

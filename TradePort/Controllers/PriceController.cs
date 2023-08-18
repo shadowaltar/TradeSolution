@@ -41,34 +41,21 @@ public class PriceController : Controller
         [FromQuery(Name = "start")] string startStr = "20230101",
         [FromQuery(Name = "end")] string? endStr = null)
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (startStr == null)
-            return BadRequest("Missing start date-time.");
-        var start = startStr.ParseDate();
-        if (start == DateTime.MinValue)
-            return BadRequest("Invalid start date-time.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsDateBad(startStr, out var start, out var r3)) return r3;
+        DateTime end = DateTime.UtcNow;
+        if (endStr != null && IsDateBad(endStr, out end, out var r4)) return r4;
 
-        DateTime? end = null;
-        if (endStr != null)
-        {
-            end = endStr.ParseDate();
-            if (end == null || end == DateTime.MinValue)
-                return BadRequest("Invalid end date-time.");
-        }
         var security = await Storage.ReadSecurity(exchange, code, secType);
+        if (security == null) return NotFound("Security is not found.");
+
         var prices = await Storage.ReadPrices(security.Id, interval, secType, start, end);
         return Ok(prices);
     }
 
     /// <summary>
-    /// Get prices given exchange, code, interval and start time.
+    /// Get prices from Yahoo given exchange, code, interval and start time.
     /// </summary>
     /// <param name="exchange"></param>
     /// <param name="code"></param>
@@ -83,21 +70,13 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1d",
         [FromQuery(Name = "range")] string rangeStr = "10y")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (rangeStr == null)
-            return BadRequest("Invalid range string.");
-        var range = TimeRangeTypeConverter.Parse(rangeStr);
-        if (range == TimeRangeType.Unknown)
-            return BadRequest("Invalid range string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
+        if (security == null) return NotFound("Security is not found.");
+
         var prices = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader()
             .ReadYahooPrices(new List<Security> { security }, interval, range);
         return Ok(prices);
@@ -123,21 +102,13 @@ public class PriceController : Controller
         if (minMarketCap < 0)
             return BadRequest("Invalid market cap min as filter. Either == 0 (no filter) or larger than 0.");
 
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (rangeStr == null)
-            return BadRequest("Invalid range string.");
-        var range = TimeRangeTypeConverter.Parse(rangeStr);
-        if (range == TimeRangeType.Unknown)
-            return BadRequest("Invalid range string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
 
         var securities = await Storage.ReadSecurities(ExternalNames.Hkex, secType);
+        if (securities == null) return NotFound("Security is not found.");
+
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(securities, interval, range, (FinancialStatType.MarketCap, minMarketCap));
 
@@ -169,28 +140,11 @@ public class PriceController : Controller
         [FromQuery(Name = "start")] string startStr = "20220101",
         [FromQuery(Name = "end")] string? endStr = null)
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
-        if (startStr == null)
-            return BadRequest("Missing start date-time.");
-        var start = startStr.ParseDate();
-        if (start == DateTime.MinValue)
-            return BadRequest("Invalid start date-time.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsDateBad(startStr, out var start, out var r3)) return r3;
         DateTime end = DateTime.UtcNow;
-        if (endStr != null)
-        {
-            end = endStr.ParseDate();
-            if (end == DateTime.MinValue)
-                return BadRequest("Invalid end date-time.");
-        }
+        if (endStr != null && IsDateBad(endStr, out end, out var r4)) return r4;
 
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
@@ -199,6 +153,8 @@ public class PriceController : Controller
 
         var securities = await Storage.ReadSecurities(ExternalNames.Binance, secType);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
+        if (securities == null) return NotFound("Security is not found.");
+
         var priceReader = new TradeDataCore.Importing.Binance.HistoricalPriceReader();
 
         if (interval != IntervalType.OneMinute)
@@ -256,16 +212,13 @@ public class PriceController : Controller
        [FromQuery(Name = "interval")] string intervalStr = "1m",
        [FromQuery(Name = "symbols")] string? symbol = "BTCUSDT")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
 
         if (symbol.IsBlank())
             return BadRequest("Missing symbol.");
 
         var security = await Storage.ReadSecurity(ExternalNames.Binance, symbol, SecurityType.Fx);
+        if (security == null) return NotFound("Security is not found.");
 
         var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(interval).ToLowerInvariant()}";
         var url = $"wss://stream.binance.com:9443/stream?streams={wsName}";
@@ -291,23 +244,12 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "range")] string rangeStr = "2y")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (rangeStr == null)
-            return BadRequest("Invalid range string.");
-        var range = TimeRangeTypeConverter.Parse(rangeStr);
-        if (range == TimeRangeType.Unknown)
-            return BadRequest("Invalid range string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
-        if (security == null)
-            return BadRequest($"Security {code} in {exchange} is not found.");
+        if (security == null) return NotFound("Security is not found.");
 
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
         var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
@@ -338,27 +280,19 @@ public class PriceController : Controller
         [FromQuery(Name = "symbols")] string? concatenatedSymbols = "",
         [FromQuery(Name = "range")] string rangeStr = "2y")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (rangeStr == null)
-            return BadRequest("Invalid range string.");
-        var range = TimeRangeTypeConverter.Parse(rangeStr);
-        if (range == TimeRangeType.Unknown)
-            return BadRequest("Invalid range string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
 
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
 
         var securities = await Storage.ReadSecurities(exchange, secType);
-        if (symbols != null && symbols.Count > 0)
+        if (securities == null) return NotFound("Security is not found.");
+
+        if (!symbols.IsNullOrEmpty())
         {
-            securities = securities.Where(s => symbols.ContainsIgnoreCase(s.Code)).ToList();
+            securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         }
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
         var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
@@ -395,14 +329,8 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
 
         var resultSet = await Storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
         return resultSet != null ? Ok(resultSet.Rows[0][0]) : BadRequest();
@@ -414,18 +342,11 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("metrics/per-security-row-count")]
     public async Task<ActionResult> ReportPriceCount(
-        [FromServices] IHistoricalMarketDataService dataService,
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        if (intervalStr.IsBlank())
-            return BadRequest("Invalid interval string.");
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
 
         var priceTableName = DatabaseNames.GetPriceTableName(interval, secType);
         var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
@@ -448,5 +369,72 @@ public class PriceController : Controller
             return Ok(result);
         }
         return BadRequest();
+    }
+
+    /// <summary>
+    /// List the count of OHLC price entries within one day.
+    /// Supports 1m, 1h, 1d.
+    /// </summary>
+    /// <param name="intervalStr"></param>
+    /// <param name="secTypeStr"></param>
+    /// <returns></returns>
+    [HttpGet("metrics/daily-price-count")]
+    public async Task<ActionResult> ReportDailyPriceEntryCount(
+        [FromQuery(Name = "interval")] string intervalStr = "1h",
+        [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
+    {
+        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+
+        var results = await Storage.ReadDailyMissingPriceSituations(interval, secType);
+        return Ok(results);
+    }
+
+    private bool IsIntervalBad(string intervalStr, out IntervalType interval, out ObjectResult? result)
+    {
+        result = null;
+        interval = IntervalTypeConverter.Parse(intervalStr);
+        if (interval == IntervalType.Unknown)
+        {
+            result = BadRequest("Invalid interval string.");
+            return true;
+        }
+        return false;
+    }
+
+    private bool IsSecurityTypeBad(string secTypeStr, out SecurityType securityType, out ObjectResult? result)
+    {
+        result = null;
+        securityType = SecurityTypeConverter.Parse(secTypeStr);
+        if (securityType == SecurityType.Unknown)
+        {
+            result = BadRequest("Invalid sec-type string.");
+            return true;
+        }
+        return false;
+    }
+
+    private bool IsTimeRangeBad(string rangeStr, out TimeRangeType timeRangeType, out ObjectResult? result)
+    {
+        result = null;
+        timeRangeType = TimeRangeTypeConverter.Parse(rangeStr);
+        if (timeRangeType == TimeRangeType.Unknown)
+        {
+            result = BadRequest("Invalid time range string.");
+            return true;
+        }
+        return false;
+    }
+
+    private bool IsDateBad(string timeString, out DateTime date, out ObjectResult? result)
+    {
+        result = null;
+        date = timeString.ParseDate();
+        if (date == DateTime.MinValue)
+        {
+            result = BadRequest("Invalid start date-time.");
+            return true;
+        }
+        return false;
     }
 }

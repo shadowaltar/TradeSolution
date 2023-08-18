@@ -13,6 +13,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Reporting;
+using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore;
@@ -34,9 +35,9 @@ public class Program
 
         Dependencies.Register(ExternalNames.Binance);
 
-        //await NewOrderDemo();
+        await NewOrderDemo();
         //await RunRumiBackTestDemo();
-        await RunMACBackTestDemo();
+        //await RunMACBackTestDemo();
         //await RunCore();
 
         Console.WriteLine("Finished.");
@@ -45,7 +46,7 @@ public class Program
     private static async Task RunCore()
     {
         var engine = Dependencies.ComponentContext.Resolve<Core>();
-        await engine.Start("mars", "???");
+        await engine.Start("mars", "???", EnvironmentType.Prod);
     }
 
     private static async Task NewSecurityOhlcSubscriptionDemo()
@@ -90,6 +91,7 @@ public class Program
 
         portfolioService.SelectUser(new User());
 
+        orderService.CancelAllOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
         var order = new Order
         {
@@ -114,24 +116,29 @@ public class Program
 
         async void AfterOrderSent(Order order)
         {
-            Console.WriteLine(order);
+            _log.Info("Order sent: " + order);
             var orders = await orderService.GetOpenOrders();
 
-            orderService.CancelAllOrders();
+            foreach (var openOrder in orders)
+            {
+                _log.Info("Existing Open Order: " + openOrder);
+            }
 
             orderService.CancelOrder(order.Id);
+
+            orderService.CancelAllOrders();
         }
 
         static void OnNewTradesReceived(List<Trade> trades)
         {
             foreach (var trade in trades)
             {
-                Console.WriteLine(trade);
+                _log.Info("Trade received: " + trade);
             }
         }
         static void OnOrderCancelled(Order order)
         {
-            throw new NotImplementedException();
+            _log.Info("Order cancelled: " + order);
         }
     }
 
@@ -279,21 +286,24 @@ public class Program
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
 
-        var filter = "BTCUSDT";
+        var filter = "ETHUSDT";
+        //var filter = "ETHUSDT";
         var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
 
         var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
         securities = securities!.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
 
-        var stopLosses = new List<decimal> { /*0.0025m, 0.001m,*/ 0.0002m, 0.00015m };
-        var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
+        var fast = 26;
+        var slow = 51;
+        var stopLosses = new List<decimal> { 0.0025m, 0.005m, 0.0075m };
+        var intervalTypes = new List<IntervalType> { IntervalType.OneHour };
+        //var fast = 2;
+        //var slow = 5;
+        //var stopLosses = new List<decimal> { 0.0002m, 0.00015m };
+        //var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
 
-        var fast = 3;
-        var slow = 7;
-        //var fast = 2;
-        //var slow = 5;
         var periodTuples = new List<(DateTime start, DateTime end)>
         {
             (new DateTime(2020, 1, 1), new DateTime(2021, 1, 1)),

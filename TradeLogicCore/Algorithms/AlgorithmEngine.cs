@@ -289,9 +289,12 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             current.Elapsed = last.Elapsed + _interval;
             current.SLPrice = last.SLPrice;
             current.UnrealizedPnl = (currentPrice - current.EnterPrice!.Value) * current.Quantity;
+            current.Fee = last.Fee;
 
             Assertion.Shall(current.EnterPrice.HasValue);
+            Assertion.Shall(current.SLPrice.HasValue);
             Assertion.Shall(last.Quantity != 0);
+            Assertion.Shall(current.Fee >= 0);
 
             OpenedEntries[current.Id] = current;
         }
@@ -306,6 +309,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithemContext<T> whe
             current.Elapsed = null;
             current.SLPrice = null;
             current.UnrealizedPnl = 0;
+            current.Fee = 0;
         }
 
         if (last.LongSignal == SignalType.Open)

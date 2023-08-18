@@ -14,21 +14,21 @@ public static class AutofacExtensions
             return builder.RegisterType<TImpl>().As<T>().SingleInstance();
     }
 
-    public static void RegisterSingleton<T>(this ContainerBuilder builder)
+    public static IRegistrationBuilder<T, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton<T>(this ContainerBuilder builder)
         where T : notnull
     {
-        builder.RegisterType<T>().AsSelf().SingleInstance();
+        return builder.RegisterType<T>().AsSelf().SingleInstance();
     }
 
-    public static void RegisterSingletonInstance<T>(this ContainerBuilder builder, object instance)
+    public static IRegistrationBuilder<object, SimpleActivatorData, SingleRegistrationStyle> RegisterSingletonInstance<T>(this ContainerBuilder builder, object instance)
         where T : notnull
     {
-        builder.RegisterInstance(instance).AsSelf().SingleInstance();
+        return builder.RegisterInstance(instance).AsSelf().SingleInstance();
     }
 
-    public static void RegisterSingleton<T>(this ContainerBuilder builder, object key)
+    public static IRegistrationBuilder<T, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton<T>(this ContainerBuilder builder, object key)
         where T : notnull
     {
-        builder.RegisterType<T>().Keyed<T>(key).SingleInstance();
+        return builder.RegisterType<T>().Keyed<T>(key).SingleInstance();
     }
 }

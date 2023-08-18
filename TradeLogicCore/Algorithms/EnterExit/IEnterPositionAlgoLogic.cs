@@ -6,7 +6,7 @@ public interface IEnterPositionAlgoLogic<T> where T : IAlgorithmVariables
 {
     IPositionSizingAlgoLogic<T> Sizing { get; }
    
-    IUpfrontFeeLogic<T>? UpfrontFeeLogic { get; set; }
+    ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
     void Open(IAlgorithemContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice);
 }

@@ -9,7 +9,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
 {
     private static readonly ILog _log = Logger.New();
     public IPositionSizingAlgoLogic<T> Sizing { get; }
-    public IUpfrontFeeLogic<T>? UpfrontFeeLogic { get; set; }
+    public ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
     public SimpleEnterPositionAlgoLogic(IPositionSizingAlgoLogic<T> sizing)
     {
@@ -35,8 +35,8 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
         current.SLPrice = stopLossPrice;
         current.Notional = current.Quantity * enterPrice;
 
-        // apply fee
-        //UpfrontFeeLogic?.ApplyFee(current);
+        // apply fee when a new position is opened
+        FeeLogic?.ApplyFee(current);
 
         _log.Info($"action=open|time0={current.EnterTime:yyMMdd-HHmm}|p0={current.EnterPrice}|q={current.Quantity}");
     }

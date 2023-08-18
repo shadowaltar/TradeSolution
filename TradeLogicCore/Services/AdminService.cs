@@ -1,17 +1,13 @@
 ﻿using Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
 
 namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
-    public async Task<int> CreateUser(string userName, string userPassword, string email)
+    public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)
     {
         if (userName.IsBlank() || userPassword.IsBlank() || email.IsBlank())
         {
@@ -33,13 +29,23 @@ public class AdminService : IAdminService
         return await Storage.InsertUser(user);
     }
 
-    public async Task<User?> ReadUser(string userName)
+    public async Task<User?> ReadUser(string userName, EnvironmentType environment)
     {
-        return await Storage.ReadUser(userName);
+        return await Storage.ReadUser(userName, "", environment);
     }
 
-    public async Task<User?> ReadUserByEmail(string email)
+    public async Task<User?> ReadUserByEmail(string email, EnvironmentType environment)
     {
-        return await Storage.ReadUser("", email);
+        return await Storage.ReadUser("", email, environment);
+    }
+
+    public async Task<int> CreateAccount(Account account)
+    {
+        return await Storage.InsertAccount(account);
+    }
+
+    public async Task<Account?> ReadAccount(string accountName, EnvironmentType environment)
+    {
+        return await Storage.ReadAccount(accountName, environment);
     }
 }

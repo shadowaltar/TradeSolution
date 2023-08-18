@@ -17,9 +17,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
     private readonly SimpleMovingAverage _fastMa;
     private readonly SimpleMovingAverage _slowMa;
-    private AlgoEntry<MacVariables> _last1;
-    private AlgoEntry<MacVariables> _last0;
-    private readonly QuantityPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
+    private readonly OpenPositionPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
 
     public IAlgorithemContext<MacVariables> Context { get; set; }
 
@@ -34,7 +32,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
     public MovingAverageCrossing(int fast, int slow, decimal stopLossRatio)
     {
-        _upfrontFeeLogic = new QuantityPercentageFeeLogic<MacVariables>();
+        _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
 
         Sizing = new SimplePositionSizing<MacVariables>();
         Screening = new SingleSecurityScreeningAlgoLogic<MacVariables>();
@@ -54,11 +52,11 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
         {
             _upfrontFeeLogic.PercentageOfQuantity = 0.001m;
-            Entering.UpfrontFeeLogic = _upfrontFeeLogic;
+            Entering.FeeLogic = _upfrontFeeLogic;
         }
         else
         {
-            Entering.UpfrontFeeLogic = null;
+            Entering.FeeLogic = null;
         }
     } 
 
@@ -88,9 +86,6 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
         ProcessSignal(current, last);
 
-        _last1 = last;
-        _last0 = current;
-
         return current.Variables.PriceXFast > 0
                && current.Variables.PriceXSlow > 0
                && current.Variables.FastXSlow > 0;
@@ -102,9 +97,6 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
             return true;
 
         ProcessSignal(current, last);
-
-        _last1 = last;
-        _last0 = current;
 
         return current.Variables.PriceXFast < 0
                && current.Variables.PriceXSlow < 0

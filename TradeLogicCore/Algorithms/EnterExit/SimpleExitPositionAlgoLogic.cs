@@ -1,11 +1,14 @@
 ﻿using Common;
 using log4net;
+using TradeLogicCore.Algorithms.FeeCalculation;
 
 namespace TradeLogicCore.Algorithms.EnterExit;
 
 public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T : IAlgorithmVariables
 {
     private static readonly ILog _log = Logger.New();
+
+    public ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
     public decimal StopLossRatio { get; }
 
@@ -45,6 +48,9 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         current.UnrealizedPnl = 0;
         current.RealizedReturn = r;
         current.Notional = current.Quantity * exitPrice;
+
+        // apply fee when a new position is opened
+        FeeLogic?.ApplyFee(current);
 
         _log.Info($"action=close|p1={current.ExitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
     }

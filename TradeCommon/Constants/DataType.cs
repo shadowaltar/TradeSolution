@@ -37,15 +37,15 @@ public class DataTypeConverter
 
         return str switch
         {
-            "ORDERBOOK" or "DEPTHBOOK" => DataType.OrderBook,
-            "ORDER" => DataType.Order,
-            "TRADE" => DataType.Trade,
-            "POSITION" => DataType.Position,
+            "ORDERBOOK" or "DEPTHBOOK" or "ORDERBOOKS" or "DEPTHBOOKS" => DataType.OrderBook,
+            "ORDER" or "ORDERS" => DataType.Order,
+            "TRADE" or "TRADES" => DataType.Trade,
+            "POSITION" or "POSITIONS" => DataType.Position,
             "TRADEORDERPOSITIONRELATIONSHIP" or "TOP" => DataType.TradeOrderPositionRelationship,
             "FINANCIALSTAT" or "STAT" => DataType.FinancialStat,
-            "ACCOUNT" => DataType.Account,
-            "BALANCE" => DataType.Balance,
-            "USER" => DataType.User,
+            "ACCOUNT" or "ACCOUNTS" => DataType.Account,
+            "BALANCE" or "BALANCES" => DataType.Balance,
+            "USER" or "USERS" => DataType.User,
             _ => DataType.Unknown,
         };
     }

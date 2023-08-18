@@ -15,7 +15,7 @@ public class OrderService : IOrderService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
-    private readonly IServices _services;
+    private readonly Context _context;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
@@ -30,12 +30,13 @@ public class OrderService : IOrderService, IDisposable
     public event Action<Order>? OrderCancelled;
 
     public OrderService(IExternalExecutionManagement execution,
-        IServices services,
+        Context context,
+        ISecurityService securityService,
         Persistence persistence)
     {
         _execution = execution;
-        _services = services;
-        _securityService = services.Security;
+        _context = context;
+        _securityService = securityService;
         _persistence = persistence;
 
         _execution.OrderPlaced += OnSentOrderAccepted;
@@ -113,7 +114,7 @@ public class OrderService : IOrderService, IDisposable
             .Select(o => o.SecurityId).ToList();
         Task.Run(async () =>
         {
-            var securities = await _securityService.GetSecurities(_services.ExchangeType, securityIds);
+            var securities = await _securityService.GetSecurities(_context.ExchangeType, securityIds);
             if (securities == null)
                 return;
             foreach (var security in securities)
@@ -203,7 +204,7 @@ public class OrderService : IOrderService, IDisposable
         {
             Id = id,
             AccountId = accountId,
-            BrokerId = _services.Context.BrokerId,
+            BrokerId = _context.BrokerId,
             CreateTime = now,
             UpdateTime = now,
             ExchangeId = ExchangeIds.GetId(security.Exchange),

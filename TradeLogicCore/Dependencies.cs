@@ -2,8 +2,6 @@
 using Common;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
-using TradeLogicCore.Algorithms;
-using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Instruments;
 using TradeLogicCore.Services;
 
@@ -18,9 +16,12 @@ public static class Dependencies
         builder ??= new ContainerBuilder();
         builder.RegisterModule<DependencyModule>();
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
-        builder.RegisterSingleton<IServices, TradeLogicCore.Services.Services>()
+        builder.RegisterSingleton<IServices, Services.Services>()
             .WithParameter(new TypedParameter(typeof(string), externalName));
-        builder.RegisterSingleton<Context>();
+
+        builder.RegisterSingleton<Context>()
+            .WithParameter(new TypedParameter(typeof(ExchangeType), ExternalNames.ConvertToExchange(externalName)))
+            .WithParameter(new TypedParameter(typeof(BrokerType), ExternalNames.ConvertToBroker(externalName)));
         builder.RegisterSingleton<Core>();
         switch (externalName)
         {

@@ -1,4 +1,5 @@
-﻿using System.Security.Permissions;
+﻿using TradeCommon.Constants;
+using TradeCommon.Runtime;
 using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Accounts;
@@ -11,6 +12,8 @@ public class User
     public string Name { get; set; } = "";
 
     public string Email { get; set; } = "";
+
+    public string Environment { get; set; } = Environments.Test;
 
     public string EncryptedPassword { get; set; } = "";
 

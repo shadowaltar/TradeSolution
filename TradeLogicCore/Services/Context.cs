@@ -6,12 +6,12 @@ namespace TradeLogicCore.Services;
 public class Context
 {
     private readonly IExternalConnectivityManagement _external;
+    public EnvironmentType EnvironmentType { get; private set; } = EnvironmentType.Unknown;
     public ExchangeType ExchangeType { get; }
     public BrokerType BrokerType { get; }
     public int BrokerId { get; }
 
-    public Context(IExternalConnectivityManagement connectivity,
-                   ExchangeType exchangeType,
+    public Context(ExchangeType exchangeType,
                    BrokerType brokerType)
     {
         ExchangeType = exchangeType;
@@ -22,5 +22,6 @@ public class Context
     public void SetEnvironment(EnvironmentType type)
     {
         _external.SetEnvironment(type);
+        EnvironmentType = type;
     }
 }
