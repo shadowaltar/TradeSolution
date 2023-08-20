@@ -22,7 +22,9 @@ public static class Dependencies
         builder.RegisterSingleton<Context>()
             .WithParameter(new TypedParameter(typeof(ExchangeType), ExternalNames.ConvertToExchange(externalName)))
             .WithParameter(new TypedParameter(typeof(BrokerType), ExternalNames.ConvertToBroker(externalName)));
-        builder.RegisterSingleton<Core>();
+        builder.RegisterSingleton<Core>()
+            .WithParameter(new TypedParameter(typeof(ExchangeType), ExternalNames.ConvertToExchange(externalName)))
+            .WithParameter(new TypedParameter(typeof(BrokerType), ExternalNames.ConvertToBroker(externalName)));
         switch (externalName)
         {
             case ExternalNames.Binance:

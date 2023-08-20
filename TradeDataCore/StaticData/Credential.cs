@@ -15,7 +15,18 @@ public class Credential
         return CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
     }
 
-    public static bool IsPasswordCorrect(string password)
+    public static bool IsPasswordCorrect(User user, string password)
+    {
+        if (password.IsBlank()) return false;
+        if (user == null) throw new ArgumentNullException(nameof(user));
+        var encryptedPassword =
+            CryptographyUtils.Encrypt(user.Name + password, PasswordSalt)
+            + CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt)
+            + CryptographyUtils.Encrypt(user.Environment.ToUpperInvariant() + password, PasswordSalt);
+        return encryptedPassword == user.EncryptedPassword;
+    }
+
+    public static bool IsAdminPasswordCorrect(string password)
     {
         if (password.IsBlank()) return false;
         return CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
@@ -28,9 +39,10 @@ public class Credential
         if (password.IsBlank()) throw new ArgumentNullException(nameof(password));
 
         var encrypted1 = CryptographyUtils.Encrypt(user.Name + password, PasswordSalt);
-        var encrypted2 = CryptographyUtils.Encrypt(user.Email + password, PasswordSalt);
-        user.EncryptedPassword = encrypted1 + encrypted2;
-        
+        var encrypted2 = CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt);
+        var encrypted3 = CryptographyUtils.Encrypt(user.Environment.ToUpperInvariant() + password, PasswordSalt);
+        user.EncryptedPassword = encrypted1 + encrypted2 + encrypted3;
+
         // erase the original one
         password = "";
     }

@@ -16,7 +16,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
         Sizing = sizing;
     }
 
-    public void Open(IAlgorithemContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
+    public void Open(IAlgorithmContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
     {
         Assertion.ShallNever(context.Portfolio.FreeCash == 0);
 

@@ -13,6 +13,7 @@ public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
     public IExternalQuotationManagement External => _external;
 
     public event Action<int, OhlcPrice>? NextOhlc;
+    public event Action<int, Tick> NextTick;
 
     public RealTimeMarketDataService(IExternalQuotationManagement external)
     {

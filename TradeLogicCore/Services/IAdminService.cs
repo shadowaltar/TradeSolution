@@ -13,4 +13,6 @@ public interface IAdminService
     Task<User?> ReadUser(string userName, EnvironmentType environment);
 
     Task<User?> ReadUserByEmail(string email, EnvironmentType environment);
+
+    bool Authenticate(User user, string password, EnvironmentType environment);
 }

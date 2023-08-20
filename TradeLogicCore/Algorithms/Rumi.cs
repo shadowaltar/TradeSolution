@@ -16,7 +16,7 @@ public class Rumi : IAlgorithm<RumiVariables>
     private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
 
-    public IAlgorithemContext<RumiVariables> Context { get; set; }
+    public IAlgorithmContext<RumiVariables> Context { get; set; }
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
@@ -31,7 +31,7 @@ public class Rumi : IAlgorithm<RumiVariables>
     public Rumi(int fast, int slow, int rumi, decimal stopLossRatio)
     {
         Sizing = new SimplePositionSizing<RumiVariables>();
-        Screening = new SingleSecurityScreeningAlgoLogic<RumiVariables>();
+        Screening = new SimpleSecurityScreeningAlgoLogic<RumiVariables>();
         Entering = new SimpleEnterPositionAlgoLogic<RumiVariables>(Sizing);
         Exiting = new SimpleExitPositionAlgoLogic<RumiVariables>(stopLossRatio);
 
@@ -102,4 +102,5 @@ public class RumiVariables : IAlgorithmVariables
     public decimal Slow { get; set; } = decimal.MinValue;
     public decimal Rumi { get; set; } = decimal.MinValue;
     public decimal LastRumi { get; set; } = decimal.MinValue;
+    public string Type => "RUMI";
 }

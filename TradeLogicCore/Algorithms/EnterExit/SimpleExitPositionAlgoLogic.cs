@@ -17,7 +17,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         StopLossRatio = stopLossRatio;
     }
 
-    public void Close(IAlgorithemContext<T> context, AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
+    public void Close(IAlgorithmContext<T> context, AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
         Assertion.ShallNever(current.EnterPrice == null || current.EnterPrice == 0);
         if (exitPrice == 0 || !exitPrice.IsValid() || exitTime == DateTime.MinValue)
@@ -55,7 +55,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         _log.Info($"action=close|p1={current.ExitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
     }
 
-    public void StopLoss(IAlgorithemContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
+    public void StopLoss(IAlgorithmContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
     {
         context.OpenedEntries[current.Id] = current;
 

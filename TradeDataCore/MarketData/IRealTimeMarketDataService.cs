@@ -7,6 +7,7 @@ namespace TradeDataCore.MarketData;
 public interface IRealTimeMarketDataService
 {
     event Action<int, OhlcPrice> NextOhlc;
+    event Action<int, Tick> NextTick;
 
     IExternalQuotationManagement External { get; }
 
