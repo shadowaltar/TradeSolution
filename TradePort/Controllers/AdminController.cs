@@ -35,7 +35,7 @@ public class AdminController : Controller
         if (model.UserPassword.IsBlank()) return BadRequest();
         if (model.AdminPassword.IsBlank()) return BadRequest();
         if (model.Email.IsBlank() || !model.Email.IsValidEmail()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(model.AdminPassword)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
 
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
@@ -66,7 +66,7 @@ public class AdminController : Controller
     {
         if (accountName.IsBlank()) return BadRequest();
         if (model == null) return BadRequest();
-        if (!Credential.IsPasswordCorrect(model.AdminPassword)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
 
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
@@ -123,7 +123,7 @@ public class AdminController : Controller
     public async Task<ActionResult> RebuildStaticTables([FromForm] string password)
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         await Storage.CreateSecurityTable(SecurityType.Equity);
         await Storage.CreateSecurityTable(SecurityType.Fx);
@@ -157,7 +157,7 @@ public class AdminController : Controller
         [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         IntervalType interval = IntervalType.Unknown;
         SecurityType secType = SecurityType.Unknown;
@@ -210,7 +210,7 @@ public class AdminController : Controller
         [FromQuery(Name = "table-type")] string? tableTypeStr = "order")
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
         SecurityType secType = SecurityType.Unknown;
         if (secTypeStr != null)
             secType = SecurityTypeConverter.Parse(secTypeStr);

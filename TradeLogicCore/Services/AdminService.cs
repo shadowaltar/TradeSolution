@@ -8,6 +8,12 @@ using TradeDataCore.StaticData;
 namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
+    public bool Authenticate(User user, string password, EnvironmentType environment)
+    {
+        Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
+        return Credential.IsPasswordCorrect(user, password);
+    }
+
     public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)
     {
         if (userName.IsBlank() || userPassword.IsBlank() || email.IsBlank())

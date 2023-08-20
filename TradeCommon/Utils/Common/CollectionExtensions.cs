@@ -4,6 +4,16 @@ using System.Diagnostics.CodeAnalysis;
 namespace Common;
 public static class CollectionExtensions
 {
+    /// <summary>
+    /// Get value by a key from the dictionary. If no matching key,
+    /// create a new instance and save into the dictionary using the given key.
+    /// </summary>
+    /// <typeparam name="TK"></typeparam>
+    /// <typeparam name="TV"></typeparam>
+    /// <param name="map"></param>
+    /// <param name="key"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
     public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key)
         where TK : notnull
         where TV : new()

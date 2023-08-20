@@ -19,7 +19,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     private readonly SimpleMovingAverage _slowMa;
     private readonly OpenPositionPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
 
-    public IAlgorithemContext<MacVariables> Context { get; set; }
+    public IAlgorithmContext<MacVariables> Context { get; set; }
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
@@ -35,7 +35,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
 
         Sizing = new SimplePositionSizing<MacVariables>();
-        Screening = new SingleSecurityScreeningAlgoLogic<MacVariables>();
+        Screening = new SimpleSecurityScreeningAlgoLogic<MacVariables>();
         Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(Sizing);
         Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(stopLossRatio);
 
@@ -47,7 +47,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
     }
 
-    public void BeforeProcessingSecurity(IAlgorithemContext<MacVariables> context, Security security)
+    public void BeforeProcessingSecurity(IAlgorithmContext<MacVariables> context, Security security)
     {
         if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
         {
@@ -203,4 +203,6 @@ public class MacVariables : IAlgorithmVariables
     /// -1 the other way round. 0 means no crossing after the flag is reset.
     /// </summary>
     public int FastXSlow { get; set; } = 0;
+
+    public string Type => "MovingAverageCrossing";
 }

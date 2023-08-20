@@ -30,7 +30,7 @@ public class ExecutionController : Controller
                                        [FromQuery(Name = "env")] string environment = "Test")
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         var type = environment.ConvertDescriptionToEnum<EnvironmentType>();
         if (type == EnvironmentType.Unknown)
@@ -74,7 +74,7 @@ public class ExecutionController : Controller
         [FromQuery(Name = "fake")] bool isFakeOrder = true)
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         var secType = SecurityTypeConverter.Parse(secTypeStr);
         if (secType == SecurityType.Unknown)
@@ -134,7 +134,7 @@ public class ExecutionController : Controller
         [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         // TODO
         portfolioService.SelectUser(null);

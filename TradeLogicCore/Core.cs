@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
+using TradeLogicCore.Algorithms;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
@@ -21,28 +22,35 @@ public class Core
     private ITradeService TradeService => _services.Trade;
     private ISecurityService SecurityService => _services.Security;
 
-    public ExchangeType ExchangeType => ExchangeType.Binance;
+    public ExchangeType ExchangeType { get; private set; }
+    public BrokerType BrokerType { get; private set; }
 
-    public Core(IComponentContext componentContext)
+    public Core(IComponentContext componentContext, IServices services, ExchangeType exchange, BrokerType broker)
     {
         _componentContext = componentContext;
+        _services = services;
+        ExchangeType = exchange;
+        BrokerType = broker;
     }
 
-    public async Task Start(string userName, string adminPassword, EnvironmentType environment)
+    public async Task Start<T>(string userName, string password, IAlgorithm<T> algorithm, EnvironmentType environment) where T : IAlgorithmVariables
     {
-        // TODO admin password is not used here
-
         _services = _componentContext.Resolve<IServices>();
 
         var user = await _services.Admin.ReadUser(userName, environment);
         if (user == null)
             throw new InvalidOperationException("The user does not exist.");
 
+        if (!_services.Admin.Authenticate(user, password, environment))
+            throw new InvalidOperationException("The password is incorrect.");
+
         await CheckAccountAndBalance(user);
         await CheckOpenOrders();
         await CheckRecentOrderHistory();
         await CheckRecentTradeHistory();
 
+        var engine = new AlgorithmEngine<T>(_services, algorithm);
+        engine.Run();
         //SubscribeToMarketData();
         //StartAlgorithmEngine();
     }

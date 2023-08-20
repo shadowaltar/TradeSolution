@@ -3,7 +3,7 @@ using TradeCommon.Essentials.Portfolios;
 
 namespace TradeLogicCore.Algorithms;
 
-public interface IAlgorithemContext<T>
+public interface IAlgorithmContext<T>
 {
     Portfolio Portfolio { get; }
 

@@ -1,15 +1,12 @@
 ﻿using Common;
-using Iced.Intel;
 using log4net;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Cryptography;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeDataCore.Instruments;
-using TradeDataCore.MarketData;
 using TradeLogicCore.Algorithms;
+using TradeLogicCore.Services;
 
 namespace TradePort.Controllers;
 
@@ -24,8 +21,7 @@ public class BackTestingController : Controller
     /// <summary>
     /// Back-test RUMI using 100K as initial cash.
     /// </summary>
-    /// <param name="securityService"></param>
-    /// <param name="mds"></param>
+    /// <param name="services"></param>
     /// <param name="code">Security code.</param>
     /// <param name="startStr">In yyyyMMdd</param>
     /// <param name="endStr">In yyyyMMdd</param>
@@ -38,8 +34,7 @@ public class BackTestingController : Controller
     /// <param name="rumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
     /// <returns></returns>
     [HttpGet("rumi/single")]
-    public async Task<IActionResult> RunSingleRumi([FromServices] ISecurityService securityService,
-                                                   [FromServices] IHistoricalMarketDataService mds,
+    public async Task<IActionResult> RunSingleRumi([FromServices] IServices services,
                                                    [FromQuery(Name = "code")] string? code = "BTCTUSD",
                                                    [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
                                                    [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
@@ -70,14 +65,13 @@ public class BackTestingController : Controller
         if (end == DateTime.MinValue)
             return BadRequest("Invalid end date-time.");
 
-        var security = await securityService.GetSecurity(code ?? "", ExchangeType.Binance, SecurityType.Fx);
+        var security = await services.Security.GetSecurity(code ?? "", ExchangeType.Binance, SecurityType.Fx);
         if (security == null)
             return BadRequest("Invalid security.");
 
         var initCash = 100000;
-        var engine = new AlgorithmEngine<RumiVariables>(mds);
         var algo = new Rumi(fastParam, slowParam, rumiParam, stopLossRatio);
-        engine.SetAlgorithm(algo);
+        var engine = new AlgorithmEngine<RumiVariables>(services, algo);
         var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
 
         return Ok(entries);
@@ -86,8 +80,7 @@ public class BackTestingController : Controller
     /// <summary>
     /// Back-test RUMI for all given combinations of parameters, using 100K as initial cash.
     /// </summary>
-    /// <param name="securityService"></param>
-    /// <param name="mds"></param>
+    /// <param name="services"></param>
     /// <param name="concatenatedCodes">Optional security code. Empty value will run every codes available, or else eg. 00001,00002,00003.</param>
     /// <param name="startStr">In yyyyMMdd</param>
     /// <param name="endStr">In yyyyMMdd</param>
@@ -100,8 +93,7 @@ public class BackTestingController : Controller
     /// <param name="concatenatedRumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
     /// <returns></returns>
     [HttpGet("rumi/multiple")]
-    public async Task<IActionResult> RunMultipleRumi([FromServices] ISecurityService securityService,
-                                                     [FromServices] IHistoricalMarketDataService mds,
+    public async Task<IActionResult> RunMultipleRumi([FromServices] IServices services,
                                                      [FromQuery(Name = "codes")] string? concatenatedCodes = "BTCTUSD",
                                                      [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
                                                      [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
@@ -167,7 +159,7 @@ public class BackTestingController : Controller
 
                 foreach (var r in rumis)
                 {
-                    var zipFilePath = await RunRumi(mds, securities, f, s, r, stopLossRatio, interval, start, end, initCash);
+                    var zipFilePath = await RunRumi(services, securities, f, s, r, stopLossRatio, interval, start, end, initCash);
                     zipFilePaths.Add(zipFilePath);
                 }
             });
@@ -192,16 +184,16 @@ public class BackTestingController : Controller
             "application/octet-stream", Path.GetFileName(finalZipFilePath));
     }
 
-    private async Task<string> RunRumi(IHistoricalMarketDataService mds,
-                                      List<Security> securities,
-                                      int f,
-                                      int s,
-                                      int r,
-                                      decimal stopLossRatio,
-                                      IntervalType interval,
-                                      DateTime start,
-                                      DateTime end,
-                                      int initCash)
+    private async Task<string> RunRumi(IServices services,
+                                       List<Security> securities,
+                                       int f,
+                                       int s,
+                                       int r,
+                                       decimal stopLossRatio,
+                                       IntervalType interval,
+                                       DateTime start,
+                                       DateTime end,
+                                       int initCash)
     {
         var now = DateTime.Now;
         var subFolder = $"AlgorithmEngine-{f},{s},{r}-{now:yyyyMMdd-HHmmss}";
@@ -212,8 +204,8 @@ public class BackTestingController : Controller
         var summaryRows = new List<List<object>>();
         await Parallel.ForEachAsync(securities, async (security, t) =>
         {
-            var engine = new AlgorithmEngine<RumiVariables>(mds);
             var algo = new Rumi(f, s, r, stopLossRatio);
+            var engine = new AlgorithmEngine<RumiVariables>(services, algo);
             engine.SetAlgorithm(algo);
             var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
             if (entries.IsNullOrEmpty())

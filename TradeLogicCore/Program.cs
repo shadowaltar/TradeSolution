@@ -3,7 +3,9 @@ using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
+using Org.BouncyCastle.Crypto.Tls;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
@@ -18,6 +20,7 @@ using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
@@ -27,26 +30,45 @@ public class Program
 
     private static readonly int _maxPrintCount = 10;
 
-    private static async Task Main(string[] args)
+    public static async Task Main(string[] args)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        Dependencies.Register(ExternalNames.Binance);
-
-        await NewOrderDemo();
+        //await NewOrderDemo();
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
-        //await RunCore();
+
+        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+        var user = "test";
+        var password = "password";
+        var screeningLogic = new SingleSecurityLogic(await securityService.GetSecurity("ETHUSDT", ExchangeType.Binance, SecurityType.Fx));
+        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
+        algorithm.Screening = screeningLogic;
+
+        await StartAlgorithm(user, password, ExchangeType.Binance, BrokerType.Binance, algorithm);
 
         Console.WriteLine("Finished.");
     }
 
-    private static async Task RunCore()
+    private static async Task StartAlgorithm<T>(string userName,
+                                                string password,
+                                                ExchangeType exchangeType,
+                                                BrokerType brokerType,
+                                                IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
-        var engine = Dependencies.ComponentContext.Resolve<Core>();
-        await engine.Start("mars", "???", EnvironmentType.Prod);
+        if (brokerType == BrokerType.Binance)
+        {
+            Dependencies.Register(ExternalNames.Binance);
+        }
+        else
+        {
+            throw new NotImplementedException();
+        }
+
+        var engine = Dependencies.ComponentContext.Resolve<Core>(TypedParameter.From(exchangeType), TypedParameter.From(brokerType));
+        await engine.Start(userName, password, algorithm, EnvironmentType.Test);
     }
 
     private static async Task NewSecurityOhlcSubscriptionDemo()
@@ -144,8 +166,8 @@ public class Program
 
     private static async Task RunRumiBackTestDemo()
     {
-        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
+        var services = Dependencies.ComponentContext.Resolve<IServices>();
+        var securityService = services.Security;
 
         //var filter = "00001,00002,00005";
 
@@ -181,9 +203,8 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-                    var engine = new AlgorithmEngine<RumiVariables>(mds);
                     var algo = new Rumi(fast, slow, rumi, sl);
-                    engine.SetAlgorithm(algo);
+                    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
 
                     var initCash = 1000;
                     var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
@@ -283,8 +304,8 @@ public class Program
             "PNL>0/Total Cnt",
             "FilePath"
         };
-        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        var mds = Dependencies.ComponentContext.Resolve<IHistoricalMarketDataService>();
+        var services = Dependencies.ComponentContext.Resolve<IServices>();
+        var securityService = services.Security;
 
         var filter = "ETHUSDT";
         //var filter = "ETHUSDT";
@@ -333,9 +354,8 @@ public class Program
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     foreach (var sl in stopLosses)
                     {
-                        var engine = new AlgorithmEngine<MacVariables>(mds);
                         var algo = new MovingAverageCrossing(fast, slow, sl);
-                        engine.SetAlgorithm(algo);
+                        var engine = new AlgorithmEngine<MacVariables>(services, algo);
 
                         var initCash = 1000;
                         var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
