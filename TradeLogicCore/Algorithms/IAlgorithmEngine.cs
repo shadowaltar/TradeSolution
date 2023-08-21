@@ -13,7 +13,7 @@ public abstract class IAlgorithmEngine<T> where T : IAlgorithmVariables
 
     public IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
 
-    public ISecurityScreeningAlgoLogic<T> Screening { get; protected set; }
+    public ISecurityScreeningAlgoLogic Screening { get; protected set; }
 
     protected abstract void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, decimal currentPrice);
 }

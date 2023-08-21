@@ -38,9 +38,14 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         Screening = algorithm.Screening;
     }
 
-    public void Run(List<Security> securityPool, IntervalType intervalType)
+    public void Run(List<Security> securityPool, IntervalType intervalType, Parameters.AlgoEffectiveTimeRange effectiveTimeRange)
     {
-        // TODO reactive to real-time market prices
+        Screening.SetAndPick(securityPool);
+        var pickedSecurities = Screening.GetPickedOnes();
+        foreach (var security in pickedSecurities)
+        {
+            _services.RealTimeMarketData.SubscribeOhlc(security);
+        }
     }
 
     /// <summary>
@@ -58,11 +63,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     internal void Run(AlgoStartTimeType )
     {
-        var pickedSecurities = Screening.GetPickedOnes();
-        foreach (var security in pickedSecurities)
-        {
-            _services.RealTimeMarketData.SubscribeOhlc(security);
-        }
     }
 
     private void OnNextPrice(int securityId, OhlcPrice ohlcPrice)
@@ -442,7 +442,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
 public enum AlgoStartTimeType
 {
+    Never,
     Immediately,
+    Designated,
     NextStartOfMinute,
     NextStartOfHour,
     NextStartOfLocalDay,
@@ -450,4 +452,11 @@ public enum AlgoStartTimeType
     NextMarketOpens,
     NextWeekMarketOpens,
     NextStartOfMonth,
+}
+
+public enum AlgoStopTimeType
+{
+    Never,
+    Designated,
+    BeforeBrokerMaintenance,
 }

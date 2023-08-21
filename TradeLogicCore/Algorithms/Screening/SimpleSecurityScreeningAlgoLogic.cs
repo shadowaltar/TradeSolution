@@ -4,25 +4,10 @@ namespace TradeLogicCore.Algorithms.Screening;
 
 public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
-    private static readonly List<Security> _empty = new();
-    private static readonly List<Security> _originalPool = new();
-    private static readonly Dictionary<int, Security> _pickedPool = new();
+    private readonly List<Security> _originalPool = new();
+    private readonly Dictionary<int, Security> _pickedPool = new();
 
-    public bool CheckIsPicked(int securityId)
-    {
-        lock (_pickedPool)
-        {
-            return _pickedPool.ContainsKey(securityId);
-        }
-    }
-
-    public IReadOnlyCollection<Security> GetPickedOnes(List<Security> securityPool)
-    {
-        lock (_pickedPool)
-            return _pickedPool.Values;
-    }
-
-    public void Pick(List<Security> securityPool)
+    public void SetAndPick(List<Security> securityPool)
     {
         lock (_originalPool)
         {
@@ -38,19 +23,36 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
             }
         }
     }
+
+    public bool CheckIsPicked(int securityId)
+    {
+        lock (_pickedPool)
+        {
+            return _pickedPool.ContainsKey(securityId);
+        }
+    }
+
+    public IReadOnlyCollection<Security> GetPickedOnes()
+    {
+        lock (_pickedPool)
+            return _pickedPool.Values;
+    }
 }
 
 public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 {
     private Security? _security;
-    private List<Security> _securities;
-    public SingleSecurityLogic(Security? security)
+    private readonly List<Security> _securities = new(1);
+
+    public void SetAndPick(List<Security> securityPool)
     {
-        _security = security;
-        if (security != null)
-            _securities = new List<Security> { security };
-        else
-            _securities = new List<Security>();
+        if (securityPool == null || securityPool.Count == 0) throw new ArgumentNullException(nameof(securityPool));
+
+        _security = securityPool[0];
+        if (_security == null) throw new InvalidOperationException("Must provide at least one security in the pool for screening.");
+
+        _securities.Clear();
+        _securities.Add(_security);
     }
 
     public bool CheckIsPicked(int securityId)
@@ -66,5 +68,6 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 
     public void Pick(List<Security> securityPool)
     {
+        // 
     }
 }

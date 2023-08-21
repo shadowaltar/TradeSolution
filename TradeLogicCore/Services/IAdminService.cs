@@ -14,5 +14,19 @@ public interface IAdminService
 
     Task<User?> ReadUserByEmail(string email, EnvironmentType environment);
 
-    bool Authenticate(User user, string password, EnvironmentType environment);
+    /// <summary>
+    /// Login a user.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <param name="password"></param>
+    /// <param name="environment"></param>
+    /// <returns></returns>
+    bool Login(User user, string password, EnvironmentType environment);
+
+    /// <summary>
+    /// Select a user in order to use its account / balance / credentials.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <returns></returns>
+    bool SelectUser(User user);
 }

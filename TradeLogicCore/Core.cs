@@ -2,11 +2,14 @@
 using Common;
 using log4net;
 using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore;
@@ -25,23 +28,39 @@ public class Core
     public ExchangeType ExchangeType { get; private set; }
     public BrokerType BrokerType { get; private set; }
 
-    public Core(IComponentContext componentContext, IServices services, ExchangeType exchange, BrokerType broker)
+    public Core(IComponentContext componentContext, IServices services)
     {
         _componentContext = componentContext;
         _services = services;
-        ExchangeType = exchange;
-        BrokerType = broker;
     }
 
-    public async Task Start<T>(string userName, string password, IAlgorithm<T> algorithm, EnvironmentType environment) where T : IAlgorithmVariables
+    /// <summary>
+    /// To start a trading algorithm, the following parameters need to be provided:
+    /// * environment, broker, exchange, user and account details.
+    /// * securities to be listened and screened.
+    /// * algorithm instance, with position-sizing, entering, exiting, screening, fee-charging logic components.
+    /// * when to start: immediately or wait for next start of min/hour/day/week etc.
+    /// * when to stop: algorithm halting condition, eg. 2 hours before exchange maintenance.
+    /// * what time interval is the algorithm interested in.
+    /// Additionally if it is in back-testing mode:
+    /// * whether it is a perpetual or ranged testing.
+    /// 
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="parameters"></param>
+    /// <param name="algorithm"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public async Task StartAlgorithm<T>(AlgoStartupParameters parameters,
+                                        IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
         _services = _componentContext.Resolve<IServices>();
 
-        var user = await _services.Admin.ReadUser(userName, environment);
+        var user = await _services.Admin.ReadUser(parameters.UserName, parameters.Environment);
         if (user == null)
             throw new InvalidOperationException("The user does not exist.");
 
-        if (!_services.Admin.Authenticate(user, password, environment))
+        if (!_services.Admin.Login(user, parameters.Password, parameters.Environment))
             throw new InvalidOperationException("The password is incorrect.");
 
         await CheckAccountAndBalance(user);
@@ -50,9 +69,7 @@ public class Core
         await CheckRecentTradeHistory();
 
         var engine = new AlgorithmEngine<T>(_services, algorithm);
-        engine.Run();
-        //SubscribeToMarketData();
-        //StartAlgorithmEngine();
+        engine.Run(parameters.BasicSecurityPool, parameters.Interval, parameters.EffectiveTimeRange);
     }
 
     private Task CheckRecentOrderHistory()
@@ -67,15 +84,15 @@ public class Core
 
     private async Task CheckAccountAndBalance(User user)
     {
-        if (!PortfolioService.SelectUser(user))
-        {
-            Environment.Exit(StatusCodes.GetUserFailed);
-            return;
-        }
         foreach (var account in user.Accounts)
         {
             var externalAccount = await PortfolioService.GetAccountByName(account.Name, true);
             var internalAccount = await PortfolioService.GetAccountByName(account.Name);
+            if (externalAccount != internalAccount)
+            {
+                _log.Warn("Internally stored account does not exactly match the external account.");
+
+            }
         }
     }
 

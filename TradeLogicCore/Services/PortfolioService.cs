@@ -101,11 +101,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
     }
 
-    public bool SelectUser(User user)
-    {
-        return AsyncHelper.RunSync(() => ExternalExecution.Initialize(user));
-    }
-
     public List<Position> GetOpenPositions()
     {
         List<Position> results;

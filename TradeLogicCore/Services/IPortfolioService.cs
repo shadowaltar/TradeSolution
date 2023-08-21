@@ -46,13 +46,6 @@ public interface IPortfolioService
 
     bool Validate(Order order);
 
-    /// <summary>
-    /// Select a user in order to use its account / balance / credentials.
-    /// </summary>
-    /// <param name="user"></param>
-    /// <returns></returns>
-    bool SelectUser(User user);
-
     Task<bool> Deposit(int accountId, int assetId, decimal value);
 
     Task<bool> Withdraw(int accountId, int assetId, decimal value);

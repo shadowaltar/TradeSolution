@@ -20,6 +20,7 @@ using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
@@ -40,35 +41,30 @@ public class Program
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
 
+        var broker = BrokerType.Binance;
+        var exchange = ExchangeType.Binance;
+
+        Dependencies.Register(broker, exchange);
+
+        var engine = Dependencies.ComponentContext.Resolve<Core>();
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+        var security = await securityService.GetSecurity("ETHUSDT", exchange, SecurityType.Fx);
+        if (security == null)
+        {
+            _log.Error("Security is not found.");
+            return;
+        }
+        var securityPool = new List<Security> { security };
+        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic() };
         var user = "test";
         var password = "password";
-        var screeningLogic = new SingleSecurityLogic(await securityService.GetSecurity("ETHUSDT", ExchangeType.Binance, SecurityType.Fx));
-        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
-        algorithm.Screening = screeningLogic;
 
-        await StartAlgorithm(user, password, ExchangeType.Binance, BrokerType.Binance, algorithm);
+        var parameters = new AlgoStartupParameters(user, password, "0", EnvironmentType.Test, exchange, broker,
+            IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
+
+        await engine.StartAlgorithm(parameters, algorithm);
 
         Console.WriteLine("Finished.");
-    }
-
-    private static async Task StartAlgorithm<T>(string userName,
-                                                string password,
-                                                ExchangeType exchangeType,
-                                                BrokerType brokerType,
-                                                IAlgorithm<T> algorithm) where T : IAlgorithmVariables
-    {
-        if (brokerType == BrokerType.Binance)
-        {
-            Dependencies.Register(ExternalNames.Binance);
-        }
-        else
-        {
-            throw new NotImplementedException();
-        }
-
-        var engine = Dependencies.ComponentContext.Resolve<Core>(TypedParameter.From(exchangeType), TypedParameter.From(brokerType));
-        await engine.Start(userName, password, algorithm, EnvironmentType.Test);
     }
 
     private static async Task NewSecurityOhlcSubscriptionDemo()
@@ -289,7 +285,7 @@ public class Program
     private static async Task RunMACBackTestDemo()
     {
         List<string> headers = new List<string> {
-            "Start",
+            "StartAlgorithm",
             "End",
             "Interval",
             "StopLoss",
