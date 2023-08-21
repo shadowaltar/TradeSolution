@@ -11,29 +11,27 @@ public static class Dependencies
     [NotNull]
     public static IComponentContext? ComponentContext { get; private set; }
 
-    public static void Register(string externalName, ContainerBuilder? builder = null)
+    public static void Register(BrokerType brokerType, ExchangeType exchangeType, ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();
         builder.RegisterModule<DependencyModule>();
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
         builder.RegisterSingleton<IServices, Services.Services>()
-            .WithParameter(new TypedParameter(typeof(string), externalName));
+            .WithParameter(new TypedParameter(typeof(BrokerType), brokerType));
 
         builder.RegisterSingleton<Context>()
-            .WithParameter(new TypedParameter(typeof(ExchangeType), ExternalNames.ConvertToExchange(externalName)))
-            .WithParameter(new TypedParameter(typeof(BrokerType), ExternalNames.ConvertToBroker(externalName)));
-        builder.RegisterSingleton<Core>()
-            .WithParameter(new TypedParameter(typeof(ExchangeType), ExternalNames.ConvertToExchange(externalName)))
-            .WithParameter(new TypedParameter(typeof(BrokerType), ExternalNames.ConvertToBroker(externalName)));
-        switch (externalName)
+            .WithParameter(new TypedParameter(typeof(ExchangeType), exchangeType))
+            .WithParameter(new TypedParameter(typeof(BrokerType), brokerType));
+        builder.RegisterSingleton<Core>();
+        switch (brokerType)
         {
-            case ExternalNames.Binance:
+            case BrokerType.Binance:
                 builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
                 break;
-            case ExternalNames.Futu:
+            case BrokerType.Futu:
                 builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
                 break;
-            case ExternalNames.CryptoSimulator:
+            case BrokerType.Simulator:
                 builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
                 break;
         }

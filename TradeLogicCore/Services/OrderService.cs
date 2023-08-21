@@ -176,11 +176,7 @@ public class OrderService : IOrderService, IDisposable
 
     private void Persist(Order order)
     {
-        var orderTask = new PersistenceTask<Order>()
-        {
-            Entry = order,
-            DatabaseName = DatabaseNames.ExecutionData
-        };
+        var orderTask = new PersistenceTask<Order>(order);
         _persistence.Enqueue(orderTask);
     }
 

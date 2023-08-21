@@ -7,7 +7,7 @@ namespace TradeCommon.Essentials.Trading;
 /// <summary>
 /// Action to buy or sell a security.
 /// </summary>
-public class Order
+public class Order : IComparable<Order>
 {
     public const long DefaultId = 0;
 
@@ -130,6 +130,35 @@ public class Order
     /// </summary>
     [UpsertIgnore]
     public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
+
+    public int CompareTo(Order? other)
+    {
+        var r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
+        if (r != 0) r = SecurityId.CompareTo(other?.SecurityId);
+        if (r != 0) r = AccountId.CompareTo(other?.AccountId);
+        if (r != 0) r = Type.CompareTo(other?.Type);
+        if (r != 0) r = Side.CompareTo(other?.Side);
+        if (r != 0) r = Price.CompareTo(other?.Price);
+        if (r != 0) r = StopPrice.CompareTo(other?.StopPrice);
+        if (r != 0) r = Quantity.CompareTo(other?.Quantity);
+        if (r != 0) r = FilledQuantity.CompareTo(other?.FilledQuantity);
+        if (r != 0) r = Status.CompareTo(other?.Status);
+        if (r != 0) r = CreateTime.CompareTo(other?.CreateTime);
+        if (r != 0) r = UpdateTime.CompareTo(other?.UpdateTime);
+        if (r != 0) r = ExternalCreateTime.CompareTo(other?.ExternalCreateTime);
+        if (r != 0) r = ExternalUpdateTime.CompareTo(other?.ExternalUpdateTime);
+        if (r != 0) r = TimeInForce.CompareTo(other?.TimeInForce);
+        if (r != 0) r = BrokerId.CompareTo(other?.BrokerId);
+        if (r != 0) r = ExchangeId.CompareTo(other?.ExchangeId);
+        if (AdvancedOrderSettings != null)
+        {
+            if (r != 0) r = AdvancedOrderSettings.TimeInForceTime.CompareTo(other?.AdvancedOrderSettings?.TimeInForceTime);
+            if (r != 0) r = AdvancedOrderSettings.TrailingSpread.CompareTo(other?.AdvancedOrderSettings?.TrailingSpread);
+            if (r != 0) r = AdvancedOrderSettings.TrailingType.CompareTo(other?.AdvancedOrderSettings?.TrailingType);
+            if (r != 0) r = AdvancedOrderSettings.TrailingValue.CompareTo(other?.AdvancedOrderSettings?.TrailingValue);
+        }
+        return r;
+    }
 
     public override string ToString()
     {

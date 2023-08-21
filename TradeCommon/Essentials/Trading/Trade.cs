@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Constants;
+﻿using TradeCommon.Constants;
 using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
@@ -13,7 +8,7 @@ namespace TradeCommon.Essentials.Trading;
 /// It can also be called as a Deal.
 /// One order object may result in zero or more trades immediately or in a period of time.
 /// </summary>
-public class Trade
+public class Trade : IComparable<Trade>
 {
     public const long DefaultId = 0;
 
@@ -90,6 +85,24 @@ public class Trade
     /// </summary>
     [UpsertIgnore]
     public bool IsCoarse { get; set; } = false;
+
+    public int CompareTo(Trade? other)
+    {
+        var r = SecurityId.CompareTo(other?.SecurityId);
+        if (r != 0) r = OrderId.CompareTo(other?.OrderId);
+        if (r != 0) r = ExternalTradeId.CompareTo(other?.ExternalTradeId);
+        if (r != 0) r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
+        if (r != 0) r = Time.CompareTo(other?.Time);
+        if (r != 0) r = Side.CompareTo(other?.Side);
+        if (r != 0) r = Price.CompareTo(other?.Price);
+        if (r != 0) r = Quantity.CompareTo(other?.Quantity);
+        if (r != 0) r = Fee.CompareTo(other?.Fee);
+        if (r != 0) r = FeeCurrency.CompareTo(other?.FeeCurrency);
+        if (r != 0) r = BrokerId.CompareTo(other?.BrokerId);
+        if (r != 0) r = ExchangeId.CompareTo(other?.ExchangeId);
+        return r;
+    }
+
     public override string ToString()
     {
         return $"[{Id}][{ExternalTradeId}][{Time:yyMMdd-HHmmss}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
