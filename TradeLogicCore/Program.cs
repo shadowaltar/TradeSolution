@@ -4,7 +4,6 @@ using log4net;
 using log4net.Config;
 using OfficeOpenXml;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
@@ -32,6 +31,10 @@ public class Program
 
     private static readonly string _testUserName = "test";
     private static readonly string _testPassword = "testtest";
+    private static readonly string _testAccountName = "0";
+    private static readonly BrokerType _broker = BrokerType.Binance;
+    private static readonly ExchangeType _exchange = ExchangeType.Binance;
+    private static readonly EnvironmentType _environment = EnvironmentType.Test;
 
     public static async Task Main(string[] args)
     {
@@ -42,15 +45,21 @@ public class Program
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
+        await Run();
 
-        var broker = BrokerType.Binance;
-        var exchange = ExchangeType.Binance;
 
-        Dependencies.Register(broker, exchange);
+        Console.WriteLine("Finished.");
+    }
+
+    private static async Task Run()
+    {
+        Dependencies.Register(_broker, _exchange);
 
         var engine = Dependencies.ComponentContext.Resolve<Core>();
-        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        var security = await securityService.GetSecurity("ETHUSDT", exchange, SecurityType.Fx);
+        var services = Dependencies.ComponentContext.Resolve<IServices>();
+
+        var account = await CheckTestUserAndAccount(services);
+        var security = await services.Security.GetSecurity("ETHUSDT", _exchange, SecurityType.Fx);
         if (security == null)
         {
             _log.Error("Security is not found.");
@@ -60,13 +69,50 @@ public class Program
         var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic() };
         var user = _testUserName;
         var password = _testPassword;
-
-        var parameters = new AlgoStartupParameters(user, password, "0", EnvironmentType.Test, exchange, broker,
+        var parameters = new AlgoStartupParameters(user, password, account.Name, _environment, _exchange, _broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
 
         await engine.StartAlgorithm(parameters, algorithm);
+    }
 
-        Console.WriteLine("Finished.");
+    private static async Task<Account> CheckTestUserAndAccount(IServices services)
+    {
+        var user = await services.Admin.GetUser(_testUserName, _environment);
+        if (user == null)
+        {
+            var email = _testUserName + "@test.com";
+            var count = await services.Admin.CreateUser(_testUserName, _testPassword, email, _environment);
+            user = await services.Admin.GetUser(_testUserName, _environment);
+            if (count == 0 || user == null)
+            {
+                _log.Error("Failed to create test user.");
+                throw new InvalidOperationException();
+            }
+        }
+        var account = await services.Admin.GetAccount(_testAccountName, _environment);
+        if (account == null)
+        {
+            var count = await services.Admin.CreateAccount(new Account
+            {
+                Name = _testAccountName,
+                OwnerId = user.Id,
+                Type = "spot",
+                SubType = "",
+                BrokerId = ExternalNames.GetBrokerId(_broker),
+                CreateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow,
+                Environment = _environment,
+                ExternalAccount = _testAccountName,
+                FeeStructure = "",
+            });
+            account = await services.Admin.GetAccount(_testAccountName, _environment);
+            if (count == 0 || account == null)
+            {
+                _log.Error("Failed to create test account.");
+                throw new InvalidOperationException();
+            }
+        }
+        return account;
     }
 
     private static async Task NewSecurityOhlcSubscriptionDemo()
@@ -75,7 +121,7 @@ public class Program
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
 
         var printCount = 0;
-        var dataService = Dependencies.ComponentContext.Resolve<IRealTimeMarketDataService>();
+        var dataService = Dependencies.ComponentContext.Resolve<IMarketDataService>();
         dataService.NextOhlc += OnNewOhlc;
         await dataService.SubscribeOhlc(security);
         while (printCount < _maxPrintCount)
@@ -110,10 +156,10 @@ public class Program
         orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
-        var user = await adminService.ReadUser(_testUserName, EnvironmentType.Test);
-        adminService.Login(user, _testPassword, EnvironmentType.Test);
+        var user = await adminService.GetUser(_testUserName, _environment);
+        adminService.Login(user, _testPassword, _environment);
 
-        orderService.CancelAllOrders();
+        orderService.CancelAllOpenOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
         if (security == null)
             return;
@@ -130,7 +176,7 @@ public class Program
         };
         await Task.Run(async () =>
         {
-            await portfolioService.GetAccountByName("whatever");
+            await adminService.GetAccount(_testAccountName, _environment, false);
             orderService.SendOrder(order, false);
         });
 
@@ -151,7 +197,7 @@ public class Program
 
             orderService.CancelOrder(order.Id);
 
-            orderService.CancelAllOrders();
+            orderService.CancelAllOpenOrders();
         }
 
         static void OnNewTradesReceived(List<Trade> trades)
@@ -161,10 +207,7 @@ public class Program
                 _log.Info("Trade received: " + trade);
             }
         }
-        static void OnOrderCancelled(Order order)
-        {
-            _log.Info("Order cancelled: " + order);
-        }
+        static void OnOrderCancelled(Order order) => _log.Info("Order cancelled: " + order);
     }
 
     private static async Task RunRumiBackTestDemo()
@@ -206,13 +249,13 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-                    var algo = new Rumi(fast, slow, rumi, sl);
-                    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
                     var securityPool = new List<Security> { security };
-                    var initCash = 1000;
-                    var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = stop };
-                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, "test", EnvironmentType.Test, ExchangeType.Binance, BrokerType.Binance, interval, securityPool)
-                    var entries = await engine.Run( securityPool, interval, start, end, initCash);
+                    var algo = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic() };
+                    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
+                    var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
+                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
+                        _environment, _exchange, _broker, interval, securityPool, timeRange);
+                    await engine.Run(algoStartParams);
                     if (entries.IsNullOrEmpty())
                         continue;
 
@@ -221,7 +264,7 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-
+                    engine.Cash
                     var annualizedReturn = Metrics.GetAnnualizedReturn(initCash, engine.Portfolio.Notional.ToDouble(), start, end);
                     if (annualizedReturn == 0)
                     {

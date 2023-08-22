@@ -40,7 +40,7 @@ public class AdminController : Controller
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
 
-        var user = await adminService.ReadUser(userName, model.Environment);
+        var user = await adminService.GetUser(userName, model.Environment);
         if (user != null)
         {
             return BadRequest();
@@ -70,7 +70,7 @@ public class AdminController : Controller
 
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
-        var user = await adminService.ReadUser(model.OwnerName, model.Environment);
+        var user = await adminService.GetUser(model.OwnerName, model.Environment);
         if (user == null) return BadRequest("Invalid owner.");
         var brokerId = ExternalNames.GetBrokerId(model.Broker);
         if (brokerId == ExternalNames.BrokerTypeToIds[BrokerType.Unknown]) return BadRequest("Invalid broker.");
@@ -107,7 +107,7 @@ public class AdminController : Controller
     {
         if (userName.IsBlank()) return BadRequest();
 
-        var user = await adminService.ReadUser(userName, environment);
+        var user = await adminService.GetUser(userName, environment);
         if (user == null)
         {
             return NotFound();

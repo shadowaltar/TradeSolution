@@ -28,14 +28,14 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public IPositionSizingAlgoLogic<MacVariables> Sizing { get; }
     public IEnterPositionAlgoLogic<MacVariables> Entering { get; }
     public IExitPositionAlgoLogic<MacVariables> Exiting { get; }
-    public ISecurityScreeningAlgoLogic<MacVariables> Screening { get; }
+    public ISecurityScreeningAlgoLogic Screening { get; }
 
     public MovingAverageCrossing(int fast, int slow, decimal stopLossRatio)
     {
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
 
         Sizing = new SimplePositionSizing<MacVariables>();
-        Screening = new SimpleSecurityScreeningAlgoLogic<MacVariables>();
+        Screening = new SimpleSecurityScreeningAlgoLogic();
         Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(Sizing);
         Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(stopLossRatio);
 

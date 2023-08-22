@@ -4,7 +4,7 @@ using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
 namespace TradeDataCore.MarketData;
-public interface IRealTimeMarketDataService
+public interface IMarketDataService
 {
     event Action<int, OhlcPrice> NextOhlc;
     event Action<int, Tick> NextTick;

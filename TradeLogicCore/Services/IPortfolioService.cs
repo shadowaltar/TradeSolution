@@ -21,8 +21,6 @@ public interface IPortfolioService
 
     Task Initialize();
 
-    Task<Account?> GetAccountByName(string accountName, bool isExternal = false);
-
     List<Position> GetOpenPositions();
 
     List<Position> GetPositions(string externalName, SecurityType securityType);

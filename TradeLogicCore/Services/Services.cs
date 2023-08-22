@@ -1,6 +1,4 @@
-﻿using Common;
-using TradeCommon.Constants;
-using TradeCommon.Database;
+﻿using TradeCommon.Database;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 
@@ -15,7 +13,7 @@ public class Services : IServices
                     ITradeService trade,
                     ISecurityService security,
                     IHistoricalMarketDataService historicalMarketDataService,
-                    IRealTimeMarketDataService realTimeMarketDataService)
+                    IMarketDataService marketDataService)
     {
         Context = context;
         Persistence = persistence;
@@ -25,7 +23,7 @@ public class Services : IServices
         Trade = trade;
         Security = security;
         HistoricalMarketData = historicalMarketDataService;
-        RealTimeMarketData = realTimeMarketDataService;
+        MarketData = marketDataService;
     }
 
     public Context Context { get; }
@@ -44,5 +42,5 @@ public class Services : IServices
 
     public IHistoricalMarketDataService HistoricalMarketData { get; private set; }
 
-    public IRealTimeMarketDataService RealTimeMarketData { get; private set; }
+    public IMarketDataService MarketData { get; private set; }
 }

@@ -12,5 +12,29 @@ public record AlgoStartupParameters(string UserName,
                                     ExchangeType Exchange,
                                     BrokerType Broker,
                                     IntervalType Interval,
-                                    List<Security> BasicSecurityPool,
-                                    AlgoEffectiveTimeRange EffectiveTimeRange);
+                                    List<Security> SecurityPool,
+                                    AlgoEffectiveTimeRange TimeRange)
+{
+    public bool ShouldCloseOpenPositionsWhenStopped { get; set; } = true;
+    public bool ShouldCloseOpenPositionsWhenHalted { get; set; } = true;
+}
+
+
+public enum AlgoStartTimeType
+{
+    Never,
+    Immediately,
+    Designated,
+    NextStartOf,
+    NextStartOfLocalDay,
+    NextMarketOpens,
+    NextWeekMarketOpens,
+}
+
+
+public enum AlgoStopTimeType
+{
+    Never,
+    Designated,
+    BeforeBrokerMaintenance,
+}

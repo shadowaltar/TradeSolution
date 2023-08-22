@@ -52,14 +52,16 @@ public class Core
     {
         _services = _componentContext.Resolve<IServices>();
 
-        var user = await _services.Admin.ReadUser(parameters.UserName, parameters.Environment);
+        var user = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
         if (user == null)
             throw new InvalidOperationException("The user does not exist.");
 
         if (!_services.Admin.Login(user, parameters.Password, parameters.Environment))
             throw new InvalidOperationException("The password is incorrect.");
 
-        var startTime = parameters.EffectiveTimeRange.ActualStartTime;
+        var startTime = parameters.TimeRange.ActualStartTime;
+        if (!startTime.IsValid())
+            throw new InvalidOperationException("The start time is incorrect.");
 
         await CheckAccountAndBalance(user);
         await CheckOpenOrders();
@@ -69,12 +71,12 @@ public class Core
             // check one day's historical order / trade only
             // they should not impact trading
             var previousDay = startTime.AddDays(-1);
-            await CheckRecentOrderHistory(previousDay, startTime, parameters.BasicSecurityPool);
-            await CheckRecentTradeHistory(previousDay, startTime, parameters.BasicSecurityPool);
+            await CheckRecentOrderHistory(previousDay, startTime, parameters.SecurityPool);
+            await CheckRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
         });
 
         var engine = new AlgorithmEngine<T>(_services, algorithm);
-        engine.Run(parameters.BasicSecurityPool, parameters.Interval, parameters.EffectiveTimeRange);
+        engine.Run(parameters.SecurityPool, parameters.Interval, parameters.TimeRange);
     }
 
     private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)

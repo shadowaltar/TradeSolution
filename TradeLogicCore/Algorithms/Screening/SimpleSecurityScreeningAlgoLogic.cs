@@ -37,6 +37,10 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
         lock (_pickedPool)
             return _pickedPool.Values;
     }
+
+    public void Repick()
+    {
+    }
 }
 
 public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
@@ -66,8 +70,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         return _securities;
     }
 
-    public void Pick(List<Security> securityPool)
+    public void Repick()
     {
-        // 
     }
 }

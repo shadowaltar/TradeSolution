@@ -6,13 +6,13 @@ public interface IAdminService
 {
     Task<int> CreateAccount(Account account);
 
-    Task<Account?> ReadAccount(string accountName, EnvironmentType environment);
+    Task<Account?> GetAccount(string accountName, EnvironmentType environment, bool requestExternal = false);
 
     Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment);
 
-    Task<User?> ReadUser(string userName, EnvironmentType environment);
+    Task<User?> GetUser(string userName, EnvironmentType environment);
 
-    Task<User?> ReadUserByEmail(string email, EnvironmentType environment);
+    Task<User?> GetUserByEmail(string email, EnvironmentType environment);
 
     /// <summary>
     /// Login a user.

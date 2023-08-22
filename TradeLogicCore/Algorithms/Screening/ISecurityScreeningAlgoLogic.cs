@@ -8,4 +8,6 @@ public interface ISecurityScreeningAlgoLogic
     IReadOnlyCollection<Security> GetPickedOnes();
 
     bool CheckIsPicked(int securityId);
+    
+    void Repick();
 }

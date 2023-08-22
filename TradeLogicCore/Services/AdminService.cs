@@ -59,12 +59,12 @@ public class AdminService : IAdminService
         return await Storage.InsertUser(user);
     }
 
-    public async Task<User?> ReadUser(string userName, EnvironmentType environment)
+    public async Task<User?> GetUser(string userName, EnvironmentType environment)
     {
         return await Storage.ReadUser(userName, "", environment);
     }
 
-    public async Task<User?> ReadUserByEmail(string email, EnvironmentType environment)
+    public async Task<User?> GetUserByEmail(string email, EnvironmentType environment)
     {
         return await Storage.ReadUser("", email, environment);
     }
@@ -74,8 +74,32 @@ public class AdminService : IAdminService
         return await Storage.InsertAccount(account);
     }
 
-    public async Task<Account?> ReadAccount(string accountName, EnvironmentType environment)
+    public async Task<Account?> GetAccount(string accountName, EnvironmentType environment, bool requestExternal = false)
     {
-        return await Storage.ReadAccount(accountName, environment);
+        if (!requestExternal)
+        {
+            var account = await Storage.ReadAccount(accountName, environment);
+            if (account == null)
+            {
+                _log.Error($"Failed to read account by name {accountName} from database.");
+                return null;
+            }
+            var balances = await Storage.ReadBalances(account.Id);
+            if (balances.IsNullOrEmpty())
+            {
+                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database.");
+            }
+            else
+            {
+                account.Balances.AddRange(balances);
+            }
+            return account;
+        }
+        else
+        {
+            var state = await _accountManagement.GetAccount();
+            // TODO
+            return state.Content;
+        }
     }
 }

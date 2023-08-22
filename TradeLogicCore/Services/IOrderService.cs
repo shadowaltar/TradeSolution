@@ -65,7 +65,12 @@ public interface IOrderService
     /// <summary>
     /// Cancel all open orders.
     /// </summary>
-    void CancelAllOrders();
+    void CancelAllOpenOrders();
+    
+    /// <summary>
+    /// Close all open positions by market price.
+    /// </summary>
+    void CloseAllOpenPositions();
 
     /// <summary>
     /// Create an order without any validation.

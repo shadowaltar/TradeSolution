@@ -1,4 +1,6 @@
-﻿using TradeCommon.Essentials;
+﻿using Common;
+using log4net;
+using TradeCommon.Essentials;
 
 namespace TradeLogicCore.Algorithms.Parameters;
 
@@ -7,8 +9,10 @@ public record AlgoEffectiveTimeRange
     private DateTime? _designatedStart;
     private DateTime? _designatedStop;
 
-    public required AlgoStartTimeType WhenToStart { get; set; }
-    public required AlgoStopTimeType WhenToStop { get; set; }
+    public AlgoStartTimeType WhenToStart { get; set; }
+
+    public AlgoStopTimeType WhenToStop { get; set; }
+
     public DateTime? DesignatedStart
     {
         get => _designatedStart;
@@ -33,38 +37,41 @@ public record AlgoEffectiveTimeRange
 
     public int HoursBeforeMaintenance { get; set; } = 3;
 
+    public IntervalType? NextStartOfIntervalType { get; set; }
+
     public DateTime ActualStartTime
     {
         get
         {
             switch (WhenToStart)
             {
-                case AlgoStartTimeType.Immediately:
-                    return DateTime.UtcNow;
                 case AlgoStartTimeType.Designated:
                     return DesignatedStart == null ? DateTime.MinValue : DesignatedStart.Value;
-                case AlgoStartTimeType.NextStartOfMinute:
+                case AlgoStartTimeType.Immediately:
+                    return DateTime.UtcNow;
+                case AlgoStartTimeType.Never:
+                    return DateTime.MaxValue;
+                case AlgoStartTimeType.NextStartOf:
+                    if (NextStartOfIntervalType != null)
                     {
                         var now = DateTime.UtcNow;
-                        return now.Date.AddHours(now.Hour).AddMinutes(now.Minute).AddMinutes(1);
+                        return now.NextOf(IntervalTypeConverter.ToTimeSpan(NextStartOfIntervalType.Value));
                     }
-                case AlgoStartTimeType.NextStartOfHour:
-                    {
-                        var now = DateTime.UtcNow;
-                        return now.Date.AddHours(now.Hour).AddHours(1);
-                    }
-                case AlgoStartTimeType.NextStartOfUtcDay:
-                    {
-                        var now = DateTime.UtcNow;
-                        return now.Date.AddDays(1);
-                    }
-                case AlgoStartTimeType.NextStartOfMonth:
-                    {
-                        var now = DateTime.UtcNow;
-                        return new DateTime(now.Year, now.Month, 1).AddMonths(1);
-                    }
-                default: throw new ArgumentException();
+                    return DateTime.MinValue;
+                case AlgoStartTimeType.NextStartOfLocalDay:
+                {
+                    var now = DateTime.UtcNow;
+                    var localNow = now.ToLocalTime();
+                    return now.Add(TimeSpans.LocalUtcDiff);
+                }
+                case AlgoStartTimeType.NextMarketOpens:
+                    // TODO, need market meta data
+                    break;
+                case AlgoStartTimeType.NextWeekMarketOpens:
+                    // TODO, need market meta data
+                    break;
             }
+            return DateTime.MinValue;
         }
     }
 
@@ -85,11 +92,11 @@ public record AlgoEffectiveTimeRange
         switch (intervalType)
         {
             case IntervalType.OneMinute:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfMinute; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf; break;
             case IntervalType.OneHour:
                 algoStartTimeType = AlgoStartTimeType.NextStartOfHour; break;
             case IntervalType.OneDay:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfUtcDay; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOfLocalDay; break;
         }
         return new AlgoEffectiveTimeRange
         {
@@ -104,11 +111,11 @@ public record AlgoEffectiveTimeRange
         switch (intervalType)
         {
             case IntervalType.OneMinute:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfMinute; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf; break;
             case IntervalType.OneHour:
                 algoStartTimeType = AlgoStartTimeType.NextStartOfHour; break;
             case IntervalType.OneDay:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfUtcDay; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOfLocalDay; break;
         }
         return new AlgoEffectiveTimeRange
         {

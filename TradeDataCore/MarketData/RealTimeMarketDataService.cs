@@ -6,7 +6,7 @@ using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
 namespace TradeDataCore.MarketData;
-public class RealTimeMarketDataService : IRealTimeMarketDataService, IDisposable
+public class RealTimeMarketDataService : IMarketDataService, IDisposable
 {
     private readonly IExternalQuotationManagement _external;
 

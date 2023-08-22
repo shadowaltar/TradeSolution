@@ -16,5 +16,5 @@ public interface IServices
     ITradeService Trade { get; }
     ISecurityService Security { get; }
     IHistoricalMarketDataService HistoricalMarketData { get; }
-    IRealTimeMarketDataService RealTimeMarketData { get; }
+    IMarketDataService MarketData { get; }
 }

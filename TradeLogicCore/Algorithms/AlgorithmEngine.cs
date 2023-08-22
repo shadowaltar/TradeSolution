@@ -1,10 +1,15 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeDataCore.MarketData;
+using TradeLogicCore.Algorithms.EnterExit;
+using TradeLogicCore.Algorithms.Parameters;
+using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
@@ -13,40 +18,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     private static readonly ILog _log = Logger.New();
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
     private readonly IServices _services;
+    private readonly int _engineThreadId;
     private IntervalType _intervalType;
     private TimeSpan _interval;
-
-    public Dictionary<long, AlgoEntry<T>> OpenedEntries { get; } = new();
-
-    public Portfolio Portfolio { get; private set; }
-
-    public List<Security> SecurityPool { get; private set; }
-
-    public IAlgorithm<T> Algorithm { get; private set; }
-
-    public IPriceProvider PriceProvider { get; private set; }
-
-    public AlgorithmEngine(IServices services, IAlgorithm<T> algorithm)
-    {
-        _historicalMarketDataService = services.HistoricalMarketData;
-        _services = services;
-
-        Algorithm = algorithm;
-        Sizing = algorithm.Sizing;
-        EnterLogic = algorithm.Entering;
-        ExitLogic = algorithm.Exiting;
-        Screening = algorithm.Screening;
-    }
-
-    public void Run(List<Security> securityPool, IntervalType intervalType, Parameters.AlgoEffectiveTimeRange effectiveTimeRange)
-    {
-        Screening.SetAndPick(securityPool);
-        var pickedSecurities = Screening.GetPickedOnes();
-        foreach (var security in pickedSecurities)
-        {
-            _services.RealTimeMarketData.SubscribeOhlc(security);
-        }
-    }
 
     /// <summary>
     /// Caches algo-entries related to last time frame.
@@ -61,8 +35,216 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     /// </summary>
     private Dictionary<int, List<AlgoEntry<T>>> _entries = new();
 
+    private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
+
+    public override IPositionSizingAlgoLogic<T> Sizing { get; protected set; }
+    public override IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
+    public override IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
+    public override ISecurityScreeningAlgoLogic Screening { get; protected set; }
+
+    public Dictionary<long, AlgoEntry<T>> OpenedEntries { get; } = new();
+
+    public Portfolio Portfolio { get; private set; }
+
+    public List<Security> SecurityPool { get; private set; }
+
+    public override IAlgorithm<T> Algorithm { get; }
+
+    public override User? User { get; protected set; }
+
+    public override Account? Account { get; protected set; }
+
+    public List<Position> OpenPositions { get; } = new();
+
+    public override decimal InitialFreeAmount { get; protected set; }
+
+    public AlgoStopTimeType WhenToStopOrHalt { get; private set; }
+
+    public DateTime? DesignatedStartTime { get; private set; }
+    public DateTime? DesignatedStopTime { get; private set; }
+    public DateTime? DesignatedHaltTime { get; private set; }
+    public DateTime? DesignatedResumeTime { get; private set; }
+    public bool ShouldCloseOpenPositionsWhenHalted { get; private set; }
+    public bool ShouldCloseOpenPositionsWhenStopped { get; private set; }
+
+    public event Action ReachedDesignatedEndTime;
+
+    public AlgorithmEngine(IServices services, IAlgorithm<T> algorithm)
+    {
+        _historicalMarketDataService = services.HistoricalMarketData;
+        _services = services;
+
+        _engineThreadId = Environment.CurrentManagedThreadId;
+
+        Algorithm = algorithm;
+        Sizing = algorithm.Sizing;
+        EnterLogic = algorithm.Entering;
+        ExitLogic = algorithm.Exiting;
+        Screening = algorithm.Screening;
+    }
+
+    public override async Task Run(AlgoStartupParameters parameters)
+    {
+        SetStartStop(parameters.TimeRange);
+
+        User = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
+        Account = await _services.Admin.GetAccount(parameters.UserName, parameters.Environment);
+        if (User == null || Account == null)
+            return;
+
+        InitialFreeAmount = Account.MainBalance?.FreeAmount ?? 0;
+        if (InitialFreeAmount == 0)
+            return;
+
+        ShouldCloseOpenPositionsWhenHalted = parameters.ShouldCloseOpenPositionsWhenHalted;
+        ShouldCloseOpenPositionsWhenStopped = parameters.ShouldCloseOpenPositionsWhenStopped;
+
+        _services.MarketData.NextOhlc -= OnNextPrice;
+        _services.MarketData.NextOhlc += OnNextPrice;
+
+        Screening.SetAndPick(parameters.SecurityPool);
+        var pickedSecurities = Screening.GetPickedOnes();
+        foreach (var security in pickedSecurities)
+        {
+            await _services.MarketData.SubscribeOhlc(security);
+        }
+    }
+
+    private void SetStartStop(AlgoEffectiveTimeRange timeRange)
+    {
+        DateTime? stopTime = null;
+        var now = DateTime.UtcNow;
+        var localNow = now.ToLocalTime();
+        if (timeRange.WhenToStop == AlgoStopTimeType.Designated)
+        {
+            stopTime = timeRange.DesignatedStop;
+            if (stopTime != null && stopTime > now)
+                DesignatedStopTime = stopTime;
+        }
+        else if (timeRange.WhenToStop == AlgoStopTimeType.BeforeBrokerMaintenance)
+        {
+
+        }
+
+        var startTime = timeRange.ActualStartTime;
+        switch (timeRange.WhenToStart)
+        {
+            case AlgoStartTimeType.Designated:
+            {
+                if (startTime.IsValid() && startTime > now)
+                {
+                    WaitTillStartTime(startTime, stopTime, now);
+                }
+                else
+                {
+                    _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                }
+                break;
+            }
+            case AlgoStartTimeType.Immediately:
+                _runningState = AlgoRunningState.Running;
+                break;
+            case AlgoStartTimeType.Never:
+                _runningState = AlgoRunningState.Stopped;
+                break;
+            case AlgoStartTimeType.NextStartOf:
+                if (timeRange.NextStartOfIntervalType != null)
+                {
+                    if (startTime > now)
+                    {
+                        WaitTillStartTime(startTime, stopTime, now);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                }
+                else
+                {
+                    _log.Error($"Invalid designated algo start time type, missing interval for \"NextStartOf\" type.");
+                }
+                break;
+            case AlgoStartTimeType.NextStartOfLocalDay:
+            {
+                _runningState = AlgoRunningState.Stopped;
+                if (startTime > localNow)
+                {
+                    if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
+                    WaitTillStartTime(startTime, stopTime, localNow);
+                }
+                else
+                {
+                    _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
+                }
+                break;
+            }
+            case AlgoStartTimeType.NextMarketOpens:
+                // TODO, need market meta data
+                break;
+            case AlgoStartTimeType.NextWeekMarketOpens:
+                // TODO, need market meta data
+                break;
+        }
+
+        void WaitTillStartTime(DateTime startTime, DateTime? stopTime, DateTime now)
+        {
+            if (stopTime != null && startTime > stopTime)
+            {
+                throw new ArgumentException("Start time is larger than stop time. Program exits.");
+            }
+            DesignatedStartTime = startTime;
+            var remainingTimeSpan = now - startTime;
+            _log.Info($"Wait till {startTime:yyyyMMdd-HHmmss}, remaining: {remainingTimeSpan.TotalSeconds:F4} seconds.");
+            Halt(startTime);
+        }
+    }
+
+    public override async Task Stop()
+    {
+        _runningState = AlgoRunningState.Stopped;
+        _services.MarketData.NextOhlc -= OnNextPrice;
+        await _services.MarketData.UnsubscribeAllOhlcs();
+    }
+
+    public void Halt(DateTime? resumeTime, bool isManuallyHalted = false)
+    {
+        var threadId = Environment.CurrentManagedThreadId;
+        Assertion.Shall(_engineThreadId == threadId); // we are to halt the main engine thread
+
+        var now = DateTime.UtcNow;
+        if (resumeTime != null && resumeTime.Value >= now)
+        {
+            _runningState = AlgoRunningState.Halted;
+            var remainingTimeSpan = (now - resumeTime.Value).Add(TimeSpan.FromMilliseconds(1));
+            Thread.Sleep(remainingTimeSpan);
+            _runningState = AlgoRunningState.Running;
+        }
+    }
+
+    public void ScheduleMaintenance(DateTime haltTime, DateTime resumeTime)
+    {
+        if (haltTime.IsValid())
+            DesignatedHaltTime = haltTime;
+        if (resumeTime.IsValid())
+            DesignatedResumeTime = resumeTime;
+    }
+
+    /// <summary>
+    /// Handler which is invoked when price feed notifies a new price object arrives.
+    /// We expect this is a separated thread from the original engine.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <param name="ohlcPrice"></param>
+    /// <exception cref="NotImplementedException"></exception>
     private void OnNextPrice(int securityId, OhlcPrice ohlcPrice)
     {
+        var runningState = ProcessRunningState();
+        if (runningState != AlgoRunningState.Running)
+            return;
+
+        var threadId = Environment.CurrentManagedThreadId;
+        Assertion.Shall(_engineThreadId != threadId);
+
         var securities = Screening.GetPickedOnes();
         foreach (var security in securities)
         {
@@ -143,6 +325,48 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
             Algorithm.AfterProcessingSecurity(this, security);
         }
+
+        if ()
+    }
+
+    private AlgoRunningState ProcessRunningState()
+    {
+        // check if it is time to halt or stop, due to market close or suspension, or end of simulation
+        var state = AlgoRunningState.NotYetStarted;
+        var now = DateTime.UtcNow;
+        // stop state always has higher precedence
+        if (DesignatedStartTime >= now)
+        {
+            state = AlgoRunningState.Running;
+        }
+        if (DesignatedResumeTime <= now)
+        {
+            state = AlgoRunningState.Running;
+        }
+        if (DesignatedHaltTime <= now)
+        {
+            state = AlgoRunningState.Halted;
+        }
+        if (DesignatedStopTime <= now)
+        {
+            state = AlgoRunningState.Stopped;
+        }
+
+        if (state == AlgoRunningState.Stopped)
+        {
+            if (ShouldCloseOpenPositionsWhenStopped && OpenPositions.Count != 0)
+            {
+                CloseAllOpenPositions();
+            }
+        }
+        else if (state == AlgoRunningState.Halted)
+        {
+            if (ShouldCloseOpenPositionsWhenHalted && OpenPositions.Count != 0)
+            {
+                CloseAllOpenPositions();
+            }
+        }
+        return state;
     }
 
     //public async Task<List<AlgoEntry<T>>> BackTest(List<Security> securityPool, IntervalType intervalType, DateTime start, DateTime end, decimal initialCash = 1000)
@@ -434,25 +658,18 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         current.ShortCloseType = CloseType.None;
         current.Notional = current.Quantity * currentPrice;
     }
+
+    private void CloseAllOpenPositions()
+    {
+        _services.Order.CancelAllOpenOrders();
+        _services.Order.CloseAllOpenPositions();
+    }
 }
 
-public enum AlgoStartTimeType
+public enum AlgoRunningState
 {
-    Never,
-    Immediately,
-    Designated,
-    NextStartOfMinute,
-    NextStartOfHour,
-    NextStartOfLocalDay,
-    NextStartOfUtcDay,
-    NextMarketOpens,
-    NextWeekMarketOpens,
-    NextStartOfMonth,
-}
-
-public enum AlgoStopTimeType
-{
-    Never,
-    Designated,
-    BeforeBrokerMaintenance,
+    NotYetStarted,
+    Running,
+    Halted,
+    Stopped
 }

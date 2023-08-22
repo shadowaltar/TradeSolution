@@ -12,7 +12,7 @@ namespace TradeDataCore;
 public class DataServices : IDataServices
 {
     public DataServices(IHistoricalMarketDataService historicalMarketDataService,
-                        IRealTimeMarketDataService realTimeMarketDataService,
+                        IMarketDataService realTimeMarketDataService,
                         IFinancialStatsDataService financialStatsDataService)
     {
         HistoricalMarketData = historicalMarketDataService;
@@ -21,7 +21,7 @@ public class DataServices : IDataServices
     }
 
     public IHistoricalMarketDataService HistoricalMarketData { get; }
-    public IRealTimeMarketDataService RealTimeMarketData { get; }
+    public IMarketDataService RealTimeMarketData { get; }
     public IFinancialStatsDataService FinancialStatsData { get; }
 
     public Task<OhlcPrice> GetOhlcPrice(Security security, IntervalType type, DateTime at)

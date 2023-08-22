@@ -13,5 +13,5 @@ public interface IAlgorithmContext<T>
     /// Gets the list of entries representing currently opened positions.
     /// Key is the entry's id.
     /// </summary>
-    public Dictionary<long, AlgoEntry<T>> OpenedEntries { get; }
+    Dictionary<long, AlgoEntry<T>> OpenedEntries { get; }
 }

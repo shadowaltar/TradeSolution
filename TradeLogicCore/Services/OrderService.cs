@@ -108,7 +108,7 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void CancelAllOrders()
+    public void CancelAllOpenOrders()
     {
         var securityIds = _orders.Values.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
             .Select(o => o.SecurityId).ToList();
@@ -216,5 +216,10 @@ public class OrderService : IOrderService, IDisposable
             StrategyId = Constants.ManualTradingStrategyId,
             TimeInForce = timeInForce,
         };
+    }
+
+    public void CloseAllOpenPositions()
+    {
+        throw new NotImplementedException();
     }
 }
