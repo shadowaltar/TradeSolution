@@ -61,13 +61,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     /// </summary>
     private Dictionary<int, List<AlgoEntry<T>>> _entries = new();
 
-    internal void Run(AlgoStartTimeType )
-    {
-    }
-
     private void OnNextPrice(int securityId, OhlcPrice ohlcPrice)
     {
-        var securities = Screening.GetPickedOnes(SecurityPool);
+        var securities = Screening.GetPickedOnes();
         foreach (var security in securities)
         {
             Algorithm.BeforeProcessingSecurity(this, security);

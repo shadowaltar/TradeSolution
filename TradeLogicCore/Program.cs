@@ -3,7 +3,6 @@ using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
-using Org.BouncyCastle.Crypto.Tls;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -31,6 +30,9 @@ public class Program
 
     private static readonly int _maxPrintCount = 10;
 
+    private static readonly string _testUserName = "test";
+    private static readonly string _testPassword = "testtest";
+
     public static async Task Main(string[] args)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -56,8 +58,8 @@ public class Program
         }
         var securityPool = new List<Security> { security };
         var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic() };
-        var user = "test";
-        var password = "password";
+        var user = _testUserName;
+        var password = _testPassword;
 
         var parameters = new AlgoStartupParameters(user, password, "0", EnvironmentType.Test, exchange, broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
@@ -85,7 +87,7 @@ public class Program
         void OnNewOhlc(int securityId, OhlcPrice price)
         {
             printCount++;
-            if (security.Id != securityId)
+            if (security != null && security.Id != securityId)
             {
                 Console.WriteLine("Impossible!");
                 return;
@@ -98,6 +100,7 @@ public class Program
     {
         var engine = Dependencies.ComponentContext.Resolve<Core>();
 
+        var adminService = Dependencies.ComponentContext.Resolve<IAdminService>();
         var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
         var orderService = Dependencies.ComponentContext.Resolve<IOrderService>();
         var tradeService = Dependencies.ComponentContext.Resolve<ITradeService>();
@@ -107,10 +110,14 @@ public class Program
         orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
-        portfolioService.SelectUser(new User());
+        var user = await adminService.ReadUser(_testUserName, EnvironmentType.Test);
+        adminService.Login(user, _testPassword, EnvironmentType.Test);
 
         orderService.CancelAllOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
+        if (security == null)
+            return;
+
         var order = new Order
         {
             SecurityCode = "BTCUSDT",
@@ -201,9 +208,11 @@ public class Program
                 {
                     var algo = new Rumi(fast, slow, rumi, sl);
                     var engine = new AlgorithmEngine<RumiVariables>(services, algo);
-
+                    var securityPool = new List<Security> { security };
                     var initCash = 1000;
-                    var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
+                    var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = stop };
+                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, "test", EnvironmentType.Test, ExchangeType.Binance, BrokerType.Binance, interval, securityPool)
+                    var entries = await engine.Run( securityPool, interval, start, end, initCash);
                     if (entries.IsNullOrEmpty())
                         continue;
 

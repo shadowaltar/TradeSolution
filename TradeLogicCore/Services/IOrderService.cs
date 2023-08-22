@@ -30,6 +30,7 @@ public interface IOrderService
     /// <param name="start"></param>
     /// <param name="end"></param>
     /// <param name="security"></param>
+    /// <param name="requestExternal"></param>
     /// <returns></returns>
     Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security? security = null, bool requestExternal = false);
     

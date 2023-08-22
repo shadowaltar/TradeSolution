@@ -2,6 +2,7 @@
 using Common;
 using log4net;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
@@ -19,11 +20,6 @@ public class Core
 
     private readonly IComponentContext _componentContext;
     private IServices _services;
-
-    private IPortfolioService PortfolioService => _services.Portfolio;
-    private IOrderService OrderService => _services.Order;
-    private ITradeService TradeService => _services.Trade;
-    private ISecurityService SecurityService => _services.Security;
 
     public ExchangeType ExchangeType { get; private set; }
     public BrokerType BrokerType { get; private set; }
@@ -63,35 +59,136 @@ public class Core
         if (!_services.Admin.Login(user, parameters.Password, parameters.Environment))
             throw new InvalidOperationException("The password is incorrect.");
 
+        var startTime = parameters.EffectiveTimeRange.ActualStartTime;
+
         await CheckAccountAndBalance(user);
         await CheckOpenOrders();
-        await CheckRecentOrderHistory();
-        await CheckRecentTradeHistory();
+
+        await Task.Run(async () =>
+        {
+            // check one day's historical order / trade only
+            // they should not impact trading
+            var previousDay = startTime.AddDays(-1);
+            await CheckRecentOrderHistory(previousDay, startTime, parameters.BasicSecurityPool);
+            await CheckRecentTradeHistory(previousDay, startTime, parameters.BasicSecurityPool);
+        });
 
         var engine = new AlgorithmEngine<T>(_services, algorithm);
         engine.Run(parameters.BasicSecurityPool, parameters.Interval, parameters.EffectiveTimeRange);
     }
 
-    private Task CheckRecentOrderHistory()
+    private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)
     {
-        throw new NotImplementedException();
+        var externalOrders = new Dictionary<long, Order>();
+        var internalOrders = new Dictionary<long, Order>();
+        foreach (var security in securities)
+        {
+            var externalResults = await _services.Order.GetOrderHistory(start, end, security, true);
+            if (externalResults != null)
+            {
+                foreach (var r in externalResults)
+                {
+                    externalOrders[r.ExternalOrderId] = r;
+                }
+            }
+
+            var internalResults = await _services.Order.GetOrderHistory(start, end, security);
+            if (internalResults != null)
+            {
+                foreach (var r in internalResults)
+                {
+                    internalOrders[r.ExternalOrderId] = r;
+                }
+            }
+        }
+        var (toCreate, toUpdate, toDelete) = FindDifferences(externalOrders, internalOrders);
+
+        if (toCreate != null)
+            _services.Persistence.Enqueue(new PersistenceTask<Order>(toCreate) { ActionType = DatabaseActionType.Create });
+        if (toUpdate != null)
+            _services.Persistence.Enqueue(new PersistenceTask<Order>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
     }
 
-    private Task CheckRecentTradeHistory()
+    public static (List<T>, Dictionary<long, T>, List<long>) FindDifferences<T>(Dictionary<long, T> primary, Dictionary<long, T> secondary)
+        where T : IComparable<T>
     {
-        throw new NotImplementedException();
+        var toCreate = new List<T>();
+        var toUpdate = new Dictionary<long, T>();
+        var toDelete = new List<long>();
+        foreach (var (id, external) in primary)
+        {
+            if (secondary.TryGetValue(id, out var @internal))
+            {
+                if (@internal.CompareTo(external) != 0)
+                    toUpdate[id] = external;
+            }
+            else
+            {
+                toCreate.Add(external);
+            }
+        }
+        foreach (var (id, @internal) in secondary)
+        {
+            if (primary.TryGetValue(id, out var external))
+            {
+                if (@internal.CompareTo(external) != 0)
+                    toUpdate[id] = external;
+            }
+            else
+            {
+                toDelete.Add(id);
+            }
+        }
+        return (toCreate, toUpdate, toDelete);
+    }
+
+    private async Task CheckRecentTradeHistory(DateTime start, DateTime end, List<Security> securities)
+    {
+        var externalTrades = new Dictionary<long, Trade>();
+        var internalTrades = new Dictionary<long, Trade>();
+        foreach (var security in securities)
+        {
+            var externalResults = await _services.Trade.GetTradeHistory(start, end, security, true);
+            if (externalResults != null)
+            {
+                foreach (var r in externalResults)
+                {
+                    externalTrades[r.ExternalTradeId] = r;
+                }
+            }
+
+            var internalResults = await _services.Trade.GetTradeHistory(start, end, security);
+            if (internalResults != null)
+            {
+                foreach (var r in internalResults)
+                {
+                    internalTrades[r.ExternalTradeId] = r;
+                }
+            }
+        }
+        var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
+        if (toCreate != null)
+            _services.Persistence.Enqueue(new PersistenceTask<Trade>(toCreate) { ActionType = DatabaseActionType.Create });
+        if (toUpdate != null)
+            _services.Persistence.Enqueue(new PersistenceTask<Trade>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
     }
 
     private async Task CheckAccountAndBalance(User user)
     {
         foreach (var account in user.Accounts)
         {
-            var externalAccount = await PortfolioService.GetAccountByName(account.Name, true);
-            var internalAccount = await PortfolioService.GetAccountByName(account.Name);
-            if (externalAccount != internalAccount)
+            var externalAccount = await _services.Portfolio.GetAccountByName(account.Name, true);
+            var internalAccount = await _services.Portfolio.GetAccountByName(account.Name);
+            if (internalAccount == null && externalAccount != null)
             {
-                _log.Warn("Internally stored account does not exactly match the external account.");
+                _log.Warn("Internally stored account is missing; will sync with external one.");
+                _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Create });
 
+            }
+            else if (externalAccount != null && externalAccount != internalAccount)
+            {
+                _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
+                _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Update });
             }
         }
     }

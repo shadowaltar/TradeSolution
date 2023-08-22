@@ -61,7 +61,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         return securityId == _security?.Id;
     }
 
-    public IReadOnlyCollection<Security> GetPickedOnes(List<Security> securityPool)
+    public IReadOnlyCollection<Security> GetPickedOnes()
     {
         return _securities;
     }

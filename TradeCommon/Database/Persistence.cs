@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
 
 namespace TradeCommon.Database;
@@ -28,7 +29,12 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                await Storage.Insert(task);
+                if (task.ActionType == DatabaseActionType.Create)
+                    await Storage.Insert(task, false);
+                else if (task.ActionType == DatabaseActionType.Update)
+                    await Storage.Insert(task, true);
+                else
+                    return;
                 Persisted?.Invoke(task);
             }
             else
