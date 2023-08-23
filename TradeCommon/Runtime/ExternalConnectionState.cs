@@ -48,7 +48,9 @@ public enum SubscriptionType
 {
     Unknown,
     QuotationService,
+    MarketData,
     RealTimeMarketData,
+    HistoricalMarketData,
 }
 
 public enum ExternalActionType

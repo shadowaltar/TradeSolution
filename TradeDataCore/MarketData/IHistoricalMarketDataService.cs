@@ -5,6 +5,10 @@ using TradeCommon.Essentials.Quotes;
 namespace TradeDataCore.MarketData;
 public interface IHistoricalMarketDataService
 {
+    event Action<int, IntervalType, OhlcPrice>? NextPrice;
+
+    public bool HasSubscription { get; }
+
     Task<OhlcPrice> Get(Security security, IntervalType intervalType, DateTime at);
     
     Task<List<OhlcPrice>> Get(Security security, IntervalType intervalType, DateTime start, DateTime end);
@@ -14,4 +18,6 @@ public interface IHistoricalMarketDataService
     Task StartGet(Security security, IntervalType intervalType, DateTime start, DateTime end);
     
     Task<List<Tick>> GetTicks(Security security, DateTime start, DateTime end);
+
+    Task<int> Subscribe(Security security, IntervalType interval, DateTime start, DateTime stop, Action<int, IntervalType, OhlcPrice>? callback);
 }

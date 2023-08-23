@@ -29,8 +29,7 @@ public record AlgoEntry<T>
     public CloseType LongCloseType { get; set; }
     public bool IsShort { get; set; }
     public CloseType ShortCloseType { get; set; }
-    //public bool IsLongStopLossTriggered { get; set; }
-    //public bool IsShortStopLossTriggered { get; set; }
+
     public decimal Quantity { get; set; }
 
     /// <summary>

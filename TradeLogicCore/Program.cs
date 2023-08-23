@@ -256,7 +256,8 @@ public class Program
                     var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
                         _environment, _exchange, _broker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
-                    if (entries.IsNullOrEmpty())
+                    engine.Entries
+                    if (engine..IsNullOrEmpty())
                         continue;
 
                     if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
