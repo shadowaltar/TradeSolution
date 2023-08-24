@@ -114,7 +114,7 @@ public class OrderService : IOrderService, IDisposable
             .Select(o => o.SecurityId).ToList();
         Task.Run(async () =>
         {
-            var securities = await _securityService.GetSecurities(_context.ExchangeType, securityIds);
+            var securities = await _securityService.GetSecurities(securityIds);
             if (securities == null)
                 return;
             foreach (var security in securities)

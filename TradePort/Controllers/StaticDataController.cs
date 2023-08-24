@@ -55,7 +55,7 @@ public class StaticDataController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var securities = await Storage.ReadSecurities(exchange, secType);
+        var securities = await Storage.ReadSecurities(secType, exchange);
 
         return Ok(securities.Take(limit));
     }
@@ -151,7 +151,7 @@ public class StaticDataController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var securities = await Storage.ReadSecurities(exchange, secType);
+        var securities = await Storage.ReadSecurities(secType, exchange);
         var reader = new ListedOptionReader();
         var stats = await reader.ReadUnderlyingStats(securities);
         if (stats == null)
