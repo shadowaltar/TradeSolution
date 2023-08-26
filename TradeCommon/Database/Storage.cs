@@ -19,7 +19,7 @@ public partial class Storage
     private static readonly ILog _log = Logger.New();
     private static readonly Dictionary<DataType, ISqlWriter> _writers = new();
 
-    public static async Task Insert(IPersistenceTask task)
+    public static async Task Insert(IPersistenceTask task, bool isUpsert = true)
     {
         if (task is PersistenceTask<OhlcPrice> priceTask)
         {
@@ -27,18 +27,27 @@ public partial class Storage
         }
         else if (task is PersistenceTask<Order> orderTask)
         {
-            var firstItem = orderTask.Entries[0];
-            await InsertOrder(firstItem, orderTask.SecurityType);
+            if (orderTask.Entries.Count > 0)
+                foreach (var entry in orderTask.Entries)
+                    await InsertOrder(entry, orderTask.SecurityType, isUpsert);
+            else
+                await InsertOrder(orderTask.Entry, orderTask.SecurityType, isUpsert);
         }
         else if (task is PersistenceTask<Trade> tradeTask)
         {
-            var firstItem = tradeTask.Entries[0];
-            await InsertTrade(firstItem, tradeTask.SecurityType);
+            if (tradeTask.Entries.Count > 0)
+                foreach (var entry in tradeTask.Entries)
+                    await InsertTrade(entry, tradeTask.SecurityType, isUpsert);
+            else
+                await InsertTrade(tradeTask.Entry, tradeTask.SecurityType, isUpsert);
         }
         else if (task is PersistenceTask<Position> positionTask)
         {
-            var firstItem = positionTask.Entries[0];
-            await InsertPosition(firstItem, positionTask.SecurityType);
+            if (positionTask.Entries.Count > 0)
+                foreach (var entry in positionTask.Entries)
+                    await InsertPosition(entry, positionTask.SecurityType, isUpsert);
+            else
+                await InsertPosition(positionTask.Entry, positionTask.SecurityType, isUpsert);
         }
         else if (task is PersistenceTask<Security> securityTask)
         {
@@ -321,7 +330,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return await writer.InsertOne(account, true);
     }
 
-    public static async Task InsertOrder(Order order, SecurityType securityType)
+    public static async Task InsertOrder(Order order, SecurityType securityType, bool isUpsert = true)
     {
         var tableName = DatabaseNames.GetOrderTableName(securityType);
         if (!_writers.TryGetValue(DataType.Order, out var writer))
@@ -329,7 +338,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             writer = new SqlWriter<Order>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Order] = writer;
         }
-        await writer.InsertOne(order, true);
+        await writer.InsertOne(order, isUpsert);
 
         //        string sql =
         //@$"
@@ -356,7 +365,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         //";
     }
 
-    public static async Task InsertTrade(Trade trade, SecurityType securityType)
+    public static async Task InsertTrade(Trade trade, SecurityType securityType, bool isUpsert = true)
     {
         var tableName = DatabaseNames.GetTradeTableName(securityType);
         if (!_writers.TryGetValue(DataType.Trade, out var writer))
@@ -364,10 +373,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             writer = new SqlWriter<Trade>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Trade] = writer;
         }
-        await writer.InsertOne(trade, false);
+        await writer.InsertOne(trade, isUpsert);
     }
 
-    public static async Task InsertPosition(Position position, SecurityType securityType)
+    public static async Task InsertPosition(Position position, SecurityType securityType, bool isUpsert = true)
     {
         var tableName = DatabaseNames.GetPositionTableName(securityType);
         if (!_writers.TryGetValue(DataType.Position, out var writer))
@@ -375,7 +384,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             writer = new SqlWriter<Position>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Position] = writer;
         }
-        await writer.InsertOne(position, true);
+        await writer.InsertOne(position, isUpsert);
     }
 
     /// <summary>

@@ -16,8 +16,6 @@ public interface IExternalExecutionManagement
     event TradeReceivedCallback? TradeReceived;
     event TradesReceivedCallback? TradesReceived;
 
-    Task<bool> Initialize(User user);
-
     Task<ExternalQueryState<Order>> SendOrder(Order order);
 
     Task<ExternalQueryState<Order>> CancelOrder(Order order);

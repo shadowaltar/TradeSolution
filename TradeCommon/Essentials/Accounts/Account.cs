@@ -64,5 +64,9 @@ public class Account
 
     [InsertIgnore]
     [UpsertIgnore]
+    public Balance? MainBalance { get; set; }
+
+    [InsertIgnore]
+    [UpsertIgnore]
     public List<Balance> Balances { get; } = new();
 }

@@ -11,7 +11,7 @@ public interface IDataServices
 {
     IHistoricalMarketDataService HistoricalMarketData { get; }
 
-    IRealTimeMarketDataService RealTimeMarketData { get; }
+    IMarketDataService RealTimeMarketData { get; }
 
     IFinancialStatsDataService FinancialStatsData { get; }
 

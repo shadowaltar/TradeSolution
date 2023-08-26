@@ -106,7 +106,7 @@ public class PriceController : Controller
         if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
         if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
 
-        var securities = await Storage.ReadSecurities(ExternalNames.Hkex, secType);
+        var securities = await Storage.ReadSecurities(secType, ExternalNames.Hkex);
         if (securities == null) return NotFound("Security is not found.");
 
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
@@ -151,7 +151,7 @@ public class PriceController : Controller
         if (symbols == null || symbols.Count == 0)
             return BadRequest("Missing symbols (delimited by ',').");
 
-        var securities = await Storage.ReadSecurities(ExternalNames.Binance, secType);
+        var securities = await Storage.ReadSecurities(secType, ExternalNames.Binance);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         if (securities == null) return NotFound("Security is not found.");
 
@@ -287,7 +287,7 @@ public class PriceController : Controller
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
 
-        var securities = await Storage.ReadSecurities(exchange, secType);
+        var securities = await Storage.ReadSecurities(secType, exchange);
         if (securities == null) return NotFound("Security is not found.");
 
         if (!symbols.IsNullOrEmpty())

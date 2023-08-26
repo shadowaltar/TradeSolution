@@ -1,4 +1,5 @@
 ﻿using Common;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
@@ -127,32 +128,40 @@ WHERE
         }
     }
 
-    public static async Task<List<Security>> ReadSecurities(string exchange, List<int> ids)
+    public static async Task<List<Security>> ReadSecurities(List<int>? ids = null)
     {
         var results = new List<Security>();
-        foreach (var type in Enum.GetValues<SecurityType>())
+        foreach (var exchange in Enum.GetValues<ExchangeType>())
         {
-            if (type == SecurityType.Unknown) continue;
-            var partialResults = await ReadSecurities(exchange, type, ids);
-            if (partialResults == null)
-                continue;
-            results.AddRange(partialResults);
+            var exchStr = ExchangeTypeConverter.ToString(exchange);
+            foreach (var type in Enum.GetValues<SecurityType>())
+            {
+                if (type == SecurityType.Unknown) continue;
+                var partialResults = await ReadSecurities(type, exchStr, ids);
+                if (partialResults == null)
+                    continue;
+                results.AddRange(partialResults);
+            }
         }
         return results;
     }
 
-    public static async Task<List<Security>?> ReadSecurities(string exchange, SecurityType type, List<int>? ids = null)
+    public static async Task<List<Security>> ReadSecurities(SecurityType type, string? exchange = null, List<int>? ids = null)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
         if (tableName.IsBlank())
-            return null;
+            return new List<Security>();
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        exchange = exchange.ToUpperInvariant();
+        if (exchange !=null)
+            exchange = exchange.ToUpperInvariant();
         var idClause = ids == null
             ? ""
             : ids.Count == 1
             ? $"Id = {ids[0]} AND"
             : $"Id IN ({string.Join(',', ids)}) AND";
+        var exchangeClause = exchange == null
+            ? ""
+            : "AND Exchange = $Exchange";
         string sql;
         if (type == SecurityType.Equity)
         {
@@ -162,9 +171,9 @@ SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,Currency,Cusip,Isin,YahooTicke
 FROM {tableName}
 WHERE
     {idClause}
-    IsEnabled = true AND
-    LocalEndDate > $LocalEndDate AND
-    Exchange = $Exchange
+    IsEnabled = true
+    AND LocalEndDate > $LocalEndDate
+    {exchangeClause}
 ";
             if (type == SecurityType.Equity)
                 sql += $" AND Type IN ('{string.Join("','", SecurityTypes.StockTypes)}')";
@@ -178,7 +187,7 @@ FROM {tableName}
 WHERE
     IsEnabled = true AND
     LocalEndDate > $LocalEndDate AND
-    Exchange = $Exchange
+    {exchangeClause}
 "
                 : throw new NotImplementedException();
         }
@@ -474,7 +483,7 @@ WHERE
             var list = results.GetOrCreate(secId);
             var price = new ExtendedOhlcPrice
             (
-                Id: sec.Code,
+                Code: sec.Code,
                 Ex: sec.Exchange,
                 O: r.GetDecimal("Open"),
                 H: r.GetDecimal("High"),

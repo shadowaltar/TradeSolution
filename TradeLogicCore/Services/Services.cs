@@ -1,41 +1,36 @@
-﻿using Common;
-using TradeCommon.Constants;
+﻿using TradeCommon.Database;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 
 namespace TradeLogicCore.Services;
 public class Services : IServices
 {
-    public Services(string brokerName,
-        Context context,
-        IAdminService admin,
-        IPortfolioService portfolio,
-        IOrderService order,
-        ITradeService trade,
-        ISecurityService security,
-        IHistoricalMarketDataService historicalMarketDataService,
-        IRealTimeMarketDataService realTimeMarketDataService)
+    public Services(Context context,
+                    Persistence persistence,
+                    IAdminService admin,
+                    IPortfolioService portfolio,
+                    IOrderService order,
+                    ITradeService trade,
+                    ISecurityService security,
+                    IHistoricalMarketDataService historicalMarketDataService,
+                    IMarketDataService marketDataService)
     {
-        BrokerType = brokerName.ConvertDescriptionToEnum<BrokerType>();
-        ExchangeType = ExternalNames.Convert(BrokerType);
-
         Context = context;
+        Persistence = persistence;
         Admin = admin;
         Portfolio = portfolio;
         Order = order;
         Trade = trade;
         Security = security;
         HistoricalMarketData = historicalMarketDataService;
-        RealTimeMarketData = realTimeMarketDataService;
+        MarketData = marketDataService;
     }
 
-    public Context Context { get; private set; }
+    public Context Context { get; }
+
+    public Persistence Persistence { get; }
 
     public IAdminService Admin { get; }
-
-    public ExchangeType ExchangeType { get; private set; }
-
-    public BrokerType BrokerType { get; private set; }
 
     public IPortfolioService Portfolio { get; private set; }
 
@@ -47,5 +42,5 @@ public class Services : IServices
 
     public IHistoricalMarketDataService HistoricalMarketData { get; private set; }
 
-    public IRealTimeMarketDataService RealTimeMarketData { get; private set; }
+    public IMarketDataService MarketData { get; private set; }
 }

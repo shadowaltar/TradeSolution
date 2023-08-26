@@ -22,4 +22,6 @@ public interface ITradeService
     Task<List<Trade>?> GetMarketTrades(Security security);
 
     Task<List<Trade>?> GetTrades(Security security);
+
+    Task<List<Trade>?> GetTradeHistory(DateTime start, DateTime end, Security security, bool requestExternal = false);
 }

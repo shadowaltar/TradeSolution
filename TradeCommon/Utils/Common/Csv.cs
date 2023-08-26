@@ -1,5 +1,6 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
+using Microsoft.SqlServer.Server;
 using System.Globalization;
 using System.Linq.Expressions;
 using TradeCommon.Constants;
@@ -59,7 +60,7 @@ public static class Csv
                     }
                 }
 
-                value = converter.Invoke(values) as TV;
+                value = converter.Invoke(values);
             }
             if (key != null)
             {
@@ -156,10 +157,24 @@ public static class Csv
         }
     }
 
-    public static void Write<T>(IList<ColumnDefinition> columns, List<T> entries, string filePath)
+    public static void Write<T>(IList<ColumnDefinition> columns,
+                                List<T> entries,
+                                string filePath)
     {
+        Write(columns, entries, null, filePath);
+    }
+
+    public static void Write<T>(IList<ColumnDefinition> columns,
+                                List<T> entries,
+                                List<Expression<Func<T, object>>>? ignoringPropertySelectors,
+                                string filePath)
+    {
+        var map = new CsvClassMap<T>(ignoringPropertySelectors);
         using var writer = new StreamWriter(filePath);
         using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+
+        csv.Context.RegisterClassMap(map);
+
         foreach (var header in columns.Select(c => c.Caption))
         {
             csv.WriteField(header);
@@ -168,6 +183,20 @@ public static class Csv
         {
             csv.NextRecord();
             csv.WriteRecord(entry);
+        }
+    }
+
+    private class CsvClassMap<T> : ClassMap<T>
+    {
+        public CsvClassMap(List<Expression<Func<T, object>>>? expressions = null)
+        {
+            AutoMap(CultureInfo.InvariantCulture);
+            if (expressions == null)
+                return;
+            foreach (var expression in expressions)
+            {
+                Map(expression).Ignore();
+            }
         }
     }
 }

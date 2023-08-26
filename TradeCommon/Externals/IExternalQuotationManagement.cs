@@ -14,9 +14,11 @@ public interface IExternalQuotationManagement
 
     Task<ExternalConnectionState> Initialize();
 
-    Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
+    Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType);
 
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType = IntervalType.Unknown);
+    
+    Task<ExternalConnectionState> UnsubscribeAllOhlc();
 
     Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown);
 

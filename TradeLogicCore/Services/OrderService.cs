@@ -108,13 +108,13 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void CancelAllOrders()
+    public void CancelAllOpenOrders()
     {
         var securityIds = _orders.Values.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
             .Select(o => o.SecurityId).ToList();
         Task.Run(async () =>
         {
-            var securities = await _securityService.GetSecurities(_context.ExchangeType, securityIds);
+            var securities = await _securityService.GetSecurities(securityIds);
             if (securities == null)
                 return;
             foreach (var security in securities)
@@ -176,11 +176,7 @@ public class OrderService : IOrderService, IDisposable
 
     private void Persist(Order order)
     {
-        var orderTask = new PersistenceTask<Order>()
-        {
-            Entry = order,
-            DatabaseName = DatabaseNames.ExecutionData
-        };
+        var orderTask = new PersistenceTask<Order>(order);
         _persistence.Enqueue(orderTask);
     }
 
@@ -220,5 +216,10 @@ public class OrderService : IOrderService, IDisposable
             StrategyId = Constants.ManualTradingStrategyId,
             TimeInForce = timeInForce,
         };
+    }
+
+    public void CloseAllOpenPositions()
+    {
+        throw new NotImplementedException();
     }
 }

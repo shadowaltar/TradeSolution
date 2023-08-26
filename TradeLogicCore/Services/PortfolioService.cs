@@ -101,11 +101,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
     }
 
-    public bool SelectUser(User user)
-    {
-        return AsyncHelper.RunSync(() => ExternalExecution.Initialize(user));
-    }
-
     public List<Position> GetOpenPositions()
     {
         List<Position> results;
@@ -219,9 +214,8 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     private void Persist(Position position)
     {
-        var task = new PersistenceTask<Position>()
+        var task = new PersistenceTask<Position>(position)
         {
-            Entry = position,
             DatabaseName = DatabaseNames.ExecutionData
         };
         _persistence.Enqueue(task);
@@ -238,34 +232,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public async Task<Account?> GetAccountByName(string accountName, bool isExternal = false)
-    {
-        if (isExternal)
-        {
-            var state = await ExternalAccountManagement.GetAccount();
-            // TODO
-            return state.Content;
-        }
-        else
-        {
-            var account = await Storage.ReadAccount(accountName, _context.EnvironmentType);
-            if (account == null)
-            {
-                _log.Error($"Failed to read account by name {accountName} from database.");
-                return null;
-            }
-            var balances = await Storage.ReadBalances(account.Id);
-            if (balances.IsNullOrEmpty())
-            {
-                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database.");
-            }
-            else
-            {
-                account.Balances.AddRange(balances);
-            }
-            return account;
-        }
-    }
 
     public Task<bool> Deposit(int accountId, int assetId, decimal value)
     {

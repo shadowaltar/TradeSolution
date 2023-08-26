@@ -38,7 +38,7 @@ public class Dependencies
         {
             builder.RegisterSingleton<IDataServices, DataServices>();
             builder.RegisterSingleton<IHistoricalMarketDataService, HistoricalMarketDataService>();
-            builder.RegisterSingleton<IRealTimeMarketDataService, RealTimeMarketDataService>();
+            builder.RegisterSingleton<IMarketDataService, RealTimeMarketDataService>();
             builder.RegisterSingleton<IFinancialStatsDataService, FinancialStatsDataService>();
 
             builder.RegisterSingleton<MessageBroker<Order>>(nameof(Order));

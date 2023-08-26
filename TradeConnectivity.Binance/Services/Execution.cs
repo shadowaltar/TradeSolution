@@ -44,11 +44,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         _cancelIdGenerator = new IdGenerator("CancelOrderIdGen");
     }
 
-    public async Task<bool> Initialize(User user)
-    {
-        return _keyManager.Select(user);
-    }
-
     /// <summary>
     /// Send an order to Binance [SIGNED].
     /// </summary>
@@ -514,7 +509,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         ees.TotalTime = swOuter.ElapsedMilliseconds;
         return ees;
     }
-
 
     /// <summary>
     /// Check the <see cref="HttpResponseMessage"/> responseString and status.

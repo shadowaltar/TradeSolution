@@ -3,9 +3,12 @@
 namespace TradeLogicCore.Algorithms.Screening;
 public interface ISecurityScreeningAlgoLogic
 {
-    IReadOnlyCollection<Security> GetPickedOnes(List<Security> securityPool);
+    void SetAndPick(List<Security> securityPool);
 
-    void Pick(List<Security> securityPool);
+    IReadOnlyCollection<Security> GetPickedOnes();
+    IReadOnlyCollection<Security> GetAll();
 
     bool CheckIsPicked(int securityId);
+    
+    void Repick();
 }

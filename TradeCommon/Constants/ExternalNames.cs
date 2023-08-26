@@ -97,4 +97,9 @@ public static class ExternalNames
         var type = ConvertToBroker(externalName);
         return BrokerTypeToIds.GetValueOrDefault(type, BrokerTypeToIds[BrokerType.Unknown]);
     }
+
+    public static int GetBrokerId(BrokerType broker)
+    {
+        return BrokerTypeToIds.GetValueOrDefault(broker, BrokerTypeToIds[BrokerType.Unknown]);
+    }
 }

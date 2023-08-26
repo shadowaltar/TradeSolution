@@ -16,12 +16,19 @@ public class AccountManager : IExternalAccountManagement
     private static readonly List<string> _accountTypes = new() { "SPOT", "MARGIN", "FUTURES" };
 
     private readonly HttpClient _httpClient;
+    private readonly KeyManager _keyManager;
     private readonly RequestBuilder _requestBuilder;
 
     public AccountManager(HttpClient httpClient, KeyManager keyManager)
     {
         _httpClient = httpClient;
+        _keyManager = keyManager;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
+    }
+
+    public bool Login(User user)
+    {
+        return _keyManager.Select(user);
     }
 
     /// <summary>
