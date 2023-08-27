@@ -120,16 +120,17 @@ public class Program
     {
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
-
+        if (security == null) return;
         var printCount = 0;
         var dataService = Dependencies.ComponentContext.Resolve<IMarketDataService>();
+        var interval = IntervalType.OneMinute;
         dataService.NextOhlc += OnNewOhlc;
-        await dataService.SubscribeOhlc(security);
+        await dataService.SubscribeOhlc(security, interval);
         while (printCount < _maxPrintCount)
         {
             Thread.Sleep(100);
         }
-        await dataService.UnsubscribeOhlc(security);
+        await dataService.UnsubscribeOhlc(security, interval);
 
         void OnNewOhlc(int securityId, OhlcPrice price)
         {
