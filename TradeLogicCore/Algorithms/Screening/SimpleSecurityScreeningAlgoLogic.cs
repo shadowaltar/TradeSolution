@@ -4,7 +4,6 @@ namespace TradeLogicCore.Algorithms.Screening;
 
 public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
-<<<<<<< HEAD
     private static readonly List<Security> _empty = new();
     private static readonly List<Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
@@ -17,19 +16,7 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
         }
     }
 
-    public IReadOnlyCollection<Security> GetPickedOnes(List<Security> securityPool)
-    {
-        lock (_pickedPool)
-            return _pickedPool.Values;
-    }
-
-    public void Pick(List<Security> securityPool)
-=======
-    private readonly List<Security> _originalPool = new();
-    private readonly Dictionary<int, Security> _pickedPool = new();
-
     public void SetAndPick(List<Security> securityPool)
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
     {
         lock (_originalPool)
         {
@@ -45,16 +32,6 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
             }
         }
     }
-<<<<<<< HEAD
-=======
-
-    public bool CheckIsPicked(int securityId)
-    {
-        lock (_pickedPool)
-        {
-            return _pickedPool.ContainsKey(securityId);
-        }
-    }
 
     public IReadOnlyCollection<Security> GetPickedOnes()
     {
@@ -65,14 +42,19 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
     public void Repick()
     {
     }
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
+
+    public IReadOnlyCollection<Security> GetAll()
+    {
+        lock (_originalPool)
+            return _originalPool;
+    }
 }
 
 public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 {
     private Security? _security;
-<<<<<<< HEAD
     private List<Security> _securities;
+
     public SingleSecurityLogic(Security? security)
     {
         _security = security;
@@ -80,8 +62,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
             _securities = new List<Security> { security };
         else
             _securities = new List<Security>();
-=======
-    private readonly List<Security> _securities = new(1);
+    }
 
     public void SetAndPick(List<Security> securityPool)
     {
@@ -92,7 +73,6 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 
         _securities.Clear();
         _securities.Add(_security);
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
     }
 
     public bool CheckIsPicked(int securityId)
@@ -101,20 +81,17 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         return securityId == _security?.Id;
     }
 
-<<<<<<< HEAD
-    public IReadOnlyCollection<Security> GetPickedOnes(List<Security> securityPool)
-=======
     public IReadOnlyCollection<Security> GetPickedOnes()
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
+    {
+        throw new NotImplementedException();
+    }
+
+    public IReadOnlyCollection<Security> GetAll()
     {
         return _securities;
     }
 
-<<<<<<< HEAD
-    public void Pick(List<Security> securityPool)
-=======
     public void Repick()
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
     {
     }
 }

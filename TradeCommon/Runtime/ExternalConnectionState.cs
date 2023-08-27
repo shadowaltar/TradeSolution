@@ -143,14 +143,14 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedMultipleRealTimeOhlc(Security security, List<ExternalConnectionState> subStates)
+    public static ExternalConnectionState UnsubscribedMultipleRealTimeOhlc(List<ExternalConnectionState> subStates)
     {
         return new ExternalConnectionState
         {
             Action = ExternalActionType.Subscribe,
             StatusCode = nameof(StatusCodes.MultipleUnsubscription),
-            ExternalPartyId = security.Exchange,
-            Description = $"Unsubscribed ({subStates.Count}) OHLC prices for {security.Id}",
+            ExternalPartyId = null,
+            Description = $"Unsubscribed ({subStates.Count}) OHLC prices",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
             SubStates = subStates,

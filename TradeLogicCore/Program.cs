@@ -3,9 +3,7 @@ using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
-using Org.BouncyCastle.Crypto.Tls;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
@@ -67,7 +65,7 @@ public class Program
             return;
         }
         var securityPool = new List<Security> { security };
-        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic() };
+        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic(security) };
         var user = _testUserName;
         var password = _testPassword;
         var parameters = new AlgoStartupParameters(user, password, account.Name, _environment, _exchange, _broker,
@@ -251,15 +249,16 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
+
                     var securityPool = new List<Security> { security };
-                    var algo = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic() };
-                    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
+                    var algorithm = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic(security) };
+                    var engine = new AlgorithmEngine<RumiVariables>(services, algorithm);
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
                         _environment, _exchange, _broker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
-                    engine.Entries
-                    if (engine..IsNullOrEmpty())
+
+                    if (engine.IsNullOrEmpty())
                         continue;
 
                     if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
@@ -267,8 +266,7 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    engine.Cash
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(initCash, engine.Portfolio.Notional.ToDouble(), start, end);
+                    var annualizedReturn = Metrics.GetAnnualizedReturn(engine.InitialFreeAmount, engine.Portfolio.Notional.ToDouble(), start, end);
                     if (annualizedReturn == 0)
                     {
                         _log.Info($"No trades at all: {security.Code}");
@@ -409,7 +407,7 @@ public class Program
                         var engine = new AlgorithmEngine<MacVariables>(services, algo);
 
                         var initCash = 1000;
-                        var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
+                        var entries = await engine.Run(new List<Security> { security }, interval, start, end, initCash);
                         if (entries.IsNullOrEmpty())
                             continue;
 

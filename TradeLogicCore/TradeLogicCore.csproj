@@ -29,8 +29,6 @@
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
     <ProjectReference Include="..\TradeConnectivity.Binance\TradeConnectivity.Binance.csproj" />
-    <ProjectReference Include="..\TradeConnectivity.CryptoSimulator\TradeConnectivity.CryptoSimulator.csproj" />
-    <ProjectReference Include="..\TradeConnectivity.Futu\TradeConnectivity.Futu.csproj" />
     <ProjectReference Include="..\TradeDataCore\TradeDataCore.csproj" />
   </ItemGroup>
 

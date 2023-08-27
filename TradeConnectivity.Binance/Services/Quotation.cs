@@ -125,7 +125,7 @@ public class Quotation : IExternalQuotationManagement
                 subStates.Add(await InternalUnsubscribe(this, security, i));
             }
         }
-        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(security, subStates);
+        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(subStates);
 
 
         // unsubscribe the webSocket, and dispose the message broker

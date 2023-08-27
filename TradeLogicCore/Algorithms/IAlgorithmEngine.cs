@@ -1,31 +1,57 @@
-﻿using TradeCommon.Essentials.Accounts;
+﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Portfolios;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
-public abstract class IAlgorithmEngine<T> where T : IAlgorithmVariables
+public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
 {
-    public abstract Task Run(AlgoStartupParameters parameters);
+    event Action ReachedDesignatedEndTime;
 
-    public abstract Task Stop();
+    Task Run(AlgoStartupParameters parameters);
 
-    public abstract IAlgorithm<T> Algorithm { get; }
+    Task Stop();
 
-    public abstract User? User { get; protected set; }
+    IAlgorithm<T> Algorithm { get; }
 
-    public abstract Account? Account { get; protected set; }
+    User? User { get; }
 
-    public abstract decimal InitialFreeAmount { get; protected set; }
+    Account? Account { get; }
 
-    public abstract IPositionSizingAlgoLogic<T> Sizing { get; protected set; }
+    decimal InitialFreeAmount { get; }
 
-    public abstract IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
+    IPositionSizingAlgoLogic<T> Sizing { get; }
 
-    public abstract IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
+    IEnterPositionAlgoLogic<T> EnterLogic { get; }
 
-    public abstract ISecurityScreeningAlgoLogic Screening { get; protected set; }
+    IExitPositionAlgoLogic<T> ExitLogic { get; }
 
-    protected abstract void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, decimal currentPrice);
+    ISecurityScreeningAlgoLogic Screening { get; }
+
+    DateTime? DesignatedHaltTime { get; }
+
+    DateTime? DesignatedResumeTime { get; }
+
+    DateTime? DesignatedStartTime { get; }
+
+    DateTime? DesignatedStopTime { get; }
+
+    int? HoursBeforeHalt { get; }
+
+    IntervalType Interval { get; }
+
+    Dictionary<long, AlgoEntry<T>> OpenedEntries { get; }
+
+    List<Position> OpenPositions { get; }
+
+    Portfolio Portfolio { get; }
+
+    bool ShouldCloseOpenPositionsWhenHalted { get; }
+
+    bool ShouldCloseOpenPositionsWhenStopped { get; }
+
+    AlgoStopTimeType WhenToStopOrHalt { get; }
 }

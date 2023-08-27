@@ -1,9 +1,7 @@
 ﻿using Common;
 using log4net;
-using System.Collections.Concurrent;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
-using static Futu.OpenApi.Pb.QotCommon;
 using Security = TradeCommon.Essentials.Instruments.Security;
 
 namespace TradeDataCore.Importing.Yahoo;

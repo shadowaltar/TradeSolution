@@ -41,38 +41,49 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
 
-    public override IPositionSizingAlgoLogic<T> Sizing { get; protected set; }
-    public override IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
-    public override IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
-    public override ISecurityScreeningAlgoLogic Screening { get; protected set; }
+    public event Action ReachedDesignatedEndTime;
 
-    public Portfolio Portfolio { get; private set; }
+    public IPositionSizingAlgoLogic<T> Sizing { get; protected set; }
+    public IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
+    public IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
+    public ISecurityScreeningAlgoLogic Screening { get; protected set; }
 
     public List<Security> SecurityPool { get; private set; }
 
-    public Dictionary<long, AlgoEntry<T>> OpenedEntries => _openedEntries;
+    public IAlgorithm<T> Algorithm { get; }
 
-    public override IAlgorithm<T> Algorithm { get; }
+    public User? User { get; protected set; }
 
-    public override User? User { get; protected set; }
+    public Account? Account { get; protected set; }
 
-    public override Account? Account { get; protected set; }
+    public DateTime? DesignatedHaltTime { get; protected set; }
 
-    public List<Position> OpenPositions { get; } = new();
-    public IntervalType Interval { get; private set; }
-    public override decimal InitialFreeAmount { get; protected set; }
+    public DateTime? DesignatedResumeTime
+    {
+        get; protected set;
+    }
 
-    public AlgoStopTimeType WhenToStopOrHalt { get; private set; }
+    public DateTime? DesignatedStartTime { get; protected set; }
 
-    public DateTime? DesignatedStartTime { get; private set; }
-    public DateTime? DesignatedStopTime { get; private set; }
-    public int? HoursBeforeHalt { get; private set; }
-    public DateTime? DesignatedHaltTime { get; private set; }
-    public DateTime? DesignatedResumeTime { get; private set; }
-    public bool ShouldCloseOpenPositionsWhenHalted { get; private set; }
-    public bool ShouldCloseOpenPositionsWhenStopped { get; private set; }
+    public DateTime? DesignatedStopTime { get; protected set; }
 
-    public event Action ReachedDesignatedEndTime;
+    public int? HoursBeforeHalt { get; protected set; }
+
+    public IntervalType Interval { get; protected set; }
+
+    public decimal InitialFreeAmount { get; protected set; }
+
+    public Dictionary<long, AlgoEntry<T>> OpenedEntries { get; protected set; }
+
+    public List<Position> OpenPositions { get; protected set; }
+
+    public Portfolio Portfolio { get; protected set; }
+
+    public bool ShouldCloseOpenPositionsWhenHalted { get; protected set; }
+
+    public bool ShouldCloseOpenPositionsWhenStopped { get; protected set; }
+
+    public AlgoStopTimeType WhenToStopOrHalt { get; protected set; }
 
     public AlgorithmEngine(IServices services, IAlgorithm<T> algorithm)
     {
@@ -87,8 +98,22 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         ExitLogic = algorithm.Exiting;
         Screening = algorithm.Screening;
     }
+    public void Halt(DateTime? resumeTime, bool isManuallyHalted = false)
+    {
+        var threadId = Environment.CurrentManagedThreadId;
+        Assertion.Shall(_engineThreadId == threadId); // we are to halt the main engine thread
 
-    public override async Task Run(AlgoStartupParameters parameters)
+        var now = DateTime.UtcNow;
+        if (resumeTime != null && resumeTime.Value >= now)
+        {
+            _runningState = AlgoRunningState.Halted;
+            var remainingTimeSpan = (now - resumeTime.Value).Add(TimeSpan.FromMilliseconds(1));
+            Thread.Sleep(remainingTimeSpan);
+            _runningState = AlgoRunningState.Running;
+        }
+    }
+
+    public async Task Run(AlgoStartupParameters parameters)
     {
         SetAlgoEffectiveTimeRange(parameters.TimeRange);
 
@@ -115,7 +140,112 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         }
     }
 
-    public override async Task Stop()
+    public void ScheduleMaintenance(DateTime haltTime, DateTime resumeTime)
+    {
+        if (haltTime.IsValid())
+            DesignatedHaltTime = haltTime;
+        if (resumeTime.IsValid())
+            DesignatedResumeTime = resumeTime;
+    }
+
+    private void SetAlgoEffectiveTimeRange(AlgoEffectiveTimeRange timeRange)
+    {
+        DateTime? stopTime = null;
+        var now = DateTime.UtcNow;
+        var localNow = now.ToLocalTime();
+
+        // handle the stop time
+        switch (timeRange.WhenToStop)
+        {
+            case AlgoStopTimeType.Designated:
+                stopTime = timeRange.DesignatedStop;
+                if (stopTime != null && stopTime > now)
+                    DesignatedStopTime = stopTime;
+                break;
+            case AlgoStopTimeType.Never:
+                DesignatedStopTime = null;
+                break;
+            case AlgoStopTimeType.BeforeBrokerMaintenance:
+                if (timeRange.HoursBeforeMaintenance < 0)
+                    throw new ArgumentException("Invalid hours before maintenance.");
+                HoursBeforeHalt = timeRange.HoursBeforeMaintenance;
+                break;
+        }
+
+        // handle (and wait for) the start time
+        var startTime = timeRange.ActualStartTime;
+        switch (timeRange.WhenToStart)
+        {
+            case AlgoStartTimeType.Designated:
+                {
+                    if (startTime.IsValid() && startTime > now)
+                    {
+                        WaitTillStartTime(startTime, stopTime, now);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                    break;
+                }
+            case AlgoStartTimeType.Immediately:
+                _runningState = AlgoRunningState.Running;
+                break;
+            case AlgoStartTimeType.Never:
+                _runningState = AlgoRunningState.Stopped;
+                break;
+            case AlgoStartTimeType.NextStartOf:
+                if (timeRange.NextStartOfIntervalType != null)
+                {
+                    if (startTime > now)
+                    {
+                        WaitTillStartTime(startTime, stopTime, now);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                }
+                else
+                {
+                    _log.Error($"Invalid designated algo start time type, missing interval for \"NextStartOf\" type.");
+                }
+                break;
+            case AlgoStartTimeType.NextStartOfLocalDay:
+                {
+                    _runningState = AlgoRunningState.Stopped;
+                    if (startTime > localNow)
+                    {
+                        if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
+                        WaitTillStartTime(startTime, stopTime, localNow);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                    break;
+                }
+            case AlgoStartTimeType.NextMarketOpens:
+                // TODO, need market meta data
+                break;
+            case AlgoStartTimeType.NextWeekMarketOpens:
+                // TODO, need market meta data
+                break;
+        }
+
+        void WaitTillStartTime(DateTime startTime, DateTime? stopTime, DateTime now)
+        {
+            if (stopTime != null && startTime > stopTime)
+            {
+                throw new ArgumentException("Start time is larger than stop time. Program exits.");
+            }
+            DesignatedStartTime = startTime;
+            var remainingTimeSpan = now - startTime;
+            _log.Info($"Wait till {startTime:yyyyMMdd-HHmmss}, remaining: {remainingTimeSpan.TotalSeconds:F4} seconds.");
+            Halt(startTime);
+        }
+    }
+    public async Task Stop()
     {
         _runningState = AlgoRunningState.Stopped;
         _services.MarketData.NextOhlc -= OnNextPrice;
@@ -125,29 +255,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         {
             await _services.MarketData.UnsubscribeOhlc(security, Interval);
         }
-    }
-
-    public void Halt(DateTime? resumeTime, bool isManuallyHalted = false)
-    {
-        var threadId = Environment.CurrentManagedThreadId;
-        Assertion.Shall(_engineThreadId == threadId); // we are to halt the main engine thread
-
-        var now = DateTime.UtcNow;
-        if (resumeTime != null && resumeTime.Value >= now)
-        {
-            _runningState = AlgoRunningState.Halted;
-            var remainingTimeSpan = (now - resumeTime.Value).Add(TimeSpan.FromMilliseconds(1));
-            Thread.Sleep(remainingTimeSpan);
-            _runningState = AlgoRunningState.Running;
-        }
-    }
-
-    public void ScheduleMaintenance(DateTime haltTime, DateTime resumeTime)
-    {
-        if (haltTime.IsValid())
-            DesignatedHaltTime = haltTime;
-        if (resumeTime.IsValid())
-            DesignatedResumeTime = resumeTime;
     }
 
     /// <summary>
@@ -523,7 +630,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         return price == null ? DateTime.MinValue : price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
     }
 
-    protected override void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, decimal currentPrice)
+    protected void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, decimal currentPrice)
     {
         current.IsLong = last.IsLong;
         current.IsShort = last.IsShort;
@@ -578,104 +685,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     {
         _services.Order.CancelAllOpenOrders();
         _services.Order.CloseAllOpenPositions();
-    }
-
-    private void SetAlgoEffectiveTimeRange(AlgoEffectiveTimeRange timeRange)
-    {
-        DateTime? stopTime = null;
-        var now = DateTime.UtcNow;
-        var localNow = now.ToLocalTime();
-
-        // handle the stop time
-        switch (timeRange.WhenToStop)
-        {
-            case AlgoStopTimeType.Designated:
-                stopTime = timeRange.DesignatedStop;
-                if (stopTime != null && stopTime > now)
-                    DesignatedStopTime = stopTime;
-                break;
-            case AlgoStopTimeType.Never:
-                DesignatedStopTime = null;
-                break;
-            case AlgoStopTimeType.BeforeBrokerMaintenance:
-                if (timeRange.HoursBeforeMaintenance < 0)
-                    throw new ArgumentException("Invalid hours before maintenance.");
-                HoursBeforeHalt = timeRange.HoursBeforeMaintenance;
-                break;
-        }
-
-        // handle (and wait for) the start time
-        var startTime = timeRange.ActualStartTime;
-        switch (timeRange.WhenToStart)
-        {
-            case AlgoStartTimeType.Designated:
-            {
-                if (startTime.IsValid() && startTime > now)
-                {
-                    WaitTillStartTime(startTime, stopTime, now);
-                }
-                else
-                {
-                    _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
-                }
-                break;
-            }
-            case AlgoStartTimeType.Immediately:
-                _runningState = AlgoRunningState.Running;
-                break;
-            case AlgoStartTimeType.Never:
-                _runningState = AlgoRunningState.Stopped;
-                break;
-            case AlgoStartTimeType.NextStartOf:
-                if (timeRange.NextStartOfIntervalType != null)
-                {
-                    if (startTime > now)
-                    {
-                        WaitTillStartTime(startTime, stopTime, now);
-                    }
-                    else
-                    {
-                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
-                    }
-                }
-                else
-                {
-                    _log.Error($"Invalid designated algo start time type, missing interval for \"NextStartOf\" type.");
-                }
-                break;
-            case AlgoStartTimeType.NextStartOfLocalDay:
-            {
-                _runningState = AlgoRunningState.Stopped;
-                if (startTime > localNow)
-                {
-                    if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
-                    WaitTillStartTime(startTime, stopTime, localNow);
-                }
-                else
-                {
-                    _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
-                }
-                break;
-            }
-            case AlgoStartTimeType.NextMarketOpens:
-                // TODO, need market meta data
-                break;
-            case AlgoStartTimeType.NextWeekMarketOpens:
-                // TODO, need market meta data
-                break;
-        }
-
-        void WaitTillStartTime(DateTime startTime, DateTime? stopTime, DateTime now)
-        {
-            if (stopTime != null && startTime > stopTime)
-            {
-                throw new ArgumentException("Start time is larger than stop time. Program exits.");
-            }
-            DesignatedStartTime = startTime;
-            var remainingTimeSpan = now - startTime;
-            _log.Info($"Wait till {startTime:yyyyMMdd-HHmmss}, remaining: {remainingTimeSpan.TotalSeconds:F4} seconds.");
-            Halt(startTime);
-        }
     }
 }
 

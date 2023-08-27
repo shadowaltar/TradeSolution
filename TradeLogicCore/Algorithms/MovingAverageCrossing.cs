@@ -28,7 +28,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public IPositionSizingAlgoLogic<MacVariables> Sizing { get; }
     public IEnterPositionAlgoLogic<MacVariables> Entering { get; }
     public IExitPositionAlgoLogic<MacVariables> Exiting { get; }
-    public ISecurityScreeningAlgoLogic Screening { get; }
+    public ISecurityScreeningAlgoLogic Screening { get; set; }
 
     public MovingAverageCrossing(int fast, int slow, decimal stopLossRatio, IPositionSizingAlgoLogic<MacVariables> sizing = null)
     {

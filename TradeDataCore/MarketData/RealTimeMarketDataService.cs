@@ -141,18 +141,23 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> UnsubscribeAllOhlcs()
+    public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
     {
         List<(int securityId, IntervalType interval)> keys;
         lock (_ohlcSubscriptionCounters)
         {
             keys = _ohlcSubscriptionCounters.Select(pair => pair.Key).ToList();
         }
-        _securityService.GetSecurity()
+        var securities = await _securityService.GetSecurities(keys.Select(k => k.securityId).Distinct().ToList());
+        var securityMap = securities.ToDictionary(s => s.Id, s => s);
+        var states = new List<ExternalConnectionState>();
         foreach (var key in keys)
         {
-            return await _external.UnsubscribeOhlc(key.securityId, key.interval);
+            var security = securityMap[key.securityId];
+            var state = await _external.UnsubscribeOhlc(security, key.interval);
+            states.Add(state);
         }
+        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(states); 
     }
 
     public Task<ExternalConnectionState> UnsubscribeAllTicks()
