@@ -11,7 +11,7 @@ public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
 {
     event Action ReachedDesignatedEndTime;
 
-    Task Run(AlgoStartupParameters parameters);
+    Task<int> Run(AlgoStartupParameters parameters);
 
     Task Stop();
 
@@ -31,6 +31,11 @@ public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
 
     ISecurityScreeningAlgoLogic Screening { get; }
 
+    /// <summary>
+    /// Total signal count being processed. It is usually the count of prices / ticks.
+    /// </summary>
+    int TotalSignalCount { get; }
+
     DateTime? DesignatedHaltTime { get; }
 
     DateTime? DesignatedResumeTime { get; }
@@ -43,10 +48,6 @@ public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
 
     IntervalType Interval { get; }
 
-    Dictionary<long, AlgoEntry<T>> OpenedEntries { get; }
-
-    List<Position> OpenPositions { get; }
-
     Portfolio Portfolio { get; }
 
     bool ShouldCloseOpenPositionsWhenHalted { get; }
@@ -54,4 +55,19 @@ public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
     bool ShouldCloseOpenPositionsWhenStopped { get; }
 
     AlgoStopTimeType WhenToStopOrHalt { get; }
+
+    /// <summary>
+    /// Gets all the algo entries created during engine execution.
+    /// </summary>
+    List<AlgoEntry<T>> GetAllEntries(int securityId);
+
+    /// <summary>
+    /// Gets the algo entries only related to trading activities during engine execution.
+    /// </summary>
+    List<AlgoEntry<T>> GetExecutionEntries(int securityId);
+
+    /// <summary>
+    /// Gets the algo entries currently stands for opened positions.
+    /// </summary>
+    Dictionary<long, AlgoEntry<T>> GetOpenEntries(int securityId);
 }

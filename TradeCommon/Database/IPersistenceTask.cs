@@ -4,8 +4,5 @@ namespace TradeCommon.Database;
 
 public interface IPersistenceTask
 {
-    DatabaseActionType ActionType
-    {
-        get;
-    }
+    DatabaseActionType ActionType { get; }
 }

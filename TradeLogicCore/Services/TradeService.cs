@@ -94,11 +94,7 @@ public class TradeService : ITradeService, IDisposable
 
     private void Persist(Trade trade)
     {
-        var tradeTask = new PersistenceTask<Trade>()
-        {
-            Entry = trade,
-            DatabaseName = DatabaseNames.ExecutionData
-        };
+        var tradeTask = new PersistenceTask<Trade>(trade);
         _persistence.Enqueue(tradeTask);
     }
 
@@ -110,10 +106,15 @@ public class TradeService : ITradeService, IDisposable
     public async Task<List<Trade>?> GetMarketTrades(Security security)
     {
         var state = await _execution.GetMarketTrades(security);
-        return state.Content;
+        return state.ContentAs<List<Trade>?>();
     }
 
-    public Task<List<Trade>?> GetTrades(Security security)
+    public Task<List<Trade>?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<List<Trade>?> GetTrades(Security security, long orderId, bool requestExternal = false)
     {
         throw new NotImplementedException();
     }

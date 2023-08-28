@@ -1,11 +1,11 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using Common;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms.Screening;
 
 public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
-    private static readonly List<Security> _empty = new();
-    private static readonly List<Security> _originalPool = new();
+    private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
 
     public bool CheckIsPicked(int securityId)
@@ -16,7 +16,7 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
         }
     }
 
-    public void SetAndPick(List<Security> securityPool)
+    public void SetAndPick(IDictionary<int, Security> securityPool)
     {
         lock (_originalPool)
         {
@@ -25,46 +25,55 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
             lock (_pickedPool)
             {
                 _pickedPool.Clear();
-                foreach (var security in _originalPool)
+                foreach (var pair in _originalPool)
                 {
-                    _pickedPool[security.Id] = security;
+                    _pickedPool[pair.Key] = pair.Value;
                 }
             }
         }
     }
 
-    public IReadOnlyCollection<Security> GetPickedOnes()
+    public IReadOnlyDictionary<int, Security> GetPickedOnes()
     {
         lock (_pickedPool)
-            return _pickedPool.Values;
+            return _pickedPool;
     }
 
     public void Repick()
     {
     }
 
-    public IReadOnlyCollection<Security> GetAll()
+    public IReadOnlyDictionary<int, Security> GetAll()
     {
         lock (_originalPool)
             return _originalPool;
+    }
+
+    public bool TryCheckIfChanged(out IReadOnlyDictionary<int, Security> pickedOnes)
+    {
+        lock (_originalPool)
+        {
+            pickedOnes = _originalPool;
+        }
+        return false;
     }
 }
 
 public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 {
     private Security? _security;
-    private List<Security> _securities;
+    private readonly Dictionary<int, Security> _securities = new(1);
 
     public SingleSecurityLogic(Security? security)
     {
         _security = security;
         if (security != null)
-            _securities = new List<Security> { security };
+            _securities = new Dictionary<int, Security> { { security.Id, security } };
         else
-            _securities = new List<Security>();
+            _securities = new Dictionary<int, Security>();
     }
 
-    public void SetAndPick(List<Security> securityPool)
+    public void SetAndPick(IDictionary<int, Security> securityPool)
     {
         if (securityPool == null || securityPool.Count == 0) throw new ArgumentNullException(nameof(securityPool));
 
@@ -72,7 +81,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         if (_security == null) throw new InvalidOperationException("Must provide at least one security in the pool for screening.");
 
         _securities.Clear();
-        _securities.Add(_security);
+        _securities[_security.Id] = _security;
     }
 
     public bool CheckIsPicked(int securityId)
@@ -81,14 +90,20 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         return securityId == _security?.Id;
     }
 
-    public IReadOnlyCollection<Security> GetPickedOnes()
-    {
-        throw new NotImplementedException();
-    }
-
-    public IReadOnlyCollection<Security> GetAll()
+    public IReadOnlyDictionary<int, Security> GetPickedOnes()
     {
         return _securities;
+    }
+
+    public IReadOnlyDictionary<int, Security> GetAll()
+    {
+        return _securities;
+    }
+
+    public bool TryCheckIfChanged(out IReadOnlyDictionary<int, Security> pickedOnes)
+    {
+        pickedOnes = _securities;
+        return false;
     }
 
     public void Repick()

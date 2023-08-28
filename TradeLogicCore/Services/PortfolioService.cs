@@ -1,7 +1,6 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Database;
-using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -214,10 +213,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     private void Persist(Position position)
     {
-        var task = new PersistenceTask<Position>(position)
-        {
-            DatabaseName = DatabaseNames.ExecutionData
-        };
+        var task = new PersistenceTask<Position>(position);
         _persistence.Enqueue(task);
     }
 

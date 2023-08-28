@@ -65,16 +65,6 @@ public class BackTestingController : Controller
     //    if (end == DateTime.MinValue)
     //        return BadRequest("Invalid end date-time.");
 
-<<<<<<< HEAD
-        var security = await services.Security.GetSecurity(code ?? "", ExchangeType.Binance, SecurityType.Fx);
-        if (security == null)
-            return BadRequest("Invalid security.");
-
-        var initCash = 100000;
-        var algo = new Rumi(fastParam, slowParam, rumiParam, stopLossRatio);
-        var engine = new AlgorithmEngine<RumiVariables>(services, algo);
-        var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
-=======
     //    var security = await services.Security.GetSecurity(code ?? "", ExchangeType.Binance, SecurityType.Fx);
     //    if (security == null)
     //        return BadRequest("Invalid security.");
@@ -83,46 +73,9 @@ public class BackTestingController : Controller
     //    var algo = new Rumi(fastParam, slowParam, rumiParam, stopLossRatio);
     //    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
     //    var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
-
     //    return Ok(entries);
     //}
 
-<<<<<<< HEAD
-    /// <summary>
-    /// Back-test RUMI for all given combinations of parameters, using 100K as initial cash.
-    /// </summary>
-    /// <param name="services"></param>
-    /// <param name="concatenatedCodes">Optional security code. Empty value will run every codes available, or else eg. 00001,00002,00003.</param>
-    /// <param name="startStr">In yyyyMMdd</param>
-    /// <param name="endStr">In yyyyMMdd</param>
-    /// <param name="exchangeStr">Exchange of the security.</param>
-    /// <param name="secTypeStr">Security type like Equity/Fx.</param>
-    /// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
-    /// <param name="stopLossRatio">Checks the SLPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the SLPrice.</param>
-    /// <param name="concatenatedFastParam">Fast SMA param.</param>
-    /// <param name="concatenatedSlowParam">Slow EMA param.</param>
-    /// <param name="concatenatedRumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
-    /// <returns></returns>
-    [HttpGet("rumi/multiple")]
-    public async Task<IActionResult> RunMultipleRumi([FromServices] IServices services,
-                                                     [FromQuery(Name = "codes")] string? concatenatedCodes = "BTCTUSD",
-                                                     [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
-                                                     [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
-                                                     [FromQuery(Name = "start")] string startStr = "20220101",
-                                                     [FromQuery(Name = "end")] string endStr = "20230701",
-                                                     [FromQuery(Name = "interval")] string? intervalStr = "1h",
-                                                     [FromQuery(Name = "stop-loss-ratio")] decimal stopLossRatio = 0.02m,
-                                                     [FromQuery(Name = "fasts")] string concatenatedFastParam = "2",
-                                                     [FromQuery(Name = "slows")] string concatenatedSlowParam = "5",
-                                                     [FromQuery(Name = "rumis")] string concatenatedRumiParam = "1")
-    {
-        var interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-            return BadRequest("Invalid interval string.");
-        if (interval == IntervalType.OneMinute || interval == IntervalType.OneHour) // TODO
-            return BadRequest("Does not support yet.");
-=======
     ///// <summary>
     ///// Back-test RUMI for all given combinations of parameters, using 100K as initial cash.
     ///// </summary>
@@ -156,8 +109,6 @@ public class BackTestingController : Controller
     //        return BadRequest("Invalid interval string.");
     //    if (interval == IntervalType.OneMinute || interval == IntervalType.OneHour) // TODO
     //        return BadRequest("Does not support yet.");
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
-
     //    var secType = SecurityTypeConverter.Parse(secTypeStr);
     //    if (secType == SecurityType.Unknown)
     //        return BadRequest("Invalid sec-type string.");
@@ -203,16 +154,6 @@ public class BackTestingController : Controller
     //        await Parallel.ForEachAsync(slows, async (s, t) =>
     //        {
     //            if (s <= f) return;
-
-<<<<<<< HEAD
-                foreach (var r in rumis)
-                {
-                    var zipFilePath = await RunRumi(services, securities, f, s, r, stopLossRatio, interval, start, end, initCash);
-                    zipFilePaths.Add(zipFilePath);
-                }
-            });
-        });
-=======
     //            foreach (var r in rumis)
     //            {
     //                var zipFilePath = await RunRumi(services, securities, f, s, r, stopLossRatio, interval, start, end, initCash);
@@ -220,8 +161,6 @@ public class BackTestingController : Controller
     //            }
     //        });
     //    });
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
-
     //    if (zipFilePaths.Count == 0)
     //        return BadRequest("No result is generated.");
     //    if (zipFilePaths.Count == 1)
@@ -241,34 +180,6 @@ public class BackTestingController : Controller
     //        "application/octet-stream", Path.GetFileName(finalZipFilePath));
     //}
 
-<<<<<<< HEAD
-    private async Task<string> RunRumi(IServices services,
-                                       List<Security> securities,
-                                       int f,
-                                       int s,
-                                       int r,
-                                       decimal stopLossRatio,
-                                       IntervalType interval,
-                                       DateTime start,
-                                       DateTime end,
-                                       int initCash)
-    {
-        var now = DateTime.Now;
-        var subFolder = $"AlgorithmEngine-{f},{s},{r}-{now:yyyyMMdd-HHmmss}";
-        var zipFileName = $"Result-AlgorithmEngine-{f},{s},{r}-{now:yyyyMMdd-HHmmss}.zip";
-        var folder = Path.Combine(rootFolder, subFolder);
-        var zipFilePath = Path.Combine(rootFolder, zipFileName);
-        var summaryFilePath = Path.Combine(folder, $"!Summary-{f},{s},{r}-{now:yyyyMMdd-HHmmss}.csv");
-        var summaryRows = new List<List<object>>();
-        await Parallel.ForEachAsync(securities, async (security, t) =>
-        {
-            var algo = new Rumi(f, s, r, stopLossRatio);
-            var engine = new AlgorithmEngine<RumiVariables>(services, algo);
-            engine.SetAlgorithm(algo);
-            var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
-            if (entries.IsNullOrEmpty())
-                return;
-=======
     //private async Task<string> RunRumi(IServices services,
     //                                   List<Security> securities,
     //                                   int f,
@@ -294,8 +205,6 @@ public class BackTestingController : Controller
     //        var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
     //        if (entries.IsNullOrEmpty())
     //            return;
->>>>>>> 76ee123a3f052a2e2cab3966024a518b20502019
-
     //        var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
     //        var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
 

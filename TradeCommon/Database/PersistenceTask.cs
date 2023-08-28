@@ -6,14 +6,16 @@ namespace TradeCommon.Database;
 
 public class PersistenceTask<T> : IPersistenceTask
 {
-    public PersistenceTask(T entry)
+    public PersistenceTask(T entry, string? databaseName = null)
     {
         Entry = entry;
+        DatabaseName = databaseName ?? DatabaseNames.GetDatabaseName<T>();
     }
 
-    public PersistenceTask(List<T> entries)
+    public PersistenceTask(List<T> entries, string? databaseName = null)
     {
         Entries = entries;
+        DatabaseName = databaseName ?? DatabaseNames.GetDatabaseName<T>();
     }
 
     public DatabaseActionType ActionType { get; set; } = DatabaseActionType.Create;
@@ -25,20 +27,20 @@ public class PersistenceTask<T> : IPersistenceTask
     /// <summary>
     /// For single item usage.
     /// </summary>
-    public T Entry { get; set; }
+    public T? Entry { get; private set; }
 
     /// <summary>
     /// For batch / transaction item processing.
     /// </summary>
-    public List<T> Entries { get; set; }
+    public List<T>? Entries { get; private set; }
 
     /// <summary>
     /// Target table for insertion.
     /// </summary>
-    public string TableName { get; set; }
+    public string TableName { get; private set; }
 
     /// <summary>
     /// Target database for insertion.
     /// </summary>
-    public string DatabaseName { get; set; }
+    public string DatabaseName { get; private set; }
 }

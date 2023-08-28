@@ -58,13 +58,13 @@ public class OrderService : IOrderService, IDisposable
     public async Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security? security = null, bool requestExternal = false)
     {
         var state = await _execution.GetOrderHistory(start, end);
-        return state.Content;
+        return state.ContentAs<List<Order>?>();
     }
 
     public async Task<List<Order>?> GetOpenOrders(Security? security = null, bool requestExternal = false)
     {
         var state = await _execution.GetOpenOrders(security);
-        return state.Content;
+        return state.ContentAs<List<Order>?>();
     }
 
     public void SendOrder(Order order, bool isFakeOrder = true)
@@ -125,14 +125,14 @@ public class OrderService : IOrderService, IDisposable
         _log.Info("Canceling all open orders.");
     }
 
-    private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState<Order> state)
+    private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState state)
     {
         if (!isSuccessful)
         {
             _log.Warn("Received a sent order action with issue.");
         }
 
-        var order = state.Content;
+        var order = state.ContentAs<Order>();
         if (order == null)
         {
             _log.Warn("Received a state object without content!");
@@ -148,14 +148,14 @@ public class OrderService : IOrderService, IDisposable
         Persist(order);
     }
 
-    private void OnOrderCancelled(bool isSuccessful, ExternalQueryState<Order> state)
+    private void OnOrderCancelled(bool isSuccessful, ExternalQueryState state)
     {
         if (!isSuccessful)
         {
             _log.Warn("Received a cancel order action with issue.");
         }
 
-        var order = state.Content;
+        var order = state.ContentAs<Order>();
         if (order == null)
         {
             _log.Warn("Received a state object without content!");

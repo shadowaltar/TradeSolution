@@ -29,9 +29,7 @@ public class Order : IComparable<Order>
     public int SecurityId { get; set; }
 
     /// <summary>
-    /// The code / symbol / ticker for execution.
-    /// It caches the value from <see cref="Security"/> object and should not
-    /// be persisted.
+    /// Security code (will not be saved to database).
     /// </summary>
     [UpsertIgnore]
     public string SecurityCode { get; set; } = "";

@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using log4net;
+using System.Security;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
@@ -76,7 +77,7 @@ public class Core
         });
 
         var engine = new AlgorithmEngine<T>(_services, algorithm);
-        engine.Run(parameters.SecurityPool, parameters.Interval, parameters.TimeRange);
+        await engine.Run(parameters);
     }
 
     private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)
@@ -150,20 +151,22 @@ public class Core
         var internalTrades = new Dictionary<long, Trade>();
         foreach (var security in securities)
         {
-            var externalResults = await _services.Trade.GetTradeHistory(start, end, security, true);
+            var externalResults = await _services.Trade.GetTrades(security, start, end, true);
             if (externalResults != null)
             {
                 foreach (var r in externalResults)
                 {
+                    if (r == null) continue;
                     externalTrades[r.ExternalTradeId] = r;
                 }
             }
 
-            var internalResults = await _services.Trade.GetTradeHistory(start, end, security);
+            var internalResults = await _services.Trade.GetTrades(security, start, end);
             if (internalResults != null)
             {
                 foreach (var r in internalResults)
                 {
+                    if (r == null) continue;
                     internalTrades[r.ExternalTradeId] = r;
                 }
             }
@@ -179,8 +182,8 @@ public class Core
     {
         foreach (var account in user.Accounts)
         {
-            var externalAccount = await _services.Portfolio.GetAccountByName(account.Name, true);
-            var internalAccount = await _services.Portfolio.GetAccountByName(account.Name);
+            var externalAccount = await _services.Admin.GetAccount(account.Name, account.Environment, true);
+            var internalAccount = await _services.Admin.GetAccount(account.Name, account.Environment);
             if (internalAccount == null && externalAccount != null)
             {
                 _log.Warn("Internally stored account is missing; will sync with external one.");

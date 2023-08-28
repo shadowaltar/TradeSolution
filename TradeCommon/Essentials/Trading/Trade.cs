@@ -23,6 +23,12 @@ public class Trade : IComparable<Trade>
     public int SecurityId { get; set; }
 
     /// <summary>
+    /// Security code (will not be saved to database).
+    /// </summary>
+    [UpsertIgnore]
+    public string? SecurityCode { get; set; }
+
+    /// <summary>
     /// The order id associated with this trade.
     /// </summary>
     public long OrderId { get; set; }
@@ -63,9 +69,9 @@ public class Trade : IComparable<Trade>
     public decimal Fee { get; set; }
 
     /// <summary>
-    /// The currency of the fee.
+    /// The asset/currency of the fee.
     /// </summary>
-    public string FeeCurrency { get; set; } = "";
+    public string? FeeAsset { get; set; }
 
     /// <summary>
     /// The broker's ID.
@@ -85,21 +91,28 @@ public class Trade : IComparable<Trade>
     /// </summary>
     [UpsertIgnore]
     public bool IsCoarse { get; set; } = false;
+    
+    /// <summary>
+    /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
+    /// </summary>
+    [UpsertIgnore]
+    public int BestMatch { get; set; } = 0;
 
-    public int CompareTo(Trade? other)
+    public int CompareTo(Trade? trade)
     {
-        var r = SecurityId.CompareTo(other?.SecurityId);
-        if (r != 0) r = OrderId.CompareTo(other?.OrderId);
-        if (r != 0) r = ExternalTradeId.CompareTo(other?.ExternalTradeId);
-        if (r != 0) r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
-        if (r != 0) r = Time.CompareTo(other?.Time);
-        if (r != 0) r = Side.CompareTo(other?.Side);
-        if (r != 0) r = Price.CompareTo(other?.Price);
-        if (r != 0) r = Quantity.CompareTo(other?.Quantity);
-        if (r != 0) r = Fee.CompareTo(other?.Fee);
-        if (r != 0) r = FeeCurrency.CompareTo(other?.FeeCurrency);
-        if (r != 0) r = BrokerId.CompareTo(other?.BrokerId);
-        if (r != 0) r = ExchangeId.CompareTo(other?.ExchangeId);
+        var r = SecurityId.CompareTo(trade?.SecurityId);
+        if (r != 0) r = OrderId.CompareTo(trade?.OrderId);
+        if (r != 0) r = ExternalTradeId.CompareTo(trade?.ExternalTradeId);
+        if (r != 0) r = ExternalOrderId.CompareTo(trade?.ExternalOrderId);
+        if (r != 0) r = Time.CompareTo(trade?.Time);
+        if (r != 0) r = Side.CompareTo(trade?.Side);
+        if (r != 0) r = Price.CompareTo(trade?.Price);
+        if (r != 0) r = Quantity.CompareTo(trade?.Quantity);
+        if (r != 0) r = Fee.CompareTo(trade?.Fee);
+        if (r != 0) r = FeeAsset.CompareTo(trade?.FeeAsset);
+        if (r != 0) r = BrokerId.CompareTo(trade?.BrokerId);
+        if (r != 0) r = ExchangeId.CompareTo(trade?.ExchangeId);
+        if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);
         return r;
     }
 

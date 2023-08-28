@@ -6,7 +6,7 @@ public interface IExternalAccountManagement
 {
     bool Login(User user);
 
-    Task<ExternalQueryState<List<Account>>> GetAccounts();
+    Task<ExternalQueryState> GetAccounts();
 
-    Task<ExternalQueryState<Account?>> GetAccount();
+    Task<ExternalQueryState> GetAccount();
 }

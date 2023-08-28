@@ -7,6 +7,7 @@ using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
+using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
 
@@ -45,9 +46,11 @@ public class ExecutionController : Controller
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="orderService"></param>
+    /// <param name="adminService"></param>
     /// <param name="portfolioService"></param>
     /// <param name="password">Required.</param>
     /// <param name="exchangeStr">Exchange name.</param>
+    /// <param name="envStr"></param>
     /// <param name="accountName">Account name.</param>
     /// <param name="secTypeStr">Security type.</param>
     /// <param name="symbol">Symbol of security.</param>
@@ -61,9 +64,11 @@ public class ExecutionController : Controller
     public async Task<ActionResult> SendOrder(
         [FromServices] ISecurityService securityService,
         [FromServices] IOrderService orderService,
+        [FromServices] IAdminService adminService,
         [FromServices] IPortfolioService portfolioService,
         [FromForm] string password,
         [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
+        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
         [FromRoute(Name = "account")] string accountName = "0",
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
         [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
@@ -76,6 +81,9 @@ public class ExecutionController : Controller
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
+        var envType = Environments.Parse(envStr);
+        if (envType == EnvironmentType.Unknown)
+            return BadRequest("Invalid env-type string.");
         var secType = SecurityTypeConverter.Parse(secTypeStr);
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
@@ -96,9 +104,7 @@ public class ExecutionController : Controller
         if (quantity <= 0)
             return BadRequest("Does not support non-positive quantity.");
 
-        // TODO account validation
-        portfolioService.SelectUser(null);
-        var account = portfolioService.GetAccountByName(accountName);
+        var account = await adminService.GetAccount(accountName, envType);
 
         var order = orderService.CreateManualOrder(security, account.Id, price, quantity, side, orderType);
         // TODO validate the remaining balance by rules defined from portfolio service only
@@ -129,16 +135,19 @@ public class ExecutionController : Controller
     /// <returns></returns>
     [HttpPost("{exchange}/accounts/{account}")]
     public async Task<ActionResult> GetAccount(
-        [FromServices] IPortfolioService portfolioService,
+        [FromServices] IAdminService adminService,
         [FromForm] string password,
+        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
         [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
     {
+        var envType = Environments.Parse(envStr);
+        if (envType == EnvironmentType.Unknown)
+            return BadRequest("Invalid env-type string.");
+
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
-        // TODO
-        portfolioService.SelectUser(null);
-        var account = await portfolioService.GetAccountByName(accountName);
+        var account = await adminService.GetAccount(accountName, envType);
         return Ok(account);
     }
 }

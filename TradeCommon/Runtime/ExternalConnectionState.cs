@@ -1,5 +1,7 @@
-﻿using TradeCommon.Essentials;
+﻿using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Trading;
 
 namespace TradeCommon.Runtime;
 
@@ -18,9 +20,9 @@ public class ExternalConnectionState
     }
 }
 
-public class ExternalQueryState<T> : INetworkTimeState
+public class ExternalQueryState : INetworkTimeState
 {
-    public T? Content { get; set; }
+    public object? Content { get; set; }
 
     public string? ResponsePayload { get; set; }
 
@@ -33,6 +35,8 @@ public class ExternalQueryState<T> : INetworkTimeState
     public long NetworkRoundtripTime { get; set; }
     public long TotalTime { get; set; }
 
+    public T? ContentAs<T>() => Content is T typed ? typed : default;
+
     public override string ToString()
     {
         return $"ExecState Time[{NetworkRoundtripTime}ms/{TotalTime}ms]Action[{Action}] [{StatusCode}] [{UniqueConnectionId}]";
@@ -44,8 +48,6 @@ public interface INetworkTimeState
     long NetworkRoundtripTime { get; set; }
     long TotalTime { get; set; }
 }
-
-public class ExternalQueryState : ExternalQueryState<object> { }
 
 public enum SubscriptionType
 {
@@ -75,6 +77,48 @@ public enum ExternalActionType
     CheckOrderSpeedLimit,
 }
 
+
+public static class ExternalQueryStates
+{
+    public static ExternalQueryState InvalidSecurity(ExternalActionType action)
+    {
+        return new ExternalQueryState
+        {
+            Content = default,
+            ResponsePayload = null,
+            Action = action,
+            ExternalPartyId = null,
+            StatusCode = StatusCodes.InvalidArgument,
+            Description = $"Invalid or missing security.",
+        };
+    }
+
+    public static ExternalQueryState InvalidArgument(ExternalActionType action, string message)
+    {
+        return new ExternalQueryState
+        {
+            Content = default,
+            ResponsePayload = null,
+            Action = action,
+            ExternalPartyId = null,
+            StatusCode = StatusCodes.InvalidArgument,
+            Description = message,
+        };
+    }
+
+    public static ExternalQueryState InvalidExchange(ExternalActionType action, string externalName)
+    {
+        return new ExternalQueryState
+        {
+            Content = default,
+            ResponsePayload = null,
+            Action = action,
+            ExternalPartyId = externalName,
+            StatusCode = StatusCodes.InvalidArgument,
+            Description = $"Wrong exchange for the security; expecting {externalName}.",
+        };
+    }
+}
 
 public static class ExternalConnectionStates
 {

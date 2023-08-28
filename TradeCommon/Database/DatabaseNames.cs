@@ -1,5 +1,9 @@
 ﻿using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 
 namespace TradeCommon.Database;
 
@@ -40,6 +44,23 @@ public static class DatabaseNames
 
     public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
     public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
+
+    public static string GetDatabaseName<T>()
+    {
+        var t = typeof(T);
+        if (t == typeof(Trade)) return ExecutionData;
+        if (t == typeof(Order)) return ExecutionData;
+        if (t == typeof(Position)) return ExecutionData;
+
+        if (t == typeof(Account)) return StaticData;
+        if (t == typeof(Balance)) return StaticData;
+
+        if (t == typeof(ExtendedOhlcPrice)) return MarketData;
+        if (t == typeof(OhlcPrice)) return MarketData;
+        if (t == typeof(Tick)) return MarketData;
+
+        throw new InvalidOperationException("Unsupported Type to Database name mapping.");
+    }
 
     public static string GetDefinitionTableName(SecurityType type)
     {
@@ -135,7 +156,6 @@ public static class DatabaseNames
         }
         return tableName;
     }
-
 
     public static string GetTradeOrderPositionIdTable(SecurityType type)
     {

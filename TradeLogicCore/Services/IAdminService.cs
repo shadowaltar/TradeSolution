@@ -22,11 +22,4 @@ public interface IAdminService
     /// <param name="environment"></param>
     /// <returns></returns>
     bool Login(User user, string password, EnvironmentType environment);
-
-    /// <summary>
-    /// Select a user in order to use its account / balance / credentials.
-    /// </summary>
-    /// <param name="user"></param>
-    /// <returns></returns>
-    bool SelectUser(User user);
 }

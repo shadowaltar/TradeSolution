@@ -28,12 +28,12 @@ public static class Dependencies
             case BrokerType.Binance:
                 builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
                 break;
-            case BrokerType.Futu:
-                builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
-                break;
-            case BrokerType.Simulator:
-                builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
-                break;
+            //case BrokerType.Futu:
+            //    builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
+            //    break;
+            //case BrokerType.Simulator:
+            //    builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+            //    break;
         }
 
         var container = builder.Build();

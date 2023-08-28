@@ -249,7 +249,6 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-
                     var securityPool = new List<Security> { security };
                     var algorithm = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic(security) };
                     var engine = new AlgorithmEngine<RumiVariables>(services, algorithm);
@@ -258,7 +257,8 @@ public class Program
                         _environment, _exchange, _broker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
 
-                    if (engine.IsNullOrEmpty())
+                    var entries = engine.GetAllEntries(security.Id);
+                    if (entries.IsNullOrEmpty())
                         continue;
 
                     if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
@@ -266,7 +266,7 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(engine.InitialFreeAmount, engine.Portfolio.Notional.ToDouble(), start, end);
+                    var annualizedReturn = Metrics.GetAnnualizedReturn(engine.InitialFreeAmount.ToDouble(), engine.Portfolio.Notional.ToDouble(), start, end);
                     if (annualizedReturn == 0)
                     {
                         _log.Info($"No trades at all: {security.Code}");
@@ -403,11 +403,20 @@ public class Program
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     foreach (var sl in stopLosses)
                     {
-                        var algo = new MovingAverageCrossing(fast, slow, sl);
-                        var engine = new AlgorithmEngine<MacVariables>(services, algo);
 
                         var initCash = 1000;
-                        var entries = await engine.Run(new List<Security> { security }, interval, start, end, initCash);
+
+
+                        var securityPool = new List<Security> { security };
+                        var algo = new MovingAverageCrossing(fast, slow, sl) { Screening = new SingleSecurityLogic(security) };
+                        var engine = new AlgorithmEngine<MacVariables>(services, algo);
+                        var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
+                        var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
+                            _environment, _exchange, _broker, interval, securityPool, timeRange);
+
+                        await engine.Run(algoStartParams);
+
+                        var entries = engine.GetAllEntries(security.Id);
                         if (entries.IsNullOrEmpty())
                             continue;
 

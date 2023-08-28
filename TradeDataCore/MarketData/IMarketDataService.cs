@@ -18,7 +18,7 @@ public interface IMarketDataService
     /// <summary>
     /// Event when no more historical price would be output. Returns total price count.
     /// </summary>
-    event Action<int> HistoricalPriceStopped;
+    event Action<int> HistoricalPriceEnd;
 
     IExternalQuotationManagement External { get; }
 

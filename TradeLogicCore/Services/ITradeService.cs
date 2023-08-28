@@ -19,9 +19,29 @@ public interface ITradeService
 
     IReadOnlyDictionary<long, long> TradeToOrderIds { get; }
 
+    /// <summary>
+    /// Get the recent trades executed in the market (not only ours).
+    /// </summary>
+    /// <param name="security"></param>
+    /// <returns></returns>
     Task<List<Trade>?> GetMarketTrades(Security security);
 
-    Task<List<Trade>?> GetTrades(Security security);
+    /// <summary>
+    /// Get the executed trades for a given security.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <param name="requestExternal"></param>
+    /// <returns></returns>
+    Task<List<Trade>?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
 
-    Task<List<Trade>?> GetTradeHistory(DateTime start, DateTime end, Security security, bool requestExternal = false);
+    /// <summary>
+    /// Get the trades related to an order.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="orderId"></param>
+    /// <param name="requestExternal"></param>
+    /// <returns></returns>
+    Task<List<Trade>?> GetTrades(Security security, long orderId, bool requestExternal = false);
 }

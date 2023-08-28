@@ -297,8 +297,8 @@ public class PriceController : Controller
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
         var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
 
-        var extendedResults = allPrices.SelectMany(tuple => tuple.Value)
-            .OrderBy(i => i.Ex).ThenBy(i => i.Id).ThenBy(i => i.I).ThenBy(i => i.T)
+        var extendedResults = allPrices.Values.SelectMany(l => l)
+            .OrderBy(i => i.Ex).ThenBy(i => i.Code).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
 
         var dataFilePath = Path.Join(Path.GetTempPath(), $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");

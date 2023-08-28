@@ -21,7 +21,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public event Action<int, OhlcPrice>? NextOhlc;
     public event Action<int, Tick>? NextTick;
-    public event Action<int>? HistoricalPriceStopped;
+    public event Action<int>? HistoricalPriceEnd;
 
     private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = new();
     private readonly Dictionary<int, int> _tickSubscriptionCounters = new();
@@ -85,7 +85,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
                         OnNextHistoricalPrice(id, interval, p);
                         count++;
                     }
-                    HistoricalPriceStopped?.Invoke(count);
+                    HistoricalPriceEnd?.Invoke(count);
                 });
             }
             return ExternalConnectionStates.SubscribedHistoricalOhlcOk(security, start.Value, end.Value);

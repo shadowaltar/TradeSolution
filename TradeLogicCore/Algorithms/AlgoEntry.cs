@@ -1,9 +1,13 @@
 ﻿using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Utils.Attributes;
 
 namespace TradeLogicCore.Algorithms;
 
 public record AlgoEntry<T>
 {
+    public int SeqNum { get; set; }
+
+    [UpsertIgnore]
     public long Id { get; set; }
 
     public required DateTime Time { get; set; }

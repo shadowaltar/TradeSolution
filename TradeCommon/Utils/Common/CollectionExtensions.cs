@@ -39,6 +39,12 @@ public static class CollectionExtensions
             collection.Add(v);
     }
 
+    public static void AddRange<Tk, Tv>(this IDictionary<Tk, Tv> collection, IEnumerable<KeyValuePair<Tk, Tv>> values)
+    {
+        foreach (var v in values)
+            collection.Add(v);
+    }
+
     public static IEnumerable<List<T>> Split<T>(this IEnumerable<T> items, int bucketSize = 30)
     {
         if (bucketSize <= 0)

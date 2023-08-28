@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using System.Runtime.InteropServices;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -29,11 +28,6 @@ public class AdminService : IAdminService
         }
         _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
         return false;
-    }
-
-    public bool SelectUser(User user)
-    {
-        return AsyncHelper.RunSync(() => ExternalExecution.Initialize(user));
     }
 
     public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)
@@ -99,7 +93,7 @@ public class AdminService : IAdminService
         {
             var state = await _accountManagement.GetAccount();
             // TODO
-            return state.Content;
+            return state.ContentAs<Account>();
         }
     }
 }

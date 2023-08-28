@@ -89,39 +89,58 @@ public record AlgoEffectiveTimeRange
     public static AlgoEffectiveTimeRange ForPaperTrading(IntervalType intervalType)
     {
         AlgoStartTimeType algoStartTimeType = AlgoStartTimeType.Never;
+        IntervalType? nextStartOfIntervalType = null;
         switch (intervalType)
         {
             case IntervalType.OneMinute:
-                algoStartTimeType = AlgoStartTimeType.NextStartOf; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneMinute;
+                break;
             case IntervalType.OneHour:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfHour; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneHour;
+                break;
             case IntervalType.OneDay:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfLocalDay; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneDay;
+                break;
         }
         return new AlgoEffectiveTimeRange
         {
             WhenToStart = algoStartTimeType,
             WhenToStop = AlgoStopTimeType.Never,
+            NextStartOfIntervalType = nextStartOfIntervalType,
         };
     }
 
     public static AlgoEffectiveTimeRange ForProduction(IntervalType intervalType)
     {
         AlgoStartTimeType algoStartTimeType = AlgoStartTimeType.Never;
+        IntervalType? nextStartOfIntervalType = null;
         switch (intervalType)
         {
             case IntervalType.OneMinute:
-                algoStartTimeType = AlgoStartTimeType.NextStartOf; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneMinute;
+                break;
             case IntervalType.OneHour:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfHour; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneHour;
+                break;
             case IntervalType.OneDay:
-                algoStartTimeType = AlgoStartTimeType.NextStartOfLocalDay; break;
+                algoStartTimeType = AlgoStartTimeType.NextStartOf;
+                nextStartOfIntervalType = IntervalType.OneDay;
+                break;
+            default:
+                // TODO
+                throw new NotImplementedException();
         }
         return new AlgoEffectiveTimeRange
         {
             WhenToStart = algoStartTimeType,
             WhenToStop = AlgoStopTimeType.BeforeBrokerMaintenance,
             HoursBeforeMaintenance = 3,
+            NextStartOfIntervalType = nextStartOfIntervalType,
         };
     }
 }

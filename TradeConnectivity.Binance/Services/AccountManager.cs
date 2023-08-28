@@ -35,7 +35,7 @@ public class AccountManager : IExternalAccountManagement
     /// Get the account information [SIGNED].
     /// </summary>
     /// <returns></returns>
-    public async Task<ExternalQueryState<Account?>> GetAccount()
+    public async Task<ExternalQueryState> GetAccount()
     {
         var swOuter = Stopwatch.StartNew();
         var url = $"{RootUrls.DefaultHttps}/api/v3/account";
@@ -72,7 +72,7 @@ public class AccountManager : IExternalAccountManagement
         }
         if (account != null)
         {
-            var state = new ExternalQueryState<Account?>
+            var state = new ExternalQueryState
             {
                 Content = account,
                 ResponsePayload = responseString,
@@ -89,7 +89,7 @@ public class AccountManager : IExternalAccountManagement
         }
         else
         {
-            var state = new ExternalQueryState<Account?>
+            var state = new ExternalQueryState
             {
                 Content = null,
                 ResponsePayload = responseString,
@@ -110,7 +110,7 @@ public class AccountManager : IExternalAccountManagement
     /// Get the account detailed info [SIGNED] [PROD ONLY].
     /// </summary>
     /// <returns></returns>
-    public async Task<ExternalQueryState<List<Account>>> GetAccounts()
+    public async Task<ExternalQueryState> GetAccounts()
     {
         var accounts = new List<Account>(_accountTypes.Count);
         var payloads = new List<string>(_accountTypes.Count);
@@ -154,7 +154,7 @@ public class AccountManager : IExternalAccountManagement
             connIds.Add(ResponseHandler.GetUniqueConnectionId(response));
         }
 
-        var state = new ExternalQueryState<List<Account>>
+        var state = new ExternalQueryState
         {
             Content = accounts,
             ResponsePayload = $"[{string.Join(Environment.NewLine, payloads)}]",

@@ -26,7 +26,6 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
             return;
         }
 
-        context.OpenedEntries[current.Id] = current;
         var enterPrice = current.EnterPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
 
@@ -57,8 +56,6 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 
     public void StopLoss(IAlgorithmContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
     {
-        context.OpenedEntries[current.Id] = current;
-
         var enterPrice = current.EnterPrice!.Value;
         var exitPrice = current.SLPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
