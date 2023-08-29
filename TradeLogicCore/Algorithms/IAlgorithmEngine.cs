@@ -11,15 +11,12 @@ namespace TradeLogicCore.Algorithms;
 public interface IAlgorithmEngine
 {
     Task<int> Run(AlgoStartupParameters parameters);
+    Task Stop();
 }
 
 public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
 {
     event Action ReachedDesignatedEndTime;
-
-    Task<int> Run(AlgoStartupParameters parameters);
-
-    Task Stop();
 
     IAlgorithm<T> Algorithm { get; }
 

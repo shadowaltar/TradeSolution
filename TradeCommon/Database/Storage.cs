@@ -153,12 +153,12 @@ DO UPDATE SET
         using var connection = await Connect(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
 
+        var count = 0;
         SqliteCommand? command = null;
         try
         {
             command = connection.CreateCommand();
             command.CommandText = sql;
-
             foreach (var entry in entries)
             {
                 command.Parameters.Clear();
@@ -174,12 +174,13 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$QuantityPrecision", entry.QuantityPrecision);
                 command.Parameters.AddWithValue("$IsEnabled", true);
                 command.Parameters.AddWithValue("$IsMarginTradingAllowed", entry.FxInfo!.IsMarginTradingAllowed);
-                command.Parameters.AddWithValue("$MaxLotSize", entry.FxInfo!.MaxLotSize);
-                command.Parameters.AddWithValue("$MinNotional", entry.FxInfo!.MinNotional);
+                command.Parameters.AddWithValue("$MaxLotSize", entry.FxInfo!.MaxLotSize ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("$MinNotional", entry.FxInfo!.MinNotional ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$LocalStartDate", 0);
                 command.Parameters.AddWithValue("$LocalEndDate", DateTime.MaxValue.ToString("yyyy-MM-dd HH:mm:ss"));
 
                 await command.ExecuteNonQueryAsync();
+                count++;
             }
             transaction.Commit();
             _log.Info($"Upserted {entries.Count} entries into securities table.");

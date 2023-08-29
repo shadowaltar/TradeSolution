@@ -23,7 +23,7 @@ public class AdminService : IAdminService
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
         if (Credential.IsPasswordCorrect(user, password) && _accountManagement.Login(user))
         {
-            _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
+            _log.Info($"Logged in user {user.Name} in env {user.Environment}.");
             return true;
         }
         _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");

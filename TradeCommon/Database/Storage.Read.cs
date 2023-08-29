@@ -52,10 +52,10 @@ WHERE
         var dbName = DatabaseNames.StaticData;
         var sql =
 @$"
-{sqlPart} FROM {tableName} WHERE Account = $Account AND Environment = $Environment
+{sqlPart} FROM {tableName} WHERE Name = $Name AND Environment = $Environment
 ";
         return await SqlReader.ReadOne<Account>(tableName, dbName, sql,
-            ("$Account", accountName), ("$Environment", Environments.ToString(environment)));
+            ("$Name", accountName), ("$Environment", Environments.ToString(environment)));
     }
 
     public static async Task<List<Balance>> ReadBalances(int accountId)

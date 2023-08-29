@@ -74,6 +74,7 @@ public class Quotation : IExternalQuotationManagement
             var node = JsonNode.Parse(json);
             if (node != null)
             {
+                //var example = @"{""stream"":""btctusd@kline_1m"",""data"":{""e"":""kline"",""E"":1693333305611,""s"":""BTCTUSD"",""k"":{""t"":1693333260000,""T"":1693333319999,""s"":""BTCTUSD"",""i"":""1m"",""f"":349256438,""L"":349258039,""o"":""27951.39000000"",""c"":""27935.49000000"",""h"":""27952.00000000"",""l"":""27923.03000000"",""v"":""57.60304000"",""n"":1602,""x"":false,""q"":""1609180.77265510"",""V"":""24.67172000"",""Q"":""689202.76346730"",""B"":""0""}}}";
                 var dataNode = node.AsObject()["data"]!.AsObject();
                 //var asOfTime = DateUtils.FromUnixMs(dataNode["E"]!.GetValue<long>());
                 var kLineNode = dataNode["k"]!.AsObject();

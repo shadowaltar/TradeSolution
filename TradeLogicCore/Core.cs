@@ -1,16 +1,13 @@
 ﻿using Autofac;
 using Common;
-using Iced.Intel;
 using log4net;
-using System.Security;
+using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
-using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
-using TradeDataCore.Instruments;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Services;
@@ -22,10 +19,10 @@ public class Core
 
     private readonly IComponentContext _componentContext;
     private readonly Dictionary<Guid, IAlgorithmEngine> _engines = new();
+    private readonly Dictionary<Guid, AlgoMetaInfo> _algorithms = new();
     private IServices _services;
 
     public IReadOnlyDictionary<Guid, IAlgorithmEngine> Engines => _engines;
-
     public ExchangeType ExchangeType { get; private set; }
     public BrokerType BrokerType { get; private set; }
 
@@ -90,13 +87,39 @@ public class Core
             await engine.Run(parameters); // this is a blocking call
         }, TaskCreationOptions.LongRunning);
 
+        _algorithms[guid] = new AlgoMetaInfo(guid, algorithm.GetType().Name, parameters);
         // the engine execution is a blocking call
-        return Guid.NewGuid();
+        return guid;
     }
 
-    public void StopAlgorithm()
+    public async Task StopAlgorithm(Guid guid)
     {
+        if (_engines.TryGetValue(guid, out var engine))
+        {
+            _log.Info("Stopping Algorithm Engine " + guid.ToString());
+            await engine.Stop();
+            _log.Info("Stopped Algorithm Engine " + guid.ToString());
+            _engines.Remove(guid);
+            _algorithms.Remove(guid);
+        }
+        else
+        {
+            _log.Warn("Failed to stop Algorithm Engine " + guid.ToString());
+        }
+    }
 
+    public async Task StopAllAlgorithms()
+    {
+        foreach (var guid in _engines.Keys.ToList())
+        {
+            await StopAlgorithm(guid);
+        }
+        _log.Info("All Algorithm Engines are stopped.");
+    }
+
+    public List<AlgoMetaInfo> ListAllAlgorithmInfo()
+    {
+        return _algorithms.Values.ToList();
     }
 
     private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)

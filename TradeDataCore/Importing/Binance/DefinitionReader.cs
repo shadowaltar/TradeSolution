@@ -13,6 +13,8 @@ public class DefinitionReader
 
     public async Task<List<Security>?> ReadAndSave(SecurityType type)
     {
+        const int assetPrecision = 8;
+        const string exchange = ExternalNames.Binance;
         const string url = "https://data-api.binance.vision/api/v3/exchangeInfo";
 
         var jo = await HttpHelper.ReadJson(url, _log);
@@ -25,7 +27,6 @@ public class DefinitionReader
             if (symbolObj!["status"].ParseString() != "TRADING")
                 continue;
             var code = symbolObj.GetString("symbol");
-            var exchange = ExternalNames.Binance.ToUpperInvariant();
             var filterArray = symbolObj["filters"]?.AsArray();
             double? lotSize = null;
             double? maxLotSize = null;
@@ -59,7 +60,32 @@ public class DefinitionReader
         }
 
         // find assets
-        var assetNames = securities.Select(s => s.FxInfo!.BaseCurrency).Union(securities.Select(s => s.FxInfo!.QuoteCurrency)).Distinct().ToList();
+        var assetNames = securities.Select(s => s.FxInfo!.BaseCurrency).Union(securities.Select(s => s.FxInfo!.QuoteCurrency)).Distinct().OrderBy(s => s);
+        foreach (var assetName in assetNames)
+        {
+            if (assetName.IsBlank()) continue;
+            var security = new Security
+            {
+                Code = assetName,
+                Name = assetName,
+                Exchange = exchange,
+                Type = SecurityTypes.Fx,
+                SubType = SecurityTypes.Crypto,
+                LotSize = 0, // it is meaningless to set lot size for asset entry
+                PricePrecision = assetPrecision,
+                QuantityPrecision = assetPrecision,
+                Currency = "",
+                FxInfo = new FxSecurityInfo
+                {
+                    BaseCurrency = assetName,
+                    QuoteCurrency = "",
+                    MaxLotSize = null,
+                    MinNotional = null,
+                    IsMarginTradingAllowed = false,
+                }
+            };
+            securities.Add(security);
+        }
 
         await Storage.UpsertFxDefinitions(securities);
         return securities;

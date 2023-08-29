@@ -62,11 +62,9 @@ public class Account
 
     public DateTime UpdateTime { get; set; }
 
-    [InsertIgnore]
-    [UpsertIgnore]
+    [InsertIgnore, UpsertIgnore, SelectIgnore]
     public Balance? MainBalance { get; set; }
 
-    [InsertIgnore]
-    [UpsertIgnore]
+    [InsertIgnore, UpsertIgnore, SelectIgnore]
     public List<Balance> Balances { get; } = new();
 }

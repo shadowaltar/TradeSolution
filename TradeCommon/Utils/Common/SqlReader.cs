@@ -89,6 +89,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.SafeGetInt(name);
         else if (type == typeof(bool?))
             return Reader.SafeGetBool(name);
+        else if (type.IsEnum)
+            return Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : default;
         throw new NotImplementedException("Unsupported type: " + type.Name);
     }
 

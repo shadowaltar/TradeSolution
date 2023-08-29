@@ -3,17 +3,15 @@
 namespace TradeCommon.Constants;
 public static class ExternalNames
 {
-    public const string Futu = "Futu";
+    public const string Futu = "FUTU";
     public const string Hkex = "HKEX";
-    public const string Binance = "Binance";
-    public const string Okex = "Okex";
-    public const string Yahoo = "Yahoo";
+    public const string Binance = "BINANCE";
+    public const string Okex = "OKEX";
+    public const string Yahoo = "YAHOO";
 
-    public const string Unknown = "Unknown";
+    public const string Unknown = "UNKNOWN";
 
-    public const string Simulator = "Simulator";
-    public const string CryptoSimulator = "CryptoSimulator";
-    public const string StockSimulator = "StockSimulator";
+    public const string Simulator = "SIMULATOR";
 
     public static readonly IReadOnlyDictionary<BrokerType, int> BrokerTypeToIds = new Dictionary<BrokerType, int>()
     {
@@ -51,45 +49,27 @@ public static class ExternalNames
     public static ExchangeType ConvertToExchange(string externalName)
     {
         externalName = externalName.ToUpperInvariant();
-        if (externalName == Futu.ToUpperInvariant())
+        return externalName switch
         {
-            return ExchangeType.Hkex;
-        }
-        else if (externalName == Hkex.ToUpperInvariant())
-        {
-            return ExchangeType.Hkex;
-        }
-        else if (externalName == Binance.ToUpperInvariant())
-        {
-            return ExchangeType.Binance;
-        }
-        else if (externalName == Okex.ToUpperInvariant())
-        {
-            return ExchangeType.Okex;
-        }
-        return ExchangeType.Unknown;
+            Futu => ExchangeType.Hkex,
+            Hkex => ExchangeType.Hkex,
+            Binance => ExchangeType.Binance,
+            Okex => ExchangeType.Okex,
+            _ => ExchangeType.Unknown,
+        };
     }
 
     public static BrokerType ConvertToBroker(string externalName)
     {
         externalName = externalName.ToUpperInvariant();
-        if (externalName == Futu.ToUpperInvariant())
+        return externalName switch
         {
-            return BrokerType.Futu;
-        }
-        else if (externalName == Hkex.ToUpperInvariant())
-        {
-            return BrokerType.Futu;
-        }
-        else if (externalName == Binance.ToUpperInvariant())
-        {
-            return BrokerType.Binance;
-        }
-        else if (externalName == Okex.ToUpperInvariant())
-        {
-            return BrokerType.Okex;
-        }
-        return BrokerType.Unknown;
+            Futu => BrokerType.Futu,
+            Hkex => BrokerType.Futu,
+            Binance => BrokerType.Binance,
+            Okex => BrokerType.Okex,
+            _ => BrokerType.Unknown,
+        };
     }
 
     public static int GetBrokerId(string externalName)

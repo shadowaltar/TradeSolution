@@ -228,13 +228,12 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-
-    public Task<bool> Deposit(int accountId, int assetId, decimal value)
+    public async Task<bool> Deposit(int accountId, int assetId, decimal value)
     {
         throw new NotImplementedException();
     }
 
-    public Task<bool> Withdraw(int accountId, int assetId, decimal value)
+    public async Task<bool> Withdraw(int accountId, int assetId, decimal value)
     {
         throw new NotImplementedException();
     }

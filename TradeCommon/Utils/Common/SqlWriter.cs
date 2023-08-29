@@ -121,7 +121,11 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                 var placeholder = _targetFieldNamePlaceHolders[fn];
                 var value = _valueGetter.Get(entry.Cast<T>(), fn);
                 value ??= DBNull.Value;
-                command.Parameters.AddWithValue(placeholder, value);
+                // by default treat enum value as upper string
+                if (value.GetType().IsEnum)
+                    command.Parameters.AddWithValue(placeholder, value.ToString().ToUpperInvariant());
+                else
+                    command.Parameters.AddWithValue(placeholder, value);
             }
             count++;
             result = await command.ExecuteNonQueryAsync();

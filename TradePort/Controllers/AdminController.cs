@@ -8,6 +8,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
+using TradePort.Utils;
 using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
@@ -19,6 +20,67 @@ namespace TradePort.Controllers;
 [Route("admin")]
 public class AdminController : Controller
 {
+    /// <summary>
+    /// Login.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="userName"></param>
+    /// <param name="password"></param>
+    /// <param name="environment"></param>
+    /// <returns></returns>
+    [HttpPost("users/{user}/login")]
+    public async Task<ActionResult> Login([FromServices] IAdminService adminService,
+                                          [FromRoute(Name = "user")] string userName,
+                                          [FromForm(Name = "user-password")] string password,
+                                          [FromQuery(Name = "environment")] EnvironmentType environment)
+    {
+        var user = await adminService.GetUser(userName, environment);
+        if (user == null) return BadRequest("Invalid user or credential.");
+        if (!adminService.Login(user, password, environment)) return BadRequest("Invalid user or credential.");
+
+        return Ok(user);
+    }
+
+    /// <summary>
+    /// Get details of a user.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="userName"></param>
+    /// <param name="environment"></param>
+    /// <returns></returns>
+    [HttpGet("users/{user}")]
+    public async Task<ActionResult> GetUser([FromServices] IAdminService adminService,
+                                            [FromRoute(Name = "user")] string userName,
+                                            [FromQuery(Name = "environment")] EnvironmentType environment)
+    {
+        if (userName.IsBlank()) return BadRequest();
+
+        var user = await adminService.GetUser(userName, environment);
+        if (user == null)
+        {
+            return NotFound();
+        }
+        return Ok(user);
+    }
+
+    /// <summary>
+    /// Get account's information.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="accountName"></param>
+    /// <param name="environment"></param>
+    /// <param name="requestExternal"></param>
+    /// <returns></returns>
+    [HttpGet("accounts/{account}")]
+    public async Task<ActionResult> GetAccount([FromServices] IAdminService adminService,
+                                               [FromRoute(Name = "account")] string accountName = "test",
+                                               [FromQuery(Name = "env")] EnvironmentType environment = EnvironmentType.Unknown,
+                                               [FromQuery(Name = "request-external")] bool requestExternal = false)
+    {
+        var account = await adminService.GetAccount(accountName, environment, requestExternal);
+        return Ok(account);
+    }
+
     /// <summary>
     /// Create a new user.
     /// </summary>
@@ -47,7 +109,7 @@ public class AdminController : Controller
             return BadRequest();
         }
 
-        var result = await adminService.CreateUser(userName, model.Email, model.UserPassword, model.Environment);
+        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, model.Environment);
         model.UserPassword = "";
 
         return Ok(result);
@@ -60,10 +122,10 @@ public class AdminController : Controller
     /// <param name="model"></param>
     /// <param name="accountName"></param>
     /// <returns></returns>
-    [HttpPost("accounts/{accountName}")]
+    [HttpPost("accounts/{account}")]
     public async Task<ActionResult> CreateAccount([FromServices] IAdminService adminService,
                                                   [FromForm] AccountCreationModel model,
-                                                  [FromRoute] string accountName)
+                                                  [FromRoute(Name = "account")] string accountName = "test")
     {
         if (accountName.IsBlank()) return BadRequest();
         if (model == null) return BadRequest();
@@ -95,55 +157,11 @@ public class AdminController : Controller
     }
 
     /// <summary>
-    /// Get account's information.
-    /// </summary>
-    /// <returns></returns>
-    [HttpPost("{exchange}/accounts/{account}")]
-    public async Task<ActionResult> GetAccount(
-        [FromServices] IAdminService adminService,
-        [FromForm] string password,
-        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
-        [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
-    {
-        var envType = Environments.Parse(envStr);
-        if (envType == EnvironmentType.Unknown)
-            return BadRequest("Invalid env-type string.");
-
-        if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
-
-        var account = await adminService.GetAccount(accountName, envType);
-        return Ok(account);
-    }
-
-    /// <summary>
-    /// Get details of a user.
-    /// </summary>
-    /// <param name="adminService"></param>
-    /// <param name="userName"></param>
-    /// <param name="environment"></param>
-    /// <returns></returns>
-    [HttpGet("users/{user}")]
-    public async Task<ActionResult> GetUser([FromServices] IAdminService adminService,
-                                            [FromRoute(Name = "user")] string userName,
-                                            [FromQuery(Name = "environment")] EnvironmentType environment)
-    {
-        if (userName.IsBlank()) return BadRequest();
-
-        var user = await adminService.GetUser(userName, environment);
-        if (user == null)
-        {
-            return NotFound();
-        }
-        return Ok(user);
-    }
-
-    /// <summary>
     /// WARNING, this will erase all the data. Rebuild all the tables.
     /// </summary>
     /// <returns></returns>
     [HttpPost("rebuild-static-tables")]
-    public async Task<ActionResult> RebuildStaticTables([FromForm] string password)
+    public async Task<ActionResult> RebuildStaticTables([FromForm(Name = "admin-password")] string password)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
@@ -175,7 +193,7 @@ public class AdminController : Controller
     /// <param name="secTypeStr">Must be used along with <paramref name="intervalStr"/>.</param>
     /// <returns></returns>
     [HttpPost("rebuild-price-tables")]
-    public async Task<ActionResult> RebuildPriceTables([FromForm] string password,
+    public async Task<ActionResult> RebuildPriceTables([FromForm(Name = "admin-password")] string password,
         [FromQuery(Name = "interval")] string? intervalStr,
         [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
@@ -228,12 +246,12 @@ public class AdminController : Controller
     /// <param name="tableTypeStr">Empty to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables-except-prices")]
-    public async Task<ActionResult> RebuildAllTablesExceptPrices([FromForm] string password,
+    public async Task<ActionResult> RebuildAllTablesExceptPrices([FromForm(Name = "admin-password")] string password,
         [FromQuery(Name = "sec-type")] string? secTypeStr = null,
         [FromQuery(Name = "table-type")] string? tableTypeStr = null)
     {
-        if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
+        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
+
         SecurityType secType = SecurityType.Unknown;
         if (secTypeStr != null)
             secType = SecurityTypeConverter.Parse(secTypeStr);
