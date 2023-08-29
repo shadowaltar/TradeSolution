@@ -21,8 +21,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     private readonly IServices _services;
     private readonly int _engineThreadId;
-    private IntervalType _intervalType;
-    private TimeSpan _interval;
+    private readonly IntervalType _intervalType;
+    private readonly TimeSpan _interval;
+    private readonly IdGenerator _idGenerator;
 
     private IReadOnlyDictionary<int, Security> _pickedSecurities;
 
@@ -62,8 +63,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     public IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
     public IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
     public ISecurityScreeningAlgoLogic Screening { get; protected set; }
-
-    private IdGenerator _idGenerator;
 
     public int TotalSignalCount { get; protected set; }
 
@@ -219,17 +218,17 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         switch (timeRange.WhenToStart)
         {
             case AlgoStartTimeType.Designated:
-            {
-                if (startTime.IsValid() && startTime > now)
                 {
-                    WaitTillStartTime(startTime, stopTime, now);
+                    if (startTime.IsValid() && startTime > now)
+                    {
+                        WaitTillStartTime(startTime, stopTime, now);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                    break;
                 }
-                else
-                {
-                    _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
-                }
-                break;
-            }
             case AlgoStartTimeType.Immediately:
                 _runningState = AlgoRunningState.Running;
                 break;
@@ -254,19 +253,19 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                 }
                 break;
             case AlgoStartTimeType.NextStartOfLocalDay:
-            {
-                _runningState = AlgoRunningState.Stopped;
-                if (startTime > localNow)
                 {
-                    if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
-                    WaitTillStartTime(startTime, stopTime, localNow);
+                    _runningState = AlgoRunningState.Stopped;
+                    if (startTime > localNow)
+                    {
+                        if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
+                        WaitTillStartTime(startTime, stopTime, localNow);
+                    }
+                    else
+                    {
+                        _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
+                    }
+                    break;
                 }
-                else
-                {
-                    _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
-                }
-                break;
-            }
             case AlgoStartTimeType.NextMarketOpens:
                 // TODO, need market meta data
                 break;

@@ -3,6 +3,10 @@ using TradeCommon.Utils.Attributes;
 
 namespace TradeLogicCore.Algorithms;
 
+/// <summary>
+/// Class which records prop algo execution.
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public record AlgoEntry<T>
 {
     public int SeqNum { get; set; }

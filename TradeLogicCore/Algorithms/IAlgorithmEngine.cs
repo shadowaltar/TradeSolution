@@ -7,7 +7,13 @@ using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
-public interface IAlgorithmEngine<T> where T : IAlgorithmVariables
+
+public interface IAlgorithmEngine
+{
+    Task<int> Run(AlgoStartupParameters parameters);
+}
+
+public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
 {
     event Action ReachedDesignatedEndTime;
 

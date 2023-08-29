@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using Iced.Intel;
 using log4net;
 using System.Security;
 using TradeCommon.Constants;
@@ -20,7 +21,10 @@ public class Core
     private static readonly ILog _log = Logger.New();
 
     private readonly IComponentContext _componentContext;
+    private readonly Dictionary<Guid, IAlgorithmEngine> _engines = new();
     private IServices _services;
+
+    public IReadOnlyDictionary<Guid, IAlgorithmEngine> Engines => _engines;
 
     public ExchangeType ExchangeType { get; private set; }
     public BrokerType BrokerType { get; private set; }
@@ -32,7 +36,10 @@ public class Core
     }
 
     /// <summary>
-    /// To start a trading algorithm, the following parameters need to be provided:
+    /// Start a trading algorithm working thread and returns a GUID.
+    /// The working thread will not end by itself unless being stopped manually or reaching its designated end time.
+    /// 
+    /// The following parameters need to be provided:
     /// * environment, broker, exchange, user and account details.
     /// * securities to be listened and screened.
     /// * algorithm instance, with position-sizing, entering, exiting, screening, fee-charging logic components.
@@ -48,8 +55,7 @@ public class Core
     /// <param name="algorithm"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task StartAlgorithm<T>(AlgoStartupParameters parameters,
-                                        IAlgorithm<T> algorithm) where T : IAlgorithmVariables
+    public async Task<Guid> StartAlgorithm<T>(AlgoStartupParameters parameters, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
         _services = _componentContext.Resolve<IServices>();
 
@@ -76,8 +82,21 @@ public class Core
             await CheckRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
         });
 
-        var engine = new AlgorithmEngine<T>(_services, algorithm);
-        await engine.Run(parameters);
+        var guid = Guid.NewGuid();
+        _ = Task.Factory.StartNew(async () =>
+        {
+            var engine = new AlgorithmEngine<T>(_services, algorithm);
+            _engines[guid] = engine;
+            await engine.Run(parameters); // this is a blocking call
+        }, TaskCreationOptions.LongRunning);
+
+        // the engine execution is a blocking call
+        return Guid.NewGuid();
+    }
+
+    public void StopAlgorithm()
+    {
+
     }
 
     private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)

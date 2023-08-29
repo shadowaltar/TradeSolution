@@ -8,6 +8,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
+using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
 
@@ -91,6 +92,28 @@ public class AdminController : Controller
         };
         var result = await adminService.CreateAccount(account);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get account's information.
+    /// </summary>
+    /// <returns></returns>
+    [HttpPost("{exchange}/accounts/{account}")]
+    public async Task<ActionResult> GetAccount(
+        [FromServices] IAdminService adminService,
+        [FromForm] string password,
+        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
+        [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
+    {
+        var envType = Environments.Parse(envStr);
+        if (envType == EnvironmentType.Unknown)
+            return BadRequest("Invalid env-type string.");
+
+        if (password.IsBlank()) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
+
+        var account = await adminService.GetAccount(accountName, envType);
+        return Ok(account);
     }
 
     /// <summary>
@@ -202,41 +225,66 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="password"></param>
     /// <param name="secTypeStr"></param>
-    /// <param name="tableTypeStr">Order, Trade, Position, FinancialStat, or TOP (trade-order-position-relationship).</param>
+    /// <param name="tableTypeStr">Empty to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
-    [HttpPost("rebuild-tables")]
-    public async Task<ActionResult> RebuildTables([FromForm] string password,
-        [FromQuery(Name = "sec-type")] string? secTypeStr = "equity",
-        [FromQuery(Name = "table-type")] string? tableTypeStr = "order")
+    [HttpPost("rebuild-tables-except-prices")]
+    public async Task<ActionResult> RebuildAllTablesExceptPrices([FromForm] string password,
+        [FromQuery(Name = "sec-type")] string? secTypeStr = null,
+        [FromQuery(Name = "table-type")] string? tableTypeStr = null)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
         SecurityType secType = SecurityType.Unknown;
         if (secTypeStr != null)
             secType = SecurityTypeConverter.Parse(secTypeStr);
+
+        Dictionary<string, bool>? results = null;
         DataType dataType = DataType.Unknown;
         if (tableTypeStr != null)
+        {
             dataType = DataTypeConverter.Parse(tableTypeStr);
+            results = await CreateTables(dataType, secType);
+        }
+        else if (tableTypeStr.IsBlank() && secTypeStr.IsBlank())
+        {
+            results = new();
+            results.AddRange(await CreateTables(DataType.User));
+            results.AddRange(await CreateTables(DataType.Account));
+            results.AddRange(await CreateTables(DataType.Balance));
+            results.AddRange(await CreateTables(DataType.FinancialStat));
+            results.AddRange(await CreateTables(DataType.Order, SecurityType.Fx));
+            results.AddRange(await CreateTables(DataType.Order, SecurityType.Equity));
+            results.AddRange(await CreateTables(DataType.Trade, SecurityType.Fx));
+            results.AddRange(await CreateTables(DataType.Trade, SecurityType.Equity));
+            results.AddRange(await CreateTables(DataType.Position, SecurityType.Fx));
+            results.AddRange(await CreateTables(DataType.Position, SecurityType.Equity));
+        }
+        if (results.IsNullOrEmpty())
+            return BadRequest($"Invalid parameters: either {tableTypeStr} or {secTypeStr} is wrong.");
+        else
+            return Ok(results);
+    }
 
-        List<string>? resultTableNames = null;
-
+    private async Task<Dictionary<string, bool>?> CreateTables(DataType dataType, SecurityType secType = SecurityType.Unknown)
+    {
+        List<string> resultTableNames = new();
         switch (dataType)
         {
             case DataType.FinancialStat:
                 await Storage.CreateFinancialStatsTable();
-                resultTableNames = new List<string> { DatabaseNames.FinancialStatsTable };
+                resultTableNames.Add(DatabaseNames.FinancialStatsTable);
                 break;
             case DataType.Account:
                 await Storage.CreateAccountTable();
-                resultTableNames = new List<string> { DatabaseNames.AccountTable };
+                resultTableNames.Add(DatabaseNames.AccountTable);
                 break;
             case DataType.Balance:
                 await Storage.CreateBalanceTable();
-                resultTableNames = new List<string> { DatabaseNames.BalanceTable };
+                resultTableNames.Add(DatabaseNames.BalanceTable);
                 break;
             case DataType.User:
                 await Storage.CreateUserTable();
-                resultTableNames = new List<string> { DatabaseNames.UserTable };
+                resultTableNames.Add(DatabaseNames.UserTable);
                 break;
         }
 
@@ -245,48 +293,43 @@ public class AdminController : Controller
             switch (dataType)
             {
                 case DataType.Order:
-                    resultTableNames = await Storage.CreateOrderTable(secType);
+                    resultTableNames.AddRange(await Storage.CreateOrderTable(secType));
                     break;
                 case DataType.Trade:
-                    resultTableNames = await Storage.CreateTradeTable(secType);
+                    resultTableNames.AddRange(await Storage.CreateTradeTable(secType));
                     break;
                 case DataType.Position:
-                    resultTableNames = await Storage.CreatePositionTable(secType);
+                    resultTableNames.AddRange(await Storage.CreatePositionTable(secType));
                     break;
-                case DataType.TradeOrderPositionRelationship:
-                    resultTableNames = new List<string> { await Storage.CreateTradeOrderPositionIdTable(secType) };
-                    break;
+                    //case DataType.TradeOrderPositionRelationship:
+                    //    results = new List<string> { await Storage.CreateTradeOrderPositionIdTable(secType) };
+                    //    break;
             }
-            if (resultTableNames == null)
-                return BadRequest($"Invalid parameters: {tableTypeStr}");
-
-            var results = new Dictionary<string, bool>();
-            foreach (var tn in resultTableNames)
-            {
-                var r = await Storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
-                if (!r)
-                    r = await Storage.CheckTableExists(tn, DatabaseNames.StaticData);
-                if (!r)
-                    r = await Storage.CheckTableExists(tn, DatabaseNames.MarketData);
-                results[tn] = r;
-            }
-            return Ok(results);
         }
 
-        return BadRequest($"Invalid parameters: {secTypeStr}");
+        var results = new Dictionary<string, bool>();
+        foreach (var tn in resultTableNames)
+        {
+            var r = await Storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
+            if (!r)
+                r = await Storage.CheckTableExists(tn, DatabaseNames.StaticData);
+            if (!r)
+                r = await Storage.CheckTableExists(tn, DatabaseNames.MarketData);
+            results[tn] = r;
+        }
+        return results;
     }
-
 
     public class UserCreationModel
     {
         [FromForm(Name = "adminPassword")]
-        public string AdminPassword { get; set; }
+        public string? AdminPassword { get; set; }
 
         [FromForm(Name = "userPassword")]
-        public string UserPassword { get; set; }
+        public string? UserPassword { get; set; }
 
         [FromForm(Name = "email")]
-        public string Email { get; set; }
+        public string? Email { get; set; }
 
         [FromForm(Name = "environment")]
         public EnvironmentType Environment { get; set; }
@@ -296,19 +339,19 @@ public class AdminController : Controller
     public class AccountCreationModel
     {
         [FromForm(Name = "adminPassword")]
-        public string AdminPassword { get; set; }
+        public string? AdminPassword { get; set; }
 
         [FromForm(Name = "ownerName")]
-        public string OwnerName { get; set; }
+        public string? OwnerName { get; set; }
 
         [FromForm(Name = "brokerType")]
-        public string Broker { get; set; }
+        public string? Broker { get; set; }
 
         [FromForm(Name = "externalAccount")]
-        public string ExternalAccount { get; set; }
+        public string? ExternalAccount { get; set; }
 
         [FromForm(Name = "type")]
-        public string Type { get; set; }
+        public string? Type { get; set; }
 
         [FromForm(Name = "subType")]
         public string? SubType { get; set; }

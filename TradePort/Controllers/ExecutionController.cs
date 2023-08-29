@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using BenchmarkDotNet.Engines;
+using Common;
 using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
@@ -6,7 +7,12 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
+using TradeLogicCore;
+using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.Parameters;
+using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
+using TradePort.Utils;
 using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
@@ -61,22 +67,21 @@ public class ExecutionController : Controller
     /// <param name="isFakeOrder">Send a fake order if true.</param>
     /// <returns></returns>
     [HttpPost("{exchange}/accounts/{account}/order")]
-    public async Task<ActionResult> SendOrder(
-        [FromServices] ISecurityService securityService,
-        [FromServices] IOrderService orderService,
-        [FromServices] IAdminService adminService,
-        [FromServices] IPortfolioService portfolioService,
-        [FromForm] string password,
-        [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
-        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
-        [FromRoute(Name = "account")] string accountName = "0",
-        [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
-        [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
-        [FromQuery(Name = "side")] string sideStr = "Buy",
-        [FromQuery(Name = "order-type")] string orderTypeStr = "Limit",
-        [FromQuery(Name = "price")] decimal price = 0,
-        [FromQuery(Name = "quantity")] decimal quantity = 0,
-        [FromQuery(Name = "fake")] bool isFakeOrder = true)
+    public async Task<ActionResult> SendOrder([FromServices] ISecurityService securityService,
+                                              [FromServices] IOrderService orderService,
+                                              [FromServices] IAdminService adminService,
+                                              [FromServices] IPortfolioService portfolioService,
+                                              [FromForm] string password,
+                                              [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
+                                              [FromRoute(Name = "env")] string envStr = Environments.Unknown,
+                                              [FromRoute(Name = "account")] string accountName = "0",
+                                              [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
+                                              [FromQuery(Name = "side")] string sideStr = "Buy",
+                                              [FromQuery(Name = "order-type")] string orderTypeStr = "Limit",
+                                              [FromQuery(Name = "price")] decimal price = 0,
+                                              [FromQuery(Name = "quantity")] decimal quantity = 0,
+                                              [FromQuery(Name = "fake")] bool isFakeOrder = true)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
@@ -129,25 +134,90 @@ public class ExecutionController : Controller
         return Ok();
     }
 
-    /// <summary>
-    /// Get account's information.
-    /// </summary>
-    /// <returns></returns>
-    [HttpPost("{exchange}/accounts/{account}")]
-    public async Task<ActionResult> GetAccount(
-        [FromServices] IAdminService adminService,
-        [FromForm] string password,
-        [FromRoute(Name = "env")] string envStr = Environments.Unknown,
-        [FromRoute(Name = "account")] string accountName = "TEST_ACCOUNT_NAME")
+    [HttpPost("algos/mac/start")]
+    public async Task<ActionResult?> RunMac([FromServices] ISecurityService securityService,
+                                            [FromServices] IOrderService orderService,
+                                            [FromServices] IAdminService adminService,
+                                            [FromServices] IPortfolioService portfolioService,
+                                            [FromServices] Core core,
+                                            [FromForm] UserCredentialModel model,
+                                            [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
+                                            [FromRoute(Name = "env")] string envStr = Environments.Test,
+                                            [FromRoute(Name = "user")] string userName = "test",
+                                            [FromRoute(Name = "account")] string accountName = "test",
+                                            [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
+                                            [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
+                                            [FromQuery(Name = "interval")] string intervalStr = "1d",
+                                            [FromQuery(Name = "back-test-start")] string? startStr = "",
+                                            [FromQuery(Name = "back-test-end")] string? endStr = "")
     {
-        var envType = Environments.Parse(envStr);
-        if (envType == EnvironmentType.Unknown)
-            return BadRequest("Invalid env-type string.");
+        if (model.AdminPassword.IsBlank()) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
 
-        if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
+        if (envStr.IsEnvBad(out var env, out var badRequest)) return badRequest;
+        if (exchangeStr.IsExchangeBad(out var exchange, out badRequest)) return badRequest;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out badRequest)) return badRequest;
+        if (intervalStr.IsIntervalBad(out var interval, out badRequest)) return badRequest;
+        if (model.UserName.IsBlank()) return BadRequest("Missing user name.");
+        if (model.UserPassword.IsBlank()) return BadRequest("Missing user password.");
 
-        var account = await adminService.GetAccount(accountName, envType);
-        return Ok(account);
+        var security = await securityService.GetSecurity(symbol, exchange, secType);
+        if (security == null) return BadRequest("Invalid or missing security.");
+
+        AlgoEffectiveTimeRange algoTimeRange;
+        switch (env)
+        {
+            case EnvironmentType.Prod:
+                algoTimeRange = AlgoEffectiveTimeRange.ForProduction(interval);
+                break;
+            case EnvironmentType.Test:
+                if (startStr.IsDateBad(out var start, out badRequest)) return badRequest;
+                if (endStr.IsDateBad(out var end, out badRequest)) return badRequest;
+                algoTimeRange = AlgoEffectiveTimeRange.ForBackTesting(start, end);
+                break;
+            case EnvironmentType.Uat:
+                algoTimeRange = AlgoEffectiveTimeRange.ForPaperTrading(interval);
+                break;
+            default:
+                return BadRequest("Invalid environment.");
+        }
+        var parameters = new AlgoStartupParameters(model.UserName,
+                                                          model.UserPassword,
+                                                          accountName,
+                                                          env,
+                                                          exchange,
+                                                          ExternalNames.ConvertToBroker(exchangeStr),
+                                                          interval,
+                                                          new List<Security> { security },
+                                                          algoTimeRange);
+
+        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic(security) };
+
+        var guid = await core.StartAlgorithm(parameters, algorithm);
+    }
+
+    [HttpPost("algos/mac/stop")]
+    public async Task<ActionResult> StopMac()
+    {
+
+    }
+
+    [HttpPost("algos/stop-all")]
+    public async Task<ActionResult> RunMac()
+    {
+
+    }
+
+
+    public class UserCredentialModel
+    {
+        [FromForm(Name = "userName")]
+        public string? UserName { get; set; }
+
+        [FromForm(Name = "adminPassword")]
+        public string? AdminPassword { get; set; }
+
+        [FromForm(Name = "userPassword")]
+        public string? UserPassword { get; set; }
     }
 }

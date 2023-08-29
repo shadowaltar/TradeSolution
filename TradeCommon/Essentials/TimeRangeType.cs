@@ -1,4 +1,6 @@
-﻿namespace TradeDataCore.Essentials;
+﻿using Common;
+
+namespace TradeDataCore.Essentials;
 
 public enum TimeRangeType
 {
@@ -18,9 +20,9 @@ public enum TimeRangeType
 
 public static class TimeRangeTypeConverter
 {
-    public static TimeRangeType Parse(string strInterval)
+    public static TimeRangeType Parse(string? strInterval)
     {
-        if (strInterval == null)
+        if (strInterval.IsBlank())
             return TimeRangeType.Unknown;
 
         strInterval = strInterval.Trim().ToUpperInvariant();

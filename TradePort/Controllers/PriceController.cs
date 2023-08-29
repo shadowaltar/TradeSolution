@@ -11,6 +11,7 @@ using TradeCommon.Exporting;
 using TradeCommon.Utils.Common;
 using TradeDataCore.Essentials;
 using TradeDataCore.MarketData;
+using TradePort.Utils;
 
 namespace TradePort.Controllers;
 
@@ -41,11 +42,11 @@ public class PriceController : Controller
         [FromQuery(Name = "start")] string startStr = "20230101",
         [FromQuery(Name = "end")] string? endStr = null)
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsDateBad(startStr, out var start, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (startStr.IsDateBad(out var start, out var r3)) return r3;
         DateTime end = DateTime.UtcNow;
-        if (endStr != null && IsDateBad(endStr, out end, out var r4)) return r4;
+        if (endStr != null && endStr.IsDateBad(out end, out var r4)) return r4;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
         if (security == null) return NotFound("Security is not found.");
@@ -70,9 +71,9 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1d",
         [FromQuery(Name = "range")] string rangeStr = "10y")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (rangeStr.IsTimeRangeBad(out var range, out var r3)) return r3;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
         if (security == null) return NotFound("Security is not found.");
@@ -102,9 +103,9 @@ public class PriceController : Controller
         if (minMarketCap < 0)
             return BadRequest("Invalid market cap min as filter. Either == 0 (no filter) or larger than 0.");
 
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (rangeStr.IsTimeRangeBad(out var range, out var r3)) return r3;
 
         var securities = await Storage.ReadSecurities(secType, ExternalNames.Hkex);
         if (securities == null) return NotFound("Security is not found.");
@@ -140,11 +141,11 @@ public class PriceController : Controller
         [FromQuery(Name = "start")] string startStr = "20220101",
         [FromQuery(Name = "end")] string? endStr = null)
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsDateBad(startStr, out var start, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (startStr.IsDateBad(out var start, out var r3)) return r3;
         DateTime end = DateTime.UtcNow;
-        if (endStr != null && IsDateBad(endStr, out end, out var r4)) return r4;
+        if (endStr != null && endStr.IsDateBad(out end, out var r4)) return r4;
 
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
@@ -212,7 +213,7 @@ public class PriceController : Controller
        [FromQuery(Name = "interval")] string intervalStr = "1m",
        [FromQuery(Name = "symbols")] string? symbol = "BTCUSDT")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
 
         if (symbol.IsBlank())
             return BadRequest("Missing symbol.");
@@ -244,9 +245,9 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "range")] string rangeStr = "2y")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (rangeStr.IsTimeRangeBad(out var range, out var r3)) return r3;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
         if (security == null) return NotFound("Security is not found.");
@@ -280,9 +281,9 @@ public class PriceController : Controller
         [FromQuery(Name = "symbols")] string? concatenatedSymbols = "",
         [FromQuery(Name = "range")] string rangeStr = "2y")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
-        if (IsTimeRangeBad(rangeStr, out var range, out var r3)) return r3;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
+        if (rangeStr.IsTimeRangeBad(out var range, out var r3)) return r3;
 
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
@@ -329,8 +330,8 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
 
         var resultSet = await Storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
         return resultSet != null ? Ok(resultSet.Rows[0][0]) : BadRequest();
@@ -345,8 +346,8 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
 
         var priceTableName = DatabaseNames.GetPriceTableName(interval, secType);
         var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
@@ -383,58 +384,58 @@ public class PriceController : Controller
         [FromQuery(Name = "interval")] string intervalStr = "1h",
         [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
-        if (IsIntervalBad(intervalStr, out var interval, out var r1)) return r1;
-        if (IsSecurityTypeBad(secTypeStr, out var secType, out var r2)) return r2;
+        if (intervalStr.IsIntervalBad(out var interval, out var r1)) return r1;
+        if (secTypeStr.IsSecurityTypeBad(out var secType, out var r2)) return r2;
 
         var results = await Storage.ReadDailyMissingPriceSituations(interval, secType);
         return Ok(results);
     }
 
-    private bool IsIntervalBad(string intervalStr, out IntervalType interval, out ObjectResult? result)
-    {
-        result = null;
-        interval = IntervalTypeConverter.Parse(intervalStr);
-        if (interval == IntervalType.Unknown)
-        {
-            result = BadRequest("Invalid interval string.");
-            return true;
-        }
-        return false;
-    }
+    //private bool IsIntervalBad(string intervalStr, out IntervalType interval, out ObjectResult? result)
+    //{
+    //    result = null;
+    //    interval = IntervalTypeConverter.Parse(intervalStr);
+    //    if (interval == IntervalType.Unknown)
+    //    {
+    //        result = BadRequest("Invalid interval string.");
+    //        return true;
+    //    }
+    //    return false;
+    //}
 
-    private bool IsSecurityTypeBad(string secTypeStr, out SecurityType securityType, out ObjectResult? result)
-    {
-        result = null;
-        securityType = SecurityTypeConverter.Parse(secTypeStr);
-        if (securityType == SecurityType.Unknown)
-        {
-            result = BadRequest("Invalid sec-type string.");
-            return true;
-        }
-        return false;
-    }
+    //private bool IsSecurityTypeBad(string secTypeStr, out SecurityType securityType, out ObjectResult? result)
+    //{
+    //    result = null;
+    //    securityType = SecurityTypeConverter.Parse(secTypeStr);
+    //    if (securityType == SecurityType.Unknown)
+    //    {
+    //        result = BadRequest("Invalid sec-type string.");
+    //        return true;
+    //    }
+    //    return false;
+    //}
 
-    private bool IsTimeRangeBad(string rangeStr, out TimeRangeType timeRangeType, out ObjectResult? result)
-    {
-        result = null;
-        timeRangeType = TimeRangeTypeConverter.Parse(rangeStr);
-        if (timeRangeType == TimeRangeType.Unknown)
-        {
-            result = BadRequest("Invalid time range string.");
-            return true;
-        }
-        return false;
-    }
+    //private bool IsTimeRangeBad(string rangeStr, out TimeRangeType timeRangeType, out ObjectResult? result)
+    //{
+    //    result = null;
+    //    timeRangeType = TimeRangeTypeConverter.Parse(rangeStr);
+    //    if (timeRangeType == TimeRangeType.Unknown)
+    //    {
+    //        result = BadRequest("Invalid time range string.");
+    //        return true;
+    //    }
+    //    return false;
+    //}
 
-    private bool IsDateBad(string timeString, out DateTime date, out ObjectResult? result)
-    {
-        result = null;
-        date = timeString.ParseDate();
-        if (date == DateTime.MinValue)
-        {
-            result = BadRequest("Invalid start date-time.");
-            return true;
-        }
-        return false;
-    }
+    //private bool IsDateBad(string timeString, out DateTime date, out ObjectResult? result)
+    //{
+    //    result = null;
+    //    date = timeString.ParseDate();
+    //    if (date == DateTime.MinValue)
+    //    {
+    //        result = BadRequest("Invalid start date-time.");
+    //        return true;
+    //    }
+    //    return false;
+    //}
 }

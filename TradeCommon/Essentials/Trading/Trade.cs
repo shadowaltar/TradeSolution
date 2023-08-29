@@ -1,4 +1,5 @@
-﻿using TradeCommon.Constants;
+﻿using Common;
+using TradeCommon.Constants;
 using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
@@ -109,7 +110,7 @@ public class Trade : IComparable<Trade>
         if (r != 0) r = Price.CompareTo(trade?.Price);
         if (r != 0) r = Quantity.CompareTo(trade?.Quantity);
         if (r != 0) r = Fee.CompareTo(trade?.Fee);
-        if (r != 0) r = FeeAsset.CompareTo(trade?.FeeAsset);
+        if (r != 0) r = FeeAsset.SafeCompareTo(trade?.FeeAsset);
         if (r != 0) r = BrokerId.CompareTo(trade?.BrokerId);
         if (r != 0) r = ExchangeId.CompareTo(trade?.ExchangeId);
         if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);

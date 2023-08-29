@@ -303,6 +303,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     Quantity DOUBLE NOT NULL,
     Side CHAR(1) NOT NULL,
     Fee DOUBLE NOT NULL,
+    FeeAsset VARCHAR(100) NOT NULL,
     BrokerId INT DEFAULT 0,
     ExchangeId INT DEFAULT 0,
     UNIQUE(Id)
@@ -362,49 +363,49 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId_startTime
         return tableNames;
     }
 
-    public static async Task<string> CreateTradeOrderPositionIdTable(SecurityType securityType)
-    {
-        var tableName = DatabaseNames.GetTradeOrderPositionIdTable(securityType);
-        var dropSql =
-@$"
-DROP TABLE IF EXISTS {tableName};
-DROP INDEX IF EXISTS idx_{tableName}_securityId;
-DROP INDEX IF EXISTS idx_{tableName}_tradeId;
-DROP INDEX IF EXISTS idx_{tableName}_orderId;
-DROP INDEX IF EXISTS idx_{tableName}_positionId;
-DROP INDEX IF EXISTS idx_{tableName}_externalTradeId;
-DROP INDEX IF EXISTS idx_{tableName}_externalOrderId;
-";
-        var createSql =
-@$"
-CREATE TABLE IF NOT EXISTS {tableName} (
-    Id INTEGER PRIMARY KEY,
-    SecurityId INTEGER NOT NULL,
-    TradeId INTEGER NOT NULL,
-    OrderId INTEGER NOT NULL,
-    PositionId INTEGER NOT NULL,
-    ExternalTradeId INTEGER,
-    ExternalOrderId INTEGER,
-    UNIQUE(Id)
-);
-CREATE UNIQUE INDEX idx_{tableName}_securityId
-    ON {tableName} (SecurityId);
-CREATE UNIQUE INDEX idx_{tableName}_tradeId
-    ON {tableName} (TradeId);
-CREATE UNIQUE INDEX idx_{tableName}_orderId
-    ON {tableName} (OrderId);
-CREATE UNIQUE INDEX idx_{tableName}_positionId
-    ON {tableName} (PositionId);
-CREATE UNIQUE INDEX idx_{tableName}_externalTradeId
-    ON {tableName} (ExternalTradeId);
-CREATE UNIQUE INDEX idx_{tableName}_externalOrderId
-    ON {tableName} (ExternalOrderId);
-";
+//    public static async Task<string> CreateTradeOrderPositionIdTable(SecurityType securityType)
+//    {
+//        var tableName = DatabaseNames.GetTradeOrderPositionIdTable(securityType);
+//        var dropSql =
+//@$"
+//DROP TABLE IF EXISTS {tableName};
+//DROP INDEX IF EXISTS idx_{tableName}_securityId;
+//DROP INDEX IF EXISTS idx_{tableName}_tradeId;
+//DROP INDEX IF EXISTS idx_{tableName}_orderId;
+//DROP INDEX IF EXISTS idx_{tableName}_positionId;
+//DROP INDEX IF EXISTS idx_{tableName}_externalTradeId;
+//DROP INDEX IF EXISTS idx_{tableName}_externalOrderId;
+//";
+//        var createSql =
+//@$"
+//CREATE TABLE IF NOT EXISTS {tableName} (
+//    Id INTEGER PRIMARY KEY,
+//    SecurityId INTEGER NOT NULL,
+//    TradeId INTEGER NOT NULL,
+//    OrderId INTEGER NOT NULL,
+//    PositionId INTEGER NOT NULL,
+//    ExternalTradeId INTEGER,
+//    ExternalOrderId INTEGER,
+//    UNIQUE(Id)
+//);
+//CREATE UNIQUE INDEX idx_{tableName}_securityId
+//    ON {tableName} (SecurityId);
+//CREATE UNIQUE INDEX idx_{tableName}_tradeId
+//    ON {tableName} (TradeId);
+//CREATE UNIQUE INDEX idx_{tableName}_orderId
+//    ON {tableName} (OrderId);
+//CREATE UNIQUE INDEX idx_{tableName}_positionId
+//    ON {tableName} (PositionId);
+//CREATE UNIQUE INDEX idx_{tableName}_externalTradeId
+//    ON {tableName} (ExternalTradeId);
+//CREATE UNIQUE INDEX idx_{tableName}_externalOrderId
+//    ON {tableName} (ExternalOrderId);
+//";
 
-        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
+//        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
 
-        return tableName;
-    }
+//        return tableName;
+//    }
 
     public static async Task CreateFinancialStatsTable()
     {

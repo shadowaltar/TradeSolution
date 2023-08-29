@@ -39,8 +39,9 @@ public static class CollectionExtensions
             collection.Add(v);
     }
 
-    public static void AddRange<Tk, Tv>(this IDictionary<Tk, Tv> collection, IEnumerable<KeyValuePair<Tk, Tv>> values)
+    public static void AddRange<Tk, Tv>(this IDictionary<Tk, Tv>? collection, IEnumerable<KeyValuePair<Tk, Tv>>? values)
     {
+        if (collection == null || values == null) return;
         foreach (var v in values)
             collection.Add(v);
     }
