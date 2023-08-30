@@ -31,9 +31,11 @@ public class SecurityService : ISecurityService
         }
     }
 
-    public async Task<List<Security>> GetSecurities(ExchangeType exchange, SecurityType secType, bool requestExternal = false)
+    public async Task<List<Security>> GetSecurities(SecurityType secType,
+                                                    ExchangeType exchange = ExchangeType.Unknown,
+                                                    bool requestExternal = false)
     {
-        var exchStr = ExchangeTypeConverter.ToString(exchange);
+        var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
         if (!_requestedExternalOnce || requestExternal)
         {
             var securities = await Storage.ReadSecurities(secType, exchStr);

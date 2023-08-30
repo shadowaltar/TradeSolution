@@ -19,7 +19,8 @@ public interface IAdminService
     /// </summary>
     /// <param name="user"></param>
     /// <param name="password"></param>
+    /// <param name="accountName"></param>
     /// <param name="environment"></param>
     /// <returns></returns>
-    bool Login(User user, string password, EnvironmentType environment);
+    Task<bool> Login(User user, string password, string accountName, EnvironmentType environment);
 }

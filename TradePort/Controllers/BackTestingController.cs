@@ -144,9 +144,9 @@ public class BackTestingController : Controller
     //        return BadRequest("Invalid security.");
 
     //    var initCash = 100000;
-    //    var fasts = concatenatedFastParam.Split(',').Select(i => int.TryParse(i, out var v) ? v : 0);
-    //    var slows = concatenatedSlowParam.Split(',').Select(i => int.TryParse(i, out var v) ? v : 0);
-    //    var rumis = concatenatedRumiParam.Split(',').Select(i => int.TryParse(i, out var v) ? v : 0);
+    //    var fasts = concatenatedFastParam.Split(',').Use(i => int.TryParse(i, out var v) ? v : 0);
+    //    var slows = concatenatedSlowParam.Split(',').Use(i => int.TryParse(i, out var v) ? v : 0);
+    //    var rumis = concatenatedRumiParam.Split(',').Use(i => int.TryParse(i, out var v) ? v : 0);
 
     //    var zipFilePaths = new List<string>();
     //    await Parallel.ForEachAsync(fasts, async (f, t) =>

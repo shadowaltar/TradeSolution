@@ -19,6 +19,7 @@ public class Quotation : IExternalQuotationManagement
     private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
     private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _messageBrokers = new();
 
+    private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = new();
     private readonly ConcurrentDictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly HttpClient _httpClient;
@@ -76,15 +77,30 @@ public class Quotation : IExternalQuotationManagement
             {
                 //var example = @"{""stream"":""btctusd@kline_1m"",""data"":{""e"":""kline"",""E"":1693333305611,""s"":""BTCTUSD"",""k"":{""t"":1693333260000,""T"":1693333319999,""s"":""BTCTUSD"",""i"":""1m"",""f"":349256438,""L"":349258039,""o"":""27951.39000000"",""c"":""27935.49000000"",""h"":""27952.00000000"",""l"":""27923.03000000"",""v"":""57.60304000"",""n"":1602,""x"":false,""q"":""1609180.77265510"",""V"":""24.67172000"",""Q"":""689202.76346730"",""B"":""0""}}}";
                 var dataNode = node.AsObject()["data"]!.AsObject();
+                _lastOhlcPrices.TryGetValue((security.Id, intervalType), out var price);
+
                 //var asOfTime = DateUtils.FromUnixMs(dataNode["E"]!.GetValue<long>());
                 var kLineNode = dataNode["k"]!.AsObject();
                 var start = DateUtils.FromUnixMs(kLineNode["t"]!.GetValue<long>());
+
+                var isComplete = kLineNode["x"]!.GetBoolean("x");
+
                 var o = kLineNode["o"]!.GetValue<string>().ParseDecimal();
                 var h = kLineNode["h"]!.GetValue<string>().ParseDecimal();
                 var l = kLineNode["l"]!.GetValue<string>().ParseDecimal();
                 var c = kLineNode["c"]!.GetValue<string>().ParseDecimal();
                 var v = kLineNode["v"]!.GetValue<string>().ParseDecimal();
-                var price = new OhlcPrice(o, h, l, c, v, start);
+                if (price == null)
+                    price = new OhlcPrice(o, h, l, c, v, start);
+                else
+                {
+                    price.O = o;
+                    price.H = h;
+                    price.L = l;
+                    price.C = c;
+                    price.V = v;
+                    price.T = start;
+                }
                 broker!.Enqueue(price);
             }
         }
@@ -147,7 +163,7 @@ public class Quotation : IExternalQuotationManagement
             return ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
         }
     }
-    
+
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
     {
         throw new NotImplementedException();

@@ -10,8 +10,27 @@
 /// <param name="AC">Adjusted Close</param>
 /// <param name="V">Volume</param>
 /// <param name="T">StartTime</param>
-public record OhlcPrice(decimal O, decimal H, decimal L, decimal C, decimal AC, decimal V, DateTime T)
+public record OhlcPrice()
 {
+    public decimal O { get; set; }
+    public decimal H { get; set; }
+    public decimal L { get; set; }
+    public decimal C { get; set; }
+    public decimal AC { get; set; }
+    public decimal V { get; set; }
+    public DateTime T { get; set; }
+
+    public OhlcPrice(decimal o, decimal h, decimal l, decimal c, decimal ac, decimal v, DateTime t) : this()
+    {
+        O = o;
+        H = h;
+        L = l;
+        C = c;
+        AC = ac;
+        V = v;
+        T = t;
+    }
+
     public OhlcPrice(decimal o, decimal h, decimal l, decimal c, decimal v, DateTime t) : this(o, h, l, c, c, v, t) { }
 
     public static implicit operator OhlcPrice?((decimal O, decimal H, decimal L, decimal C, decimal V, DateTime T) tuple)

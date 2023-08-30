@@ -3,8 +3,10 @@ using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
 
 namespace TradeLogicCore.Services;
@@ -12,18 +14,31 @@ public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalAccountManagement _accountManagement;
+    private readonly ISecurityService _securityService;
+    private readonly Persistence _persistence;
 
-    public AdminService(IExternalAccountManagement accountManagement)
+    public AdminService(IExternalAccountManagement accountManagement,
+                        ISecurityService securityService,
+                        Persistence persistence)
     {
         _accountManagement = accountManagement;
+        _securityService = securityService;
+        _persistence = persistence;
     }
 
-    public bool Login(User user, string password, EnvironmentType environment)
+    public async Task<bool> Login(User user, string password, string accountName, EnvironmentType environment)
     {
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
-        if (Credential.IsPasswordCorrect(user, password) && _accountManagement.Login(user))
+        if (Credential.IsPasswordCorrect(user, password))
         {
-            _log.Info($"Logged in user {user.Name} in env {user.Environment}.");
+            var account = await GetAccount(accountName, environment);
+            if (account == null)
+            {
+                _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
+                return false;
+            }
+            _accountManagement.Login(user, account);
+            _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
             return true;
         }
         _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
@@ -91,9 +106,17 @@ public class AdminService : IAdminService
         }
         else
         {
+            var assets = await _securityService.GetSecurities(SecurityType.Fx);
+            assets = assets.Where(a => a.FxInfo != null && a.FxInfo.IsAsset).ToList();
             var state = await _accountManagement.GetAccount();
-            // TODO
-            return state.ContentAs<Account>();
+            var account = state.ContentAs<Account>();
+            if (account == null)
+                return null;
+
+            _persistence.Enqueue(new PersistenceTask<Account>(account));
+            if (account.Balances.IsNullOrEmpty())
+
+            return account;
         }
     }
 }

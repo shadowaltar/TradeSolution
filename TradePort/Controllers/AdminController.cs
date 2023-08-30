@@ -26,17 +26,20 @@ public class AdminController : Controller
     /// <param name="adminService"></param>
     /// <param name="userName"></param>
     /// <param name="password"></param>
+    /// <param name="accountName"></param>
     /// <param name="environment"></param>
     /// <returns></returns>
     [HttpPost("users/{user}/login")]
     public async Task<ActionResult> Login([FromServices] IAdminService adminService,
                                           [FromRoute(Name = "user")] string userName,
                                           [FromForm(Name = "user-password")] string password,
+                                          [FromQuery(Name = "account-name")] string accountName,
                                           [FromQuery(Name = "environment")] EnvironmentType environment)
     {
         var user = await adminService.GetUser(userName, environment);
         if (user == null) return BadRequest("Invalid user or credential.");
-        if (!adminService.Login(user, password, environment)) return BadRequest("Invalid user or credential.");
+        var result = await adminService.Login(user, password, accountName, environment);
+        if (!result) return BadRequest("Invalid user or credential.");
 
         return Ok(user);
     }

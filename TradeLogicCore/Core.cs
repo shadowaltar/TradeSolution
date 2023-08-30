@@ -57,15 +57,13 @@ public class Core
         _services = _componentContext.Resolve<IServices>();
 
         var user = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
-        if (user == null)
-            throw new InvalidOperationException("The user does not exist.");
+        if (user == null) throw new InvalidOperationException("The user does not exist.");
 
-        if (!_services.Admin.Login(user, parameters.Password, parameters.Environment))
-            throw new InvalidOperationException("The password is incorrect.");
+        var loginResult = await _services.Admin.Login(user, parameters.Password, parameters.AccountName, parameters.Environment);
+        if (!loginResult) throw new InvalidOperationException("The password is incorrect.");
 
         var startTime = parameters.TimeRange.ActualStartTime;
-        if (!startTime.IsValid())
-            throw new InvalidOperationException("The start time is incorrect.");
+        if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
         await CheckAccountAndBalance(user);
         await CheckOpenOrders();

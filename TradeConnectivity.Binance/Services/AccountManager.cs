@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
@@ -26,26 +27,28 @@ public class AccountManager : IExternalAccountManagement
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
     }
 
-    public bool Login(User user)
+    public bool Login(User user, Account account)
     {
-        return _keyManager.Select(user);
+        return _keyManager.Use(user, account);
     }
 
     /// <summary>
     /// Get the account information [SIGNED].
+    /// If a list of asset is provided, the balances will be created too.
     /// </summary>
     /// <returns></returns>
-    public async Task<ExternalQueryState> GetAccount()
+    public async Task<ExternalQueryState> GetAccount(List<Security>? assets = null)
     {
         var swOuter = Stopwatch.StartNew();
         var url = $"{RootUrls.DefaultHttps}/api/v3/account";
         using var request = new HttpRequestMessage();
-        _requestBuilder.Build(request, HttpMethod.Get, url, true);
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url);
 
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
         swInner.Stop();
-        // example json: var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
+        // example json:
+        var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
         var responseString = await CheckContentAndStatus(response);
         var example = @"{""makerCommission"":0,""takerCommission"":0,""buyerCommission"":0,""sellerCommission"":0,""commissionRates"":{""maker"":""0.00000000"",""taker"":""0.00000000"",""buyer"":""0.00000000"",""seller"":""0.00000000""},""canTrade"":true,""canWithdraw"":false,""canDeposit"":false,""brokered"":false,""requireSelfTradePrevention"":false,""preventSor"":false,""updateTime"":1692305848018,""accountType"":""SPOT"",""balances"":[{""asset"":""BNB"",""free"":""1000.00000000"",""locked"":""0.00000000""},{""asset"":""BTC"",""free"":""1.19000000"",""locked"":""0.00000000""},{""asset"":""BUSD"",""free"":""10000.00000000"",""locked"":""0.00000000""},{""asset"":""ETH"",""free"":""100.00000000"",""locked"":""0.00000000""},{""asset"":""LTC"",""free"":""500.00000000"",""locked"":""0.00000000""},{""asset"":""TRX"",""free"":""500000.00000000"",""locked"":""0.00000000""},{""asset"":""USDT"",""free"":""8100.00000000"",""locked"":""0.00000000""},{""asset"":""XRP"",""free"":""50000.00000000"",""locked"":""0.00000000""}],""permissions"":[""SPOT""],""uid"":1688996631782681271}";
         Account? account = null;
@@ -65,7 +68,10 @@ public class AccountManager : IExternalAccountManagement
                     var asset = balanceObj.GetString("asset");
                     var free = balanceObj.GetDecimal("free");
                     var locked = balanceObj.GetDecimal("locked");
-                    var balance = new Balance { AssetName = asset, FreeAmount = free, LockedAmount = locked };
+
+                    var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? 0;
+
+                    var balance = new Balance { AssetId = assetId, AssetName = asset, FreeAmount = free, LockedAmount = locked };
                     account.Balances.Add(balance);
                 }
             }
@@ -127,7 +133,7 @@ public class AccountManager : IExternalAccountManagement
                 ("type", accountType),
                 ("limit", 7.ToString()), // the api returns a history list of account statuses; min is 7
             };
-            var payload = _requestBuilder.Build(request, HttpMethod.Get, url, true, parameters);
+            var payload = _requestBuilder.Build(request, HttpMethod.Get, url, parameters);
             payloads.Add(payload);
             var swHttpRoundtrip = Stopwatch.StartNew();
             var response = await _httpClient.SendAsync(request);

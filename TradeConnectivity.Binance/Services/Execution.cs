@@ -171,7 +171,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             ("origClientOrderId", order.Id.ToString()),
             ("newClientOrderId", _cancelIdGenerator.NewTimeBasedId.ToString())
         };
-        var payload = _requestBuilder.Build(request, HttpMethod.Delete, url, true, parameters);
+        var payload = _requestBuilder.BuildSigned(request, HttpMethod.Delete, url, parameters);
 
         var swHttpRoundtrip = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -225,7 +225,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var url = $"{RootUrls.DefaultHttps}/api/v3/openOrders";
         using var request = new HttpRequestMessage();
         var parameters = new List<(string, string)> { ("symbol", security.Code) };
-        var payload = _requestBuilder.Build(request, HttpMethod.Delete, url, true, parameters);
+        var payload = _requestBuilder.BuildSigned(request, HttpMethod.Delete, url, parameters);
 
         var swHttpRoundtrip = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -262,8 +262,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var swOuter = Stopwatch.StartNew();
         var url = $"{RootUrls.DefaultHttps}/api/v3/trades";
         using var request = new HttpRequestMessage();
-        _requestBuilder.Build(request, HttpMethod.Get, url, true,
-            new List<(string, string)> { ("symbol", security.Code) });
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url, new List<(string, string)> { ("symbol", security.Code) });
 
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -362,7 +361,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             parameters.Add(("orderId", orderId.ToString()));
         else
             parameters.Add(("origClientOrderId", externalOrderId.ToString()));
-        _requestBuilder.Build(request, HttpMethod.Get, url, true, parameters);
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url, parameters);
 
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -416,7 +415,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         {
             parameters.Add(("symbol", security.Code));
         }
-        _requestBuilder.Build(request, HttpMethod.Get, url, true, parameters);
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url, parameters);
 
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -487,7 +486,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var swOuter = Stopwatch.StartNew();
         var url = $"{RootUrls.DefaultHttps}/api/v3/rateLimit/order";
         using var request = new HttpRequestMessage();
-        _requestBuilder.Build(request, HttpMethod.Get, url, true);
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url);
 
         var swInner = Stopwatch.StartNew();
         var response = await _httpClient.SendAsync(request);
@@ -559,7 +558,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             }
         }
         parameters.Add(("limit", 500.ToString()));
-        _requestBuilder.Build(request, HttpMethod.Get, url, true, parameters);
+        _requestBuilder.BuildSigned(request, HttpMethod.Get, url, parameters);
 
 
         var swInner = Stopwatch.StartNew();
@@ -643,7 +642,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             ("price", order.Price.ToString()),
             ("newClientOrderId", order.Id.ToString()),
         };
-        var payload = _requestBuilder.Build(request, HttpMethod.Post, url, true, parameters);
+        var payload = _requestBuilder.BuildSigned(request, HttpMethod.Post, url, parameters);
         return payload;
     }
 

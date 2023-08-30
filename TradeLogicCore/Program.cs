@@ -157,7 +157,8 @@ public class Program
         tradeService.NextTrades += OnNewTradesReceived;
 
         var user = await adminService.GetUser(_testUserName, _environment);
-        adminService.Login(user, _testPassword, _environment);
+        if (user == null) throw new InvalidOperationException("Invalid user");
+        await adminService.Login(user, _testPassword, _testAccountName, _environment);
 
         orderService.CancelAllOpenOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
