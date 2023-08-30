@@ -36,7 +36,7 @@ public class StockScreener : IStockScreener
 
     public async Task<SecurityScreeningResult> Filter(ExchangeType exchange, ScreeningCriteria criteria)
     {
-        var securities = await _securityService.GetSecurities(exchange, SecurityType.Equity);
+        var securities = await _securityService.GetSecurities(SecurityType.Equity, exchange);
         if (!criteria.ExcludedCodes.IsNullOrEmpty())
         {
             securities = securities.Where(s => !criteria.ExcludedCodes.Contains(s.Code)).ToList();

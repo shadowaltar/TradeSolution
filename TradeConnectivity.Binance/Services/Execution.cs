@@ -462,7 +462,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
     public async Task<ExternalQueryState> GetOrderHistory(DateTime start, DateTime end)
     {
-        throw new NotImplementedException();
+        // TODO
+        return null;
     }
 
     /// <summary>

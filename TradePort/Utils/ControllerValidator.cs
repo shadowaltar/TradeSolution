@@ -1,7 +1,5 @@
 ﻿using Common;
-using Iced.Intel;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.CodeAnalysis.Text;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using TradeCommon.Constants;
@@ -9,7 +7,6 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
-using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
 
 namespace TradePort.Utils;
@@ -79,6 +76,18 @@ public static class ControllerValidator
         if (str.IsBlank() || str.Length < len)
         {
             result = new BadRequestObjectResult($"Invalid {inputName}. Must be at least of length {len}.");
+            return true;
+        }
+        return false;
+    }
+
+    public static bool IsUnknown<T>(T val, [NotNullWhen(true)] out ObjectResult? result, [CallerArgumentExpression(nameof(val))] string inputName = "") where T : Enum
+    {
+        result = null;
+        var intVal = Unsafe.As<T, int>(ref val);
+        if (intVal == 0)
+        {
+            result = new BadRequestObjectResult($"Enum of type {typeof(T).Name} should not be {val}");
             return true;
         }
         return false;

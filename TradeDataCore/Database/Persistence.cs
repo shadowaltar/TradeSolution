@@ -1,34 +1,59 @@
-﻿using Microsoft.Diagnostics.Tracing.Parsers;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 using TradeCommon.Database;
 
 namespace TradeDataCore.Database;
 public class Persistence
 {
-    private ConcurrentQueue<IPersistenceTask> _tasks = new();
+    private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
 
-    private bool _isRunning;
+    private volatile bool _isRunning;
+    private bool _isPaused;
 
-    public void Submit(IPersistenceTask task)
+    public Action<IPersistenceTask>? Persisted;
+
+    public Persistence()
     {
-        _tasks.Enqueue(task);
+        Start();
     }
 
-    private async Task Run()
+    public void Start()
     {
-        while (_isRunning)
+        if (_isRunning) return;
+        _isRunning = true;
+
+        Run();
+    }
+
+    public void Stop() => _isRunning = false;
+
+    public void Pause() => _isPaused = true;
+    
+    public void Resume() => _isPaused = false;
+
+    public void Submit(IPersistenceTask task) => _tasks.Enqueue(task);
+
+    private void Run()
+    {
+        Task.Factory.StartNew(async () =>
         {
-            if (_tasks.TryDequeue(out var task))
+            _isRunning = true;
+            while (_isRunning)
             {
-                await Storage.Insert(task);
-            }
-        }        
-    }
+                if (_isPaused)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
 
-    public Action<IPersistenceTask> Persisted;
+                while (_tasks.TryDequeue(out var task))
+                {
+                    await Storage.Insert(task);
+                    Persisted?.Invoke(task);
+                }
+
+                Thread.Sleep(50);
+            }
+        }, TaskCreationOptions.LongRunning);
+
+    }
 }

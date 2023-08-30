@@ -110,7 +110,7 @@ public class PriceController : Controller
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (ControllerValidator.IsBadOrParse(rangeStr, out TimeRangeType range, out br)) return br;
 
-        var securities = await securityService.GetSecurities(ExchangeType.Hkex, secType);
+        var securities = await securityService.GetSecurities(secType, ExchangeType.Hkex);
         if (securities.IsNullOrEmpty()) return BadRequest("Missing security.");
 
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
@@ -156,7 +156,7 @@ public class PriceController : Controller
         if (symbols == null || symbols.Count == 0)
             return BadRequest("Missing symbols (delimited by ',').");
 
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, secType);
+        var securities = await securityService.GetSecurities(secType, ExchangeType.Binance);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         if (securities.IsNullOrEmpty()) return BadRequest("Missing security.");
 
@@ -295,7 +295,7 @@ public class PriceController : Controller
         var symbols = concatenatedSymbols?.Split(',')
             .Select(s => s?.Trim()?.ToUpperInvariant()).Where(s => !s.IsBlank()).ToList();
 
-        var securities = await securityService.GetSecurities(exchange, secType);
+        var securities = await securityService.GetSecurities(secType, exchange);
         if (securities.IsNullOrEmpty()) return BadRequest("Missing security.");
 
         if (!symbols.IsNullOrEmpty())

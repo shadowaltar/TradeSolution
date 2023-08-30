@@ -2,13 +2,10 @@ using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Common;
 using log4net.Config;
-using Microsoft.Extensions.FileProviders;
 using OfficeOpenXml;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
-using TradeCommon.Constants;
-using TradePort;
 
 var log = Logger.New();
 

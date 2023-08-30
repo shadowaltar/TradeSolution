@@ -1,4 +1,4 @@
-﻿using Common;
+﻿using Autofac;
 using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -12,7 +12,6 @@ using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
 using TradePort.Utils;
-using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
 
@@ -24,26 +23,6 @@ namespace TradePort.Controllers;
 public class ExecutionController : Controller
 {
     /// <summary>
-    /// Set application environment.
-    /// </summary>
-    /// <param name="context"></param>
-    /// <param name="password"></param>
-    /// <param name="envStr"></param>
-    /// <param name="environment"></param>
-    /// <returns></returns>
-    [HttpPost("set-environment")]
-    public ActionResult SetEnvironment([FromServices] Context context,
-                                       [FromForm] string password,
-                                       [FromQuery(Name = "env")] string envStr = "Test")
-    {
-        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(envStr, out EnvironmentType type, out br)) return br;
-
-        context.SetEnvironment(type);
-        return Ok(type);
-    }
-
-    /// <summary>
     /// Manually send an order.
     /// </summary>
     /// <param name="securityService"></param>
@@ -51,6 +30,8 @@ public class ExecutionController : Controller
     /// <param name="adminService"></param>
     /// <param name="portfolioService"></param>
     /// <param name="password">Required.</param>
+    /// <param name="exchange"></param>
+    /// <param name="environment"></param>
     /// <param name="exchangeStr">Exchange name.</param>
     /// <param name="envStr"></param>
     /// <param name="accountName">Account name.</param>
@@ -69,8 +50,8 @@ public class ExecutionController : Controller
                                               [FromServices] IAdminService adminService,
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromForm] string password,
-                                              [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
-                                              [FromRoute(Name = "env")] string envStr = Environments.Unknown,
+                                              [FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+                                              [FromRoute(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                               [FromRoute(Name = "account")] string accountName = "0",
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
@@ -82,8 +63,8 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "fake")] bool isFakeOrder = true)
     {
         if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(envStr, out EnvironmentType envType, out br)) return br;
-        if (ControllerValidator.IsBadOrParse(exchangeStr, out ExchangeType exchange, out br)) return br;
+        if (ControllerValidator.IsUnknown(environment, out br)) return br;
+        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (side == Side.None) return BadRequest("Invalid side.");
         if (ControllerValidator.IsDecimalNegative(price, out br)) return br;
@@ -97,7 +78,7 @@ public class ExecutionController : Controller
         if (price == 0 && orderType != OrderType.Market)
             return BadRequest("Only market order can have zero price.");
 
-        var account = await adminService.GetAccount(accountName, envType);
+        var account = await adminService.GetAccount(accountName, environment);
         if (account == null) return BadRequest("Invalid or missing account.");
 
         var order = orderService.CreateManualOrder(security, account.Id, price, quantity, side, orderType);
@@ -122,11 +103,11 @@ public class ExecutionController : Controller
     }
 
     [HttpPost("algos/mac/start")]
-    public async Task<ActionResult?> RunMac([FromServices] ISecurityService securityService,
-                                            [FromServices] Core core,
+    public async Task<ActionResult?> RunMac([FromServices] Core core,
+                                            [FromServices] ISecurityService securityService,
                                             [FromForm] UserCredentialModel model,
-                                            [FromRoute(Name = "exchange")] string exchangeStr = ExternalNames.Binance,
-                                            [FromRoute(Name = "env")] string envStr = Environments.Test,
+                                            //[FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+                                            //[FromRoute(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                             [FromRoute(Name = "account")] string accountName = "test",
                                             [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                             [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
@@ -138,8 +119,6 @@ public class ExecutionController : Controller
                                             [FromQuery(Name = "back-test-end")] string? endStr = "")
     {
         if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(envStr, out EnvironmentType env, out br)) return br;
-        if (ControllerValidator.IsBadOrParse(exchangeStr, out ExchangeType exchange, out br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
         if (ControllerValidator.IsStringTooShort(model.UserName, 3, out br)) return br;
@@ -148,11 +127,11 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsIntNegativeOrZero(slowMa, out br)) return br;
         if (ControllerValidator.IsDecimalNegativeOrZero(stopLoss, out br)) return br;
 
-        var security = await securityService.GetSecurity(symbol, exchange, secType);
+        var security = await securityService.GetSecurity(symbol, core.Exchange, secType);
         if (security == null) return BadRequest("Invalid or missing security.");
 
         AlgoEffectiveTimeRange algoTimeRange;
-        switch (env)
+        switch (core.Environment)
         {
             case EnvironmentType.Prod:
                 algoTimeRange = AlgoEffectiveTimeRange.ForProduction(interval);
@@ -171,9 +150,9 @@ public class ExecutionController : Controller
         var parameters = new AlgoStartupParameters(model.UserName!,
                                                    model.UserPassword!,
                                                    accountName,
-                                                   env,
-                                                   exchange,
-                                                   ExternalNames.ConvertToBroker(exchangeStr),
+                                                   core.Environment,
+                                                   core.Exchange,
+                                                   core.Broker,
                                                    interval,
                                                    new List<Security> { security },
                                                    algoTimeRange);
@@ -184,24 +163,28 @@ public class ExecutionController : Controller
     }
 
     [HttpPost("algos/stop")]
-    public async Task<ActionResult> StopAlgorithm([FromServices] Core core,
-                                                  [FromQuery(Name = "admin-password")] string? adminPassword,
+    public async Task<ActionResult> StopAlgorithm([FromQuery(Name = "admin-password")] string? adminPassword,
                                                   [FromQuery(Name = "algo-guid")] string? algoGuidStr)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(algoGuidStr, out Guid guid, out br)) return br;
+        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
+
+        var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         await core.StopAlgorithm(guid);
         return Ok();
     }
 
     [HttpPost("algos/stop-all")]
-    public async Task<ActionResult> StopAllAlgorithms([FromServices] Core core, [FromQuery(Name = "admin-password")] string? adminPassword)
+    public async Task<ActionResult> StopAllAlgorithms([FromQuery(Name = "admin-password")] string? adminPassword)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
+
+        var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         await core.StopAllAlgorithms();
         return Ok();
     }
-
 
     public class UserCredentialModel
     {

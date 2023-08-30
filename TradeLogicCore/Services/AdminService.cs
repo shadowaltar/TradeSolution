@@ -4,6 +4,7 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -37,7 +38,11 @@ public class AdminService : IAdminService
                 _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
                 return false;
             }
-            _accountManagement.Login(user, account);
+            if (!_accountManagement.Login(user, account))
+            {
+                _log.Error($"Failed to login account {accountName} with user {user.Name}.");
+                return false;
+            }
             _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
             return true;
         }
@@ -114,8 +119,13 @@ public class AdminService : IAdminService
                 return null;
 
             _persistence.Enqueue(new PersistenceTask<Account>(account));
-            if (account.Balances.IsNullOrEmpty())
-
+            if (!account.Balances.IsNullOrEmpty())
+            {
+                foreach (var balance in account.Balances)
+                {
+                    _persistence.Enqueue(new PersistenceTask<Balance>(balance));
+                }
+            }    
             return account;
         }
     }

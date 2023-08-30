@@ -21,6 +21,29 @@ namespace TradePort.Controllers;
 public class AdminController : Controller
 {
     /// <summary>
+    /// Set application environment.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="password"></param>
+    /// <param name="environment"></param>
+    /// <param name="exchange"></param>
+    /// <returns></returns>
+    [HttpPost("set-environment")]
+    public ActionResult SetEnvironment([FromServices] Context context,
+                                       [FromForm] string password,
+                                       [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+                                       [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
+        if (ControllerValidator.IsUnknown(environment, out br)) return br;
+        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+
+        var broker = ExternalNames.Convert(exchange);
+        context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
+        return Ok(environment);
+    }
+
+    /// <summary>
     /// Login.
     /// </summary>
     /// <param name="adminService"></param>
@@ -260,10 +283,9 @@ public class AdminController : Controller
             secType = SecurityTypeConverter.Parse(secTypeStr);
 
         Dictionary<string, bool>? results = null;
-        DataType dataType = DataType.Unknown;
         if (tableTypeStr != null)
         {
-            dataType = DataTypeConverter.Parse(tableTypeStr);
+            var dataType = DataTypeConverter.Parse(tableTypeStr);
             results = await CreateTables(dataType, secType);
         }
         else if (tableTypeStr.IsBlank() && secTypeStr.IsBlank())

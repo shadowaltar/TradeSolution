@@ -40,7 +40,7 @@ public class KeyManager
         Assertion.ShallNever(Environments.Parse(user.Environment) != account.Environment);
         Assertion.ShallNever(user == null);
 
-        var secretFileName = $"{user!.Environment}_{user.Name}";
+        var secretFileName = $"{user!.Environment}_{user.Name}_{account.Name}";
         try
         {
             var path = Path.Combine(_secretFolder, secretFileName);

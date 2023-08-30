@@ -52,9 +52,9 @@ public class Program
 
     private static async Task Run()
     {
-        Dependencies.Register(_broker, _exchange);
+        Dependencies.Register(_broker, _exchange, _environment);
 
-        var engine = Dependencies.ComponentContext.Resolve<Core>();
+        var core = Dependencies.ComponentContext.Resolve<Core>();
         var services = Dependencies.ComponentContext.Resolve<IServices>();
 
         var account = await CheckTestUserAndAccount(services);
@@ -71,7 +71,7 @@ public class Program
         var parameters = new AlgoStartupParameters(user, password, account.Name, _environment, _exchange, _broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
 
-        await engine.StartAlgorithm(parameters, algorithm);
+        await core.StartAlgorithm(parameters, algorithm);
     }
 
     private static async Task<Account> CheckTestUserAndAccount(IServices services)
@@ -218,7 +218,7 @@ public class Program
 
         //var filter = "00001,00002,00005";
 
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
+        var securities = await securityService.GetSecurities(SecurityType.Fx, ExchangeType.Binance);
 
         securities = securities.Where(s => s.Code is "BTCUSDT").ToList();
 
@@ -361,7 +361,7 @@ public class Program
         //var filter = "ETHUSDT";
         var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
 
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
+        var securities = await securityService.GetSecurities(SecurityType.Fx, ExchangeType.Binance);
         securities = securities!.Where(s => filterCodes.ContainsIgnoreCase(s.Code)).ToList();
 
         var fast = 26;

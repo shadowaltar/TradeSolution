@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Common;
 using log4net;
-using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -17,18 +16,19 @@ public class Core
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IComponentContext _componentContext;
     private readonly Dictionary<Guid, IAlgorithmEngine> _engines = new();
     private readonly Dictionary<Guid, AlgoMetaInfo> _algorithms = new();
-    private IServices _services;
+    private readonly IServices _services;
 
     public IReadOnlyDictionary<Guid, IAlgorithmEngine> Engines => _engines;
-    public ExchangeType ExchangeType { get; private set; }
-    public BrokerType BrokerType { get; private set; }
+    public ExchangeType Exchange => Context.ExchangeType;
+    public BrokerType Broker => Context.BrokerType;
+    public EnvironmentType Environment => Context.EnvironmentType;
+    public Context Context { get; }
 
-    public Core(IComponentContext componentContext, IServices services)
+    public Core(Context context, IServices services)
     {
-        _componentContext = componentContext;
+        Context = context;
         _services = services;
     }
 
@@ -54,8 +54,6 @@ public class Core
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<Guid> StartAlgorithm<T>(AlgoStartupParameters parameters, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
-        _services = _componentContext.Resolve<IServices>();
-
         var user = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
         if (user == null) throw new InvalidOperationException("The user does not exist.");
 
@@ -65,16 +63,16 @@ public class Core
         var startTime = parameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
-        await CheckAccountAndBalance(user);
-        await CheckOpenOrders();
+        await ReconcileAccountAndBalance(user);
+        await ReconcileOpenOrders();
 
         await Task.Run(async () =>
         {
             // check one day's historical order / trade only
             // they should not impact trading
             var previousDay = startTime.AddDays(-1);
-            await CheckRecentOrderHistory(previousDay, startTime, parameters.SecurityPool);
-            await CheckRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
+            await ReconcileRecentOrderHistory(previousDay, startTime, parameters.SecurityPool);
+            await ReconcileRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
         });
 
         var guid = Guid.NewGuid();
@@ -120,7 +118,7 @@ public class Core
         return _algorithms.Values.ToList();
     }
 
-    private async Task CheckRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)
+    private async Task ReconcileRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)
     {
         var externalOrders = new Dictionary<long, Order>();
         var internalOrders = new Dictionary<long, Order>();
@@ -185,7 +183,7 @@ public class Core
         return (toCreate, toUpdate, toDelete);
     }
 
-    private async Task CheckRecentTradeHistory(DateTime start, DateTime end, List<Security> securities)
+    private async Task ReconcileRecentTradeHistory(DateTime start, DateTime end, List<Security> securities)
     {
         var externalTrades = new Dictionary<long, Trade>();
         var internalTrades = new Dictionary<long, Trade>();
@@ -218,7 +216,7 @@ public class Core
             _services.Persistence.Enqueue(new PersistenceTask<Trade>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
     }
 
-    private async Task CheckAccountAndBalance(User user)
+    private async Task ReconcileAccountAndBalance(User user)
     {
         foreach (var account in user.Accounts)
         {
@@ -238,7 +236,7 @@ public class Core
         }
     }
 
-    private async Task CheckOpenOrders()
+    private async Task ReconcileOpenOrders()
     {
         var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
         var internalOpenOrders = await _services.Order.GetOpenOrders(null);

@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
@@ -152,7 +151,7 @@ WHERE
         if (tableName.IsBlank())
             return new List<Security>();
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        if (exchange !=null)
+        if (exchange != null)
             exchange = exchange.ToUpperInvariant();
         var idClause = ids == null
             ? ""
@@ -235,21 +234,6 @@ SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 ";
         return await SqlReader.Read<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql);
-
-        //using var connection = await Connect(DatabaseNames.StaticData);
-
-        //using var command = connection.CreateCommand();
-        //command.CommandText = sql;
-        //using var r = await command.ExecuteReaderAsync();
-        //using var sqlHelper = new SqlReader<FinancialStat>(r);
-        //var results = new List<FinancialStat>();
-        //while (await r.ReadAsync())
-        //{
-        //    var stats = sqlHelper.Read();
-        //    results.Add(stats);
-        //}
-        //_log.Info($"Read {results.Count} entries from {DatabaseNames.FinancialStatsTable} table in {DatabaseNames.StaticData}.");
-        //return results;
     }
 
     public static async Task<List<FinancialStat>> ReadFinancialStats(int secId)
@@ -269,21 +253,8 @@ WHERE SecurityId = $SecurityId
         var sql = $@"SELECT * FROM (SELECT COUNT(StartTime) as Count, DATE(StartTime) as Date, SecurityId FROM {tableName}
 GROUP BY DATE(startTime), SecurityId)";
         return await SqlReader.Read(tableName, DatabaseNames.MarketData, sql, Transform);
-        MissingPriceSituation Transform(SqliteDataReader r) => new MissingPriceSituation(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
 
-        //using var connection = await Connect(DatabaseNames.MarketData);
-
-        //using var command = connection.CreateCommand();
-        //command.CommandText = sql;
-        //using var r = await command.ExecuteReaderAsync();
-        //var results = new List<MissingPriceSituation>();
-        //while (await r.ReadAsync())
-        //{
-        //    var entry = new MissingPriceSituation(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
-        //    results.Add(entry);
-        //}
-        //_log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
-        //return results;
+        MissingPriceSituation Transform(SqliteDataReader r) => new(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
     }
 
     public static async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
@@ -314,43 +285,16 @@ WHERE
             var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
             (
-                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
-                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
-                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
-                C: close,
-                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
-                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
-                T: r.GetDateTime("StartTime")
+                decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
+                close,
+                decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
+                r.GetDateTime("StartTime")
             );
             return price;
         }
-
-        //using var connection = await Connect(DatabaseNames.MarketData);
-
-        //using var command = connection.CreateCommand();
-        //command.CommandText = sql;
-        //("$SecurityId", securityId);
-        //command.Parameters.AddWithValue("$StartTime", start);
-        //command.Parameters.AddWithValue("$EndTime", end);
-
-        //using SqliteDataReader? r = await command.ExecuteReaderAsync();
-        //while (await r.ReadAsync())
-        //{
-        //    var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
-        //    var price = new OhlcPrice
-        //    (
-        //        O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
-        //        H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
-        //        L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
-        //        C: close,
-        //        AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
-        //        V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
-        //        T: r.GetDateTime("StartTime")
-        //    );
-        //    results.Add(price);
-        //}
-        //_log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
-        //return results;
     }
 
     public static async IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
@@ -383,13 +327,13 @@ WHERE
             var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
             (
-                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
-                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
-                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
-                C: close,
-                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
-                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
-                T: r.GetDateTime("StartTime")
+                decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
+                close,
+                decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
+                r.GetDateTime("StartTime")
             );
             count++;
             yield return price;
@@ -426,13 +370,13 @@ LIMIT $EntryCount
             var close = decimal.Round(r.GetDecimal("Close"), priceDecimalPoints);
             var price = new OhlcPrice
             (
-                O: decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
-                H: decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
-                L: decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
-                C: close,
-                AC: decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
-                V: decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
-                T: r.GetDateTime("StartTime")
+                decimal.Round(r.GetDecimal("Open"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("High"), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Low"), priceDecimalPoints),
+                close,
+                decimal.Round(r.SafeGetDecimal("AdjClose", close), priceDecimalPoints),
+                decimal.Round(r.GetDecimal("Volume"), priceDecimalPoints),
+                r.GetDateTime("StartTime")
             );
             results.Add(price);
         }

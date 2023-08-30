@@ -105,7 +105,7 @@ internal class Program
         var results = new List<(IntervalType i, int securityId, int count)>();
         var start = DateTime.UtcNow.Date.AddDays(-2);
         var end = DateTime.UtcNow;
-        var securities = await securityService.GetSecurities(ExchangeType.Binance, SecurityType.Fx);
+        var securities = await securityService.GetSecurities(SecurityType.Fx, ExchangeType.Binance);
 
         foreach (var i in intervals)
         {
