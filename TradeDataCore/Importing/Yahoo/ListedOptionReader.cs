@@ -34,7 +34,7 @@ public class ListedOptionReader
                 var actualUrl = string.Format(url, ticker);
                 try
                 {
-                    var jo = await HttpHelper.ReadJson(actualUrl, httpClient, _log);
+                    var jo = await httpClient.ReadJson(actualUrl, _log);
                     if (jo == null)
                         return;
 

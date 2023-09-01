@@ -21,7 +21,7 @@ public class TradeService : ITradeService, IDisposable
 
     public event Action<Trade>? NextTrade;
 
-    public event Action<List<Trade>>? NextTrades;
+    public event Action<Trade[]>? NextTrades;
 
     public TradeService(IExternalExecutionManagement execution,
         IOrderService orderService,
@@ -44,7 +44,7 @@ public class TradeService : ITradeService, IDisposable
         Persist(trade);
     }
 
-    private void OnTradesReceived(List<Trade> trades)
+    private void OnTradesReceived(Trade[] trades)
     {
         foreach (var trade in trades)
         {
@@ -103,18 +103,18 @@ public class TradeService : ITradeService, IDisposable
         _execution.TradeReceived -= OnTradeReceived;
     }
 
-    public async Task<List<Trade>?> GetMarketTrades(Security security)
+    public async Task<Trade[]?> GetMarketTrades(Security security)
     {
         var state = await _execution.GetMarketTrades(security);
-        return state.ContentAs<List<Trade>?>();
+        return state.ContentAs<Trade[]?>();
     }
 
-    public Task<List<Trade>?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
+    public Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
     {
         throw new NotImplementedException();
     }
 
-    public Task<List<Trade>?> GetTrades(Security security, long orderId, bool requestExternal = false)
+    public Task<Trade[]?> GetTrades(Security security, long orderId, bool requestExternal = false)
     {
         throw new NotImplementedException();
     }

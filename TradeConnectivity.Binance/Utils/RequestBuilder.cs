@@ -23,18 +23,15 @@ public class RequestBuilder
     /// Build a Binance REST request.
     /// To construct a request for a SIGNED API, provide a valid tuple of user, account and environment.
     /// </summary>
-    /// <param name="request"></param>
     /// <param name="method"></param>
     /// <param name="url"></param>
-    /// <param name="userName"></param>
-    /// <param name="accountName"></param>
     /// <param name="parameters"></param>
     /// <returns></returns>
-    public string Build(HttpRequestMessage request,
-                        HttpMethod method,
-                        string url,
-                        List<(string key, string value)>? parameters = null)
+    public HttpRequestMessage Build(HttpMethod method,
+                                    string url,
+                                    List<(string key, string value)>? parameters = null)
     {
+        var request = new HttpRequestMessage();
         request.Method = method;
 
         var result = "";
@@ -45,7 +42,6 @@ public class RequestBuilder
             request.RequestUri = !result.IsBlank()
                 ? new Uri($"{url}?{result}")
                 : new Uri(url);
-            return ""; // payload is empty
         }
         else
         {
@@ -56,27 +52,25 @@ public class RequestBuilder
             }
             request.Content = new StringContent(result);
             request.RequestUri = new Uri(url);
-            return result;
         }
+        return request;
     }
 
-    public string BuildSigned(HttpRequestMessage request,
-                              HttpMethod method,
-                              string url,
-                              List<(string key, string value)>? parameters = null)
+    public HttpRequestMessage BuildSigned(HttpMethod method,
+                                          string url,
+                                          List<(string key, string value)>? parameters = null)
     {
+        var request = new HttpRequestMessage();
         request.Method = method;
 
-        var result = "";
         parameters ??= new List<(string, string)>();
-        result = AppendSignedParameters(request, parameters);
+        var result = AppendSignedParameters(request, parameters);
 
         if (method == HttpMethod.Get)
         {
             request.RequestUri = !result.IsBlank()
                 ? new Uri($"{url}?{result}")
                 : new Uri(url);
-            return ""; // payload is empty
         }
         else
         {
@@ -87,8 +81,8 @@ public class RequestBuilder
             }
             request.Content = new StringContent(result);
             request.RequestUri = new Uri(url);
-            return result;
         }
+        return request;
     }
 
     private string AppendSignedParameters(HttpRequestMessage request, List<(string key, string value)> parameters)

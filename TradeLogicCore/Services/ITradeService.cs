@@ -15,7 +15,7 @@ public interface ITradeService
     /// For example, an order matches multiple depths in an order book
     /// will result in multiple trades.
     /// </summary>    
-    event Action<List<Trade>>? NextTrades;
+    event Action<Trade[]>? NextTrades;
 
     IReadOnlyDictionary<long, long> TradeToOrderIds { get; }
 
@@ -24,7 +24,7 @@ public interface ITradeService
     /// </summary>
     /// <param name="security"></param>
     /// <returns></returns>
-    Task<List<Trade>?> GetMarketTrades(Security security);
+    Task<Trade[]?> GetMarketTrades(Security security);
 
     /// <summary>
     /// Get the executed trades for a given security.
@@ -34,7 +34,7 @@ public interface ITradeService
     /// <param name="end"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Trade>?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
+    Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
 
     /// <summary>
     /// Get the trades related to an order.
@@ -43,5 +43,5 @@ public interface ITradeService
     /// <param name="orderId"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Trade>?> GetTrades(Security security, long orderId, bool requestExternal = false);
+    Task<Trade[]?> GetTrades(Security security, long orderId, bool requestExternal = false);
 }

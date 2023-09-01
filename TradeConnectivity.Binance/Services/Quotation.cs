@@ -16,21 +16,22 @@ namespace TradeConnectivity.Binance.Services;
 public class Quotation : IExternalQuotationManagement
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IExternalConnectivityManagement _connectivity;
+    private readonly HttpClient _httpClient;
     private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
     private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _messageBrokers = new();
-
     private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = new();
     private readonly ConcurrentDictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly HttpClient _httpClient;
 
     public string Name => ExternalNames.Binance;
 
     public event Action<int, OhlcPrice>? NextOhlc;
     public event Action<int, OrderBook>? NextOrderBook;
 
-    public Quotation(HttpClient httpClient)
+    public Quotation(IExternalConnectivityManagement connectivity, HttpClient httpClient)
     {
+        _connectivity = connectivity;
         _httpClient = httpClient;
     }
 
@@ -56,7 +57,7 @@ public class Quotation : IExternalQuotationManagement
         }
 
         var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(intervalType).ToLowerInvariant()}";
-        Uri uri = new($"{RootUrls.DefaultWs}/stream?streams={wsName}");
+        Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={wsName}");
 
         ClientWebSocket ws = new();
         _webSockets[wsName] = ws;
@@ -110,7 +111,7 @@ public class Quotation : IExternalQuotationManagement
         return new ExternalConnectionState
         {
             Action = ExternalActionType.Subscribe,
-            StatusCode = nameof(StatusCodes.SubscriptionOk),
+            StatusCode = nameof(ResultCode.SubscriptionOk),
             ExternalPartyId = security.Exchange,
             Description = "Subscribed",
             Type = SubscriptionType.RealTimeMarketData,
@@ -173,7 +174,7 @@ public class Quotation : IExternalQuotationManagement
     {
         if (!security.IsFrom(ExternalNames.Binance))
             return null;
-        var url = $"{RootUrls.DefaultHttps}/depth?symbol={security.Code}";
+        var url = $"{_connectivity.RootUrl}/depth?symbol={security.Code}";
         var json = await _httpClient.GetStringAsync(url);
 
         //        var json = @"

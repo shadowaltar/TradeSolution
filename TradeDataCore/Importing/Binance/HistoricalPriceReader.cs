@@ -45,7 +45,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
         long lastEndMs = 0l;
         while (lastEndMs < endMs)
         {
-            var jo = await HttpHelper.ReadJsonArray(url, httpClient, _log);
+            var jo = await httpClient.ReadJsonArray(url, _log);
             if (jo == null || jo.Count == 0)
                 break;
 

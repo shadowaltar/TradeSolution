@@ -21,9 +21,9 @@ public class Core
     private readonly IServices _services;
 
     public IReadOnlyDictionary<Guid, IAlgorithmEngine> Engines => _engines;
-    public ExchangeType Exchange => Context.ExchangeType;
-    public BrokerType Broker => Context.BrokerType;
-    public EnvironmentType Environment => Context.EnvironmentType;
+    public ExchangeType Exchange => Context.Exchange;
+    public BrokerType Broker => Context.Broker;
+    public EnvironmentType Environment => Context.Environment;
     public Context Context { get; }
 
     public Core(Context context, IServices services)
@@ -58,7 +58,7 @@ public class Core
         if (user == null) throw new InvalidOperationException("The user does not exist.");
 
         var loginResult = await _services.Admin.Login(user, parameters.Password, parameters.AccountName, parameters.Environment);
-        if (!loginResult) throw new InvalidOperationException("The password is incorrect.");
+        if (loginResult != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("The password is incorrect.");
 
         var startTime = parameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");

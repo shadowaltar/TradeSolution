@@ -24,7 +24,7 @@ public interface IExternalExecutionManagement
 
     Task<ExternalQueryState> GetOpenOrders(Security? security = null);
 
-    Task<ExternalQueryState> GetOrderHistory(DateTime start, DateTime end);
+    Task<ExternalQueryState> GetOrderHistory(Security security, DateTime start, DateTime end);
 
     Task<ExternalQueryState> UpdateOrder(Order order);
 

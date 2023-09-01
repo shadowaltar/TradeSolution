@@ -1,18 +1,11 @@
-﻿using TradeCommon.Essentials.Accounts;
+﻿using TradeCommon.Constants;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Services;
 public interface IAdminService
 {
-    Task<int> CreateAccount(Account account);
-
-    Task<Account?> GetAccount(string accountName, EnvironmentType environment, bool requestExternal = false);
-
-    Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment);
-
-    Task<User?> GetUser(string userName, EnvironmentType environment);
-
-    Task<User?> GetUserByEmail(string email, EnvironmentType environment);
+    Context Context { get; }
 
     /// <summary>
     /// Login a user.
@@ -22,5 +15,17 @@ public interface IAdminService
     /// <param name="accountName"></param>
     /// <param name="environment"></param>
     /// <returns></returns>
-    Task<bool> Login(User user, string password, string accountName, EnvironmentType environment);
+    Task<ResultCode> Login(User user, string? password, string? accountName, EnvironmentType environment);
+
+    void SetupEnvironment(EnvironmentType environment, ExchangeType exchange, BrokerType broker);
+
+    Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false);
+
+    Task<User?> GetUser(string? userName, EnvironmentType environment);
+
+    Task<User?> GetUserByEmail(string? email, EnvironmentType environment);
+
+    Task<int> CreateAccount(Account account);
+
+    Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment);
 }

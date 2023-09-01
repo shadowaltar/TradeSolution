@@ -4,33 +4,20 @@ using TradeCommon.Runtime;
 namespace TradeLogicCore.Services;
 public class Context
 {
-    //private readonly IExternalConnectivityManagement _external;
-    public EnvironmentType EnvironmentType { get; private set; }
-    public ExchangeType ExchangeType { get; private set; }
-    public BrokerType BrokerType { get; private set; }
+    public EnvironmentType Environment { get; private set; }
+    public ExchangeType Exchange { get; private set; }
+    public BrokerType Broker { get; private set; }
     public int BrokerId { get; private set; }
 
-    public void Setup(EnvironmentType environmentType, ExchangeType exchangeType, BrokerType brokerType, int brokerId)
+    public void Setup(EnvironmentType environment, ExchangeType exchange, BrokerType broker, int brokerId)
     {
-        EnvironmentType = environmentType;
-        ExchangeType = exchangeType;
-        BrokerType = brokerType;
+        Environment = environment;
+        Exchange = exchange;
+        Broker = broker;
         BrokerId = brokerId;
+
+        ExternalQueryStates.Exchange = exchange;
+        ExternalQueryStates.Environment = environment;
+        ExternalQueryStates.Broker = broker;
     }
-
-
-
-    //public Context(ExchangeType exchangeType,
-    //               BrokerType brokerType)
-    //{
-    //    ExchangeType = exchangeType;
-    //    BrokerType = brokerType;
-    //    BrokerId = ExternalNames.BrokerTypeToIds[BrokerType];
-    //}
-
-    //public void SetEnvironment(EnvironmentType type)
-    //{
-    //    _external.SetEnvironment(type);
-    //    EnvironmentType = type;
-    //}
 }

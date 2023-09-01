@@ -5,7 +5,6 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
-using TradeDataCore.MarketData;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
@@ -76,10 +75,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     public DateTime? DesignatedHaltTime { get; protected set; }
 
-    public DateTime? DesignatedResumeTime
-    {
-        get; protected set;
-    }
+    public DateTime? DesignatedResumeTime { get; protected set; }
 
     public DateTime? DesignatedStartTime { get; protected set; }
 

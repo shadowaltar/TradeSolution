@@ -11,19 +11,19 @@ public static class IntervalTypeConverter
         return intervalStr switch
         {
             "1D" => IntervalType.OneDay,
-            "1S" => IntervalType.OneSecond,
+            "1S" or "SECOND" => IntervalType.OneSecond,
             "1M" or "1MIN" => IntervalType.OneMinute,
             "2M" or "2MIN" => IntervalType.TwoMinutes,
             "5M" or "5MIN" => IntervalType.FiveMinutes,
             "15M" or "15MIN" => IntervalType.FifteenMinutes,
             "30M" or "30MIN" => IntervalType.ThirtyMinutes,
-            "1H" => IntervalType.OneHour,
+            "1H" or "HOUR" => IntervalType.OneHour,
             "90M" or "90MIN" => IntervalType.NintyMinutes,
             "4H" => IntervalType.FourHours,
-            "1W" or "1WK" => IntervalType.OneWeek,
-            "1MO" or "1MONTH" => IntervalType.OneMonth,
+            "1W" or "WEEK" or "1WK" => IntervalType.OneWeek,
+            "1MO" or "MONTH" or "1MONTH" => IntervalType.OneMonth,
             "3MO" or "3MONTH" => IntervalType.ThreeMonths,
-            "1Y" => IntervalType.OneYear,
+            "1Y" or "YEAR" => IntervalType.OneYear,
             _ => IntervalType.Unknown,
         };
     }

@@ -91,7 +91,7 @@ public class Trade : IComparable<Trade>
     /// not related to current user.
     /// </summary>
     [UpsertIgnore]
-    public bool IsCoarse { get; set; } = false;
+    public bool IsOwnerUnknown { get; set; } = false;
     
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;

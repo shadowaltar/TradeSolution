@@ -15,39 +15,58 @@ public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalAccountManagement _accountManagement;
+    private readonly IExternalConnectivityManagement _connectivity;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
 
-    public AdminService(IExternalAccountManagement accountManagement,
+    public Context Context { get; }
+
+    public AdminService(Context context,
+                        IExternalAccountManagement accountManagement,
+                        IExternalConnectivityManagement connectivity,
                         ISecurityService securityService,
                         Persistence persistence)
     {
+        Context = context;
         _accountManagement = accountManagement;
+        _connectivity = connectivity;
         _securityService = securityService;
         _persistence = persistence;
     }
 
-    public async Task<bool> Login(User user, string password, string accountName, EnvironmentType environment)
+    public void SetupEnvironment(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
+        Context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
+        _connectivity.SetEnvironment(environment);
+    }
+
+    public async Task<ResultCode> Login(User user, string? password, string? accountName, EnvironmentType environment)
+    {
+        if (password.IsBlank()) return ResultCode.InvalidCredential;
+        if (accountName.IsBlank()) return ResultCode.GetAccountFailed;
+
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
-        if (Credential.IsPasswordCorrect(user, password))
+        if (!Credential.IsPasswordCorrect(user, password))
         {
-            var account = await GetAccount(accountName, environment);
-            if (account == null)
-            {
-                _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
-                return false;
-            }
-            if (!_accountManagement.Login(user, account))
-            {
-                _log.Error($"Failed to login account {accountName} with user {user.Name}.");
-                return false;
-            }
-            _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
-            return true;
+            _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
+            return ResultCode.InvalidCredential;
         }
-        _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
-        return false;
+
+        _connectivity.SetEnvironment(environment);
+
+        var account = await GetAccount(accountName, environment);
+        if (account == null)
+        {
+            _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
+            return ResultCode.GetAccountFailed;
+        }
+        if (!_accountManagement.Login(user, account))
+        {
+            _log.Error($"Failed to login account {accountName} with user {user.Name}.");
+            return ResultCode.GetAccountFailed;
+        }
+        _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
+        return ResultCode.LoginUserAndAccountOk;
     }
 
     public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)
@@ -73,13 +92,15 @@ public class AdminService : IAdminService
         return await Storage.InsertUser(user);
     }
 
-    public async Task<User?> GetUser(string userName, EnvironmentType environment)
+    public async Task<User?> GetUser(string? userName, EnvironmentType environment)
     {
+        if (userName.IsBlank()) return null;
         return await Storage.ReadUser(userName, "", environment);
     }
 
-    public async Task<User?> GetUserByEmail(string email, EnvironmentType environment)
+    public async Task<User?> GetUserByEmail(string? email, EnvironmentType environment)
     {
+        if (email.IsBlank()) return null;
         return await Storage.ReadUser("", email, environment);
     }
 
@@ -88,8 +109,9 @@ public class AdminService : IAdminService
         return await Storage.InsertAccount(account);
     }
 
-    public async Task<Account?> GetAccount(string accountName, EnvironmentType environment, bool requestExternal = false)
+    public async Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false)
     {
+        if (accountName.IsBlank()) return null;
         if (!requestExternal)
         {
             var account = await Storage.ReadAccount(accountName, environment);

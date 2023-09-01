@@ -55,9 +55,9 @@ public class OrderService : IOrderService, IDisposable
         throw new NotImplementedException();
     }
 
-    public async Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security? security = null, bool requestExternal = false)
+    public async Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
     {
-        var state = await _execution.GetOrderHistory(start, end);
+        var state = await _execution.GetOrderHistory(security, start, end);
         return state.ContentAs<List<Order>?>();
     }
 

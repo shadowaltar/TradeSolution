@@ -2,7 +2,6 @@
 using log4net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
-using TradeCommon.Constants;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
@@ -15,13 +14,14 @@ public class AccountManager : IExternalAccountManagement
 {
     private static readonly ILog _log = Logger.New();
     private static readonly List<string> _accountTypes = new() { "SPOT", "MARGIN", "FUTURES" };
-
+    private readonly IExternalConnectivityManagement _connectivity;
     private readonly HttpClient _httpClient;
     private readonly KeyManager _keyManager;
     private readonly RequestBuilder _requestBuilder;
 
-    public AccountManager(HttpClient httpClient, KeyManager keyManager)
+    public AccountManager(IExternalConnectivityManagement connectivity, HttpClient httpClient, KeyManager keyManager)
     {
+        _connectivity = connectivity;
         _httpClient = httpClient;
         _keyManager = keyManager;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
@@ -40,26 +40,18 @@ public class AccountManager : IExternalAccountManagement
     public async Task<ExternalQueryState> GetAccount(List<Security>? assets = null)
     {
         var swOuter = Stopwatch.StartNew();
-        var url = $"{RootUrls.DefaultHttps}/api/v3/account";
-        using var request = new HttpRequestMessage();
-        _requestBuilder.BuildSigned(request, HttpMethod.Get, url);
+        var url = $"{_connectivity.RootUrl}/api/v3/account";
+        using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
 
-        var swInner = Stopwatch.StartNew();
-        var response = await _httpClient.SendAsync(request);
-        swInner.Stop();
-        // example json:
-        var responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
-        var responseString = await CheckContentAndStatus(response);
-        var example = @"{""makerCommission"":0,""takerCommission"":0,""buyerCommission"":0,""sellerCommission"":0,""commissionRates"":{""maker"":""0.00000000"",""taker"":""0.00000000"",""buyer"":""0.00000000"",""seller"":""0.00000000""},""canTrade"":true,""canWithdraw"":false,""canDeposit"":false,""brokered"":false,""requireSelfTradePrevention"":false,""preventSor"":false,""updateTime"":1692305848018,""accountType"":""SPOT"",""balances"":[{""asset"":""BNB"",""free"":""1000.00000000"",""locked"":""0.00000000""},{""asset"":""BTC"",""free"":""1.19000000"",""locked"":""0.00000000""},{""asset"":""BUSD"",""free"":""10000.00000000"",""locked"":""0.00000000""},{""asset"":""ETH"",""free"":""100.00000000"",""locked"":""0.00000000""},{""asset"":""LTC"",""free"":""500.00000000"",""locked"":""0.00000000""},{""asset"":""TRX"",""free"":""500000.00000000"",""locked"":""0.00000000""},{""asset"":""USDT"",""free"":""8100.00000000"",""locked"":""0.00000000""},{""asset"":""XRP"",""free"":""50000.00000000"",""locked"":""0.00000000""}],""permissions"":[""SPOT""],""uid"":1688996631782681271}";
+        var (response, responseString, rtt) = await _httpClient.TimedSendAsync(request, _log);
+        // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
         Account? account = null;
         var json = JsonNode.Parse(responseString);
         if (json != null && responseString != "" && responseString != "{}")
         {
             account = new();
-            var accountType = json.GetString("accountType");
-            var externalAccount = json.GetLong("uid").ToString();
-            account.Type = accountType;
-            account.ExternalAccount = externalAccount;
+            account.Type = json.GetString("accountType");
+            account.ExternalAccount = json.GetLong("uid").ToString();
             var balanceArray = json["balances"]?.AsArray();
             if (balanceArray != null)
             {
@@ -68,47 +60,20 @@ public class AccountManager : IExternalAccountManagement
                     var asset = balanceObj.GetString("asset");
                     var free = balanceObj.GetDecimal("free");
                     var locked = balanceObj.GetDecimal("locked");
-
-                    var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? 0;
-
+                    var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? -1;
                     var balance = new Balance { AssetId = assetId, AssetName = asset, FreeAmount = free, LockedAmount = locked };
                     account.Balances.Add(balance);
                 }
             }
         }
+        var connId = ResponseUtils.CheckHeaders(response);
         if (account != null)
         {
-            var state = new ExternalQueryState
-            {
-                Content = account,
-                ResponsePayload = responseString,
-                Action = ExternalActionType.GetAccount,
-                ExternalPartyId = ExternalNames.Binance,
-                StatusCode = StatusCodes.GetAccountOk,
-                UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
-                Description = "Get account info",
-                NetworkRoundtripTime = swInner.ElapsedMilliseconds,
-            };
-            swOuter.Stop();
-            state.TotalTime = swOuter.ElapsedMilliseconds;
-            return state;
+            return ExternalQueryStates.QueryAccounts(responseString, connId, account).RecordTimes(rtt, swOuter);
         }
         else
         {
-            var state = new ExternalQueryState
-            {
-                Content = null,
-                ResponsePayload = responseString,
-                Action = ExternalActionType.GetAccount,
-                ExternalPartyId = ExternalNames.Binance,
-                StatusCode = StatusCodes.GetAccountFailed,
-                UniqueConnectionId = ResponseHandler.GetUniqueConnectionId(response),
-                Description = "Failed to get account info",
-                NetworkRoundtripTime = swInner.ElapsedMilliseconds,
-            };
-            swOuter.Stop();
-            state.TotalTime = swOuter.ElapsedMilliseconds;
-            return state;
+            return ExternalQueryStates.InvalidAccount(responseString, connId).RecordTimes(rtt, swOuter);
         }
     }
 
@@ -118,30 +83,22 @@ public class AccountManager : IExternalAccountManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetAccounts()
     {
-        var accounts = new List<Account>(_accountTypes.Count);
-        var payloads = new List<string>(_accountTypes.Count);
-        var connIds = new List<string>(_accountTypes.Count);
-        var swHttpRoundtrips = new List<long>(_accountTypes.Count);
-        var isOk = true;
+        // TODO parse logic missing
         var swTotal = Stopwatch.StartNew();
+        var accounts = new List<Account>(_accountTypes.Count);
+        var states = new List<ExternalQueryState>();
+        ExternalQueryState? state = null;
         foreach (var accountType in _accountTypes)
         {
-            var url = $"{RootUrls.DefaultHttps}/sapi/v1/accountSnapshot";
-            using var request = new HttpRequestMessage();
+            var url = $"{_connectivity.RootUrl}/sapi/v1/accountSnapshot";
             var parameters = new List<(string, string)>
             {
                 ("type", accountType),
                 ("limit", 7.ToString()), // the api returns a history list of account statuses; min is 7
             };
-            var payload = _requestBuilder.Build(request, HttpMethod.Get, url, parameters);
-            payloads.Add(payload);
-            var swHttpRoundtrip = Stopwatch.StartNew();
-            var response = await _httpClient.SendAsync(request);
-            swHttpRoundtrip.Stop();
-            swHttpRoundtrips.Add(swHttpRoundtrip.ElapsedMilliseconds);
-
-            var responseString = await CheckContentAndStatus(response);
-            ResponseHandler.CheckHeaders(response);
+            using var request = _requestBuilder.Build(HttpMethod.Get, url, parameters);
+            var (response, responseString, rtt) = await _httpClient.TimedSendAsync(request, _log);
+            var connId = ResponseUtils.CheckHeaders(response);
 
             var rootObj = JsonNode.Parse(responseString)?.AsObject();
             if (rootObj != null && responseString != "" && responseString != "{}")
@@ -150,53 +107,21 @@ public class AccountManager : IExternalAccountManagement
                 if (account != null)
                 {
                     accounts.Add(account);
+                    state = ExternalQueryStates.QueryAccounts(responseString, connId, account).RecordTimes(rtt);
                 }
                 else
                 {
                     _log.Error($"Failed to get or parse account (type: {accountType}) response.");
-                    isOk = false;
                 }
             }
-            connIds.Add(ResponseHandler.GetUniqueConnectionId(response));
+            state ??= ExternalQueryStates.InvalidAccount(responseString, connId).RecordTimes(rtt);
+            states.Add(state);
         }
-
-        var state = new ExternalQueryState
-        {
-            Content = accounts,
-            ResponsePayload = $"[{string.Join(Environment.NewLine, payloads)}]",
-            Action = ExternalActionType.CancelOrder,
-            ExternalPartyId = ExternalNames.Binance,
-            StatusCode = isOk ? StatusCodes.GetAccountOk : StatusCodes.GetAccountFailed,
-            UniqueConnectionId = string.Join(",", connIds),
-            Description = "Retrieved accounts",
-        };
-
-        swTotal.Stop();
-        state.NetworkRoundtripTime = Convert.ToInt64(swHttpRoundtrips.Average());
-        state.TotalTime = swTotal.ElapsedMilliseconds;
+        state = ExternalQueryStates.QueryAccounts(null, null, accounts.ToArray()).RecordTimes(swTotal);
+        state.SubStates = states;
 
         return state;
 
         Account Parse(JsonObject rootObj) => throw new NotImplementedException();
-    }
-
-    /// <summary>
-    /// Check the <see cref="HttpResponseMessage"/> responseString and status.
-    /// Should be called after any http request.
-    /// </summary>
-    /// <param name="response"></param>
-    /// <returns></returns>
-    private static async Task<string> CheckContentAndStatus(HttpResponseMessage response)
-    {
-        var content = await response.Content.ReadAsStringAsync();
-        if (response.IsSuccessStatusCode)
-        {
-            _log.Info(response);
-        }
-        else
-        {
-            _log.Error(response.StatusCode + ": " + content);
-        }
-        return content;
     }
 }

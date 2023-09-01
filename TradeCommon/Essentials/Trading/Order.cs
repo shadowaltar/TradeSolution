@@ -7,7 +7,7 @@ namespace TradeCommon.Essentials.Trading;
 /// <summary>
 /// Action to buy or sell a security.
 /// </summary>
-public class Order : IComparable<Order>
+public class Order : IComparable<Order>, ICloneable
 {
     public const long DefaultId = 0;
 
@@ -129,6 +129,14 @@ public class Order : IComparable<Order>
     [UpsertIgnore]
     public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
 
+    public object Clone()
+    {
+        var advanced = AdvancedOrderSettings?.Clone();
+        var order = (Order)MemberwiseClone();
+        order.AdvancedOrderSettings = (AdvancedOrderSettings?)advanced;
+        return order;
+    }
+
     public int CompareTo(Order? other)
     {
         var r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
@@ -164,12 +172,17 @@ public class Order : IComparable<Order>
     }
 }
 
-public class AdvancedOrderSettings
+public class AdvancedOrderSettings : ICloneable
 {
     public OrderTrailingType TrailingType { get; set; }
     public double TrailingValue { get; set; }
     public double TrailingSpread { get; set; }
     public DateTime TimeInForceTime { get; set; }
+
+    public object Clone()
+    {
+        return MemberwiseClone();
+    }
 }
 
 public enum OrderTrailingType

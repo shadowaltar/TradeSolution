@@ -1,16 +1,16 @@
 ﻿using log4net;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 namespace Common;
-public class HttpHelper
+public static class HttpHelper
 {
     private static readonly ILog _log = Logger.New();
 
-    public static async Task ReadFile(string url, string saveFilePath, ILog? log = null)
+    public static async Task ReadIntoFile(this HttpClient client, string url, string saveFilePath, ILog? log = null)
     {
         log ??= _log;
 
-        var client = new HttpClient();
         using var stream = await client.GetStreamAsync(url).ConfigureAwait(false);
         using var fileStream = new FileStream(saveFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
 
@@ -22,19 +22,27 @@ public class HttpHelper
         log.Info($"Read and saved file {url}, length: {new FileInfo(saveFilePath).Length}bytes");
     }
 
+    public static async Task ReadIntoFile(string url, string saveFilePath, ILog? log = null)
+    {
+        log ??= _log;
+
+        using var client = new HttpClient();
+        await ReadIntoFile(client, url, saveFilePath, log);
+    }
+
     public static async Task<JsonObject?> ReadJson(string url, ILog? log = null)
     {
         log ??= _log;
         using var httpClient = new HttpClient();
-        return await ReadJson(url, httpClient, log);
+        return await ReadJson(httpClient, url, log);
     }
 
-    public static async Task<JsonObject?> ReadJson(string url, HttpClient httpClient, ILog? log = null)
+    public static async Task<JsonObject?> ReadJson(this HttpClient client, string url, ILog? log = null)
     {
         log ??= _log;
         try
         {
-            var json = await httpClient.GetStringAsync(url).ConfigureAwait(false);
+            var json = await client.GetStringAsync(url).ConfigureAwait(false);
             if (json != null)
             {
                 log.Info($"Read json object from {url}, length: {json.Length}");
@@ -55,12 +63,12 @@ public class HttpHelper
         }
     }
 
-    public static async Task<JsonArray?> ReadJsonArray(string url, HttpClient httpClient, ILog? log = null)
+    public static async Task<JsonArray?> ReadJsonArray(this HttpClient client, string url, ILog? log = null)
     {
         log ??= _log;
         try
         {
-            var json = await httpClient.GetStringAsync(url).ConfigureAwait(false);
+            var json = await client.GetStringAsync(url).ConfigureAwait(false);
             if (json != null)
             {
                 log.Info($"Read json array from {url}, length: {json.Length}");
@@ -79,5 +87,40 @@ public class HttpHelper
             log.Info($"Failed to read json array from {url}.", e);
             return null;
         }
+    }
+
+    public static async Task<(HttpResponseMessage response, string responseString, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request, ILog? log = null)
+    {
+        var swInner = Stopwatch.StartNew();
+        var response = await client.SendAsync(request);
+        swInner.Stop();
+
+        log ??= _log;
+        var content = await response.Content.ReadAsStringAsync();
+        if (response.IsSuccessStatusCode && content == "" || content == "{}")
+        {
+            log.Warn($"Received HTTP {request.Method} [{response.StatusCode}]: empty content.");
+        }
+        else if (!response.IsSuccessStatusCode)
+        {
+            log.Error($"Received HTTP {request.Method} [{response.StatusCode}]: {content}");
+        }
+
+        return (response, content, swInner.ElapsedMilliseconds);
+    }
+
+
+    private static async Task<string> CheckContentAndStatus(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (response.IsSuccessStatusCode)
+        {
+            _log.Info(response);
+        }
+        else
+        {
+            _log.Error(response.StatusCode + ": " + content);
+        }
+        return content;
     }
 }

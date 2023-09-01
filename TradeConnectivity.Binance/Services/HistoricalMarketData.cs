@@ -4,12 +4,17 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
-using TradeCommon.Utils.Common;
 
 namespace TradeConnectivity.Binance.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IExternalConnectivityManagement _connectivity;
+
+    public HistoricalMarketData(IExternalConnectivityManagement connectivity)
+    {
+        _connectivity = connectivity;
+    }
 
     public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
@@ -27,8 +32,8 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 
     public async Task<List<OhlcPrice>?> ReadPrices(Security security, DateTime start, DateTime end, IntervalType intervalType)
     {
-        static string UpdateTimeFrame(string c, string i, long s, long e) =>
-            $"{RootUrls.DefaultHttps}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
+        string UpdateTimeFrame(string c, string i, long s, long e) =>
+            $"{_connectivity.RootUrl}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
 
         var code = security.Code;
         var intervalStr = IntervalTypeConverter.ToIntervalString(intervalType);
@@ -46,7 +51,7 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         long lastEndMs = 0l;
         while (lastEndMs < endMs)
         {
-            var jo = await HttpHelper.ReadJsonArray(url, httpClient, _log);
+            var jo = await httpClient.ReadJsonArray(url, _log);
             if (jo == null || jo.Count == 0)
                 break;
 

@@ -1,19 +1,14 @@
 ﻿using Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TradeConnectivity.Binance.Utils;
-public class ResponseHandler
+public class ResponseUtils
 {
     /// <summary>
     /// Check the headers in <see cref="HttpResponseMessage"/>.
     /// Should be called selectively after an http request.
     /// </summary>
     /// <param name="response"></param>
-    public static void CheckHeaders(HttpResponseMessage response)
+    public static string CheckHeaders(HttpResponseMessage response)
     {
         foreach (var (key, valueArray) in response.Headers)
         {
@@ -37,7 +32,13 @@ public class ResponseHandler
             {
                 // TODO
             }
+            else if (key == "x-mbx-uuid")
+            {
+                var values = ((string[])valueArray);
+                return values.FirstOrDefault() ?? "";
+            }
         }
+        return "";
     }
 
     public static string GetUniqueConnectionId(HttpResponseMessage response)

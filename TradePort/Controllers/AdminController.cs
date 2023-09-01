@@ -21,25 +21,58 @@ namespace TradePort.Controllers;
 public class AdminController : Controller
 {
     /// <summary>
-    /// Set application environment.
+    /// Set application environment + login (combination of two other calls).
     /// </summary>
-    /// <param name="context"></param>
+    /// <param name="adminService"></param>
+    /// <param name="adminPassword"></param>
+    /// <param name="userName"></param>
+    /// <param name="accountName"></param>
     /// <param name="password"></param>
     /// <param name="environment"></param>
     /// <param name="exchange"></param>
     /// <returns></returns>
-    [HttpPost("set-environment")]
-    public ActionResult SetEnvironment([FromServices] Context context,
-                                       [FromForm] string password,
-                                       [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
-                                       [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
+    [HttpPost("login-environment")]
+    public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IAdminService adminService,
+                                                           [FromForm(Name = "admin-password")] string adminPassword,
+                                                           [FromForm(Name = "user-password")] string password,
+                                                           [FromQuery(Name = "user")] string userName,
+                                                           [FromQuery(Name = "account-name")] string accountName,
+                                                           [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+                                                           [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
     {
         if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
         if (ControllerValidator.IsUnknown(environment, out br)) return br;
         if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
         var broker = ExternalNames.Convert(exchange);
-        context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
+        adminService.SetupEnvironment(environment, exchange, broker);
+
+        var user = await adminService.GetUser(userName, adminService.Context.Environment);
+        if (user == null) return BadRequest("Invalid user or credential.");
+        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
+        return Ok(environment);
+    }
+
+    /// <summary>
+    /// Set application environment.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="adminPassword"></param>
+    /// <param name="environment"></param>
+    /// <param name="exchange"></param>
+    /// <returns></returns>
+    [HttpPost("set-environment")]
+    public ActionResult SetEnvironment([FromServices] IAdminService adminService,
+                                       [FromForm(Name = "admin-password")] string adminPassword,
+                                       [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+                                       [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsUnknown(environment, out br)) return br;
+        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+
+        adminService.SetupEnvironment(environment, exchange, ExternalNames.Convert(exchange));
         return Ok(environment);
     }
 
@@ -50,20 +83,17 @@ public class AdminController : Controller
     /// <param name="userName"></param>
     /// <param name="password"></param>
     /// <param name="accountName"></param>
-    /// <param name="environment"></param>
     /// <returns></returns>
-    [HttpPost("users/{user}/login")]
+    [HttpPost("login")]
     public async Task<ActionResult> Login([FromServices] IAdminService adminService,
-                                          [FromRoute(Name = "user")] string userName,
-                                          [FromForm(Name = "user-password")] string password,
+                                          [FromQuery(Name = "user")] string userName,
                                           [FromQuery(Name = "account-name")] string accountName,
-                                          [FromQuery(Name = "environment")] EnvironmentType environment)
+                                          [FromForm(Name = "user-password")] string password)
     {
-        var user = await adminService.GetUser(userName, environment);
+        var user = await adminService.GetUser(userName, adminService.Context.Environment);
         if (user == null) return BadRequest("Invalid user or credential.");
-        var result = await adminService.Login(user, password, accountName, environment);
-        if (!result) return BadRequest("Invalid user or credential.");
-
+        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(Login)}; code: {result}");
         return Ok(user);
     }
 
@@ -72,21 +102,15 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="adminService"></param>
     /// <param name="userName"></param>
-    /// <param name="environment"></param>
     /// <returns></returns>
     [HttpGet("users/{user}")]
     public async Task<ActionResult> GetUser([FromServices] IAdminService adminService,
-                                            [FromRoute(Name = "user")] string userName,
-                                            [FromQuery(Name = "environment")] EnvironmentType environment)
+                                            [FromRoute(Name = "user")] string userName)
     {
         if (userName.IsBlank()) return BadRequest();
 
-        var user = await adminService.GetUser(userName, environment);
-        if (user == null)
-        {
-            return NotFound();
-        }
-        return Ok(user);
+        var user = await adminService.GetUser(userName, adminService.Context.Environment);
+        return user == null ? NotFound() : Ok(user);
     }
 
     /// <summary>
@@ -94,16 +118,16 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="adminService"></param>
     /// <param name="accountName"></param>
-    /// <param name="environment"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
     [HttpGet("accounts/{account}")]
     public async Task<ActionResult> GetAccount([FromServices] IAdminService adminService,
                                                [FromRoute(Name = "account")] string accountName = "test",
-                                               [FromQuery(Name = "env")] EnvironmentType environment = EnvironmentType.Unknown,
                                                [FromQuery(Name = "request-external")] bool requestExternal = false)
     {
-        var account = await adminService.GetAccount(accountName, environment, requestExternal);
+        var account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
+        if (account == null) return BadRequest("Invalid account name.");
+
         return Ok(account);
     }
 
@@ -129,13 +153,13 @@ public class AdminController : Controller
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
 
-        var user = await adminService.GetUser(userName, model.Environment);
+        var user = await adminService.GetUser(userName, adminService.Context.Environment);
         if (user != null)
         {
             return BadRequest();
         }
 
-        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, model.Environment);
+        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, adminService.Context.Environment);
         model.UserPassword = "";
 
         return Ok(result);
@@ -154,8 +178,8 @@ public class AdminController : Controller
                                                   [FromRoute(Name = "account")] string accountName = "test")
     {
         if (accountName.IsBlank()) return BadRequest();
-        if (model == null) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
+        if (model == null) return BadRequest("Missing creation model.");
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
 
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
@@ -363,6 +387,7 @@ public class AdminController : Controller
         return results;
     }
 
+
     public class UserCreationModel
     {
         [FromForm(Name = "adminPassword")]
@@ -373,9 +398,6 @@ public class AdminController : Controller
 
         [FromForm(Name = "email")]
         public string? Email { get; set; }
-
-        [FromForm(Name = "environment")]
-        public EnvironmentType Environment { get; set; }
     }
 
 

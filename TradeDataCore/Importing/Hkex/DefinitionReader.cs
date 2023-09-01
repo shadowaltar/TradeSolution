@@ -26,7 +26,7 @@ public class DefinitionReader
     {
         const string url = "https://www.hkex.com.hk/eng/services/trading/securities/securitieslists/ListOfSecurities.xlsx";
         var filePath = Path.GetTempFileName();
-        await HttpHelper.ReadFile(url, filePath);
+        await HttpHelper.ReadIntoFile(url, filePath);
 
         var reader = new ExcelReader();
         var securities = reader.ReadSheet<Security>(filePath, "StaticData.HKSecurityExcelDefinition",

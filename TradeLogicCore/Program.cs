@@ -201,7 +201,7 @@ public class Program
             orderService.CancelAllOpenOrders();
         }
 
-        static void OnNewTradesReceived(List<Trade> trades)
+        static void OnNewTradesReceived(Trade[] trades)
         {
             foreach (var trade in trades)
             {
