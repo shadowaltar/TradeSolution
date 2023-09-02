@@ -105,7 +105,8 @@ public class ExecutionController : Controller
     [HttpPost("algos/mac/start")]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
                                             [FromServices] ISecurityService securityService,
-                                            [FromForm] UserCredentialModel model,
+                                            [FromServices] IAdminService adminService,
+                                            [FromForm(Name = "admin-password")] string adminPassword,
                                             //[FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
                                             //[FromRoute(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                             [FromRoute(Name = "account")] string accountName = "test",
@@ -118,14 +119,15 @@ public class ExecutionController : Controller
                                             [FromQuery(Name = "back-test-start")] string? startStr = "",
                                             [FromQuery(Name = "back-test-end")] string? endStr = "")
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
-        if (ControllerValidator.IsStringTooShort(model.UserName, 3, out br)) return br;
-        if (ControllerValidator.IsStringTooShort(model.UserPassword, 3, out br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(fastMa, out br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(slowMa, out br)) return br;
         if (ControllerValidator.IsDecimalNegativeOrZero(stopLoss, out br)) return br;
+
+        if (adminService.CurrentUser == null || adminService.CurrentAccount == null)
+            return BadRequest("Must login user and account");
 
         var security = await securityService.GetSecurity(symbol, core.Exchange, secType);
         if (security == null) return BadRequest("Invalid or missing security.");
@@ -147,9 +149,8 @@ public class ExecutionController : Controller
             default:
                 return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgoStartupParameters(model.UserName!,
-                                                   model.UserPassword!,
-                                                   accountName,
+        var parameters = new AlgoStartupParameters(adminService.CurrentUser.Name,
+                                                   adminService.CurrentAccount.Name,
                                                    core.Environment,
                                                    core.Exchange,
                                                    core.Broker,

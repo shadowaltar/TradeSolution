@@ -153,6 +153,7 @@ WHERE
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         if (exchange != null)
             exchange = exchange.ToUpperInvariant();
+        var typeStr = type.ToString().ToUpperInvariant();
         var idClause = ids == null
             ? ""
             : ids.Count == 1
@@ -184,8 +185,9 @@ WHERE
 SELECT Id,Code,Name,Exchange,Type,SubType,LotSize,BaseCurrency,QuoteCurrency,IsMarginTradingAllowed,MaxLotSize,MinNotional,PricePrecision,QuantityPrecision
 FROM {tableName}
 WHERE
-    IsEnabled = true AND
-    LocalEndDate > $LocalEndDate AND
+    {idClause}
+    IsEnabled = true
+    AND LocalEndDate > $LocalEndDate
     {exchangeClause}
 "
                 : throw new NotImplementedException();
@@ -193,7 +195,7 @@ WHERE
 
         SqlReader<Security>? sqlHelper = null;
         return await SqlReader.Read(tableName, DatabaseNames.StaticData, sql, Transform,
-            ("$LocalEndDate", now), ("$Exchange", exchange), ("$Type", type));
+            ("$LocalEndDate", now), ("$Exchange", exchange?.ToUpperInvariant() ?? ""), ("$Type", typeStr));
 
         Security Transform(SqliteDataReader r)
         {

@@ -15,7 +15,7 @@ namespace TradeCommon.Runtime;
 public class ExternalConnectionState
 {
     public SubscriptionType Type { get; set; }
-    public ExternalActionType Action { get; set; }
+    public ActionType Action { get; set; }
     public string? StatusCode { get; set; }
     public string? ExternalPartyId { get; set; }
     public string? UniqueConnectionId { get; set; }
@@ -33,7 +33,7 @@ public class ExternalQueryState : INetworkTimeState
 
     public string? ResponsePayload { get; set; }
 
-    public ExternalActionType Action { get; set; }
+    public ActionType Action { get; set; }
 
     public ResultCode ResultCode { get; set; }
 
@@ -78,6 +78,12 @@ public class ExternalQueryState : INetworkTimeState
     {
         return $"ExecState Time[{NetworkRoundtripTime}ms/{TotalTime}ms]Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
     }
+
+    public ExternalQueryState SetDescription(string description)
+    {
+        Description = description;
+        return this;
+    }
 }
 
 public interface INetworkTimeState
@@ -95,7 +101,7 @@ public enum SubscriptionType
     HistoricalMarketData,
 }
 
-public enum ExternalActionType
+public enum ActionType
 {
     Unknown,
     Connect,
@@ -111,7 +117,7 @@ public enum ExternalActionType
     GetTrade,
     GetOrder,
 
-    CheckOrderSpeedLimit,
+    GetFrequencyRestriction,
 }
 
 
@@ -121,7 +127,8 @@ public static class ExternalQueryStates
     public static ExchangeType Exchange { get; set; }
     public static BrokerType Broker { get; set; }
     public static int BrokerId { get; set; }
-    public static ExternalQueryState InvalidSecurity(ExternalActionType action)
+
+    public static ExternalQueryState InvalidSecurity(ActionType action)
     {
         return new ExternalQueryState
         {
@@ -134,7 +141,7 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidArgument(ExternalActionType action, string message)
+    public static ExternalQueryState InvalidArgument(ActionType action, string message)
     {
         return new ExternalQueryState
         {
@@ -147,7 +154,7 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidExchange(ExternalActionType action, string externalName)
+    public static ExternalQueryState InvalidExchange(ActionType action, string externalName)
     {
         return new ExternalQueryState
         {
@@ -160,15 +167,15 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidOrder(string responseString,
+    public static ExternalQueryState InvalidOrder(string content,
                                                   string responseConnectionId,
                                                   string errorMessage)
     {
         return new ExternalQueryState
         {
             Content = null,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetOrder,
+            ResponsePayload = content,
+            Action = ActionType.GetOrder,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetOrderFailed,
             UniqueConnectionId = responseConnectionId,
@@ -177,14 +184,14 @@ public static class ExternalQueryStates
     }
 
     public static ExternalQueryState QueryOrder(Order order,
-                                                string responseString,
+                                                string content,
                                                 string responseConnectionId)
     {
         return new ExternalQueryState
         {
             Content = order,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetOrder,
+            ResponsePayload = content,
+            Action = ActionType.GetOrder,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetOrderOk,
             UniqueConnectionId = responseConnectionId,
@@ -192,15 +199,15 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidTrade(string responseString,
+    public static ExternalQueryState InvalidTrade(string content,
                                                   string responseConnectionId,
                                                   string errorMessage)
     {
         return new ExternalQueryState
         {
             Content = null,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetTrade,
+            ResponsePayload = content,
+            Action = ActionType.GetTrade,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetTradeFailed,
             UniqueConnectionId = responseConnectionId,
@@ -208,7 +215,7 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState QueryTrades(string responseString,
+    public static ExternalQueryState QueryTrades(string content,
                                                  string connId,
                                                  params Trade[] trades)
     {
@@ -216,8 +223,8 @@ public static class ExternalQueryStates
         return new ExternalQueryState
         {
             Content = trades.Length == 1 ? trades[0] : trades,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetTrade,
+            ResponsePayload = content,
+            Action = ActionType.GetTrade,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetTradeOk,
             UniqueConnectionId = connId,
@@ -226,17 +233,17 @@ public static class ExternalQueryStates
     }
 
     public static ExternalQueryState CancelOrders(string securityCode,
-                                                  string responseString,
+                                                  string content,
                                                   string connId,
                                                   params Order[] orders)
     {
-        var isOk = responseString != "" && responseString != "{}";
+        var isOk = content != "" && content != "{}";
 
         return new ExternalQueryState
         {
             Content = orders,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.CancelOrder,
+            ResponsePayload = content,
+            Action = ActionType.CancelOrder,
             ExternalId = BrokerId,
             ResultCode = isOk ? ResultCode.CancelOrderOk : ResultCode.CancelOrderFailed,
             UniqueConnectionId = connId,
@@ -244,13 +251,28 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState QueryOrders(string? code, string responseString, string connId, Order[] orders)
+
+    public static ExternalQueryState Error(ActionType actionType, ResultCode resultCode, string? content, string connId, string errorMessage)
+    {
+        return new ExternalQueryState
+        {
+            Content = null,
+            ResponsePayload = content,
+            Action = actionType,
+            ExternalId = BrokerId,
+            ResultCode = resultCode,
+            UniqueConnectionId = connId,
+            Description = errorMessage,
+        };
+    }
+
+    public static ExternalQueryState QueryOrders(string? code, string content, string connId, Order[] orders)
     {
         return new ExternalQueryState
         {
             Content = orders,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetOrder,
+            ResponsePayload = content,
+            Action = ActionType.GetOrder,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetOrderOk,
             UniqueConnectionId = connId,
@@ -279,7 +301,7 @@ public static class ExternalQueryStates
         {
             Content = null,
             ResponsePayload = null,
-            Action = ExternalActionType.UpdateOrder,
+            Action = ActionType.UpdateOrder,
             ExternalId = BrokerId,
             ResultCode = compositeResult,
             UniqueConnectionId = null,
@@ -291,13 +313,13 @@ public static class ExternalQueryStates
         return state;
     }
 
-    public static ExternalQueryState QueryAccounts(string? responseString, string? connId, params Account[] accounts)
+    public static ExternalQueryState QueryAccounts(string? content, string? connId, params Account[] accounts)
     {
         return new ExternalQueryState
         {
-            Content = accounts,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetAccount,
+            Content = accounts.Length == 1 ? accounts[0] : accounts,
+            ResponsePayload = content,
+            Action = ActionType.GetAccount,
             ExternalId = BrokerId,
             ResultCode = accounts.All(a => a != null) ? ResultCode.GetAccountOk : accounts.All(a => a == null) ? ResultCode.GetAccountFailed : ResultCode.GetSomeAccountsFailed,
             UniqueConnectionId = connId,
@@ -305,13 +327,13 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidAccount(string responseString, string connId)
+    public static ExternalQueryState InvalidAccount(string content, string connId)
     {
         return new ExternalQueryState
         {
             Content = null,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.GetAccount,
+            ResponsePayload = content,
+            Action = ActionType.GetAccount,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetAccountFailed,
             UniqueConnectionId = connId,
@@ -319,17 +341,17 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState SendOrder(Order order, string responseString, string connId, bool isOk)
+    public static ExternalQueryState SendOrder(Order order, string content, string connId, bool isOk)
     {
         return new ExternalQueryState
         {
             Content = order,
-            ResponsePayload = responseString,
-            Action = ExternalActionType.SendOrder,
+            ResponsePayload = content,
+            Action = ActionType.SendOrder,
             ExternalId = BrokerId,
             ResultCode = isOk ? ResultCode.SendOrderOk : ResultCode.SendOrderFailed,
             UniqueConnectionId = connId,
-            Description = responseString,
+            Description = content,
         };
     }
 }
@@ -340,7 +362,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.SubscriptionOk),
             ExternalPartyId = security.Exchange,
             Description = $"Subscribed OHLC price from {start:yyyyMMdd-HHmmss} to {end:yyyyMMdd-HHmmss}",
@@ -353,7 +375,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.InvalidArgument),
             ExternalPartyId = security.Exchange,
             Description = errorDescription,
@@ -366,7 +388,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.AlreadySubscribed),
             ExternalPartyId = security.Exchange,
             Description = $"Subscribed OHLC price for {security.Id} with interval {interval}",
@@ -379,7 +401,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.UnsubscriptionOk),
             ExternalPartyId = security.Exchange,
             Description = $"Unsubscribed OHLC price for {security.Id} with interval {interval}",
@@ -392,7 +414,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.UnsubscriptionOk),
             ExternalPartyId = security.Exchange,
             Description = $"Failed to unsubscribe OHLC price for {security.Id} with interval {interval}",
@@ -405,7 +427,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.MultipleUnsubscriptionOk),
             ExternalPartyId = null,
             Description = $"Unsubscribed ({subStates.Count}) OHLC prices",
@@ -419,7 +441,7 @@ public static class ExternalConnectionStates
     {
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Unsubscribe,
+            Action = ActionType.Unsubscribe,
             StatusCode = nameof(ResultCode.StillHasSubscription),
             ExternalPartyId = security.Exchange,
             Description = $"Will not unsubscribed OHLC price for {security.Id} with interval {interval} because of other subscribers",

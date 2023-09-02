@@ -45,6 +45,8 @@ public static class NumericExtensions
 
     public static bool IsNaN(this double value) => double.IsNaN(value);
 
+    public static bool IsValid(this int value) => value != int.MinValue && value != int.MaxValue;
+
     public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
     public static bool IsValid(this decimal value) => value != decimal.MaxValue && value != decimal.MinValue;

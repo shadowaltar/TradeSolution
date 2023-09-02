@@ -54,17 +54,14 @@ public class Core
     /// <exception cref="InvalidOperationException"></exception>
     public async Task<Guid> StartAlgorithm<T>(AlgoStartupParameters parameters, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
-        var user = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
+        var user = _services.Admin.CurrentUser;
         if (user == null) throw new InvalidOperationException("The user does not exist.");
-
-        var loginResult = await _services.Admin.Login(user, parameters.Password, parameters.AccountName, parameters.Environment);
-        if (loginResult != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("The password is incorrect.");
 
         var startTime = parameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
         await ReconcileAccountAndBalance(user);
-        await ReconcileOpenOrders();
+        await ReconcileOpenOrders(parameters.SecurityPool);
 
         await Task.Run(async () =>
         {
@@ -221,14 +218,13 @@ public class Core
         foreach (var account in user.Accounts)
         {
             var externalAccount = await _services.Admin.GetAccount(account.Name, account.Environment, true);
-            var internalAccount = await _services.Admin.GetAccount(account.Name, account.Environment);
-            if (internalAccount == null && externalAccount != null)
+            if (account == null && externalAccount != null)
             {
                 _log.Warn("Internally stored account is missing; will sync with external one.");
                 _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Create });
 
             }
-            else if (externalAccount != null && externalAccount != internalAccount)
+            else if (externalAccount != null && externalAccount != account)
             {
                 _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
                 _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Update });
@@ -236,27 +232,30 @@ public class Core
         }
     }
 
-    private async Task ReconcileOpenOrders()
+    private async Task ReconcileOpenOrders(List<Security> securities)
     {
-        var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
-        var internalOpenOrders = await _services.Order.GetOpenOrders(null);
-
-        var notStoredOpenOrders = new List<Order>();
-
-        // a stored one does not exist on external side
-        foreach (var order in internalOpenOrders)
+        //foreach (var security in securities)
         {
-            if (!externalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
-            {
+            var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
+            var internalOpenOrders = await _services.Order.GetOpenOrders();
 
+            var notStoredOpenOrders = new List<Order>();
+
+            // a stored one does not exist on external side
+            foreach (var order in internalOpenOrders)
+            {
+                if (!externalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
+                {
+
+                }
             }
-        }
-        // an external one does not exist in storage
-        foreach (var order in externalOpenOrders)
-        {
-            if (!internalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
+            // an external one does not exist in storage
+            foreach (var order in externalOpenOrders)
             {
+                if (!internalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
+                {
 
+                }
             }
         }
     }

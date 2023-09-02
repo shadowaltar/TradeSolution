@@ -19,6 +19,10 @@ public class AdminService : IAdminService
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
 
+    public User? CurrentUser { get; private set; }
+
+    public Account? CurrentAccount { get; private set; }
+
     public Context Context { get; }
 
     public AdminService(Context context,
@@ -45,6 +49,9 @@ public class AdminService : IAdminService
         if (password.IsBlank()) return ResultCode.InvalidCredential;
         if (accountName.IsBlank()) return ResultCode.GetAccountFailed;
 
+        CurrentUser = null;
+        CurrentAccount = null;
+
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
         if (!Credential.IsPasswordCorrect(user, password))
         {
@@ -52,20 +59,29 @@ public class AdminService : IAdminService
             return ResultCode.InvalidCredential;
         }
 
-        _connectivity.SetEnvironment(environment);
-
         var account = await GetAccount(accountName, environment);
         if (account == null)
         {
             _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
             return ResultCode.GetAccountFailed;
         }
-        if (!_accountManagement.Login(user, account))
+        if (account.OwnerId != user.Id)
+        {
+            _log.Error($"Account {accountName} is not owned by {user.Name}.");
+            return ResultCode.AccountNotOwnedByUser;
+        }
+        var externalLoginResult = _accountManagement.Login(user, account);
+        if (externalLoginResult != ResultCode.LoginUserAndAccountOk)
         {
             _log.Error($"Failed to login account {accountName} with user {user.Name}.");
-            return ResultCode.GetAccountFailed;
+            return ResultCode.LoginUserAndAccountFailed;
         }
         _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
+
+        user.Accounts.Add(account);
+        CurrentUser = user;
+        CurrentAccount = account;
+
         return ResultCode.LoginUserAndAccountOk;
     }
 
@@ -147,7 +163,7 @@ public class AdminService : IAdminService
                 {
                     _persistence.Enqueue(new PersistenceTask<Balance>(balance));
                 }
-            }    
+            }
             return account;
         }
     }

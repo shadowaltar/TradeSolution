@@ -40,7 +40,7 @@ public class AdminController : Controller
                                                            [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                                            [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
     {
-        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsUnknown(environment, out br)) return br;
         if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
@@ -51,7 +51,7 @@ public class AdminController : Controller
         if (user == null) return BadRequest("Invalid user or credential.");
         var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
         if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
-        return Ok(environment);
+        return Ok(result);
     }
 
     /// <summary>
@@ -127,6 +127,24 @@ public class AdminController : Controller
     {
         var account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
         if (account == null) return BadRequest("Invalid account name.");
+
+        return Ok(account);
+    }
+    /// <summary>
+    /// Get account's information.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="accountName"></param>
+    /// <param name="requestExternal"></param>
+    /// <returns></returns>
+    [HttpPost("accounts/{account}/sync")]
+    public async Task<ActionResult> SynchronizeAccountAndBalanceFromExternal([FromServices] IAdminService adminService,
+                                               [FromRoute(Name = "account")] string accountName = "test")
+    {
+        var account = await adminService.GetAccount(accountName, adminService.Context.Environment);
+        if (account == null) return BadRequest("Invalid account name.");
+
+        var external = await adminService.GetAccount(accountName, adminService.Context.Environment, true);
 
         return Ok(account);
     }
@@ -210,21 +228,19 @@ public class AdminController : Controller
     /// WARNING, this will erase all the data. Rebuild all the tables.
     /// </summary>
     /// <returns></returns>
-    [HttpPost("rebuild-static-tables")]
-    public async Task<ActionResult> RebuildStaticTables([FromForm(Name = "admin-password")] string password)
+    [HttpPost("rebuild-security-definition-tables")]
+    public async Task<ActionResult> RebuildSecurityDefinitionTables([FromForm(Name = "admin-password")] string password)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
         await Storage.CreateSecurityTable(SecurityType.Equity);
         await Storage.CreateSecurityTable(SecurityType.Fx);
-        await Storage.CreateFinancialStatsTable();
 
         var tuples = new (string table, string db)[]
         {
             (DatabaseNames.StockDefinitionTable, DatabaseNames.StaticData),
             (DatabaseNames.FxDefinitionTable, DatabaseNames.StaticData),
-            (DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData),
         };
         var results = await Task.WhenAll(tuples.Select(async t =>
         {
@@ -244,8 +260,8 @@ public class AdminController : Controller
     /// <returns></returns>
     [HttpPost("rebuild-price-tables")]
     public async Task<ActionResult> RebuildPriceTables([FromForm(Name = "admin-password")] string password,
-        [FromQuery(Name = "interval")] string? intervalStr,
-        [FromQuery(Name = "sec-type")] string? secTypeStr)
+                                                       [FromQuery(Name = "interval")] string? intervalStr,
+                                                       [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
@@ -296,9 +312,9 @@ public class AdminController : Controller
     /// <param name="tableTypeStr">Empty to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables-except-prices")]
-    public async Task<ActionResult> RebuildAllTablesExceptPrices([FromForm(Name = "admin-password")] string password,
-        [FromQuery(Name = "sec-type")] string? secTypeStr = null,
-        [FromQuery(Name = "table-type")] string? tableTypeStr = null)
+    public async Task<ActionResult> RebuildOtherTables([FromForm(Name = "admin-password")] string password,
+                                                       [FromQuery(Name = "sec-type")] string? secTypeStr = null,
+                                                       [FromQuery(Name = "table-type")] string? tableTypeStr = null)
     {
         if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
 

@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
     AccountId INT NOT NULL,
     FreeAmount REAL DEFAULT 0 NOT NULL,
     LockedAmount REAL DEFAULT 0 NOT NULL,
+    SettlingAmount REAL DEFAULT 0 NOT NULL,
     UpdateTime DATE,
     UNIQUE(AssetId, AccountId)
 );

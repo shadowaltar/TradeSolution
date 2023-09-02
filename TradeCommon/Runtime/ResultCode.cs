@@ -23,6 +23,7 @@ public enum ResultCode
     UpdateOrderOk,
 
     GetTradeOk,
+
     GetSecretOk,
 
     AlreadySubscribed,
@@ -41,9 +42,11 @@ public enum ResultCode
     SubscriptionFailed,
     UnsubscriptionFailed,
 
+    GetMiscFailed,
     GetUserFailed,
     GetAccountFailed,
     GetSomeAccountsFailed,
+    AccountNotOwnedByUser,
     LoginUserFailed,
     LoginAccountFailed,
     LoginUserAndAccountFailed,
@@ -55,5 +58,7 @@ public enum ResultCode
     UpdateOrderSendFailed,
 
     GetTradeFailed,
+
     GetSecretFailed,
+    SecretMalformed,
 }

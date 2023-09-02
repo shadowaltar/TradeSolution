@@ -7,6 +7,10 @@ public interface IAdminService
 {
     Context Context { get; }
 
+    User? CurrentUser { get; }
+
+    Account? CurrentAccount { get; }
+
     /// <summary>
     /// Login a user.
     /// </summary>

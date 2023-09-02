@@ -110,7 +110,7 @@ public class Quotation : IExternalQuotationManagement
 
         return new ExternalConnectionState
         {
-            Action = ExternalActionType.Subscribe,
+            Action = ActionType.Subscribe,
             StatusCode = nameof(ResultCode.SubscriptionOk),
             ExternalPartyId = security.Exchange,
             Description = "Subscribed",

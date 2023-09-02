@@ -89,24 +89,12 @@ public static class HttpHelper
         }
     }
 
-    public static async Task<(HttpResponseMessage response, string responseString, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request, ILog? log = null)
+    public static async Task<(HttpResponseMessage response, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request)
     {
         var swInner = Stopwatch.StartNew();
         var response = await client.SendAsync(request);
         swInner.Stop();
-
-        log ??= _log;
-        var content = await response.Content.ReadAsStringAsync();
-        if (response.IsSuccessStatusCode && content == "" || content == "{}")
-        {
-            log.Warn($"Received HTTP {request.Method} [{response.StatusCode}]: empty content.");
-        }
-        else if (!response.IsSuccessStatusCode)
-        {
-            log.Error($"Received HTTP {request.Method} [{response.StatusCode}]: {content}");
-        }
-
-        return (response, content, swInner.ElapsedMilliseconds);
+        return (response, swInner.ElapsedMilliseconds);
     }
 
 

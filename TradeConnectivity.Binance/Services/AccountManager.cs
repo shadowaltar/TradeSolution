@@ -27,9 +27,14 @@ public class AccountManager : IExternalAccountManagement
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
     }
 
-    public bool Login(User user, Account account)
+    public ResultCode Login(User user, Account account)
     {
-        return _keyManager.Use(user, account);
+        var getSecretResult = _keyManager.Use(user, account);
+        if (getSecretResult == ResultCode.GetSecretOk)
+            return ResultCode.LoginUserAndAccountOk;
+
+        _log.Error("Failed to get secret. ResultCode: " + getSecretResult);
+        return ResultCode.LoginUserAndAccountFailed;
     }
 
     /// <summary>
@@ -43,38 +48,32 @@ public class AccountManager : IExternalAccountManagement
         var url = $"{_connectivity.RootUrl}/api/v3/account";
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
 
-        var (response, responseString, rtt) = await _httpClient.TimedSendAsync(request, _log);
+        var (response, rtt) = await _httpClient.TimedSendAsync(request);
+        var connId = response.CheckHeaders();
+        if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage);
+
         // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""balances"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
-        Account? account = null;
-        var json = JsonNode.Parse(responseString);
-        if (json != null && responseString != "" && responseString != "{}")
+        var account = new Account
         {
-            account = new();
-            account.Type = json.GetString("accountType");
-            account.ExternalAccount = json.GetLong("uid").ToString();
-            var balanceArray = json["balances"]?.AsArray();
-            if (balanceArray != null)
+            Type = json.GetString("accountType"),
+            ExternalAccount = json.GetLong("uid").ToString(),
+            UpdateTime = json.GetLong("updateTime").FromUnixMs(),
+        };
+        var balanceArray = json["balances"]?.AsArray();
+        if (balanceArray != null)
+        {
+            foreach (var balanceObj in balanceArray)
             {
-                foreach (var balanceObj in balanceArray)
-                {
-                    var asset = balanceObj.GetString("asset");
-                    var free = balanceObj.GetDecimal("free");
-                    var locked = balanceObj.GetDecimal("locked");
-                    var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? -1;
-                    var balance = new Balance { AssetId = assetId, AssetName = asset, FreeAmount = free, LockedAmount = locked };
-                    account.Balances.Add(balance);
-                }
+                var asset = balanceObj.GetString("asset");
+                var free = balanceObj.GetDecimal("free");
+                var locked = balanceObj.GetDecimal("locked");
+                var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? -1;
+                var balance = new Balance { AssetId = assetId, AssetName = asset, FreeAmount = free, LockedAmount = locked };
+                account.Balances.Add(balance);
             }
         }
-        var connId = ResponseUtils.CheckHeaders(response);
-        if (account != null)
-        {
-            return ExternalQueryStates.QueryAccounts(responseString, connId, account).RecordTimes(rtt, swOuter);
-        }
-        else
-        {
-            return ExternalQueryStates.InvalidAccount(responseString, connId).RecordTimes(rtt, swOuter);
-        }
+        return ExternalQueryStates.QueryAccounts(content, connId, account).RecordTimes(rtt, swOuter);
     }
 
     /// <summary>
@@ -97,24 +96,26 @@ public class AccountManager : IExternalAccountManagement
                 ("limit", 7.ToString()), // the api returns a history list of account statuses; min is 7
             };
             using var request = _requestBuilder.Build(HttpMethod.Get, url, parameters);
-            var (response, responseString, rtt) = await _httpClient.TimedSendAsync(request, _log);
-            var connId = ResponseUtils.CheckHeaders(response);
 
-            var rootObj = JsonNode.Parse(responseString)?.AsObject();
-            if (rootObj != null && responseString != "" && responseString != "{}")
+            var (response, rtt) = await _httpClient.TimedSendAsync(request);
+            var connId = response.CheckHeaders();
+            if (!response.ParseJsonObject(out var content, out var rootObj, out var errorMessage, _log))
+                state = ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage);
+            else
             {
+                // TODO
                 var account = Parse(rootObj);
                 if (account != null)
                 {
                     accounts.Add(account);
-                    state = ExternalQueryStates.QueryAccounts(responseString, connId, account).RecordTimes(rtt);
+                    state = ExternalQueryStates.QueryAccounts(content, connId, account).RecordTimes(rtt);
                 }
                 else
                 {
                     _log.Error($"Failed to get or parse account (type: {accountType}) response.");
                 }
             }
-            state ??= ExternalQueryStates.InvalidAccount(responseString, connId).RecordTimes(rtt);
+            state ??= ExternalQueryStates.InvalidAccount(content, connId).RecordTimes(rtt);
             states.Add(state);
         }
         state = ExternalQueryStates.QueryAccounts(null, null, accounts.ToArray()).RecordTimes(swTotal);

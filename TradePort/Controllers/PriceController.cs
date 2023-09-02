@@ -281,8 +281,8 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("{exchange}/download-json")]
     public async Task<ActionResult> DownloadAll([FromServices] ISecurityService securityService,
-                                                [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Hkex,
-                                                [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
+                                                [FromRoute(Name = "exchange")] string exchangeStr = "binance",
+                                                [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
                                                 [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                 [FromQuery(Name = "symbols")] string? concatenatedSymbols = "",
                                                 [FromQuery(Name = "range")] string rangeStr = "2y")

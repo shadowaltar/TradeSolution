@@ -1,8 +1,13 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common;
+using Iced.Intel;
 using log4net;
 using log4net.Config;
+using Microsoft.CodeAnalysis.Text;
+using Microsoft.Diagnostics.Symbols;
 using OfficeOpenXml;
+using System;
 using System.Diagnostics;
 using System.Text;
 using TradeCommon.Calculations;
@@ -42,12 +47,75 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+        await RunMacMimicWebService();
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
-        await Run();
+        //await Run();
 
         Console.WriteLine("Finished.");
+    }
+
+    private static async Task RunMacMimicWebService()
+    {
+        // mimic set env + login
+        var exchange = ExchangeType.Binance;
+        var environment = EnvironmentType.Uat;
+        var userName = "test";
+        var accountName = "spot";
+        var symbol = "BTCTUSD";
+        var secType = SecurityType.Fx;
+        var interval = IntervalType.OneMinute;
+        var fastMa = 3;
+        var slowMa = 7;
+        var stopLoss = 0.0005m;
+        var password = "testtest";
+
+        Dependencies.Register(ExternalNames.Convert(exchange), exchange, environment);
+
+        var adminService = Dependencies.ComponentContext.Resolve<IAdminService>();
+        var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+
+
+        var broker = ExternalNames.Convert(exchange);
+        adminService.SetupEnvironment(environment, exchange, broker);
+
+        var user = await adminService.GetUser(userName, adminService.Context.Environment);
+        //if (user == null) return BadRequest("Invalid user or credential.");
+        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        //if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
+
+        var core = Dependencies.ComponentContext.Resolve<Core>();
+        var security = await securityService.GetSecurity(symbol, core.Exchange, secType);
+        //if (security == null) return BadRequest("Invalid or missing security.");
+
+        AlgoEffectiveTimeRange algoTimeRange = null;
+        switch (core.Environment)
+        {
+            //case EnvironmentType.Prod:
+            //    algoTimeRange = AlgoEffectiveTimeRange.ForProduction(interval);
+            //    break;
+            //case EnvironmentType.Test:
+            //    if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+            //    if (ControllerValidator.IsBadOrParse(endStr, out DateTime end, out br)) return br;
+            //    algoTimeRange = AlgoEffectiveTimeRange.ForBackTesting(start, end);
+            //    break;
+            case EnvironmentType.Uat:
+                algoTimeRange = AlgoEffectiveTimeRange.ForPaperTrading(interval);
+                break;
+                //default:
+                //    return BadRequest("Invalid environment.");
+        }
+        var parameters = new AlgoStartupParameters(adminService.CurrentUser.Name,
+            adminService.CurrentAccount.Name, core.Environment, core.Exchange, core.Broker, interval,
+            new List<Security> { security }, algoTimeRange);
+
+        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss) { Screening = new SingleSecurityLogic(security) };
+        var guid = await core.StartAlgorithm(parameters, algorithm);
+
+        Thread.Sleep(TimeSpan.FromMinutes(10));
+
+        await core.StopAlgorithm(guid);
     }
 
     private static async Task Run()
@@ -66,10 +134,14 @@ public class Program
         }
         var securityPool = new List<Security> { security };
         var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic(security) };
-        var user = _testUserName;
-        var password = _testPassword;
-        var parameters = new AlgoStartupParameters(user, password, account.Name, _environment, _exchange, _broker,
+
+        var parameters = new AlgoStartupParameters(_testUserName, account.Name, _environment, _exchange, _broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
+
+        var user = await services.Admin.GetUser(parameters.UserName, parameters.Environment);
+        if (user == null) throw new InvalidOperationException("The user does not exist.");
+        var loginResult = await services.Admin.Login(user, _testPassword, parameters.AccountName, parameters.Environment);
+        if (loginResult != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException(loginResult.ToString());
 
         await core.StartAlgorithm(parameters, algorithm);
     }
@@ -254,7 +326,7 @@ public class Program
                     var algorithm = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic(security) };
                     var engine = new AlgorithmEngine<RumiVariables>(services, algorithm);
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
+                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testAccountName,
                         _environment, _exchange, _broker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
 
@@ -412,7 +484,7 @@ public class Program
                         var algo = new MovingAverageCrossing(fast, slow, sl) { Screening = new SingleSecurityLogic(security) };
                         var engine = new AlgorithmEngine<MacVariables>(services, algo);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                        var algoStartParams = new AlgoStartupParameters(_testUserName, _testPassword, _testAccountName,
+                        var algoStartParams = new AlgoStartupParameters(_testUserName, _testAccountName,
                             _environment, _exchange, _broker, interval, securityPool, timeRange);
 
                         await engine.Run(algoStartParams);

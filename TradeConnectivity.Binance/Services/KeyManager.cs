@@ -35,7 +35,7 @@ public class KeyManager
     /// </summary>
     /// <param name="user"></param>
     /// <returns></returns>
-    public bool Use(User user, Account account)
+    public ResultCode Use(User user, Account account)
     {
         Assertion.ShallNever(Environments.Parse(user.Environment) != account.Environment);
         Assertion.ShallNever(user == null);
@@ -45,13 +45,17 @@ public class KeyManager
         {
             var path = Path.Combine(_secretFolder, secretFileName);
             var lines = File.ReadAllLines(path);
-            if (lines.Length != 2)
+            if (lines.Length != 3)
             {
-                return false;
+                return ResultCode.SecretMalformed;
             }
             if (lines[0].Length != 64 || lines[1].Length != 64)
             {
-                return false;
+                return ResultCode.SecretMalformed;
+            }
+            if (!lines[2].IsValidEmail() || lines[2] != user.Email)
+            {
+                return ResultCode.SecretMalformed;
             }
             var apiKey = new[] { lines[0] };
             var secretKey = lines[1];
@@ -87,12 +91,12 @@ public class KeyManager
             _currentAccountId = account.Id;
             _currentEnvironment = account.Environment;
 
-            return true;
+            return ResultCode.GetSecretOk;
         }
         catch (Exception ex)
         {
             _log.Error("Failed to read secret file.", ex);
-            return false;
+            return ResultCode.GetSecretFailed;
         }
     }
 

@@ -5,7 +5,7 @@ using TradeCommon.Runtime;
 namespace TradeCommon.Externals;
 public interface IExternalAccountManagement
 {
-    bool Login(User user, Account account);
+    ResultCode Login(User user, Account account);
 
     Task<ExternalQueryState> GetAccounts();
 
