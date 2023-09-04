@@ -32,8 +32,8 @@ public interface IOrderService
     /// <param name="security"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false);
-    
+    Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false);
+
     /// <summary>
     /// Get all open orders with an optional security name.
     /// </summary>
@@ -66,7 +66,7 @@ public interface IOrderService
     /// Cancel all open orders.
     /// </summary>
     void CancelAllOpenOrders();
-    
+
     /// <summary>
     /// Close all open positions by market price.
     /// </summary>

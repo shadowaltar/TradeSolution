@@ -29,6 +29,7 @@ public static class DatabaseNames
     public const string FxPrice1hTable = "fx_prices_1h";
     public const string FxPrice1dTable = "fx_prices_1d";
 
+    public const string OpenOrderIdTable = "open_order_ids";
     public const string StockOrderTable = "stock_orders";
     public const string StockTradeTable = "stock_trades";
     public const string StockPositionTable = "stock_positions";

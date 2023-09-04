@@ -4,17 +4,17 @@ using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Accounts;
 
+[Unique(nameof(Name), nameof(Environment))]
 public class User
 {
-    [InsertIgnore]
+    [UpsertIgnore]
+    [AutoIncrementOnInsert]
     public int Id { get; set; } = -1;
 
-    [UpsertConflictKey]
     public string Name { get; set; } = "";
 
     public string Email { get; set; } = "";
 
-    [UpsertConflictKey]
     public string Environment { get; set; } = Environments.Test;
 
     public string EncryptedPassword { get; set; } = "";

@@ -45,11 +45,9 @@ public class AdminController : Controller
         if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
         var broker = ExternalNames.Convert(exchange);
-        adminService.SetupEnvironment(environment, exchange, broker);
+        adminService.Initialize(environment, exchange, broker);
 
-        var user = await adminService.GetUser(userName, adminService.Context.Environment);
-        if (user == null) return BadRequest("Invalid user or credential.");
-        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
         if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
         return Ok(result);
     }
@@ -72,7 +70,7 @@ public class AdminController : Controller
         if (ControllerValidator.IsUnknown(environment, out br)) return br;
         if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
-        adminService.SetupEnvironment(environment, exchange, ExternalNames.Convert(exchange));
+        adminService.Initialize(environment, exchange, ExternalNames.Convert(exchange));
         return Ok(environment);
     }
 
@@ -90,11 +88,9 @@ public class AdminController : Controller
                                           [FromQuery(Name = "account-name")] string accountName,
                                           [FromForm(Name = "user-password")] string password)
     {
-        var user = await adminService.GetUser(userName, adminService.Context.Environment);
-        if (user == null) return BadRequest("Invalid user or credential.");
-        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
         if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(Login)}; code: {result}");
-        return Ok(user);
+        return Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
     }
 
     /// <summary>
@@ -368,6 +364,10 @@ public class AdminController : Controller
             case DataType.User:
                 await Storage.CreateUserTable();
                 resultTableNames.Add(DatabaseNames.UserTable);
+                break;
+            case DataType.OpenOrderId:
+                await Storage.CreateOpenOrderIdTable();
+                resultTableNames.Add(DatabaseNames.OpenOrderIdTable);
                 break;
         }
 

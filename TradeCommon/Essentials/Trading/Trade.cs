@@ -9,6 +9,7 @@ namespace TradeCommon.Essentials.Trading;
 /// It can also be called as a Deal.
 /// One order object may result in zero or more trades immediately or in a period of time.
 /// </summary>
+[Unique(nameof(Id))]
 public class Trade : IComparable<Trade>
 {
     public const long DefaultId = 0;
@@ -26,7 +27,7 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// Security code (will not be saved to database).
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore]
     public string? SecurityCode { get; set; }
 
     /// <summary>

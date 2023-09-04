@@ -7,6 +7,7 @@ namespace TradeCommon.Essentials.Trading;
 /// <summary>
 /// Action to buy or sell a security.
 /// </summary>
+[Unique(nameof(Id))]
 public class Order : IComparable<Order>, ICloneable
 {
     public const long DefaultId = 0;
@@ -14,7 +15,6 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Unique order id.
     /// </summary>
-    [UpsertConflictKey]
     public long Id { get; set; }
 
     /// <summary>
@@ -31,7 +31,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Security code (will not be saved to database).
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore]
     public string SecurityCode { get; set; } = "";
 
     /// <summary>
@@ -120,13 +120,13 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Any additional order parameters.
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore]
     public AdvancedOrderSettings? AdvancedOrderSettings { get; set; }
 
     /// <summary>
     /// Gets if the order is successfully placed (either it is still alive or filled).
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore]
     public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
 
     public object Clone()

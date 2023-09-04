@@ -55,16 +55,39 @@ public class OrderService : IOrderService, IDisposable
         throw new NotImplementedException();
     }
 
-    public async Task<List<Order>?> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
+    public async Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
     {
-        var state = await _execution.GetOrderHistory(security, start, end);
-        return state.ContentAs<List<Order>?>();
+        Order[] orders;
+        if (requestExternal)
+        {
+            var state = await _execution.GetOrderHistory(security, start, end);
+            orders = state?.ContentAs<Order[]>() ?? new Order[0];
+        }
+        else
+        {
+            orders = (await Storage.ReadOrders(security, start, end)).ToArray();
+        }
+        foreach (var order in orders)
+        {
+            order.SecurityCode = security.Code;
+        }
+        return orders;
     }
 
-    public async Task<List<Order>?> GetOpenOrders(Security? security = null, bool requestExternal = false)
+    public async Task<List<Order>> GetOpenOrders(Security? security = null, bool requestExternal = false)
     {
-        var state = await _execution.GetOpenOrders(security);
-        return state.ContentAs<List<Order>?>();
+        if (security != null)
+            Assertion.Shall(ExchangeTypeConverter.Parse(security.Exchange) == _context.Exchange);
+
+        if (requestExternal)
+        {
+            var state = await _execution.GetOpenOrders(security);
+            return state.ContentAs<List<Order>?>() ?? new List<Order>();
+        }
+        else
+        {
+            return await Storage.ReadOpenOrders(security);
+        }
     }
 
     public void SendOrder(Order order, bool isFakeOrder = true)

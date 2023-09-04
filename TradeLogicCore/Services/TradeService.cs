@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -109,9 +110,23 @@ public class TradeService : ITradeService, IDisposable
         return state.ContentAs<Trade[]?>();
     }
 
-    public Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
+    public async Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
     {
-        throw new NotImplementedException();
+        Trade[] trades;
+        if (requestExternal)
+        {
+            var state = await _execution.GetTrades(security, start: start, end: end);
+            trades = state.ContentAs<Trade[]>() ?? Array.Empty<Trade>();
+        }
+        else
+        {
+            trades = (await Storage.ReadTrades(security, start.Value, end.Value)).ToArray();
+        }
+        foreach (var trade in trades)
+        {
+            trade.SecurityCode = security.Code;
+        }
+        return trades;
     }
 
     public Task<Trade[]?> GetTrades(Security security, long orderId, bool requestExternal = false)

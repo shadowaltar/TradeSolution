@@ -14,14 +14,14 @@ public interface IAdminService
     /// <summary>
     /// Login a user.
     /// </summary>
-    /// <param name="user"></param>
+    /// <param name="userName"></param>
     /// <param name="password"></param>
     /// <param name="accountName"></param>
     /// <param name="environment"></param>
     /// <returns></returns>
-    Task<ResultCode> Login(User user, string? password, string? accountName, EnvironmentType environment);
+    Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment);
 
-    void SetupEnvironment(EnvironmentType environment, ExchangeType exchange, BrokerType broker);
+    void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker);
 
     Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false);
 

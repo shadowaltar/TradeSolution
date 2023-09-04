@@ -76,7 +76,7 @@ public class ExternalQueryState : INetworkTimeState
 
     public override string ToString()
     {
-        return $"ExecState Time[{NetworkRoundtripTime}ms/{TotalTime}ms]Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
+        return $"State Time[{NetworkRoundtripTime}ms/{TotalTime}ms] Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
     }
 
     public ExternalQueryState SetDescription(string description)

@@ -5,7 +5,6 @@ using TradeCommon.Utils.Common;
 namespace TradeCommon.Database;
 public class Persistence : IDisposable
 {
-    private readonly MessageBroker<IPersistenceTask> _broker;
     private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     
@@ -13,9 +12,8 @@ public class Persistence : IDisposable
 
     public event Action<IPersistenceTask>? Persisted;
 
-    public Persistence(MessageBroker<IPersistenceTask> broker)
+    public Persistence()
     {
-        _broker = broker;
         Task.Factory.StartNew(async (t) =>
         {
             _isRunning = true;
@@ -25,7 +23,7 @@ public class Persistence : IDisposable
 
     public void Enqueue(IPersistenceTask task)
     {
-        _broker.Enqueue(task);
+        _tasks.Enqueue(task);
     }
 
     private async Task Run()
@@ -54,6 +52,6 @@ public class Persistence : IDisposable
         _isRunning = false;
         _cancellationTokenSource.Cancel();
         Persisted = null;
-        _broker.Dispose();
+        _tasks.Clear();
     }
 }

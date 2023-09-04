@@ -17,7 +17,10 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
     private readonly List<string> _targetFieldNames;
     private readonly Dictionary<string, string> _targetFieldNamePlaceHolders;
     private readonly Dictionary<string, PropertyInfo> _properties;
+    private readonly string[] _uniqueKeyNames;
     private readonly ValueGetter<T> _valueGetter;
+
+    public List<string> AutoIncrementOnInsertFieldNames { get; }
 
     private readonly string _tableName;
     private readonly string _databasePath;
@@ -26,6 +29,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
     public string InsertSql { get; private set; } = "";
 
     public string UpsertSql { get; private set; } = "";
+
+    public string DeleteSql { get; private set; } = "";
 
     public SqlWriter(string tableName,
                      string databasePath,
@@ -40,10 +45,13 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             Directory.CreateDirectory(databasePath);
 
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        _targetFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertIgnoreAttribute>() == null)
-            .Select(pair => pair.Key).ToList();
+        _uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()!.FieldNames ?? Array.Empty<string>();
+        _targetFieldNames = _properties.Select(pair => pair.Key).ToList();
         _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
         _valueGetter = ReflectionUtils.GetValueGetter<T>();
+
+        AutoIncrementOnInsertFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<AutoIncrementOnInsertAttribute>() != null)
+            .Select(pair => pair.Key).ToList();
 
         _tableName = tableName;
         _databasePath = databasePath;
@@ -71,10 +79,21 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                     continue;
 
                 command.Parameters.Clear();
-                foreach (var fn in _targetFieldNames)
+                foreach (var name in _targetFieldNames)
                 {
-                    var placeholder = _targetFieldNamePlaceHolders[fn];
-                    var value = _valueGetter.Get(entry.Cast<T>(), fn);
+                    var placeholder = _targetFieldNamePlaceHolders[name];
+
+                    var value = _valueGetter.Get(entry.Cast<T>(), name);
+
+                    if (AutoIncrementOnInsertFieldNames.Contains(name))
+                    {
+                        var maxId = await Storage.GetMax(name, _tableName, _databaseName);
+                        if (maxId.IsValid())
+                        {
+                            value = maxId + 1;
+                        }
+                    }
+
                     value ??= DBNull.Value;
                     command.Parameters.AddWithValue(placeholder, value);
                 }
@@ -98,13 +117,18 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         return result;
     }
 
+    public async Task<int> UpsertOne<T1>(T1 entry, string? sql = null)
+    {
+        return await InsertOne<T1>(entry, true, sql);
+    }
+
     public async Task<int> InsertOne<T1>(T1 entry, bool isUpsert, string? sql = null)
     {
         var result = 0;
         if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
 
         using var connection = await Connect();
-
+        using var transaction = connection.BeginTransaction();
         var count = 0;
         SqliteCommand? command = null;
         try
@@ -113,17 +137,27 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             sql ??= GetInsertSql(isUpsert);
             command.CommandText = sql;
 
-            foreach (var fn in _targetFieldNames)
+            foreach (var name in _targetFieldNames)
             {
                 if (entry == null)
                     continue;
 
-                var placeholder = _targetFieldNamePlaceHolders[fn];
-                var value = _valueGetter.Get(entry.Cast<T>(), fn);
+                var placeholder = _targetFieldNamePlaceHolders[name];
+                var value = _valueGetter.Get(entry.Cast<T>(), name);
+
+                if (AutoIncrementOnInsertFieldNames.Contains(name))
+                {
+                    var maxId = await Storage.GetMax(name, _tableName, _databaseName);
+                    if (maxId.IsValid())
+                    {
+                        value = maxId + 1;
+                    }
+                }
+
                 value ??= DBNull.Value;
                 // by default treat enum value as upper string
                 if (value.GetType().IsEnum)
-                    command.Parameters.AddWithValue(placeholder, value.ToString().ToUpperInvariant());
+                    command.Parameters.AddWithValue(placeholder, value.ToString()!.ToUpperInvariant());
                 else
                     command.Parameters.AddWithValue(placeholder, value);
             }
@@ -131,14 +165,68 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             result = await command.ExecuteNonQueryAsync();
 
             _log.Info($"Upserted 1 entry into {_tableName} table.");
+            transaction.Commit();
         }
         catch (Exception e)
         {
             _log.Error($"Failed to upsert into {_tableName} table.", e);
+            transaction.Rollback();
         }
         finally
         {
             command?.Dispose();
+            transaction.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return result;
+    }
+
+    public async Task<int> DeleteOne<T1>(T1 entry, string? sql = null)
+    {
+        var result = 0;
+        if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
+
+        using var connection = await Connect();
+        using var transaction = connection.BeginTransaction();
+        var count = 0;
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            sql ??= GetDeleteSql();
+            command.CommandText = sql;
+
+            foreach (var name in _uniqueKeyNames)
+            {
+                if (entry == null)
+                    continue;
+
+                var placeholder = _targetFieldNamePlaceHolders[name];
+                var value = _valueGetter.Get(entry.Cast<T>(), name);
+                if (value == null) // unique key columns should never be null
+                    return -1;
+                // by default treat enum value as upper string
+                if (value.GetType().IsEnum)
+                    command.Parameters.AddWithValue(placeholder, value.ToString()!.ToUpperInvariant());
+                else
+                    command.Parameters.AddWithValue(placeholder, value);
+            }
+            count++;
+            result = await command.ExecuteNonQueryAsync();
+
+            _log.Info($"Deleted 1 entry from {_tableName} table.");
+            transaction.Commit();
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to delete from {_tableName} table.", e);
+            transaction.Rollback();
+        }
+        finally
+        {
+            command?.Dispose();
+            transaction.Dispose();
         }
 
         await connection.CloseAsync();
@@ -148,6 +236,28 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
     public void Dispose()
     {
         _properties.Clear();
+    }
+
+    private string GetDeleteSql()
+    {
+        if (_uniqueKeyNames.IsNullOrEmpty())
+            throw new InvalidOperationException("Auto SQL generation for DELETE is not supported if a type has no unique key columns.");
+        if (!DeleteSql.IsNullOrEmpty())
+        {
+            return DeleteSql;
+        }
+        var sb = new StringBuilder("DELETE FROM ")
+            .Append(_tableName)
+            .Append(" WHERE ");
+        for (int i = 0; i < _uniqueKeyNames.Length; i++)
+        {
+            string? name = _uniqueKeyNames[i];
+            sb.Append(name).Append(" = ").Append(_targetFieldNamePlaceHolders[name]);
+            if (i != _uniqueKeyNames.Length - 1)
+                sb.Append(" AND ");
+        }
+        DeleteSql = sb.ToString();
+        return DeleteSql;
     }
 
     private string GetInsertSql(bool isUpsert)
@@ -167,11 +277,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         var insertIgnoreFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<InsertIgnoreAttribute>() != null)
             .Select(pair => pair.Key).ToList();
-        var upsertConflictKeyFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertConflictKeyAttribute>() != null)
-            .Select(pair => pair.Key).ToList();
-        var upsertConflictValueFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertConflictKeyAttribute>() == null)
-            .Select(pair => pair.Key).ToList();
-        var upsertConflictExcludeValueFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertIgnoreAttribute>() != null)
+        var upsertIgnoreFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertIgnoreAttribute>() != null)
             .Select(pair => pair.Key).ToList();
 
         // INSERT INTO (...)
@@ -197,11 +303,11 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         sb.RemoveLast();
         sb.Append(')').AppendLine();
 
-        if (isUpsert && !upsertConflictKeyFieldNames.IsNullOrEmpty())
+        if (isUpsert && !_uniqueKeyNames.IsNullOrEmpty())
         {
             // ON CONFLICT (...)
             sb.Append("ON CONFLICT (");
-            foreach (var fn in upsertConflictKeyFieldNames)
+            foreach (var fn in _uniqueKeyNames)
             {
                 sb.Append(fn).Append(",");
             }
@@ -210,9 +316,9 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
             // DO UPDATE SET ...
             sb.Append("DO UPDATE SET ");
-            foreach (var fn in upsertConflictValueFieldNames)
+            foreach (var fn in _uniqueKeyNames)
             {
-                if (upsertConflictExcludeValueFieldNames.Contains(fn))
+                if (upsertIgnoreFieldNames.Contains(fn))
                     continue;
 
                 sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
@@ -246,4 +352,6 @@ public interface ISqlWriter
     Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? sql = null);
 
     Task<int> InsertOne<T>(T entry, bool isUpsert, string? sql = null);
+
+    Task<int> DeleteOne<T>(T entry, string? sql = null);
 }

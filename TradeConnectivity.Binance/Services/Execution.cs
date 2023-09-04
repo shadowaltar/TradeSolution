@@ -350,7 +350,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         {
             parameters.Add(("symbol", security.Code));
         }
-        using var request = _requestBuilder.BuildSigned(HttpMethod.Delete, url, parameters);
+        using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url, parameters);
 
         var (response, rtt) = await _httpClient.TimedSendAsync(request);
         var connId = response.CheckHeaders();

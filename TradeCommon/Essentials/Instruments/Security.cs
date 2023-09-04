@@ -1,8 +1,11 @@
 ﻿using TradeCommon.Constants;
+using TradeCommon.Utils.Attributes;
 
 namespace TradeCommon.Essentials.Instruments;
 public class Security
 {
+    [UpsertIgnore]
+    [AutoIncrementOnInsert]
     public int Id { get; set; }
     public string Code { get; set; }
     public string Name { get; set; }

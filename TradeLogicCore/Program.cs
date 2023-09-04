@@ -63,7 +63,7 @@ public class Program
         var environment = EnvironmentType.Uat;
         var userName = "test";
         var accountName = "spot";
-        var symbol = "BTCTUSD";
+        var symbol = "BTCBUSD";
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
@@ -76,13 +76,11 @@ public class Program
         var adminService = Dependencies.ComponentContext.Resolve<IAdminService>();
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
 
-
         var broker = ExternalNames.Convert(exchange);
-        adminService.SetupEnvironment(environment, exchange, broker);
+        adminService.Initialize(environment, exchange, broker);
 
-        var user = await adminService.GetUser(userName, adminService.Context.Environment);
         //if (user == null) return BadRequest("Invalid user or credential.");
-        var result = await adminService.Login(user, password, accountName, adminService.Context.Environment);
+        var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
         //if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
 
         var core = Dependencies.ComponentContext.Resolve<Core>();
@@ -138,9 +136,7 @@ public class Program
         var parameters = new AlgoStartupParameters(_testUserName, account.Name, _environment, _exchange, _broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
 
-        var user = await services.Admin.GetUser(parameters.UserName, parameters.Environment);
-        if (user == null) throw new InvalidOperationException("The user does not exist.");
-        var loginResult = await services.Admin.Login(user, _testPassword, parameters.AccountName, parameters.Environment);
+        var loginResult = await services.Admin.Login(parameters.UserName, _testPassword, parameters.AccountName, parameters.Environment);
         if (loginResult != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException(loginResult.ToString());
 
         await core.StartAlgorithm(parameters, algorithm);
@@ -228,9 +224,8 @@ public class Program
         orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
-        var user = await adminService.GetUser(_testUserName, _environment);
-        if (user == null) throw new InvalidOperationException("Invalid user");
-        await adminService.Login(user, _testPassword, _testAccountName, _environment);
+        var resultCode = await adminService.Login(_testUserName, _testPassword, _testAccountName, _environment);
+        if (resultCode != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("Login failed with code: " + resultCode);
 
         orderService.CancelAllOpenOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);

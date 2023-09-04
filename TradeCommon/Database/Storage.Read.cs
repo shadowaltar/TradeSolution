@@ -1,5 +1,6 @@
 ﻿using Common;
 using Microsoft.Data.Sqlite;
+using Microsoft.Identity.Client;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -69,16 +70,74 @@ WHERE
         return await SqlReader.Read<Balance>(tableName, dbName, sql, ("$AccountId", accountId));
     }
 
-    public static async Task<List<Order>> ReadOpenOrders(SecurityType securityType)
+    public static async Task<List<OpenOrderId>> ReadOpenOrderIds()
     {
-        var sqlPart = SqlReader<Order>.GetSelectClause();
-        var tableName = DatabaseNames.GetOrderTableName(securityType);
+        var sqlPart = SqlReader<OpenOrderId>.GetSelectClause();
+        var tableName = DatabaseNames.OpenOrderIdTable;
         var dbName = DatabaseNames.ExecutionData;
-        var sql =
-@$"
-{sqlPart} FROM {tableName} WHERE Status = 'LIVE'
-";
-        return await SqlReader.Read<Order>(tableName, dbName, sql);
+        var sql = @$"{sqlPart} FROM {tableName}";
+        return await SqlReader.Read<OpenOrderId>(tableName, dbName, sql);
+    }
+
+    public static async Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end)
+    {
+        // TODO supports only fx / equity types
+        var dbName = DatabaseNames.ExecutionData;
+        var sqlPart = SqlReader<Order>.GetSelectClause();
+        var secType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetOrderTableName(secType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND CreateTime >= $StartTime AND UpdateTime <= $EndTime";
+        return await SqlReader.Read<Order>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
+    }
+
+    public static async Task<List<Order>> ReadOpenOrders(Security? security = null, SecurityType securityType = SecurityType.Unknown)
+    {
+        // TODO supports only fx / equity types
+        var dbName = DatabaseNames.ExecutionData;
+        var sqlPart = SqlReader<Order>.GetSelectClause();
+        if (security == null && securityType != SecurityType.Unknown)
+        {
+            var tableName = DatabaseNames.GetOrderTableName(securityType);
+            var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND Type = {securityType.ToString().ToUpperInvariant()}";
+            return await SqlReader.Read<Order>(tableName, dbName, sql);
+        }
+        else if (security == null && securityType == SecurityType.Unknown)
+        {
+            var results = new List<Order>();
+            var openOrderIds = await ReadOpenOrderIds();
+            var typeGroupedIds = openOrderIds.GroupBy(ooid => ooid.SecurityType);
+            foreach (var ooIds in typeGroupedIds)
+            {
+                securityType = ooIds.Key;
+                var tableName = DatabaseNames.GetOrderTableName(securityType);
+                var idClause = GetInClause("OrderId", ooIds.Select(i => i.OrderId).ToList(), false);
+                var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND {idClause}";
+                results.AddRange(await SqlReader.Read<Order>(tableName, dbName, sql));
+            }
+            return results;
+        }
+        else
+        {
+            if (security == null) throw new InvalidOperationException("Will never happen.");
+            if (SecurityTypeConverter.Parse(security.Type) != securityType)
+            {
+                return new List<Order>();
+            }
+            var tableName = DatabaseNames.GetOrderTableName(securityType);
+            var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND SecurityId = {security.Id}";
+            return await SqlReader.Read<Order>(tableName, dbName, sql);
+        }
+    }
+
+    public static async Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end)
+    {
+        // TODO supports only fx / equity types
+        var dbName = DatabaseNames.ExecutionData;
+        var sqlPart = SqlReader<Trade>.GetSelectClause();
+        var secType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetTradeTableName(secType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND Time >= $StartTime AND Time <= $EndTime";
+        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
     }
 
     public static async Task<Security?> ReadSecurity(string exchange, string code, SecurityType type)
@@ -132,6 +191,7 @@ WHERE
         var results = new List<Security>();
         foreach (var exchange in Enum.GetValues<ExchangeType>())
         {
+            if (exchange == ExchangeType.Any) continue;
             var exchStr = ExchangeTypeConverter.ToString(exchange);
             foreach (var type in Enum.GetValues<SecurityType>())
             {
@@ -145,6 +205,16 @@ WHERE
         return results;
     }
 
+    private static string GetInClause<T>(string fieldName, List<T>? items, bool withEndingAnd)
+    {
+        var endingAnd = withEndingAnd ? " AND " : "";
+        return items.IsNullOrEmpty()
+            ? ""
+            : items.Count == 1
+            ? $"{fieldName} = {items[0]}{endingAnd}"
+            : $"{fieldName} IN ({string.Join(',', items)}){endingAnd}";
+    }
+
     public static async Task<List<Security>> ReadSecurities(SecurityType type, string? exchange = null, List<int>? ids = null)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
@@ -154,11 +224,7 @@ WHERE
         if (exchange != null)
             exchange = exchange.ToUpperInvariant();
         var typeStr = type.ToString().ToUpperInvariant();
-        var idClause = ids == null
-            ? ""
-            : ids.Count == 1
-            ? $"Id = {ids[0]} AND"
-            : $"Id IN ({string.Join(',', ids)}) AND";
+        var idClause = GetInClause("Id", ids, true);
         var exchangeClause = exchange == null
             ? ""
             : "AND Exchange = $Exchange";

@@ -142,7 +142,7 @@ public static class StringExtensions
             CultureInfo.GetCultureInfo(cultureInfoName), out decimal result)
             ? result
             : defaultValue;
-        if (r != defaultValue && precision!= int.MaxValue)
+        if (r != defaultValue && precision != int.MaxValue)
             r = decimal.Round(r, precision);
         return r;
     }
@@ -213,5 +213,12 @@ public static class StringExtensions
         if (sb.Length > 0)
             return sb.Remove(sb.Length - 1, 1);
         return sb;
+    }
+
+    public static string FirstCharLowerCase(this string value)
+    {
+        if (value.IsBlank()) return value;
+        if (value.Length == 1) return char.ToUpper(value[0]).ToString();
+        return char.ToUpper(value[0]) + value[1..];
     }
 }

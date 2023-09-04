@@ -38,19 +38,24 @@ public class AdminService : IAdminService
         _persistence = persistence;
     }
 
-    public void SetupEnvironment(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
+    public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
         Context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
         _connectivity.SetEnvironment(environment);
     }
 
-    public async Task<ResultCode> Login(User user, string? password, string? accountName, EnvironmentType environment)
+    public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
     {
-        if (password.IsBlank()) return ResultCode.InvalidCredential;
-        if (accountName.IsBlank()) return ResultCode.GetAccountFailed;
+        if (userName.IsBlank()) return ResultCode.InvalidArgument;
+        if (password.IsBlank()) return ResultCode.InvalidArgument;
+        if (accountName.IsBlank()) return ResultCode.InvalidArgument;
 
         CurrentUser = null;
         CurrentAccount = null;
+
+        var user = await GetUser(userName, Context.Environment);
+        if (user == null) return ResultCode.GetUserFailed;
+        CurrentUser = user;
 
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
         if (!Credential.IsPasswordCorrect(user, password))
@@ -79,7 +84,6 @@ public class AdminService : IAdminService
         _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
 
         user.Accounts.Add(account);
-        CurrentUser = user;
         CurrentAccount = account;
 
         return ResultCode.LoginUserAndAccountOk;
@@ -122,12 +126,17 @@ public class AdminService : IAdminService
 
     public async Task<int> CreateAccount(Account account)
     {
-        return await Storage.InsertAccount(account);
+        return await Storage.InsertAccount(account, false);
     }
 
     public async Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false)
     {
+        if (CurrentUser == null) throw new InvalidOperationException("Must get user before get account.");
+
         if (accountName.IsBlank()) return null;
+
+        var assets = _securityService.GetAssets(Context.Exchange);
+
         if (!requestExternal)
         {
             var account = await Storage.ReadAccount(accountName, environment);
@@ -143,27 +152,53 @@ public class AdminService : IAdminService
             }
             else
             {
+                foreach (var balance in balances)
+                {
+                    balance.AssetCode = assets.FirstOrDefault(a => a.Id == balance.AssetId)?.Code ?? "";
+                }
                 account.Balances.AddRange(balances);
             }
             return account;
         }
         else
         {
-            var assets = await _securityService.GetSecurities(SecurityType.Fx);
-            assets = assets.Where(a => a.FxInfo != null && a.FxInfo.IsAsset).ToList();
-            var state = await _accountManagement.GetAccount();
+            var state = await _accountManagement.GetAccount(assets);
             var account = state.ContentAs<Account>();
             if (account == null)
                 return null;
 
-            _persistence.Enqueue(new PersistenceTask<Account>(account));
-            if (!account.Balances.IsNullOrEmpty())
+            // when the storged & broker's external account names are the same
+            // then must sync some info which are not on broker side
+            if (account.ExternalAccount == CurrentAccount?.ExternalAccount)
             {
+                account.Id = CurrentAccount.Id;
+
+                if (!account.CreateTime.IsValid())
+                    account.CreateTime = account.UpdateTime;
+                if (!account.OwnerId.IsValid())
+                    account.OwnerId = CurrentUser.Id;
+                if (account.Name.IsBlank())
+                    account.Name = CurrentAccount.Name;
+                if (account.Environment == EnvironmentType.Unknown)
+                    account.Environment = Context.Environment;
+                if (!account.BrokerId.IsValid())
+                    account.BrokerId = Context.BrokerId;
+
                 foreach (var balance in account.Balances)
                 {
-                    _persistence.Enqueue(new PersistenceTask<Balance>(balance));
+                    balance.AccountId = account.Id;
+                    balance.UpdateTime = account.UpdateTime;
                 }
             }
+
+            //_persistence.Enqueue(new PersistenceTask<Account>(account));
+            //if (!account.Balances.IsNullOrEmpty())
+            //{
+            //    foreach (var balance in account.Balances)
+            //    {
+            //        _persistence.Enqueue(new PersistenceTask<Balance>(balance));
+            //    }
+            //}
             return account;
         }
     }

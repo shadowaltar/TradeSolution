@@ -5,6 +5,7 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
@@ -61,7 +62,7 @@ public class Core
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
         await ReconcileAccountAndBalance(user);
-        await ReconcileOpenOrders(parameters.SecurityPool);
+        await ReconcileOpenOrders();
 
         await Task.Run(async () =>
         {
@@ -141,43 +142,10 @@ public class Core
         }
         var (toCreate, toUpdate, toDelete) = FindDifferences(externalOrders, internalOrders);
 
-        if (toCreate != null)
+        if (!toCreate.IsNullOrEmpty())
             _services.Persistence.Enqueue(new PersistenceTask<Order>(toCreate) { ActionType = DatabaseActionType.Create });
-        if (toUpdate != null)
+        if (!toUpdate.IsNullOrEmpty())
             _services.Persistence.Enqueue(new PersistenceTask<Order>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
-    }
-
-    public static (List<T>, Dictionary<long, T>, List<long>) FindDifferences<T>(Dictionary<long, T> primary, Dictionary<long, T> secondary)
-        where T : IComparable<T>
-    {
-        var toCreate = new List<T>();
-        var toUpdate = new Dictionary<long, T>();
-        var toDelete = new List<long>();
-        foreach (var (id, external) in primary)
-        {
-            if (secondary.TryGetValue(id, out var @internal))
-            {
-                if (@internal.CompareTo(external) != 0)
-                    toUpdate[id] = external;
-            }
-            else
-            {
-                toCreate.Add(external);
-            }
-        }
-        foreach (var (id, @internal) in secondary)
-        {
-            if (primary.TryGetValue(id, out var external))
-            {
-                if (@internal.CompareTo(external) != 0)
-                    toUpdate[id] = external;
-            }
-            else
-            {
-                toDelete.Add(id);
-            }
-        }
-        return (toCreate, toUpdate, toDelete);
     }
 
     private async Task ReconcileRecentTradeHistory(DateTime start, DateTime end, List<Security> securities)
@@ -187,7 +155,7 @@ public class Core
         foreach (var security in securities)
         {
             var externalResults = await _services.Trade.GetTrades(security, start, end, true);
-            if (externalResults != null)
+            if (!externalResults.IsNullOrEmpty())
             {
                 foreach (var r in externalResults)
                 {
@@ -197,7 +165,7 @@ public class Core
             }
 
             var internalResults = await _services.Trade.GetTrades(security, start, end);
-            if (internalResults != null)
+            if (!internalResults.IsNullOrEmpty())
             {
                 foreach (var r in internalResults)
                 {
@@ -224,59 +192,70 @@ public class Core
                 _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Create });
 
             }
-            else if (externalAccount != null && externalAccount != account)
+            else if (externalAccount != null && !externalAccount.Equals(account))
             {
                 _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
                 _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Update });
+                _services.Persistence.Enqueue(new PersistenceTask<Balance>(externalAccount.Balances));
             }
         }
     }
 
-    private async Task ReconcileOpenOrders(List<Security> securities)
+    private async Task ReconcileOpenOrders()
     {
-        //foreach (var security in securities)
+        var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
+        var internalOpenOrders = await _services.Order.GetOpenOrders();
+
+        var notStoredOpenOrders = new List<Order>();
+
+        // a stored one does not exist on external side
+        foreach (var order in internalOpenOrders)
         {
-            var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
-            var internalOpenOrders = await _services.Order.GetOpenOrders();
-
-            var notStoredOpenOrders = new List<Order>();
-
-            // a stored one does not exist on external side
-            foreach (var order in internalOpenOrders)
+            if (!externalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
             {
-                if (!externalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
-                {
 
-                }
             }
-            // an external one does not exist in storage
-            foreach (var order in externalOpenOrders)
+        }
+        // an external one does not exist in storage
+        foreach (var order in externalOpenOrders)
+        {
+            if (!internalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
             {
-                if (!internalOpenOrders.Exists(o => o.ExternalOrderId == order.ExternalOrderId))
-                {
 
-                }
             }
         }
     }
 
-    private bool TryRetrieveOpenedOrders(out List<Order> orders)
+    public static (List<TV>, Dictionary<TK, TV>, List<TK>) FindDifferences<TK, TV>(Dictionary<TK, TV> primary, Dictionary<TK, TV> secondary)
+        where TV : IComparable<TV>
     {
-        throw new NotImplementedException();
-    }
-
-    private void StartAlgorithmEngine()
-    {
-        throw new NotImplementedException();
-    }
-
-    private void SubscribeToMarketData()
-    {
-        throw new NotImplementedException();
-    }
-
-    private void CheckTradeHistory()
-    {
-        throw new NotImplementedException();
+        var toCreate = new List<TV>();
+        var toUpdate = new Dictionary<TK, TV>();
+        var toDelete = new List<TK>();
+        foreach (var (id, first) in primary)
+        {
+            if (secondary.TryGetValue(id, out var second))
+            {
+                if (second.CompareTo(first) != 0)
+                    toUpdate[id] = first;
+            }
+            else
+            {
+                toCreate.Add(first);
+            }
+        }
+        foreach (var (id, second) in secondary)
+        {
+            if (primary.TryGetValue(id, out var first))
+            {
+                if (second.CompareTo(first) != 0)
+                    toUpdate[id] = first;
+            }
+            else
+            {
+                toDelete.Add(id);
+            }
+        }
+        return (toCreate, toUpdate, toDelete);
     }
 }

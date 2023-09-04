@@ -53,6 +53,19 @@ public class SecurityService : ISecurityService
         }
     }
 
+    public List<Security> GetAssets(ExchangeType exchange = ExchangeType.Unknown)
+    {
+        if (!_requestedExternalOnce)
+            AsyncHelper.RunSync(() => GetAllSecurities(true));
+        var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
+        lock (_securities)
+        {
+            return _securities.Values
+                .Where(s => s.Exchange == exchStr && SecurityTypeConverter.Matches(s.Type, SecurityType.Fx) && s.FxInfo?.IsAsset == true)
+                .ToList();
+        }
+    }
+
     public async Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false)
     {
         if (!_requestedExternalOnce || requestExternal)
@@ -86,7 +99,7 @@ public class SecurityService : ISecurityService
         {
             lock (_securities)
             {
-                var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? -1 : temp;
+                var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? temp : -1;
                 if (id == -1) return null;
                 return _securities.GetValueOrDefault(id);
             }
@@ -130,6 +143,7 @@ public class SecurityService : ISecurityService
             }
         }
     }
+
     private void RefreshCache(Security s)
     {
         lock (_securities)

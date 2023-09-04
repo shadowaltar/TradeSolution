@@ -69,9 +69,11 @@ public class AccountManager : IExternalAccountManagement
                 var free = balanceObj.GetDecimal("free");
                 var locked = balanceObj.GetDecimal("locked");
                 var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? -1;
-                var balance = new Balance { AssetId = assetId, AssetName = asset, FreeAmount = free, LockedAmount = locked };
+                var balance = new Balance { AssetId = assetId, AssetCode = asset, FreeAmount = free, LockedAmount = locked };
                 account.Balances.Add(balance);
             }
+            // guarantee ordering
+            account.Balances.Sort((x, y) => x.AssetCode.CompareTo(y.AssetCode));
         }
         return ExternalQueryStates.QueryAccounts(content, connId, account).RecordTimes(rtt, swOuter);
     }
