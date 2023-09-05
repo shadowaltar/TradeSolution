@@ -88,4 +88,12 @@ public static class CollectionExtensions
     {
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
+
+    public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y)
+    {
+        lock(dictionary) { 
+        var r = dictionary.TryGetValue(key, out y);
+            return r;
+        }
+    }
 }

@@ -71,9 +71,15 @@ public class Trade : IComparable<Trade>
     public decimal Fee { get; set; }
 
     /// <summary>
+    /// The asset Id of the fee.
+    /// </summary>
+    public int FeeAssetId { get; set; }
+
+    /// <summary>
     /// The asset/currency of the fee.
     /// </summary>
-    public string? FeeAsset { get; set; }
+    [UpsertIgnore, SelectIgnore]
+    public string? FeeAssetCode { get; set; }
 
     /// <summary>
     /// The broker's ID.
@@ -91,7 +97,7 @@ public class Trade : IComparable<Trade>
     /// Usually it is a trade observed in the market which is
     /// not related to current user.
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore, InsertIgnore]
     public bool IsOwnerUnknown { get; set; } = false;
     
     /// <summary>
@@ -111,7 +117,7 @@ public class Trade : IComparable<Trade>
         if (r != 0) r = Price.CompareTo(trade?.Price);
         if (r != 0) r = Quantity.CompareTo(trade?.Quantity);
         if (r != 0) r = Fee.CompareTo(trade?.Fee);
-        if (r != 0) r = FeeAsset.SafeCompareTo(trade?.FeeAsset);
+        if (r != 0) r = FeeAssetCode.SafeCompareTo(trade?.FeeAssetCode);
         if (r != 0) r = BrokerId.CompareTo(trade?.BrokerId);
         if (r != 0) r = ExchangeId.CompareTo(trade?.ExchangeId);
         if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);

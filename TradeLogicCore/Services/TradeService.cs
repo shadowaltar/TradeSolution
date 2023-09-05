@@ -1,10 +1,12 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
 public class TradeService : ITradeService, IDisposable
@@ -12,11 +14,12 @@ public class TradeService : ITradeService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
+    private readonly ISecurityService _securityService;
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Trade> _trades = new();
     private readonly Dictionary<long, long> _tradeToOrderIds = new();
-    private readonly object _lock = new();
+    private readonly Dictionary<string, Security> _assets = new();
 
     public IReadOnlyDictionary<long, long> TradeToOrderIds => _tradeToOrderIds;
 
@@ -25,10 +28,12 @@ public class TradeService : ITradeService, IDisposable
     public event Action<Trade[]>? NextTrades;
 
     public TradeService(IExternalExecutionManagement execution,
-        IOrderService orderService,
-        Persistence persistence)
+                        ISecurityService securityService,
+                        IOrderService orderService,
+                        Persistence persistence)
     {
         _execution = execution;
+        _securityService = securityService;
         _orderService = orderService;
         _persistence = persistence;
 
@@ -83,20 +88,30 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
-        lock (_lock)
+        lock (_assets)
         {
-            trade.OrderId = order.Id;
-            _trades[trade.Id] = trade;
-            _tradeToOrderIds[trade.Id] = trade.OrderId;
+            if (_assets.IsNullOrEmpty())
+            {
+                var assets = _securityService.GetAssets();
+                foreach (var a in assets)
+                {
+                    _assets[a.Code] = a;
+                }
+            }
         }
 
-
+        trade.SecurityId = order.SecurityId;
+        trade.OrderId = order.Id;
+        trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
+        lock (_trades)
+            _trades[trade.Id] = trade;
+        lock (_tradeToOrderIds)
+            _tradeToOrderIds[trade.Id] = trade.OrderId;
     }
 
     private void Persist(Trade trade)
     {
-        var tradeTask = new PersistenceTask<Trade>(trade);
-        _persistence.Enqueue(tradeTask);
+        _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });
     }
 
     public void Dispose()

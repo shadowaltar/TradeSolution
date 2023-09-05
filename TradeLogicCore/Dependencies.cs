@@ -39,7 +39,7 @@ public static class Dependencies
 
         // setup context
         var context = container.Resolve<Context>();
-        context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
+        context.Setup(environment, exchange, broker);
         IsRegistered = true;
     }
 

@@ -309,7 +309,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     Quantity DOUBLE NOT NULL,
     Side CHAR(1) NOT NULL,
     Fee DOUBLE NOT NULL,
-    FeeAsset VARCHAR(100) NOT NULL,
+    FeeAssetCode VARCHAR(100) NOT NULL,
     BrokerId INT DEFAULT 0,
     ExchangeId INT DEFAULT 0,
     UNIQUE(Id)

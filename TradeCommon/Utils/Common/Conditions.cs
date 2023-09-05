@@ -3,9 +3,14 @@
 namespace TradeCommon.Utils.Common;
 public static class Conditions
 {
-    public static bool AnyNull<T>(T v1, T v2)
+    public static bool EitherNull<T>(T v1, T v2)
     {
         return (v1 == null && v2 != null) || (v1 != null && v2 == null);
+    }
+
+    public static bool AnyNull<T>(T v1, T v2)
+    {
+        return v1 == null || v2 == null;
     }
 
     public static bool AllNotNull<T>(params T[] vs)

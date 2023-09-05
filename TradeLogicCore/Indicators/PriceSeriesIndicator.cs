@@ -32,7 +32,7 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
     public virtual Func<OhlcPrice, decimal> ElementSelector { get; protected set; }
 
     /// <summary>
-    /// Initialize this indicator.
+    /// Subscribe this indicator.
     /// </summary>
     /// <param name="period">The interested time range / period.</param>
     /// <param name="elementToUse">The property of <see cref="OhlcPrice"/> to be used.</param>

@@ -240,7 +240,7 @@ public class Program
             Quantity = 0.01m,
             Side = Side.Buy,
             Type = OrderType.Limit,
-            TimeInForce = OrderTimeInForceType.GoodTillCancel,
+            TimeInForce = TimeInForceType.GoodTillCancel,
         };
         await Task.Run(async () =>
         {

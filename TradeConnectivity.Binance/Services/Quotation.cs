@@ -70,6 +70,12 @@ public class Quotation : IExternalQuotationManagement
         var broker = _messageBrokers.GetOrCreate((security.Id, intervalType));
         broker.NewItem += price => NextOhlc?.Invoke(security.Id, price);
 
+        ws.Receive(OnReceivedString);
+        var message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
+        _log.Info(message);
+        return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeMarketData, message);
+
+
         void OnReceivedString(byte[] bytes)
         {
             string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
@@ -92,7 +98,9 @@ public class Quotation : IExternalQuotationManagement
                 var c = kLineNode["c"]!.GetValue<string>().ParseDecimal();
                 var v = kLineNode["v"]!.GetValue<string>().ParseDecimal();
                 if (price == null)
+                {
                     price = new OhlcPrice(o, h, l, c, v, start);
+                }
                 else
                 {
                     price.O = o;
@@ -105,18 +113,6 @@ public class Quotation : IExternalQuotationManagement
                 broker!.Enqueue(price);
             }
         }
-
-        ws.Receive(OnReceivedString);
-
-        return new ExternalConnectionState
-        {
-            Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.SubscriptionOk),
-            ExternalPartyId = security.Exchange,
-            Description = "Subscribed",
-            Type = SubscriptionType.RealTimeMarketData,
-            UniqueConnectionId = "",
-        };
     }
 
     /// <summary>
@@ -236,11 +232,6 @@ public class Quotation : IExternalQuotationManagement
             }
             return false;
         }
-    }
-
-    private void Process()
-    {
-
     }
 
     public Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown)
