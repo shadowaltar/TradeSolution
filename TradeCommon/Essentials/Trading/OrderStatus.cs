@@ -80,7 +80,7 @@ public enum OrderStatus
     /// </summary>
     Rejected = 50,
     /// <summary>
-    /// The order is expired due to <see cref="OrderTimeInForceType"/> and / or its settings.
+    /// The order is expired due to <see cref="TimeInForceType"/> and / or its settings.
     /// Used by:
     ///     Binance
     /// </summary>
@@ -89,6 +89,10 @@ public enum OrderStatus
     /// The order is deleted: it never reached exchange and cancelled on broker side only.
     /// </summary>
     Deleted = 52,
+    /// <summary>
+    /// The order is removed due to broker / exchange specific prevention rules.
+    /// </summary>
+    Prevented = 53,
 }
 
 public static class OrderStatusConverter
@@ -102,22 +106,13 @@ public static class OrderStatusConverter
         return statusStr switch
         {
             "NEW" => OrderStatus.Live,
-            "PARTIALLY_FILLED" => OrderStatus.PartialFilled,
+            "PARTIALLY_FILLED" or "TRADE" => OrderStatus.PartialFilled,
             "FILLED" => OrderStatus.Filled,
             "CANCELED" => OrderStatus.Cancelled,
             "REJECTED" => OrderStatus.Rejected,
             "EXPIRED" or "EXPIRED_IN_MATCH" => OrderStatus.Expired,
+            "TRADE_PREVENTION" => OrderStatus.Prevented,
             _ => OrderStatus.Unknown
-        };
-    }
-
-    public static string ToBinance(Side side)
-    {
-        return side switch
-        {
-            Side.Buy => "BUY",
-            Side.Sell => "SELL",
-            _ => ""
         };
     }
 }

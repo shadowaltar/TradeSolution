@@ -138,7 +138,7 @@ public static class ResponseUtils
                 return false;
             }
         }
-        else if (jsonNode == null || content == "" || content == "{}") // notice that "[]" is a valid case
+        else if (jsonNode == null || content == "") // notice that "[]" and "{}" are both valid cases
         {
             errorMessage = "Missing data.";
             log.Error($"Received no data [{response.StatusCode}]: json node is null or parsed string has no valid content.");

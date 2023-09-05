@@ -40,7 +40,7 @@ public class AdminService : IAdminService
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        Context.Setup(environment, exchange, broker, ExternalNames.GetBrokerId(broker));
+        Context.Setup(environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
     }
 
@@ -85,6 +85,9 @@ public class AdminService : IAdminService
 
         user.Accounts.Add(account);
         CurrentAccount = account;
+
+        Context.User = CurrentUser;
+        Context.Account = CurrentAccount;
 
         return ResultCode.LoginUserAndAccountOk;
     }

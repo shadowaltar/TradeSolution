@@ -16,14 +16,14 @@ public class ExternalConnectionState
 {
     public SubscriptionType Type { get; set; }
     public ActionType Action { get; set; }
-    public string? StatusCode { get; set; }
-    public string? ExternalPartyId { get; set; }
+    public ResultCode ResultCode { get; set; }
+    public int ExternalId { get; set; }
     public string? UniqueConnectionId { get; set; }
     public string? Description { get; set; }
     public List<ExternalConnectionState>? SubStates { get; set; }
     public override string ToString()
     {
-        return $"ConnState [{Type}] action [{Action}] [{StatusCode}][{UniqueConnectionId}]";
+        return $"ConnState [{Type}] action [{Action}] [{ResultCode}][{UniqueConnectionId}]";
     }
 }
 
@@ -99,6 +99,7 @@ public enum SubscriptionType
     MarketData,
     RealTimeMarketData,
     HistoricalMarketData,
+    RealTimeExecutionData,
 }
 
 public enum ActionType
@@ -117,7 +118,11 @@ public enum ActionType
     GetTrade,
     GetOrder,
 
+    GetMisc,
     GetFrequencyRestriction,
+
+    Deposit,
+    Withdraw,
 }
 
 
@@ -125,6 +130,7 @@ public static class ExternalQueryStates
 {
     public static EnvironmentType Environment { get; set; }
     public static ExchangeType Exchange { get; set; }
+    public static int EnvironmentId { get; set; }
     public static BrokerType Broker { get; set; }
     public static int BrokerId { get; set; }
 
@@ -354,17 +360,38 @@ public static class ExternalQueryStates
             Description = content,
         };
     }
+
+    public static ExternalQueryState QueryMisc(string content, string connId, object obj)
+    {
+        if (obj == null) throw new InvalidOperationException("Invalid usage of " + nameof(QueryMisc));
+        return new ExternalQueryState
+        {
+            Content = obj,
+            ResponsePayload = content,
+            Action = ActionType.GetTrade,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.GetTradeOk,
+            UniqueConnectionId = connId,
+            Description = "",
+        };
+    }
 }
 
 public static class ExternalConnectionStates
 {
+    public static EnvironmentType Environment { get; set; }
+    public static ExchangeType Exchange { get; set; }
+    public static int EnvironmentId { get; set; }
+    public static BrokerType Broker { get; set; }
+    public static int BrokerId { get; set; }
+
     public static ExternalConnectionState SubscribedHistoricalOhlcOk(Security security, DateTime start, DateTime end)
     {
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.SubscriptionOk),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.SubscriptionOk,
+            ExternalId = BrokerId,
             Description = $"Subscribed OHLC price from {start:yyyyMMdd-HHmmss} to {end:yyyyMMdd-HHmmss}",
             Type = SubscriptionType.HistoricalMarketData,
             UniqueConnectionId = "",
@@ -376,8 +403,8 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.InvalidArgument),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.InvalidArgument,
+            ExternalId = BrokerId,
             Description = errorDescription,
             Type = SubscriptionType.MarketData,
             UniqueConnectionId = "",
@@ -389,8 +416,8 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.AlreadySubscribed),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.AlreadySubscribed,
+            ExternalId = BrokerId,
             Description = $"Subscribed OHLC price for {security.Id} with interval {interval}",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
@@ -402,8 +429,8 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.UnsubscriptionOk),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.UnsubscriptionOk,
+            ExternalId = BrokerId,
             Description = $"Unsubscribed OHLC price for {security.Id} with interval {interval}",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
@@ -415,8 +442,8 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.UnsubscriptionOk),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.UnsubscriptionOk,
+            ExternalId = BrokerId,
             Description = $"Failed to unsubscribe OHLC price for {security.Id} with interval {interval}",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
@@ -428,8 +455,8 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Subscribe,
-            StatusCode = nameof(ResultCode.MultipleUnsubscriptionOk),
-            ExternalPartyId = null,
+            ResultCode = ResultCode.MultipleUnsubscriptionOk,
+            ExternalId = BrokerId,
             Description = $"Unsubscribed ({subStates.Count}) OHLC prices",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
@@ -442,11 +469,35 @@ public static class ExternalConnectionStates
         return new ExternalConnectionState
         {
             Action = ActionType.Unsubscribe,
-            StatusCode = nameof(ResultCode.StillHasSubscription),
-            ExternalPartyId = security.Exchange,
+            ResultCode = ResultCode.StillHasSubscription,
+            ExternalId = BrokerId,
             Description = $"Will not unsubscribed OHLC price for {security.Id} with interval {interval} because of other subscribers",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
+        };
+    }
+
+    public static ExternalConnectionState Subscribed(SubscriptionType type, string description = "Subscribed")
+    {
+        return new ExternalConnectionState
+        {
+            Action = ActionType.Subscribe,
+            ResultCode = ResultCode.SubscriptionOk,
+            ExternalId = BrokerId,
+            Description = description,
+            Type = type,
+        };
+    }
+
+    public static ExternalConnectionState SubscriptionFailed(SubscriptionType type, string description = "Subscribed")
+    {
+        return new ExternalConnectionState
+        {
+            Action = ActionType.Subscribe,
+            ResultCode = ResultCode.SubscriptionFailed,
+            ExternalId = BrokerId,
+            Description = description,
+            Type = type,
         };
     }
 }

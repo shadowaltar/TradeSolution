@@ -6,7 +6,7 @@ public static class StringUtils
 {
     public static string ToUrlParamString(List<(string, string)>? data)
     {
-        if (data == null) return "";
+        if (data.IsNullOrEmpty()) return "";
 
         var sb = new StringBuilder();
         foreach (var (key, value) in data)

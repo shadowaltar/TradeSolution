@@ -506,10 +506,6 @@ WHERE
                 I: intervalStr,
                 T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
             );
-            if (price.T.Year == 2023 && price.T.Month == 1)
-            {
-
-            }
             list.Add(price);
         }
         _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");

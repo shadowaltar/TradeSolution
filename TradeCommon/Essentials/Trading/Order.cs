@@ -100,7 +100,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Indicates how the order will be cancelled or stay alive, like GTC / FOK etc.
     /// </summary>
-    public OrderTimeInForceType TimeInForce { get; set; } = OrderTimeInForceType.GoodTillCancel;
+    public TimeInForceType TimeInForce { get; set; } = TimeInForceType.GoodTillCancel;
 
     /// <summary>
     /// The strategy used to generate this order.

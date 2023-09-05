@@ -1,8 +1,11 @@
-﻿using System.ComponentModel;
+﻿using Common;
+using System.ComponentModel;
+using TradeCommon.Constants;
+using TradeCommon.Essentials.Portfolios;
 
 namespace TradeCommon.Essentials.Trading;
 
-public enum OrderTimeInForceType
+public enum TimeInForceType
 {
     Unknown,
 
@@ -33,3 +36,23 @@ public enum OrderTimeInForceType
     [Description("IOC")]
     ImmediateOrCancel,
 }
+
+//public static class TimeInForceTypeConverter
+//{
+//    public static TimeInForceType Parse(string? str)
+//    {
+//        if (str.IsBlank())
+//            return TimeInForceType.Unknown;
+
+//        str = str.Trim().ToUpperInvariant();
+
+//        return str switch
+//        {
+//            "GTC" or "GOODTILLCANCEL" => TimeInForceType.GoodTillCancel,
+//            "FOK" or "FILLORKILL" => TimeInForceType.FillOrKill,
+//            "GTD" or "GOODTILLDAY" => TimeInForceType.GoodTillDay,
+//            "IOC" or "IMMEDIATEORCANCEL" => TimeInForceType.ImmediateOrCancel,
+//            _ => TimeInForceType.Unknown,
+//        };
+//    }
+//}

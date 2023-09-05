@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
@@ -30,9 +31,9 @@ public class OrderService : IOrderService, IDisposable
     public event Action<Order>? OrderCancelled;
 
     public OrderService(IExternalExecutionManagement execution,
-        Context context,
-        ISecurityService securityService,
-        Persistence persistence)
+                        Context context,
+                        ISecurityService securityService,
+                        Persistence persistence)
     {
         _execution = execution;
         _context = context;
@@ -41,18 +42,49 @@ public class OrderService : IOrderService, IDisposable
 
         _execution.OrderPlaced += OnSentOrderAccepted;
         _execution.OrderCancelled += OnOrderCancelled;
+        _execution.OrderReceived += OnOrderReceived;
 
         _idGenerator = new IdGenerator("OrderIdGen");
     }
 
+    /// <summary>
+    /// Receive an order message from external.
+    /// </summary>
+    /// <param name="order"></param>
+    private void OnOrderReceived(Order order)
+    {
+        var eoid = order.ExternalOrderId;
+        var oid = order.Id;
+        if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
+        {
+            // TODO
+        }
+        else
+        {
+            order.Id = existingOrder.Id;
+            order.AccountId = existingOrder.AccountId;
+            order.CreateTime = existingOrder.CreateTime;
+            order.SecurityId = existingOrder.SecurityId;
+            if (order.Status != existingOrder.Status)
+            {
+                _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
+            }
+            lock (_externalOrderIdToOrders)
+                _externalOrderIdToOrders[eoid] = order;
+            lock (_orders)
+                _orders[oid] = order;
+            _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+        }
+    }
+
     public Order? GetOrder(long orderId)
     {
-        return _orders.TryGetValue(orderId, out var order) ? order : null;
+        return _orders.ThreadSafeTryGet(orderId, out var order) ? order : null;
     }
 
     public Order? GetOrderByExternalId(long externalOrderId)
     {
-        throw new NotImplementedException();
+        return _externalOrderIdToOrders.ThreadSafeTryGet(externalOrderId, out var order) ? order : null;
     }
 
     public async Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
@@ -215,7 +247,7 @@ public class OrderService : IOrderService, IDisposable
                                    decimal quantity,
                                    Side side,
                                    OrderType orderType = OrderType.Limit,
-                                   OrderTimeInForceType timeInForce = OrderTimeInForceType.GoodTillCancel)
+                                   TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
     {
         var id = _idGenerator.NewTimeBasedId;
         var now = DateTime.UtcNow;

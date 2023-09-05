@@ -22,6 +22,22 @@ public static class ExternalNames
         { BrokerType.Simulator, -1 },
     };
 
+    public static readonly IReadOnlyDictionary<ExchangeType, int> ExchangeTypeToIds = new Dictionary<ExchangeType, int>()
+    {
+        { ExchangeType.Binance, 100 },
+        { ExchangeType.Hkex, 200 },
+
+        { ExchangeType.Unknown, 0 },
+    };
+
+    public static readonly IReadOnlyDictionary<int, ExchangeType> ExchangeIdToTypes = new Dictionary<int, ExchangeType>()
+    {
+        { 100, ExchangeType.Binance},
+        { 200, ExchangeType.Hkex},
+
+        { 0, ExchangeType.Unknown},
+    };
+
     public static BrokerType Convert(ExchangeType exchangeType)
     {
         return exchangeType switch
@@ -78,8 +94,24 @@ public static class ExternalNames
         return BrokerTypeToIds.GetValueOrDefault(type, BrokerTypeToIds[BrokerType.Unknown]);
     }
 
+    public static int GetExchangeId(string externalName)
+    {
+        var type = ConvertToExchange(externalName);
+        return ExchangeTypeToIds.GetValueOrDefault(type, ExchangeTypeToIds[ExchangeType.Unknown]);
+    }
+
+    public static ExchangeType GetExchangeType(int id)
+    {
+        return ExchangeIdToTypes.GetValueOrDefault(id, ExchangeType.Unknown);
+    }
+
     public static int GetBrokerId(BrokerType broker)
     {
         return BrokerTypeToIds.GetValueOrDefault(broker, BrokerTypeToIds[BrokerType.Unknown]);
+    }
+
+    public static int GetExchangeId(ExchangeType exchange)
+    {
+        return ExchangeTypeToIds.GetValueOrDefault(exchange, ExchangeTypeToIds[ExchangeType.Unknown]);
     }
 }

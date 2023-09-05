@@ -90,5 +90,5 @@ public interface IOrderService
                             decimal quantity,
                             Side side,
                             OrderType orderType = OrderType.Limit,
-                            OrderTimeInForceType timeInForce = OrderTimeInForceType.GoodTillCancel);
+                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
 }
