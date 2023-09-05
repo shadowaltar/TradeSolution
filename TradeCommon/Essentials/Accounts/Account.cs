@@ -1,6 +1,6 @@
 ﻿using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 using TradeCommon.Utils.Common;
 
 namespace TradeCommon.Essentials.Accounts;
@@ -17,41 +17,49 @@ public class Account
     /// </summary>
     [UpsertIgnore]
     [AutoIncrementOnInsert]
+    [NonNegative]
     public int Id { get; set; }
 
     /// <summary>
     /// Name of account;
     /// </summary>
+    [NotBlank]
     public string Name { get; set; } = "";
 
     /// <summary>
     /// Account owner.
     /// </summary>
+    [NonNegative]
     public int OwnerId { get; set; } = int.MinValue;
 
     /// <summary>
     /// External account id from broker.
     /// </summary>
+    [NotBlank]
     public string ExternalAccount { get; set; } = "";
 
     /// <summary>
     /// Name of the broker.
     /// </summary>
+    [Positive]
     public int BrokerId { get; set; } = int.MinValue;
 
     /// <summary>
     /// Type of the account, for example it indicates if it is a sport or margin trading one.
     /// </summary>
+    [AlwaysUpperCase, NotBlank]
     public string? Type { get; set; }
 
     /// <summary>
     /// Sub-type of the account. Some brokers may contain multiple levels of types.
     /// </summary>
+    [AlwaysUpperCase(IsNullOk = true)]
     public string? SubType { get; set; }
 
     /// <summary>
     /// Trading environment like production or paper trading.
     /// </summary>
+    [NotUnknown]
     public EnvironmentType Environment { get; set; }
 
     /// <summary>
@@ -95,8 +103,9 @@ public class Account
                 var a2 = account.Balances[i];
                 if (!a1.Equals(a2)) return false;
             }
+            return true;
         }
-        return true;
+        return false;
     }
 
     public override int GetHashCode()

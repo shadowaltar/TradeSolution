@@ -175,9 +175,9 @@ public class Core
             }
         }
         var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
-        if (toCreate != null)
+        if (toCreate.IsNullOrEmpty())
             _services.Persistence.Enqueue(new PersistenceTask<Trade>(toCreate) { ActionType = DatabaseActionType.Create });
-        if (toUpdate != null)
+        if (toUpdate.IsNullOrEmpty())
             _services.Persistence.Enqueue(new PersistenceTask<Trade>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
     }
 

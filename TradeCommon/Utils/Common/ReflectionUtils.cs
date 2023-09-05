@@ -1,6 +1,10 @@
-﻿using System.Data;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
+using TradeCommon.Essentials.Accounts;
+using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Common;
 public static class ReflectionUtils
@@ -24,6 +28,33 @@ public static class ReflectionUtils
     /// Cache of property info for a given type. Property info are keyed by its name.
     /// </summary>
     private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _typeToPropertyInfoMap = new();
+
+    /// <summary>
+    /// Validate an instance and if not ok, throws <see cref="ArgumentException"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="targetObject"></param>
+    /// <exception cref="ArgumentException"></exception>
+    public static void ValidateOrThrow<T>(this T targetObject)
+    {
+        var vg = GetValueGetter<T>();
+        if (!vg.Validate(targetObject, out var propName, out var ruleName))
+            throw new ArgumentException($"Failed validation for property {propName} in type {typeof(T).Name} against rule {ruleName}");
+    }
+
+    public static void AutoCorrect<T>(this T targetObject)
+    {
+        var vs = GetValueSetter<T>();
+        var vg = GetValueGetter<T>();
+        foreach (var name in vs.GetFieldNames())
+        {
+            if (vg.IsWithAutoCorrect(targetObject, name, out var original, out var attr))
+            {
+                var now = attr.AutoCorrect(original);
+                vs.Set(targetObject, name, now);
+            }
+        }
+    }
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
     {
@@ -217,12 +248,47 @@ public class ValueGetter<T>
 {
     private readonly Dictionary<string, Func<T, object>> _getters = new();
     private readonly Dictionary<string, Type> _getterPropertyTypes = new();
+    private readonly Dictionary<string, List<ValidationAttribute>> _validationProperties = new();
+    private readonly Dictionary<string, AutoCorrectAttribute> _autoCorrectProperties = new();
+
+    private static readonly List<Type> _validationAttributes = new()
+    {
+        typeof(PositiveAttribute),
+        typeof(NonNegativeAttribute),
+        typeof(NotUnknownAttribute),
+        typeof(MinLengthAttribute)
+    };
+
+    private static readonly List<Type> _autoCorrectAttributes = new()
+    {
+        typeof(AlwaysUpperCaseAttribute),
+        typeof(AlwaysLowerCaseAttribute),
+    };
 
     public ValueGetter(IEnumerable<PropertyInfo> properties)
     {
         foreach (var property in properties)
         {
-            // must exclude the static ones
+            // mark the attributes
+            foreach (var attribute in _validationAttributes)
+            {
+                var attr = property.GetCustomAttribute(attribute);
+                if (attr is ValidationAttribute va)
+                {
+                    _validationProperties[property.Name] ??= new();
+                    _validationProperties[property.Name].Add(va);
+                }
+            }
+            foreach (var attribute in _autoCorrectAttributes)
+            {
+                var attr = property.GetCustomAttribute(attribute);
+                if (attr is AutoCorrectAttribute aa)
+                {
+                    _autoCorrectProperties[property.Name] = aa;
+                }
+            }
+
+            // exclude the static ones
             if (property.GetGetMethod()?.IsStatic ?? false)
                 continue;
             _getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
@@ -238,6 +304,58 @@ public class ValueGetter<T>
     public (object?, Type) GetTypeAndValue(T targetObject, string propertyName)
     {
         return (_getters[propertyName].Invoke(targetObject), _getterPropertyTypes[propertyName]);
+    }
+
+    public void ValidateOrThrow(T targetObject)
+    {
+        if (!Validate(targetObject, out var propName, out var ruleName))
+            throw new ArgumentException($"Failed validation for property {propName} in type {typeof(T).Name} against rule {ruleName}");
+    }
+
+    public bool Validate(T targetObject, out string invalidPropertyName, out string violatedRule)
+    {
+        violatedRule = "";
+        invalidPropertyName = "";
+        foreach (var (propertyName, attributes) in _validationProperties)
+        {
+            var value = Get(targetObject, propertyName);
+            foreach (var attr in attributes)
+            {
+                if (!attr.IsValid(value))
+                {
+                    invalidPropertyName = propertyName;
+                    violatedRule = attr.GetType().Name.Replace("Attribute", "");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public bool Validate(T targetObject, string propertyName, out string message)
+    {
+        message = "";
+        var value = Get(targetObject, propertyName);
+        if (_validationProperties.TryGetValue(propertyName, out var validationAttributes))
+        {
+            foreach (var attr in validationAttributes)
+            {
+                if (!attr.IsValid(value))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    public bool IsWithAutoCorrect(T targetObject, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
+    {
+        originalValue = null;
+        if (_autoCorrectProperties.TryGetValue(propertyName, out attribute))
+        {
+            originalValue = Get(targetObject, propertyName);
+            return true;
+        }
+        return false;
     }
 
     public IEnumerable<(string, object)> GetAllValues(T entry)

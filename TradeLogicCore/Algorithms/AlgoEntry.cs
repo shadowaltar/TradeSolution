@@ -1,5 +1,5 @@
 ﻿using TradeCommon.Essentials.Portfolios;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeLogicCore.Algorithms;
 

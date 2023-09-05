@@ -1,5 +1,5 @@
 ﻿using TradeCommon.Runtime;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Portfolios;
 public class TransferAction

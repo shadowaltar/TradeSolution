@@ -1,7 +1,7 @@
 ﻿using Common;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Trading;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Portfolios;
 

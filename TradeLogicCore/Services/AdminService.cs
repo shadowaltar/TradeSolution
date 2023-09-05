@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -40,7 +41,7 @@ public class AdminService : IAdminService
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        Context.Setup(environment, exchange, broker);
+        Context.Initialize(environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
     }
 
@@ -112,6 +113,8 @@ public class AdminService : IAdminService
         };
         Credential.EncryptUserPassword(user, ref userPassword);
 
+        user.ValidateOrThrow();
+        user.AutoCorrect();
         return await Storage.InsertUser(user);
     }
 
@@ -129,6 +132,11 @@ public class AdminService : IAdminService
 
     public async Task<int> CreateAccount(Account account)
     {
+        if (account.Id < 0) throw new ArgumentException("Invalid account type.");
+        if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
+
+        account.ValidateOrThrow();
+        account.AutoCorrect();
         return await Storage.InsertAccount(account, false);
     }
 

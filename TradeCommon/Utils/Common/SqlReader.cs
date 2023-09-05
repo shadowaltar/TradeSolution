@@ -8,7 +8,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 using static TradeCommon.Constants.Constants;
 
 namespace Common;

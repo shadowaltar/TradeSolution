@@ -1,5 +1,6 @@
-﻿namespace TradeCommon.Utils.Attributes;
+﻿namespace Common.Attributes;
 
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Property)]
 public class UniqueAttribute : Attribute
 {
     public string[] FieldNames { get; }

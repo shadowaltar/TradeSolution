@@ -1,6 +1,6 @@
 ﻿using Common;
 using TradeCommon.Constants;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
 
@@ -15,17 +15,20 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Unique order id.
     /// </summary>
+    [Positive]
     public long Id { get; set; }
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// If this is a new order it should be null.
     /// </summary>
+    [Positive]
     public long ExternalOrderId { get; set; } = DefaultId;
 
     /// <summary>
     /// The id of security to be or already being bought / sold.
     /// </summary>
+    [Positive]
     public int SecurityId { get; set; }
 
     /// <summary>
@@ -37,6 +40,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// The target account. This embeds the broker info.
     /// </summary>
+    [Positive]
     public int AccountId { get; set; }
 
     /// <summary>

@@ -1,5 +1,5 @@
 ﻿using TradeCommon.Constants;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Instruments;
 public class Security

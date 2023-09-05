@@ -9,7 +9,6 @@ using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
 using TradeLogicCore.Services;
 using TradePort.Utils;
-using Environments = TradeCommon.Constants.Environments;
 
 namespace TradePort.Controllers;
 
@@ -48,8 +47,9 @@ public class AdminController : Controller
         adminService.Initialize(environment, exchange, broker);
 
         var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
-        if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
-        return Ok(result);
+        return result != ResultCode.LoginUserAndAccountOk
+            ? BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}")
+            : Ok(result);
     }
 
     /// <summary>
@@ -89,8 +89,9 @@ public class AdminController : Controller
                                           [FromForm(Name = "user-password")] string password)
     {
         var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
-        if (result != ResultCode.LoginUserAndAccountOk) return BadRequest($"Failed to {nameof(Login)}; code: {result}");
-        return Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
+        return result != ResultCode.LoginUserAndAccountOk
+            ? BadRequest($"Failed to {nameof(Login)}; code: {result}")
+            : Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
     }
 
     /// <summary>
@@ -122,9 +123,7 @@ public class AdminController : Controller
                                                [FromQuery(Name = "request-external")] bool requestExternal = false)
     {
         var account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
-        if (account == null) return BadRequest("Invalid account name.");
-
-        return Ok(account);
+        return account == null ? BadRequest("Invalid account name.") : Ok(account);
     }
     /// <summary>
     /// Get account's information.
@@ -167,13 +166,13 @@ public class AdminController : Controller
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
 
-        var user = await adminService.GetUser(userName, adminService.Context.Environment);
+        var user = await adminService.GetUser(userName, model.Environment);
         if (user != null)
         {
             return BadRequest();
         }
 
-        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, adminService.Context.Environment);
+        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, model.Environment);
         model.UserPassword = "";
 
         return Ok(result);
@@ -191,16 +190,17 @@ public class AdminController : Controller
                                                   [FromForm] AccountCreationModel model,
                                                   [FromRoute(Name = "account")] string accountName = "test")
     {
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
         if (accountName.IsBlank()) return BadRequest();
         if (model == null) return BadRequest("Missing creation model.");
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
-
+        if (model.ExternalAccount == null) return BadRequest("Missing external account name.");
+        if (model.Broker == BrokerType.Unknown) return BadRequest("Invalid broker.");
+        if (model.Environment == EnvironmentType.Unknown) return BadRequest("Invalid environment.");
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
         var user = await adminService.GetUser(model.OwnerName, model.Environment);
         if (user == null) return BadRequest("Invalid owner.");
         var brokerId = ExternalNames.GetBrokerId(model.Broker);
-        if (brokerId == ExternalNames.BrokerTypeToIds[BrokerType.Unknown]) return BadRequest("Invalid broker.");
 
         var now = DateTime.UtcNow;
         var account = new Account
@@ -337,11 +337,9 @@ public class AdminController : Controller
             results.AddRange(await CreateTables(DataType.Trade, SecurityType.Equity));
             results.AddRange(await CreateTables(DataType.Position, SecurityType.Fx));
             results.AddRange(await CreateTables(DataType.Position, SecurityType.Equity));
+            results.AddRange(await CreateTables(DataType.OpenOrderId));
         }
-        if (results.IsNullOrEmpty())
-            return BadRequest($"Invalid parameters: either {tableTypeStr} or {secTypeStr} is wrong.");
-        else
-            return Ok(results);
+        return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableTypeStr} or {secTypeStr} is wrong.") : Ok(results);
     }
 
     private async Task<Dictionary<string, bool>?> CreateTables(DataType dataType, SecurityType secType = SecurityType.Unknown)
@@ -414,6 +412,9 @@ public class AdminController : Controller
 
         [FromForm(Name = "email")]
         public string? Email { get; set; }
+
+        [FromForm(Name = "environment")]
+        public EnvironmentType Environment { get; set; }
     }
 
 
@@ -426,7 +427,7 @@ public class AdminController : Controller
         public string? OwnerName { get; set; }
 
         [FromForm(Name = "brokerType")]
-        public string? Broker { get; set; }
+        public BrokerType Broker { get; set; }
 
         [FromForm(Name = "externalAccount")]
         public string? ExternalAccount { get; set; }

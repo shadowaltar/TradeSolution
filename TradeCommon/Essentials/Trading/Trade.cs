@@ -1,6 +1,6 @@
 ﻿using Common;
 using TradeCommon.Constants;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
 

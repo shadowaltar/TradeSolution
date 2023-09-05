@@ -4,7 +4,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
-using TradeCommon.Utils.Attributes;
+using Common.Attributes;
 
 namespace TradeCommon.Database;
 
@@ -51,9 +51,9 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.AccountTable}_ownerId;
 @$"
 CREATE TABLE IF NOT EXISTS {DatabaseNames.AccountTable} (
     Id INTEGER PRIMARY KEY,
-    OwnerId INT NOT NULL,
+    OwnerId INTEGER NOT NULL,
     Name VARCHAR(100) NOT NULL,
-    BrokerId INT NOT NULL,
+    BrokerId INTEGER NOT NULL,
     ExternalAccount VARCHAR(100) NOT NULL,
     Type VARCHAR(100),
     SubType VARCHAR(100),
@@ -85,8 +85,8 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_assetId;
 @$"
 CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
     Id INTEGER PRIMARY KEY,
-    AssetId INT NOT NULL,
-    AccountId INT NOT NULL,
+    AssetId INTEGER NOT NULL,
+    AccountId INTEGER NOT NULL,
     FreeAmount REAL DEFAULT 0 NOT NULL,
     LockedAmount REAL DEFAULT 0 NOT NULL,
     SettlingAmount REAL DEFAULT 0 NOT NULL,
@@ -201,7 +201,7 @@ DROP INDEX IF EXISTS idx_{tableName}_sec;
         string createSql =
 @$"
 CREATE TABLE IF NOT EXISTS {tableName} (
-    SecurityId INT NOT NULL,
+    SecurityId INTEGER NOT NULL,
     Open REAL NOT NULL,
     High REAL NOT NULL,
     Low REAL NOT NULL,
@@ -258,9 +258,9 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     ExternalCreateTime DATE DEFAULT 0,
     ExternalUpdateTime DATE DEFAULT 0,
     TimeInForce VARCHAR(10),
-    StrategyId INT DEFAULT 0,
-    BrokerId INT DEFAULT 0,
-    ExchangeId INT DEFAULT 0,
+    StrategyId INTEGER DEFAULT 0,
+    BrokerId INTEGER DEFAULT 0,
+    ExchangeId INTEGER DEFAULT 0,
     UNIQUE(Id)
 );
 CREATE INDEX idx_{tableName}_id
@@ -309,9 +309,9 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     Quantity DOUBLE NOT NULL,
     Side CHAR(1) NOT NULL,
     Fee DOUBLE NOT NULL,
-    FeeAssetCode VARCHAR(100) NOT NULL,
-    BrokerId INT DEFAULT 0,
-    ExchangeId INT DEFAULT 0,
+    FeeAssetId INTEGER NOT NULL,
+    BrokerId INTEGER DEFAULT 0,
+    ExchangeId INTEGER DEFAULT 0,
     UNIQUE(Id)
 );
 CREATE UNIQUE INDEX idx_{tableName}_id
@@ -462,7 +462,7 @@ DROP INDEX IF EXISTS idx_{DatabaseNames.FinancialStatsTable}_securityId;
 ";
         const string createSql =
 @$"CREATE TABLE IF NOT EXISTS {DatabaseNames.FinancialStatsTable} (
-    SecurityId INT NOT NULL,
+    SecurityId INTEGER NOT NULL,
     MarketCap REAL NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_{DatabaseNames.FinancialStatsTable}_securityId

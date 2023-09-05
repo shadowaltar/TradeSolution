@@ -265,7 +265,7 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public static async Task<int> InsertUser(User user)
     {
         var tableName = DatabaseNames.UserTable;
-        if (!_writers.TryGetValue(DataType.Account, out var writer))
+        if (!_writers.TryGetValue(DataType.User, out var writer))
         {
             writer = new SqlWriter<User>(tableName, DatabaseFolder, DatabaseNames.StaticData);
             _writers[DataType.User] = writer;
@@ -304,30 +304,6 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
             _writers[DataType.Order] = writer;
         }
         await writer.InsertOne(order, isUpsert);
-
-        //        string sql =
-        //@$"
-        //INSERT INTO {tableName}
-        //    (Id, ExternalOrderId, SecurityId, AccountId, Type, Side, StopPrice, CreateTime, UpdateTime, ExternalCreateTime, ExternalUpdateTime, TimeInForce, StrategyId)
-        //VALUES
-        //    ($Id, $ExternalOrderId, $SecurityId, $AccountId, $Type, $Side, $StopPrice, $CreateTime, $UpdateTime, $ExternalCreateTime, $ExternalUpdateTime, $TimeInForce, $StrategyId)
-        //ON CONFLICT (Id)
-        //DO UPDATE SET
-        //    ExternalOrderId = excluded.ExternalOrderId,
-        //    SecurityId = excluded.SecurityId,
-        //    AccountId = excluded.AccountId,
-        //    Type = excluded.Type,
-        //    Side = excluded.Side,
-        //    StopPrice = excluded.StopPrice,
-        //    CreateTime = excluded.CreateTime,
-        //    UpdateTime = excluded.UpdateTime,
-        //    ExternalCreateTime = excluded.ExternalCreateTime,
-        //    ExternalUpdateTime = excluded.ExternalUpdateTime,
-        //    TimeInForce = excluded.TimeInForce,
-        //    StrategyId = excluded.StrategyId,
-        //    BrokerId = excluded.BrokerId,
-        //    ExchangeId = excluded.ExchangeId
-        //";
     }
 
     public static async Task InsertTrade(Trade trade, SecurityType securityType, bool isUpsert = true)

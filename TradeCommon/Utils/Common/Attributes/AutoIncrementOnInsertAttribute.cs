@@ -1,4 +1,4 @@
-﻿namespace TradeCommon.Utils.Attributes;
+﻿namespace Common.Attributes;
 
 public class AutoIncrementOnInsertAttribute : Attribute
 {

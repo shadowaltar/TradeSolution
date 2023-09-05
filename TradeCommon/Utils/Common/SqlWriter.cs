@@ -5,8 +5,8 @@ using System.Data;
 using System.Reflection;
 using System.Text;
 using TradeCommon.Database;
-using TradeCommon.Utils.Attributes;
 using TradeCommon.Utils.Common;
+using Common.Attributes;
 
 namespace Common;
 
@@ -84,16 +84,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                     var placeholder = _targetFieldNamePlaceHolders[name];
 
                     var value = _valueGetter.Get(entry.Cast<T>(), name);
-
-                    if (AutoIncrementOnInsertFieldNames.Contains(name))
-                    {
-                        var maxId = await Storage.GetMax(name, _tableName, _databaseName);
-                        if (maxId.IsValid())
-                        {
-                            value = maxId + 1;
-                        }
-                    }
-
+                    value = TryAutoIncrement(name, out var a) ? a : value;
                     value ??= DBNull.Value;
                     command.Parameters.AddWithValue(placeholder, value);
                 }
@@ -144,16 +135,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
                 var placeholder = _targetFieldNamePlaceHolders[name];
                 var value = _valueGetter.Get(entry.Cast<T>(), name);
-
-                if (AutoIncrementOnInsertFieldNames.Contains(name))
-                {
-                    var maxId = await Storage.GetMax(name, _tableName, _databaseName);
-                    if (maxId.IsValid())
-                    {
-                        value = maxId + 1;
-                    }
-                }
-
+                value = TryAutoIncrement(name, out var a) ? a : value;
                 value ??= DBNull.Value;
                 // by default treat enum value as upper string
                 if (value.GetType().IsEnum)
@@ -180,6 +162,18 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         await connection.CloseAsync();
         return result;
+    }
+
+    private bool TryAutoIncrement(string name, out long newValue)
+    {
+        newValue = long.MinValue;
+        if (AutoIncrementOnInsertFieldNames.Contains(name))
+        {
+            var maxId = AsyncHelper.RunSync(() => Storage.GetMax(name, _tableName, _databaseName));
+            newValue = maxId.IsValid() ? maxId + 1 : 1;
+            return true;
+        }
+        return false;
     }
 
     public async Task<int> DeleteOne<T1>(T1 entry, string? sql = null)

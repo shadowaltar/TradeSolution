@@ -23,7 +23,8 @@ public partial class Storage
     {
         if (task is PersistenceTask<OhlcPrice> priceTask)
         {
-            await UpsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
+            if (!priceTask.Entries.IsNullOrEmpty())
+                await UpsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
         }
         else if (task is PersistenceTask<Order> orderTask)
         {
@@ -64,10 +65,6 @@ public partial class Storage
             else if (securityTask.SecurityType == SecurityType.Fx)
                 await UpsertFxDefinitions(securityTask.Entries);
         }
-        else if (task is PersistenceTask<Account> accountTask && accountTask.Entry != null)
-        {
-            await InsertAccount(accountTask.Entry, true);
-        }
         else if (task is PersistenceTask<Balance> balanceTask)
         {
             if (balanceTask.Entry != null)
@@ -79,6 +76,14 @@ public partial class Storage
         else if (task is PersistenceTask<FinancialStat> financialStatsTask && !financialStatsTask.Entries.IsNullOrEmpty())
         {
             await UpsertSecurityFinancialStats(financialStatsTask.Entries);
+        }
+        else if (task is PersistenceTask<Account> accountTask && accountTask.Entry != null)
+        {
+            await InsertAccount(accountTask.Entry, true);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Persistence task type {task.GetType().Name} is not supported.");
         }
     }
 
