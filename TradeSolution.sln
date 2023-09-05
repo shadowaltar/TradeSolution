@@ -25,6 +25,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeCommon.Tests", "TradeCommon.Tests\TradeCommon.Tests.csproj", "{61A61B08-156E-40DA-9F31-B4B24A5856BD}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{5638F6DF-53E4-475D-86C7-738CACD1C5FE}"
+	ProjectSection(SolutionItems) = preProject
+		UAT_test_spot = UAT_test_spot
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UI", "UI", "{0750EA06-2FD4-4907-907B-3FFA32D77F12}"
 EndProject
