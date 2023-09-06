@@ -8,7 +8,7 @@ namespace TradeCommon.Essentials.Accounts;
 public class User
 {
     [UpsertIgnore, AutoIncrementOnInsert]
-    [NonNegative]
+    [NotNegative]
     public int Id { get; set; } = -1;
 
     [Length(MinLength = 3)]

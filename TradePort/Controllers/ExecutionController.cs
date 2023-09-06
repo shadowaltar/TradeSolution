@@ -5,6 +5,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
@@ -97,9 +98,30 @@ public class ExecutionController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpDelete("{exchange}/accounts/{account}/order")]
-    public async Task<ActionResult> CancelOrder([FromServices] IOrderService orderService)
+    public async Task<ActionResult> CancelOrder([FromServices] IOrderService orderService,
+                                                [FromForm(Name = "admin-password")] string adminPassword,
+                                                [FromQuery(Name = "order-id")] long? orderId,
+                                                [FromQuery(Name = "external-order-id")] string? externalOrderId)
     {
-        return Ok();
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (Conditions.AllNull(orderId, externalOrderId)) return BadRequest("Either order id or external order id must be specified.");
+
+        object? cancelledOrder = null;
+        var a = new AutoResetEvent(true);
+        orderService.OrderCancelled += OnOrderCancelled;
+        if (orderId != null)
+        {
+            Task.Run(() => orderService.CancelOrder(orderId.Value));
+            a.WaitOne();
+        }
+
+        void OnOrderCancelled(Order order)
+        {
+            a.Set();
+            cancelledOrder = order;
+        }
+        orderService.OrderCancelled -= OnOrderCancelled;
+        return Ok(cancelledOrder ??= "Failed to cancel.");
     }
 
     [HttpPost("algos/mac/start")]
@@ -107,8 +129,6 @@ public class ExecutionController : Controller
                                             [FromServices] ISecurityService securityService,
                                             [FromServices] IAdminService adminService,
                                             [FromForm(Name = "admin-password")] string adminPassword,
-                                            //[FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-                                            //[FromRoute(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                             [FromRoute(Name = "account")] string accountName = "test",
                                             [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                             [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",

@@ -7,10 +7,8 @@ public class NotUnknownAttribute : ValidationAttribute
 {
     public override bool IsValid(object? value)
     {
-        if (value == null || !value.GetType().IsEnum) return false;
-
+        if (value == null) return false;
         var str = value.ToString();
-        if (str == "UNKNOWN" || str == "Unknown") return false;
-        return true;
+        return str != "UNKNOWN" && str != "Unknown";
     }
 }

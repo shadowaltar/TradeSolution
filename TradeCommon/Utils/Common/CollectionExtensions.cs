@@ -4,6 +4,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Common;
 public static class CollectionExtensions
 {
+    private static readonly Random random = new(DateTime.Now.Millisecond);
+
     /// <summary>
     /// Get value by a key from the dictionary. If no matching key,
     /// create a new instance and save into the dictionary using the given key.
@@ -84,6 +86,18 @@ public static class CollectionExtensions
         return value;
     }
 
+    public static TV? GetOrDefault<T, TV>(this IDictionary<T, TV?> dictionary, T key, TV? defaultValue = default) where T : notnull
+    {
+        if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
+
+        if (!dictionary.TryGetValue(key, out var value))
+        {
+            value = defaultValue;
+            dictionary[key] = value;
+        }
+        return value;
+    }
+
     public static Dictionary<T, TV> ShallowCopy<T, TV>(this IDictionary<T, TV> dictionary) where T : notnull
     {
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
@@ -91,9 +105,32 @@ public static class CollectionExtensions
 
     public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y)
     {
-        lock(dictionary) { 
-        var r = dictionary.TryGetValue(key, out y);
+        lock (dictionary)
+        {
+            var r = dictionary.TryGetValue(key, out y);
             return r;
         }
+    }
+
+    public static IEnumerable<T> RandomElements<T>(this IList<T> list, int count)
+    {
+        for (var i = 0; i < count; i++)
+            yield return RandomElement(list);
+    }
+
+    public static T RandomElement<T>(this IList<T> list)
+    {
+        return list[random.Next(list.Count)];
+    }
+
+    public static IEnumerable<T> RandomElements<T>(this T[] array, int count)
+    {
+        for (var i = 0; i < count; i++)
+            yield return RandomElement(array);
+    }
+
+    public static T RandomElement<T>(this T[] array)
+    {
+        return array[random.Next(array.Length)];
     }
 }

@@ -3,7 +3,7 @@
 namespace Common.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class NonNegativeAttribute : ValidationAttribute
+public class NotNegativeAttribute : ValidationAttribute
 {
     public override bool IsValid(object? value)
     {

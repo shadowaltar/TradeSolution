@@ -22,7 +22,7 @@ public static class Conditions
         return true;
     }
 
-    public static bool AllNull<T>(params T[] vs)
+    public static bool AllNull(params object?[] vs)
     {
         for (int i = 0; i < vs.Length; i++)
         {

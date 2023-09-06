@@ -44,7 +44,7 @@ public class SqlReader<T> : IDisposable where T : new()
     public T Read()
     {
         var entry = new T();
-        foreach (var name in _valueSetter.GetFieldNames())
+        foreach (var name in _valueSetter.GetNames())
         {
             if (!Columns.Contains(name))
                 continue; // skip when schema is available and property name doesn't exist in returned columns

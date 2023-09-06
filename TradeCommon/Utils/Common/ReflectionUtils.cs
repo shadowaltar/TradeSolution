@@ -1,10 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Common.Attributes;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using TradeCommon.Essentials.Accounts;
-using Common.Attributes;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Common;
 public static class ReflectionUtils
@@ -30,31 +29,9 @@ public static class ReflectionUtils
     private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _typeToPropertyInfoMap = new();
 
     /// <summary>
-    /// Validate an instance and if not ok, throws <see cref="ArgumentException"/>.
+    /// Cache of meta info for a given type. See <see cref="ReflectionMetaInfo{T}"/> for details.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="targetObject"></param>
-    /// <exception cref="ArgumentException"></exception>
-    public static void ValidateOrThrow<T>(this T targetObject)
-    {
-        var vg = GetValueGetter<T>();
-        if (!vg.Validate(targetObject, out var propName, out var ruleName))
-            throw new ArgumentException($"Failed validation for property {propName} in type {typeof(T).Name} against rule {ruleName}");
-    }
-
-    public static void AutoCorrect<T>(this T targetObject)
-    {
-        var vs = GetValueSetter<T>();
-        var vg = GetValueGetter<T>();
-        foreach (var name in vs.GetFieldNames())
-        {
-            if (vg.IsWithAutoCorrect(targetObject, name, out var original, out var attr))
-            {
-                var now = attr.AutoCorrect(original);
-                vs.Set(targetObject, name, now);
-            }
-        }
-    }
+    private static readonly Dictionary<Type, object> _typeToMetaInfo = new();
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
     {
@@ -162,7 +139,7 @@ public static class ReflectionUtils
         var vg = GetValueGetter<T>();
         var tableRow = table.NewRow();
 
-        foreach (var (name, value) in vg.GetAllValues(entry))
+        foreach (var (name, value) in vg.GetNamesAndValues(entry))
         {
             tableRow[name] = value;
         }
@@ -176,7 +153,20 @@ public static class ReflectionUtils
         if (!_typeToValueGetters.TryGetValue(t, out var vg))
         {
             var properties = GetPropertyToName(t, flags);
-            vg = new ValueGetter<T>(properties.Values);
+
+            ReflectionMetaInfo<T> i;
+            if (!_typeToMetaInfo.TryGetValue(t, out var info))
+            {
+                i = new ReflectionMetaInfo<T>();
+                _typeToMetaInfo[t] = i;
+                i.Ordering.AddRange(GetOrderedPropertyAndName(t).ToDictionary(t => t.name, t => t.index));
+            }
+            else
+            {
+                i = (ReflectionMetaInfo<T>)info;
+            }
+
+            vg = new ValueGetter<T>(properties.Values, i);
             _typeToValueGetters[t] = vg;
         }
         return (ValueGetter<T>)vg;
@@ -188,7 +178,20 @@ public static class ReflectionUtils
         if (!_typeToValueSetters.TryGetValue(t, out var vg))
         {
             var properties = GetPropertyToName(t, flags).Values;
-            vg = new ValueSetter<T>(properties);
+
+            ReflectionMetaInfo<T> i;
+            if (!_typeToMetaInfo.TryGetValue(t, out var info))
+            {
+                i = new ReflectionMetaInfo<T>();
+                _typeToMetaInfo[t] = i;
+                i.Ordering.AddRange(GetOrderedPropertyAndName(t).ToDictionary(t => t.name, t => t.index));
+            }
+            else
+            {
+                i = (ReflectionMetaInfo<T>)info;
+            }
+
+            vg = new ValueSetter<T>(properties, i);
             _typeToValueSetters[t] = vg;
         }
         return (ValueSetter<T>)vg;
@@ -234,91 +237,130 @@ public static class ReflectionUtils
     /// <returns></returns>
     public static Dictionary<string, PropertyInfo> GetPropertyToName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
-        if (_typeToPropertyInfoMap.TryGetValue(type, out var result))
+        if (_typeToPropertyInfoMap.TryGetValue(type, out var results))
         {
-            return result;
+            return results;
         }
-        result = type.GetProperties(flags).ToDictionary(p => p.Name, p => p);
-        _typeToPropertyInfoMap[type] = result;
-        return result;
+        // exclude the static and non-public getter
+        results = type.GetProperties(flags).Where(p => p.GetGetMethod()?.IsStatic ?? false)
+            .ToDictionary(p => p.Name, p => p);
+        _typeToPropertyInfoMap[type] = results;
+        return results;
+    }
+
+    public static List<(string name, PropertyInfo property, int index)> GetOrderedPropertyAndName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
+    {
+        return type.GetProperties(flags)
+            .Where(p => p.GetGetMethod()?.IsStatic ?? false)
+            .Select((p, i) => (p.Name, p, i)).ToList();
     }
 }
 
-public class ValueGetter<T>
+/// <summary>
+/// Class which caches all the reflection information which are dictionaries.
+/// Their keys are always the property name, values are like the getter / setter
+/// delegates, types, or validation rules.
+/// If not specified, all are initialized within .ctor of
+/// <see cref="ValueGetter{T}"/> or <see cref="ValueSetter{T}"/>.
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class ReflectionMetaInfo<T>
 {
-    private readonly Dictionary<string, Func<T, object>> _getters = new();
-    private readonly Dictionary<string, Type> _getterPropertyTypes = new();
-    private readonly Dictionary<string, List<ValidationAttribute>> _validationProperties = new();
-    private readonly Dictionary<string, AutoCorrectAttribute> _autoCorrectProperties = new();
+    /// <summary>
+    /// Ordering of properties. [Initialized by <see cref="ReflectionUtils"/>]
+    /// </summary>
+    public Dictionary<string, int> Ordering { get; } = new();
+    public Dictionary<string, Func<T, object>> Getters { get; } = new();
+    public Dictionary<string, Action<T, object?>> Setters { get; } = new();
+    public Dictionary<string, Type> PropertyTypes { get; } = new();
+    public Dictionary<string, List<ValidationAttribute>> ValidationProperties { get; } = new();
+    public Dictionary<string, AutoCorrectAttribute> AutoCorrectProperties { get; } = new();
+}
 
-    private static readonly List<Type> _validationAttributes = new()
-    {
-        typeof(PositiveAttribute),
-        typeof(NonNegativeAttribute),
-        typeof(NotUnknownAttribute),
-        typeof(MinLengthAttribute)
-    };
-
-    private static readonly List<Type> _autoCorrectAttributes = new()
-    {
-        typeof(AlwaysUpperCaseAttribute),
-        typeof(AlwaysLowerCaseAttribute),
-    };
-
-    public ValueGetter(IEnumerable<PropertyInfo> properties)
+public class ValueGetter<T> : PropertyReflectionHelper<T>
+{
+    public ValueGetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info) : base(info)
     {
         foreach (var property in properties)
         {
             // mark the attributes
-            foreach (var attribute in _validationAttributes)
+            foreach (var attribute in Validator.ValidationAttributes)
             {
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is ValidationAttribute va)
                 {
-                    _validationProperties[property.Name] ??= new();
-                    _validationProperties[property.Name].Add(va);
+                    _info.ValidationProperties[property.Name] ??= new();
+                    _info.ValidationProperties[property.Name].Add(va);
                 }
             }
-            foreach (var attribute in _autoCorrectAttributes)
+            foreach (var attribute in Validator.AutoCorrectAttributes)
             {
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is AutoCorrectAttribute aa)
                 {
-                    _autoCorrectProperties[property.Name] = aa;
+                    _info.AutoCorrectProperties[property.Name] = aa;
                 }
             }
 
-            // exclude the static ones
-            if (property.GetGetMethod()?.IsStatic ?? false)
-                continue;
-            _getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
-            _getterPropertyTypes[property.Name] = property.PropertyType;
+            _info.Getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
+            _info.PropertyTypes[property.Name] = property.PropertyType;
         }
     }
 
+    /// <summary>
+    /// Gets the value in property (with name <paramref name="propertyName"/>) from object
+    /// <paramref name="targetObject"/>.
+    /// It is way faster than ordinary reflection method.
+    /// </summary>
+    /// <param name="targetObject"></param>
+    /// <param name="propertyName"></param>
+    /// <returns></returns>
     public object? Get(T targetObject, string propertyName)
     {
-        return _getters[propertyName].Invoke(targetObject);
+        return _info.Getters[propertyName].Invoke(targetObject);
     }
 
+    /// <summary>
+    /// Gets the value + type tuple of property (with name <paramref name="propertyName"/>) from object
+    /// <paramref name="targetObject"/>.
+    /// </summary>
+    /// <param name="targetObject"></param>
+    /// <param name="propertyName"></param>
+    /// <returns></returns>
     public (object?, Type) GetTypeAndValue(T targetObject, string propertyName)
     {
-        return (_getters[propertyName].Invoke(targetObject), _getterPropertyTypes[propertyName]);
+        return (_info.Getters[propertyName].Invoke(targetObject), _info.PropertyTypes[propertyName]);
     }
 
-    public void ValidateOrThrow(T targetObject)
+    /// <summary>
+    /// Go through all validation rules specified in <see cref="ValidationAttribute"/>s,
+    /// validate the properties, and throws if any rule being violated.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <exception cref="ArgumentException"></exception>
+    public void ValidateOrThrow(T entry)
     {
-        if (!Validate(targetObject, out var propName, out var ruleName))
+        if (!Validate(entry, out var propName, out var ruleName))
             throw new ArgumentException($"Failed validation for property {propName} in type {typeof(T).Name} against rule {ruleName}");
     }
 
-    public bool Validate(T targetObject, out string invalidPropertyName, out string violatedRule)
+    /// <summary>
+    /// Go through all validation rules specified in <see cref="ValidationAttribute"/>s
+    /// for the given <paramref name="entry"/>.
+    /// Validate its properties, and if any invalid case exists, returns false, outputs the first invalid
+    /// property name and the name of validation attribute. Otherwise returns true.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <param name="invalidPropertyName"></param>
+    /// <param name="violatedRule"></param>
+    /// <returns></returns>
+    public bool Validate(T entry, out string invalidPropertyName, out string violatedRule)
     {
         violatedRule = "";
         invalidPropertyName = "";
-        foreach (var (propertyName, attributes) in _validationProperties)
+        foreach (var (propertyName, attributes) in _info.ValidationProperties)
         {
-            var value = Get(targetObject, propertyName);
+            var value = Get(entry, propertyName);
             foreach (var attr in attributes)
             {
                 if (!attr.IsValid(value))
@@ -332,11 +374,21 @@ public class ValueGetter<T>
         return true;
     }
 
-    public bool Validate(T targetObject, string propertyName, out string message)
+    /// <summary>
+    /// Validate a property specified by <paramref name="propertyName"/>
+    /// for a given object <paramref name="entry"/>.
+    /// If it is invalid, returns false, and outputs an error message.
+    /// Otherwise returns true.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <param name="propertyName"></param>
+    /// <param name="message"></param>
+    /// <returns></returns>
+    public bool Validate(T entry, string propertyName, out string message)
     {
         message = "";
-        var value = Get(targetObject, propertyName);
-        if (_validationProperties.TryGetValue(propertyName, out var validationAttributes))
+        var value = Get(entry, propertyName);
+        if (_info.ValidationProperties.TryGetValue(propertyName, out var validationAttributes))
         {
             foreach (var attr in validationAttributes)
             {
@@ -347,50 +399,86 @@ public class ValueGetter<T>
         return true;
     }
 
-    public bool IsWithAutoCorrect(T targetObject, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
+    /// <summary>
+    /// Check a property specified by <paramref name="propertyName"/>
+    /// for a given object <paramref name="entry"/>.
+    /// If it is attached by <see cref="AutoCorrectAttribute"/>,
+    /// returns true, outputs the related property value and the attribute instance.
+    /// Otherwise returns false.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <param name="propertyName"></param>
+    /// <param name="originalValue"></param>
+    /// <param name="attribute"></param>
+    /// <returns></returns>
+    public bool IsWithAutoCorrect(T entry, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
     {
         originalValue = null;
-        if (_autoCorrectProperties.TryGetValue(propertyName, out attribute))
+        if (_info.AutoCorrectProperties.TryGetValue(propertyName, out attribute))
         {
-            originalValue = Get(targetObject, propertyName);
+            originalValue = Get(entry, propertyName);
             return true;
         }
         return false;
     }
 
-    public IEnumerable<(string, object)> GetAllValues(T entry)
+    /// <summary>
+    /// Get the property names and values of a given <paramref name="entry"/>.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <returns></returns>
+    public IEnumerable<(string, object)> GetNamesAndValues(T entry)
     {
-        foreach (var (name, getter) in _getters)
+        foreach (var (name, getter) in _info.Getters)
         {
             yield return (name, getter(entry));
         }
     }
 }
 
-public class ValueSetter<T>
+public class ValueSetter<T> : PropertyReflectionHelper<T>
 {
-    private readonly Dictionary<string, Action<T, object>> _setters = new();
-
-    public ValueSetter(Dictionary<string, PropertyInfo>.ValueCollection properties)
+    public ValueSetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info) : base(info)
     {
         foreach (var property in properties)
         {
-            // must exclude the static ones
-            if (property.GetGetMethod()?.IsStatic ?? false)
-                continue;
             var setter = ReflectionUtils.BuildUntypedSetter<T>(property);
             if (setter != null)
-                _setters[property.Name] = setter;
+                _info.Setters[property.Name] = setter;
+            _info.PropertyTypes[property.Name] = property.PropertyType;
         }
     }
 
+    /// <summary>
+    /// Sets the value for property (with name <paramref name="propertyName"/>) in object
+    /// <paramref name="targetObject"/>.
+    /// It is way faster than ordinary reflection method.
+    /// </summary>
+    /// <param name="targetObject"></param>
+    /// <param name="propertyName"></param>
+    /// <param name="value"></param>
     public void Set(T targetObject, string propertyName, object? value)
     {
-        _setters[propertyName].Invoke(targetObject, value);
+        _info.Setters[propertyName].Invoke(targetObject, value);
+    }
+}
+
+public abstract class PropertyReflectionHelper<T>
+{
+    protected ReflectionMetaInfo<T> _info;
+
+    protected PropertyReflectionHelper(ReflectionMetaInfo<T> info)
+    {
+        _info = info;
     }
 
-    public IEnumerable<string> GetFieldNames()
+    public IEnumerable<string> GetNames()
     {
-        return _setters.Keys;
+        return _info.Ordering.Keys;
+    }
+
+    public int GetIndex(string propertyName)
+    {
+        return _info.Ordering.TryGetValue(propertyName, out var index) ? index : -1;
     }
 }

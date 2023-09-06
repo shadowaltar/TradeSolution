@@ -17,7 +17,7 @@ public class Account
     /// </summary>
     [UpsertIgnore]
     [AutoIncrementOnInsert]
-    [NonNegative]
+    [NotNegative]
     public int Id { get; set; }
 
     /// <summary>
@@ -29,7 +29,7 @@ public class Account
     /// <summary>
     /// Account owner.
     /// </summary>
-    [NonNegative]
+    [NotNegative]
     public int OwnerId { get; set; } = int.MinValue;
 
     /// <summary>
