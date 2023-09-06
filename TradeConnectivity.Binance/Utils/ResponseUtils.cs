@@ -1,10 +1,7 @@
-﻿using Azure.Core;
-using Common;
+﻿using Common;
 using log4net;
-using log4net.Core;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Nodes;
-using TradeCommon.Runtime;
 
 namespace TradeConnectivity.Binance.Utils;
 public static class ResponseUtils
@@ -42,7 +39,7 @@ public static class ResponseUtils
             }
             else if (key == "x-mbx-uuid")
             {
-                var values = ((string[])valueArray);
+                var values = (string[])valueArray;
                 return values.FirstOrDefault() ?? "";
             }
         }
@@ -73,7 +70,7 @@ public static class ResponseUtils
         }
         return false;
     }
-    
+
 
     public static bool ParseJsonArray(this HttpResponseMessage response,
                                       [NotNullWhen(true)] out string? content,
@@ -109,7 +106,7 @@ public static class ResponseUtils
         log ??= _log;
         jsonNode = null;
         errorMessage = null;
-        content = AsyncHelper.RunSync(() => response.Content.ReadAsStringAsync());
+        content = AsyncHelper.RunSync(response.Content.ReadAsStringAsync);
         try
         {
             jsonNode = JsonNode.Parse(content);

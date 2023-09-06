@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using System.Runtime.InteropServices;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
@@ -21,8 +22,8 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly Dictionary<long, Position> _closedPositions = new();
     private readonly object _lock = new();
 
-    public IExternalExecutionManagement ExternalExecution { get; }
-    public IExternalAccountManagement ExternalAccountManagement { get; }
+    public IExternalExecutionManagement Execution { get; }
+    public IExternalAccountManagement AccountManagement { get; }
 
     public decimal RemainingBalance { get; private set; }
 
@@ -37,8 +38,8 @@ public class PortfolioService : IPortfolioService, IDisposable
                             ITradeService tradeService,
                             Persistence persistence)
     {
-        ExternalExecution = externalExecution;
-        ExternalAccountManagement = externalAccountManagement;
+        Execution = externalExecution;
+        AccountManagement = externalAccountManagement;
         _context = context;
         _orderService = orderService;
         _tradeService = tradeService;
@@ -96,7 +97,8 @@ public class PortfolioService : IPortfolioService, IDisposable
             position.Orders.Add(order);
 
             PositionCreated?.Invoke(position);
-            Persist(position);
+
+            _persistence.Enqueue(new PersistenceTask<Position>(position));
         }
     }
 
@@ -145,9 +147,9 @@ public class PortfolioService : IPortfolioService, IDisposable
         throw new NotImplementedException();
     }
 
-    public Task Initialize()
+    public async Task Initialize()
     {
-        throw new NotImplementedException();
+        await Execution.Subscribe();
     }
 
     /// <summary>
@@ -209,12 +211,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         position.Price = newPrice;
         position.RealizedPnl += newPnl;
         position.Trades.Add(trade);
-    }
-
-    private void Persist(Position position)
-    {
-        var task = new PersistenceTask<Position>(position);
-        _persistence.Enqueue(task);
     }
 
     public void Dispose()

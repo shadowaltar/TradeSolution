@@ -18,7 +18,7 @@ public class User
     public string Email { get; set; } = "";
 
     [NotUnknown]
-    public string Environment { get; set; } = Environments.Test;
+    public string Environment { get; set; } = Environments.Unknown;
 
     public string EncryptedPassword { get; set; } = "";
 
@@ -28,4 +28,9 @@ public class User
 
     [InsertIgnore, SelectIgnore]
     public List<Account> Accounts { get; } = new();
+
+    public override string ToString()
+    {
+        return $"[{Id}] {Name}, {Environment}";
+    }
 }

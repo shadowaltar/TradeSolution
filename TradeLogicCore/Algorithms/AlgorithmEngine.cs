@@ -1,10 +1,12 @@
-﻿using Common;
+﻿using Autofac.Core;
+using Common;
 using log4net;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
@@ -85,7 +87,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     public IntervalType Interval { get; protected set; }
 
-    public decimal InitialFreeAmount { get; protected set; }
+    public Dictionary<int, decimal> InitialFreeAmounts { get; } = new();
 
     public Portfolio Portfolio { get; protected set; }
 
@@ -136,7 +138,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         if (resumeTime != null && resumeTime.Value >= now)
         {
             _runningState = AlgoRunningState.Halted;
-            var remainingTimeSpan = (now - resumeTime.Value).Add(TimeSpan.FromMilliseconds(1));
+            var remainingTimeSpan = (resumeTime.Value - now).Add(TimeSpans.OneMillisecond);
             Thread.Sleep(remainingTimeSpan);
             _runningState = AlgoRunningState.Running;
         }
@@ -144,25 +146,29 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     public async Task<int> Run(AlgoStartupParameters parameters)
     {
-        SetAlgoEffectiveTimeRange(parameters.TimeRange);
-
         TotalSignalCount = 0;
-        User = await _services.Admin.GetUser(parameters.UserName, parameters.Environment);
-        Account = await _services.Admin.GetAccount(parameters.UserName, parameters.Environment);
+        User = _services.Admin.CurrentUser;
+        Account = _services.Admin.CurrentAccount;
         if (User == null || Account == null)
             return 0;
         Interval = parameters.Interval;
-        InitialFreeAmount = Account.MainBalance?.FreeAmount ?? 0;
-        if (InitialFreeAmount == 0)
+        InitialFreeAmounts.AddRange(Account.Balances, b => b.AssetId, b => b.FreeAmount);
+        if (InitialFreeAmounts.All(t => t.Value == 0))
             return 0;
 
         ShouldCloseOpenPositionsWhenHalted = parameters.ShouldCloseOpenPositionsWhenHalted;
         ShouldCloseOpenPositionsWhenStopped = parameters.ShouldCloseOpenPositionsWhenStopped;
 
+        await _services.Portfolio.Initialize();
+
         _services.MarketData.NextOhlc -= OnNextPrice;
         _services.MarketData.NextOhlc += OnNextPrice;
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
         _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
+        _services.Order.NextOrder -= OnNextOrder;
+        _services.Order.NextOrder += OnNextOrder;
+        _services.Trade.NextTrade -= OnNextTrade;
+        _services.Trade.NextTrade += OnNextTrade;
 
         Screening.SetAndPick(parameters.SecurityPool.ToDictionary(s => s.Id, s => s));
         var pickedSecurities = Screening.GetAll();
@@ -170,6 +176,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         {
             await _services.MarketData.SubscribeOhlc(security, Interval);
         }
+        SetAlgoEffectiveTimeRange(parameters.TimeRange);
 
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
@@ -214,17 +221,17 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         switch (timeRange.WhenToStart)
         {
             case AlgoStartTimeType.Designated:
+            {
+                if (startTime.IsValid() && startTime > now)
                 {
-                    if (startTime.IsValid() && startTime > now)
-                    {
-                        WaitTillStartTime(startTime, stopTime, now);
-                    }
-                    else
-                    {
-                        _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
-                    }
-                    break;
+                    WaitTillStartTime(startTime, stopTime, now);
                 }
+                else
+                {
+                    _log.Error($"Invalid designated algo start time: {startTime:yyyyMMdd-HHmmss}");
+                }
+                break;
+            }
             case AlgoStartTimeType.Immediately:
                 _runningState = AlgoRunningState.Running;
                 break;
@@ -249,19 +256,19 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                 }
                 break;
             case AlgoStartTimeType.NextStartOfLocalDay:
+            {
+                _runningState = AlgoRunningState.Stopped;
+                if (startTime > localNow)
                 {
-                    _runningState = AlgoRunningState.Stopped;
-                    if (startTime > localNow)
-                    {
-                        if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
-                        WaitTillStartTime(startTime, stopTime, localNow);
-                    }
-                    else
-                    {
-                        _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
-                    }
-                    break;
+                    if (stopTime != null) stopTime = stopTime.Value.ToLocalTime();
+                    WaitTillStartTime(startTime, stopTime, localNow);
                 }
+                else
+                {
+                    _log.Error($"Invalid designated local algo start time: {startTime:yyyyMMdd-HHmmss}");
+                }
+                break;
+            }
             case AlgoStartTimeType.NextMarketOpens:
                 // TODO, need market meta data
                 break;
@@ -277,7 +284,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                 throw new ArgumentException("Start time is larger than stop time. Program exits.");
             }
             DesignatedStartTime = startTime;
-            var remainingTimeSpan = now - startTime;
+            var remainingTimeSpan = startTime - now;
             _log.Info($"Wait till {startTime:yyyyMMdd-HHmmss}, remaining: {remainingTimeSpan.TotalSeconds:F4} seconds.");
             Halt(startTime);
         }
@@ -404,6 +411,14 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         //Assertion.Shall((Portfolio.InitialFreeCash + Portfolio.TotalRealizedPnl).ApproxEquals(Portfolio.FreeCash));
 
         Algorithm.AfterProcessingSecurity(this, security);
+    }
+
+    private void OnNextOrder(Order order)
+    {
+    }
+
+    private void OnNextTrade(Trade trade)
+    {
     }
 
     private void OnHistoricalPriceEnd(int priceCount)

@@ -29,6 +29,7 @@ public class OrderService : IOrderService, IDisposable
 
     public event Action<Order>? AfterOrderSent;
     public event Action<Order>? OrderCancelled;
+    public event Action<Order>? NextOrder;
 
     public OrderService(IExternalExecutionManagement execution,
                         Context context,
@@ -69,12 +70,11 @@ public class OrderService : IOrderService, IDisposable
             {
                 _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
-            lock (_externalOrderIdToOrders)
-                _externalOrderIdToOrders[eoid] = order;
-            lock (_orders)
-                _orders[oid] = order;
+            _externalOrderIdToOrders.ThreadSafeSet(eoid, order);
+            _orders.ThreadSafeSet(oid, order);
             _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
         }
+        NextOrder?.Invoke(order);
     }
 
     public Order? GetOrder(long orderId)

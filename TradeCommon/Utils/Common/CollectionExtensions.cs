@@ -48,6 +48,13 @@ public static class CollectionExtensions
             collection.Add(v);
     }
 
+    public static void AddRange<T, Tk, Tv>(this IDictionary<Tk, Tv>? collection, IEnumerable<T>? items, Func<T, Tk> keySelector, Func<T, Tv> valueSelector)
+    {
+        if (collection == null || items == null) return;
+        foreach (var item in items)
+            collection[keySelector(item)] = valueSelector(item);
+    }
+
     public static IEnumerable<List<T>> Split<T>(this IEnumerable<T> items, int bucketSize = 30)
     {
         if (bucketSize <= 0)
@@ -103,12 +110,20 @@ public static class CollectionExtensions
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
 
-    public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y)
+    public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y) where T : notnull
     {
         lock (dictionary)
         {
             var r = dictionary.TryGetValue(key, out y);
             return r;
+        }
+    }
+
+    public static void ThreadSafeSet<T, TV>(this Dictionary<T, TV> dictionary, T key, TV y) where T : notnull
+    {
+        lock (dictionary)
+        {
+            dictionary[key] = y;
         }
     }
 

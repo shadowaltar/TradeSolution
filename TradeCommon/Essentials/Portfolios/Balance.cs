@@ -44,6 +44,11 @@ public class Balance
 
     public DateTime UpdateTime { get; set; }
 
+    public override string ToString()
+    {
+        return $"[{AssetId}] {AssetCode}, {FreeAmount}/{LockedAmount}, {UpdateTime:yyyyMMdd-HHmmss}";
+    }
+
     public override bool Equals(object? obj)
     {
         return obj is Balance balance &&

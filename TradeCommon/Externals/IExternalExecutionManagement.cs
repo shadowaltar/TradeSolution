@@ -16,6 +16,8 @@ public interface IExternalExecutionManagement
     event OrderReceivedCallback? OrderReceived;
     event TradeReceivedCallback? TradeReceived;
     event TradesReceivedCallback? TradesReceived;
+    
+    Task<ExternalConnectionState> Subscribe();
 
     Task<ExternalQueryState> SendOrder(Order order);
 

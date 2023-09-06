@@ -99,11 +99,11 @@ public class Trade : IComparable<Trade>
     /// </summary>
     [UpsertIgnore, SelectIgnore, InsertIgnore]
     public bool IsOwnerUnknown { get; set; } = false;
-    
+
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
     /// </summary>
-    [UpsertIgnore]
+    [UpsertIgnore, SelectIgnore, InsertIgnore]
     public int BestMatch { get; set; } = 0;
 
     public int CompareTo(Trade? trade)

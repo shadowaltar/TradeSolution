@@ -6,15 +6,19 @@ namespace TradeCommon.Database;
 
 public class PersistenceTask<T> : IPersistenceTask
 {
+    public string TypeName { get; }
+
     public PersistenceTask(T entry, string? databaseName = null)
     {
         Entry = entry;
+        TypeName = typeof(T).Name;
         DatabaseName = databaseName ?? DatabaseNames.GetDatabaseName<T>();
     }
 
     public PersistenceTask(List<T> entries, string? databaseName = null)
     {
         Entries = entries;
+        TypeName = typeof(T).Name;
         DatabaseName = databaseName ?? DatabaseNames.GetDatabaseName<T>();
     }
 

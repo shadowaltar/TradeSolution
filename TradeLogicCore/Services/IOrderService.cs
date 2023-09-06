@@ -18,6 +18,11 @@ public interface IOrderService
     event Action<Order>? OrderCancelled;
 
     /// <summary>
+    /// Invoked when any order changes are received.
+    /// </summary>
+    event Action<Order>? NextOrder;
+
+    /// <summary>
     /// Get an order from cache by its id.
     /// </summary>
     /// <param name="orderId"></param>

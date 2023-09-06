@@ -2,7 +2,6 @@
 using log4net;
 using log4net.Util;
 using Microsoft.Data.Sqlite;
-using Microsoft.Diagnostics.Runtime.Utilities;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;

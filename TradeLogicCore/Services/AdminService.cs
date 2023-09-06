@@ -4,8 +4,6 @@ using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -18,7 +16,6 @@ public class AdminService : IAdminService
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
     private readonly ISecurityService _securityService;
-    private readonly Persistence _persistence;
 
     public User? CurrentUser { get; private set; }
 
@@ -29,14 +26,12 @@ public class AdminService : IAdminService
     public AdminService(Context context,
                         IExternalAccountManagement accountManagement,
                         IExternalConnectivityManagement connectivity,
-                        ISecurityService securityService,
-                        Persistence persistence)
+                        ISecurityService securityService)
     {
         Context = context;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
         _securityService = securityService;
-        _persistence = persistence;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
@@ -120,14 +115,12 @@ public class AdminService : IAdminService
 
     public async Task<User?> GetUser(string? userName, EnvironmentType environment)
     {
-        if (userName.IsBlank()) return null;
-        return await Storage.ReadUser(userName, "", environment);
+        return userName.IsBlank() ? null : await Storage.ReadUser(userName, "", environment);
     }
 
     public async Task<User?> GetUserByEmail(string? email, EnvironmentType environment)
     {
-        if (email.IsBlank()) return null;
-        return await Storage.ReadUser("", email, environment);
+        return email.IsBlank() ? null : await Storage.ReadUser("", email, environment);
     }
 
     public async Task<int> CreateAccount(Account account)
@@ -153,13 +146,13 @@ public class AdminService : IAdminService
             var account = await Storage.ReadAccount(accountName, environment);
             if (account == null)
             {
-                _log.Error($"Failed to read account by name {accountName} from database.");
+                _log.Error($"Failed to read account by name {accountName} from database in {environment}.");
                 return null;
             }
             var balances = await Storage.ReadBalances(account.Id);
             if (balances.IsNullOrEmpty())
             {
-                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database.");
+                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database in {environment}.");
             }
             else
             {
@@ -201,15 +194,6 @@ public class AdminService : IAdminService
                     balance.UpdateTime = account.UpdateTime;
                 }
             }
-
-            //_persistence.Enqueue(new PersistenceTask<Account>(account));
-            //if (!account.Balances.IsNullOrEmpty())
-            //{
-            //    foreach (var balance in account.Balances)
-            //    {
-            //        _persistence.Enqueue(new PersistenceTask<Balance>(balance));
-            //    }
-            //}
             return account;
         }
     }

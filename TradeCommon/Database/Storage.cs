@@ -3,14 +3,6 @@ using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
-using TradeCommon.Essentials;
-using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Fundamentals;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
-using TradeCommon.Essentials.Quotes;
-using TradeCommon.Essentials.Trading;
-using static TradeCommon.Constants.Constants;
 
 namespace TradeCommon.Database;
 
@@ -18,74 +10,6 @@ public partial class Storage
 {
     private static readonly ILog _log = Logger.New();
     private static readonly Dictionary<DataType, ISqlWriter> _writers = new();
-
-    public static async Task Insert(IPersistenceTask task, bool isUpsert = true)
-    {
-        if (task is PersistenceTask<OhlcPrice> priceTask)
-        {
-            if (!priceTask.Entries.IsNullOrEmpty())
-                await UpsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
-        }
-        else if (task is PersistenceTask<Order> orderTask)
-        {
-            if (!orderTask.Entries.IsNullOrEmpty())
-                foreach (var entry in orderTask.Entries)
-                    await InsertOrder(entry, orderTask.SecurityType, isUpsert);
-            else if (orderTask.Entry != null)
-                await InsertOrder(orderTask.Entry, orderTask.SecurityType, isUpsert);
-        }
-        else if (task is PersistenceTask<Trade> tradeTask)
-        {
-            if (!tradeTask.Entries.IsNullOrEmpty())
-                foreach (var entry in tradeTask.Entries)
-                    await InsertTrade(entry, tradeTask.SecurityType, isUpsert);
-            else if (tradeTask.Entry != null)
-                await InsertTrade(tradeTask.Entry, tradeTask.SecurityType, isUpsert);
-        }
-        else if (task is PersistenceTask<OpenOrderId> openOrderIdTask)
-        {
-            if (!openOrderIdTask.Entries.IsNullOrEmpty())
-                foreach (var entry in openOrderIdTask.Entries)
-                    await InsertOpenOrderId(entry);
-            else if (openOrderIdTask.Entry != null)
-                await InsertOpenOrderId(openOrderIdTask.Entry);
-        }
-        else if (task is PersistenceTask<Position> positionTask)
-        {
-            if (!positionTask.Entries.IsNullOrEmpty())
-                foreach (var entry in positionTask.Entries)
-                    await InsertPosition(entry, positionTask.SecurityType, isUpsert);
-            else if (positionTask.Entry != null)
-                await InsertPosition(positionTask.Entry, positionTask.SecurityType, isUpsert);
-        }
-        else if (task is PersistenceTask<Security> securityTask && !securityTask.Entries.IsNullOrEmpty())
-        {
-            if (securityTask.SecurityType == SecurityType.Equity)
-                await UpsertStockDefinitions(securityTask.Entries);
-            else if (securityTask.SecurityType == SecurityType.Fx)
-                await UpsertFxDefinitions(securityTask.Entries);
-        }
-        else if (task is PersistenceTask<Balance> balanceTask)
-        {
-            if (balanceTask.Entry != null)
-                await InsertBalance(balanceTask.Entry, true);
-            else if (!balanceTask.Entries.IsNullOrEmpty())
-                foreach (var entry in balanceTask.Entries)
-                    await InsertBalance(entry, true);
-        }
-        else if (task is PersistenceTask<FinancialStat> financialStatsTask && !financialStatsTask.Entries.IsNullOrEmpty())
-        {
-            await UpsertSecurityFinancialStats(financialStatsTask.Entries);
-        }
-        else if (task is PersistenceTask<Account> accountTask && accountTask.Entry != null)
-        {
-            await InsertAccount(accountTask.Entry, true);
-        }
-        else
-        {
-            throw new InvalidOperationException($"Persistence task type {task.GetType().Name} is not supported.");
-        }
-    }
 
     /// <summary>
     /// Execute a query and return a <see cref="DataTable"/>.

@@ -223,18 +223,18 @@ public static class ExternalQueryStates
 
     public static ExternalQueryState QueryTrades(string content,
                                                  string connId,
+                                                 string securityCode,
                                                  params Trade[] trades)
     {
-        if (trades.Length == 0) throw new InvalidOperationException("Invalid usage of " + nameof(QueryTrades));
         return new ExternalQueryState
         {
-            Content = trades.Length == 1 ? trades[0] : trades,
+            Content = trades.Length == 0 ? null : trades.Length == 1 ? trades[0] : trades,
             ResponsePayload = content,
             Action = ActionType.GetTrade,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetTradeOk,
             UniqueConnectionId = connId,
-            Description = $"Got {trades.Length} trade(s) for {trades[0].SecurityCode}.",
+            Description = $"Got {trades.Length} trade(s) for {securityCode}.",
         };
     }
 

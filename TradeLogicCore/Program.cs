@@ -334,7 +334,8 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(engine.InitialFreeAmount.ToDouble(), engine.Portfolio.Notional.ToDouble(), start, end);
+                    var initFreeAmount = engine.InitialFreeAmounts.GetOrDefault(security.Id, 0);
+                    var annualizedReturn = Metrics.GetAnnualizedReturn(initFreeAmount.ToDouble(), engine.Portfolio.Notional.ToDouble(), start, end);
                     if (annualizedReturn == 0)
                     {
                         _log.Info($"No trades at all: {security.Code}");

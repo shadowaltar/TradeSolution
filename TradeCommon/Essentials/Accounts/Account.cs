@@ -2,6 +2,7 @@
 using TradeCommon.Runtime;
 using Common.Attributes;
 using TradeCommon.Utils.Common;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeCommon.Essentials.Accounts;
 
@@ -72,10 +73,15 @@ public class Account
     public DateTime UpdateTime { get; set; }
 
     [InsertIgnore, UpsertIgnore, SelectIgnore]
-    public Balance? MainBalance { get; set; }
+    public Balance? MainBalance { get; private set; }
 
     [InsertIgnore, UpsertIgnore, SelectIgnore]
     public List<Balance> Balances { get; } = new();
+
+    public override string ToString()
+    {
+        return $"[{Id}] {Name}, Owner: {OwnerId}, Env: {Environment}, Type: {Type}, External: {ExternalAccount}";
+    }
 
     public override bool Equals(object? obj)
     {

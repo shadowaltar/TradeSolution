@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
@@ -24,7 +25,7 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
 
     Account? Account { get; }
 
-    decimal InitialFreeAmount { get; }
+    Dictionary<int, decimal> InitialFreeAmounts { get; }
 
     IPositionSizingAlgoLogic<T> Sizing { get; }
 

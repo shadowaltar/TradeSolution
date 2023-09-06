@@ -242,7 +242,7 @@ public static class ReflectionUtils
             return results;
         }
         // exclude the static and non-public getter
-        results = type.GetProperties(flags).Where(p => p.GetGetMethod()?.IsStatic ?? false)
+        results = type.GetProperties(flags).Where(p => !(p.GetGetMethod()?.IsStatic ?? false))
             .ToDictionary(p => p.Name, p => p);
         _typeToPropertyInfoMap[type] = results;
         return results;
@@ -251,7 +251,7 @@ public static class ReflectionUtils
     public static List<(string name, PropertyInfo property, int index)> GetOrderedPropertyAndName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
     {
         return type.GetProperties(flags)
-            .Where(p => p.GetGetMethod()?.IsStatic ?? false)
+            .Where(p => !(p.GetGetMethod()?.IsStatic ?? false))
             .Select((p, i) => (p.Name, p, i)).ToList();
     }
 }
@@ -289,8 +289,8 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is ValidationAttribute va)
                 {
-                    _info.ValidationProperties[property.Name] ??= new();
-                    _info.ValidationProperties[property.Name].Add(va);
+                    var attrs = _info.ValidationProperties.GetOrCreate(property.Name);
+                    attrs.Add(va);
                 }
             }
             foreach (var attribute in Validator.AutoCorrectAttributes)

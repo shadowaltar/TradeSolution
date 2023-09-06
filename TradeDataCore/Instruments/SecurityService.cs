@@ -1,13 +1,16 @@
-﻿using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
+﻿using Common;
+using TradeCommon.Constants;
 using TradeCommon.Database;
-using Common;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
 {
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
+    private readonly Dictionary<int, Security> _fxToBaseAssets = new();
+    private readonly Dictionary<int, Security> _fxToQuoteAssets = new();
+
 
     private bool _requestedExternalOnce = false;
 
@@ -100,8 +103,7 @@ public class SecurityService : ISecurityService
             lock (_securities)
             {
                 var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? temp : -1;
-                if (id == -1) return null;
-                return _securities.GetValueOrDefault(id);
+                return id == -1 ? null : _securities.GetValueOrDefault(id);
             }
         }
     }
@@ -135,11 +137,37 @@ public class SecurityService : ISecurityService
     {
         lock (_securities)
         {
+            var fxSecurities = new Dictionary<string, Security>(securities.Count);
             for (int i = 0; i < securities.Count; i++)
             {
                 var s = securities[i];
+                var secType = SecurityTypeConverter.Parse(s.Type);
                 _securities[s.Id] = s;
-                _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), SecurityTypeConverter.Parse(s.Type))] = s.Id;
+                _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), secType)] = s.Id;
+
+                // mark the fx for next loop; it includes both fx and assets
+                if (secType == SecurityType.Fx)
+                    fxSecurities[s.Code] = s;
+            }
+            foreach (var fx in fxSecurities.Values)
+            {
+                if (fx.FxInfo?.IsAsset ?? false)
+                {
+                    // asset's quote asset is itself
+                    // no base asset
+                    _fxToQuoteAssets[fx.Id] = fx;
+                }
+                if (fx.FxInfo != null)
+                {
+                    if (!fx.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(fx.FxInfo.BaseCurrency, out var baseAsset))
+                    {
+                        _fxToBaseAssets[fx.Id] = baseAsset;
+                    }
+                    if (!fx.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(fx.FxInfo.QuoteCurrency, out var quoteAsset))
+                    {
+                        _fxToQuoteAssets[fx.Id] = quoteAsset;
+                    }
+                }
             }
         }
     }

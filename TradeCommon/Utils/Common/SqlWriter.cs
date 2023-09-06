@@ -310,9 +310,11 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
             // DO UPDATE SET ...
             sb.Append("DO UPDATE SET ");
-            foreach (var fn in _uniqueKeyNames)
+            foreach (var fn in _targetFieldNames)
             {
                 if (upsertIgnoreFieldNames.Contains(fn))
+                    continue;
+                if (_uniqueKeyNames.Contains(fn))
                     continue;
 
                 sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
