@@ -96,19 +96,4 @@ public static class HttpHelper
         swInner.Stop();
         return (response, swInner.ElapsedMilliseconds);
     }
-
-
-    private static async Task<string> CheckContentAndStatus(HttpResponseMessage response)
-    {
-        var content = await response.Content.ReadAsStringAsync();
-        if (response.IsSuccessStatusCode)
-        {
-            _log.Info(response);
-        }
-        else
-        {
-            _log.Error(response.StatusCode + ": " + content);
-        }
-        return content;
-    }
 }

@@ -67,8 +67,8 @@ public class Quotation : IExternalQuotationManagement
 
         await ws.ConnectAsync(uri, default);
 
-        var broker = _messageBrokers.GetOrCreate((security.Id, intervalType));
-        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price);
+        var broker = _messageBrokers.GetOrCreate((security.Id, intervalType), (k, v) => v.Run());
+        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price); // broker.Dispose() will clear this up if needed
 
         ws.Receive(OnReceivedString);
         var message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
@@ -90,7 +90,7 @@ public class Quotation : IExternalQuotationManagement
                 var kLineNode = dataNode["k"]!.AsObject();
                 var start = DateUtils.FromUnixMs(kLineNode["t"]!.GetValue<long>());
 
-                var isComplete = kLineNode["x"]!.GetBoolean("x");
+                var isComplete = kLineNode.GetBoolean("x");
 
                 var o = kLineNode["o"]!.GetValue<string>().ParseDecimal();
                 var h = kLineNode["h"]!.GetValue<string>().ParseDecimal();
@@ -110,6 +110,7 @@ public class Quotation : IExternalQuotationManagement
                     price.V = v;
                     price.T = start;
                 }
+                _lastOhlcPrices[(security.Id, intervalType)] = price;
                 broker!.Enqueue(price);
             }
         }

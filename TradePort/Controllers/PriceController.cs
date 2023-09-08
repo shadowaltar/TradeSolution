@@ -211,11 +211,13 @@ public class PriceController : Controller
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="intervalStr"></param>
+    /// <param name="isTest"></param>
     /// <param name="code"></param>
     /// <returns></returns>
     [HttpGet($"{ExternalNames.Binance}/real-time")]
     public async Task<ActionResult> GetOneRealTimeBinancePrice([FromServices] ISecurityService securityService,
                                                                [FromQuery(Name = "interval")] string intervalStr = "1m",
+                                                               [FromQuery(Name = "test")] bool isTest = false,
                                                                string? code = "BTCTUSD")
     {
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out var br)) return br;
@@ -225,7 +227,7 @@ public class PriceController : Controller
         if (security == null) return BadRequest("Missing security.");
 
         var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(interval).ToLowerInvariant()}";
-        var url = $"wss://stream.binance.com:9443/stream?streams={wsName}";
+        var url = isTest ? $"wss://testnet.binance.vision/stream?streams={wsName}" : $"wss://stream.binance.com:9443/stream?streams={wsName}";
         var result = await WebSocketHelper.ListenOne(url);
 
         return Ok(result);

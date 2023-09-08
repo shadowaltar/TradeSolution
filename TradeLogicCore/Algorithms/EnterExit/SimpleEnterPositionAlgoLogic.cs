@@ -18,8 +18,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
 
     public void Open(IAlgorithmContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
     {
-        Assertion.ShallNever(context.Portfolio.FreeCash == 0);
-
+        var securityId = current.
         current.IsLong = true;
         current.LongCloseType = CloseType.None;
         // TODO current sizing happens here

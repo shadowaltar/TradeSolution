@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using TradeCommon.Essentials;
 
 namespace Common;
@@ -59,8 +60,8 @@ public static class DateUtils
     }
 
     public static bool IsValid(this DateTime value) => value != DateTime.MaxValue && value != DateTime.MinValue;
-    
-    public static bool IsValid(this DateTime? value) => value != null && value != DateTime.MaxValue && value != DateTime.MinValue;
+
+    public static bool IsValid([NotNullWhen(true)] this DateTime? value) => value != null && value != DateTime.MaxValue && value != DateTime.MinValue;
 
     public static bool IsWeekend(this DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 

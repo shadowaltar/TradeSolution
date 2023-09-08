@@ -85,11 +85,38 @@ public class RequestBuilder
         return request;
     }
 
+    public HttpRequestMessage BuildApiKey(HttpMethod method,
+                                          string url,
+                                          List<(string key, string value)>? parameters = null)
+    {
+        var request = new HttpRequestMessage();
+        request.Method = method;
+
+        parameters ??= new List<(string, string)>();
+        AppendApiKey(request);
+
+        if (method == HttpMethod.Get)
+        {
+            request.RequestUri = new Uri(url);
+        }
+        else
+        {
+            // if signed, result string is already constructed
+            if (!parameters.IsNullOrEmpty())
+            {
+                var result = StringUtils.ToUrlParamString(parameters);
+                request.Content = new StringContent(result);
+            }
+            request.RequestUri = new Uri(url);
+        }
+        return request;
+    }
+
     private string AppendSignedParameters(HttpRequestMessage request, List<(string key, string value)> parameters)
     {
         // add 'signature' to POST body (or as GET arguments): an HMAC-SHA256 signature
         // add 'timestamp' and 'receive window'
-        request.Headers.Add("X-MBX-APIKEY", _keyManager.GetApiKey());
+        AppendApiKey(request);
 
         var timestamp = DateTime.UtcNow.ToUnixMs();
         parameters.Add(("recvWindow", _receiveWindowMsString));
@@ -100,5 +127,10 @@ public class RequestBuilder
         var trueSecret = Convert.ToHexString(hashedValueBytes);
 
         return $"{parameterString}&signature={trueSecret}";
+    }
+
+    private void AppendApiKey(HttpRequestMessage request)
+    {
+        request.Headers.Add("X-MBX-APIKEY", _keyManager.GetApiKey());
     }
 }

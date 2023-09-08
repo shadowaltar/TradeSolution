@@ -26,6 +26,11 @@ public record Position
     public int SecurityId { get; set; }
 
     /// <summary>
+    /// The account id associated to this position.
+    /// </summary>
+    public int AccountId { get; set; }
+
+    /// <summary>
     /// The time which the position is established.
     /// It should be the first trade fills.
     /// </summary>
@@ -43,6 +48,11 @@ public record Position
     /// Zero means the position has been closed.
     /// </summary>
     public decimal Quantity { get; set; }
+
+    /// <summary>
+    /// The quantity which this position holds and cannot be traded.
+    /// </summary>
+    public decimal LockQuantity { get; set; }
 
     /// <summary>
     /// The price of this position.

@@ -1,9 +1,6 @@
-﻿using OfficeOpenXml.Style;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json.Nodes;
-using TradeCommon.Essentials.Quotes;
 
 namespace Common;
 public static class WebSocketHelper
