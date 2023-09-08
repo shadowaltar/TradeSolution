@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Common;
 public static class CollectionExtensions
 {
-    private static readonly Random random = new(DateTime.Now.Millisecond);
+    private static readonly Random _random = new(DateTime.Now.Millisecond);
 
     /// <summary>
     /// Get value by a key from the dictionary. If no matching key,
@@ -16,7 +16,7 @@ public static class CollectionExtensions
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key)
+    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Action<TK, TV>? afterCreated)
         where TK : notnull
         where TV : new()
     {
@@ -25,6 +25,7 @@ public static class CollectionExtensions
             return value;
         value = new TV();
         map[key] = value;
+        afterCreated?.Invoke(key, value);
         return value;
     }
 
@@ -135,7 +136,7 @@ public static class CollectionExtensions
 
     public static T RandomElement<T>(this IList<T> list)
     {
-        return list[random.Next(list.Count)];
+        return list[_random.Next(list.Count)];
     }
 
     public static IEnumerable<T> RandomElements<T>(this T[] array, int count)
@@ -146,6 +147,6 @@ public static class CollectionExtensions
 
     public static T RandomElement<T>(this T[] array)
     {
-        return array[random.Next(array.Length)];
+        return array[_random.Next(array.Length)];
     }
 }

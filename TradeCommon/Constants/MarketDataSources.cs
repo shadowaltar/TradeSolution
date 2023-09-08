@@ -17,7 +17,7 @@ public static class MarketDataSources
 
             // check type
             var type = SecurityTypeConverter.Parse(security.Type);
-            var subType = SecurityTypeConverter.Parse(security.SubType);
+            var subType = SecurityTypeConverter.ParseSubType(security.SubType);
             var exchange = ExchangeTypeConverter.Parse(security.SubType);
 
             var matched = true;

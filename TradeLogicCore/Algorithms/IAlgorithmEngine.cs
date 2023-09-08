@@ -25,8 +25,6 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
 
     Account? Account { get; }
 
-    Dictionary<int, decimal> InitialFreeAmounts { get; }
-
     IPositionSizingAlgoLogic<T> Sizing { get; }
 
     IEnterPositionAlgoLogic<T> EnterLogic { get; }
@@ -51,8 +49,6 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
     int? HoursBeforeHalt { get; }
 
     IntervalType Interval { get; }
-
-    Portfolio Portfolio { get; }
 
     bool ShouldCloseOpenPositionsWhenHalted { get; }
 

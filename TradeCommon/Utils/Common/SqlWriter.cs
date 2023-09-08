@@ -83,7 +83,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                 {
                     var placeholder = _targetFieldNamePlaceHolders[name];
 
-                    var value = _valueGetter.Get(entry.Cast<T>(), name);
+                    var value = _valueGetter.Get((T)(object)entry, name);
                     value = TryAutoIncrement(name, out var a) ? a : value;
                     value ??= DBNull.Value;
                     command.Parameters.AddWithValue(placeholder, value);
@@ -134,7 +134,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                     continue;
 
                 var placeholder = _targetFieldNamePlaceHolders[name];
-                var value = _valueGetter.Get(entry.Cast<T>(), name);
+                var value = _valueGetter.Get((T)(object)entry, name);
                 value = TryAutoIncrement(name, out var a) ? a : value;
                 value ??= DBNull.Value;
                 // by default treat enum value as upper string
@@ -197,7 +197,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                     continue;
 
                 var placeholder = _targetFieldNamePlaceHolders[name];
-                var value = _valueGetter.Get(entry.Cast<T>(), name);
+                var value = _valueGetter.Get((T)(object)entry, name);
                 if (value == null) // unique key columns should never be null
                     return -1;
                 // by default treat enum value as upper string

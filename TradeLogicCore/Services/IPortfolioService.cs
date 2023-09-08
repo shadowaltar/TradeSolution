@@ -1,8 +1,6 @@
-﻿using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
-using TradeCommon.Externals;
 
 namespace TradeLogicCore.Services;
 public interface IPortfolioService
@@ -11,19 +9,37 @@ public interface IPortfolioService
     event Action<Position>? PositionUpdated;
     event Action<Position>? PositionClosed;
 
-    IExternalAccountManagement AccountManagement { get; }
-    IExternalExecutionManagement Execution { get; }
+    Portfolio InitialPortfolio { get; }
 
-    /// <summary>
-    /// Gets the remaining balance which is free to be traded.
-    /// </summary>
-    decimal RemainingBalance { get; }
+    Portfolio Portfolio { get; }
 
     Task Initialize();
 
     List<Position> GetOpenPositions();
 
-    List<Position> GetPositions(string externalName, SecurityType securityType);
+    /// <summary>
+    /// Get position given its security ID.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <returns></returns>
+    Position? GetPosition(int securityId);
+
+    /// <summary>
+    /// Get asset's positoin given its asset (security) ID.
+    /// </summary>
+    /// <param name="assetId"></param>
+    /// <returns></returns>
+    Position? GetAsset(int assetId);
+
+    /// <summary>
+    /// Realize the pnl from the trade just closed, related to a specific security.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <param name="tradeRealizedPnl"></param>
+    /// <returns></returns>
+    decimal Realize(int securityId, decimal tradeRealizedPnl);
+
+    List<Position> GetPositions();
 
     /// <summary>
     /// TODO revise
@@ -32,19 +48,13 @@ public interface IPortfolioService
     /// <returns></returns>
     List<Balance> GetExternalBalances(string externalName);
 
-    /// <summary>
-    /// TODO revise
-    /// </summary>
-    /// <returns></returns>
-    List<Balance> GetCurrentBalances();
-
-    List<ProfitLoss> GetRealizedPnl(Security security, DateTime rangeStart, DateTime rangeEnd);
+    decimal GetRealizedPnl(Security security);
 
     ProfitLoss GetUnrealizedPnl(Security security);
 
     bool Validate(Order order);
 
-    Task<bool> Deposit(int accountId, int assetId, decimal value);
+    Task<bool> Deposit(int assetId, decimal quantity);
 
-    Task<bool> Withdraw(int accountId, int assetId, decimal value);
+    Task<bool> Withdraw(int assetId, decimal quantity);
 }

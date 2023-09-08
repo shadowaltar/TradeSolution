@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials.Portfolios;
 using Common.Attributes;
+using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -7,12 +8,12 @@ namespace TradeLogicCore.Algorithms;
 /// Class which records prop algo execution.
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public record AlgoEntry<T>
+public record AlgoEntry<T>([UpsertIgnore] long Id,
+                           [UpsertIgnore, InsertIgnore, SelectIgnore] Security Security)
 {
-    public int SeqNum { get; set; }
+    public int PositionId { get; set; }
 
-    [UpsertIgnore]
-    public long Id { get; set; }
+    public int SecurityId { get; set; } = -1;
 
     public required DateTime Time { get; set; }
 
@@ -72,10 +73,10 @@ public record AlgoEntry<T>
     /// </summary>
     public decimal Fee { get; set; }
 
-    /// <summary>
-    /// Gets / sets the portfolio snapshot related to current entry.
-    /// </summary>
-    public Portfolio? Portfolio { get; set; }
+    ///// <summary>
+    ///// Gets / sets the portfolio snapshot related to current entry.
+    ///// </summary>
+    //public Portfolio? Portfolio { get; set; }
 }
 
 public enum SignalType

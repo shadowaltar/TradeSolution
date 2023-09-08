@@ -55,10 +55,6 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         {
             errorDescription = "Unknown combination of security type, sub-type and exchange name; security: " + security.Name;
         }
-        if (Conditions.AnyNull(start, end))
-        {
-            errorDescription = "Must specify both or none of the start / end time.";
-        }
         if (start != null && end != null && start > end)
         {
             errorDescription = "Start time must be smaller than end time";

@@ -8,6 +8,10 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
     private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
 
+    public SimpleSecurityScreeningAlgoLogic(MovingAverageCrossing movingAverageCrossing)
+    {
+    }
+
     public bool CheckIsPicked(int securityId)
     {
         lock (_pickedPool)
@@ -77,7 +81,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
     {
         if (securityPool == null || securityPool.Count == 0) throw new ArgumentNullException(nameof(securityPool));
 
-        _security = securityPool[0];
+        _security = securityPool.Values.First();
         if (_security == null) throw new InvalidOperationException("Must provide at least one security in the pool for screening.");
 
         _securities.Clear();

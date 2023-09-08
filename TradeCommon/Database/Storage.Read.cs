@@ -140,7 +140,7 @@ WHERE
         return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
     }
 
-    public static async Task<Security?> ReadSecurity(string exchange, string code, SecurityType type)
+    public static async Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
         if (tableName.IsBlank())
@@ -175,7 +175,7 @@ WHERE
 
         SqlReader<Security>? sqlHelper = null;
         return await SqlReader.ReadOne(tableName, DatabaseNames.StaticData, sql, Transform,
-            ("$Code", code.ToUpperInvariant()), ("$Exchange", exchange.ToUpperInvariant()));
+            ("$Code", code.ToUpperInvariant()), ("$Exchange", ExchangeTypeConverter.ToString(exchange)));
 
         Security Transform(SqliteDataReader r)
         {

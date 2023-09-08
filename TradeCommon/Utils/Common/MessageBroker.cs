@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace TradeCommon.Utils.Common;
+namespace Common;
 
 public class MessageBroker<T> : IDisposable
 {

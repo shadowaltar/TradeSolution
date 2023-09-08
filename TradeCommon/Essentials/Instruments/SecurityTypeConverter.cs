@@ -11,7 +11,7 @@ public static class SecurityTypeConverter
             return SecurityType.Unknown;
 
         str = str.Trim().ToUpperInvariant();
-        if (SecurityTypes.StockTypes.Contains(str))
+        if (StockTypes.Contains(str))
             return SecurityType.Equity;
 
         return str switch
@@ -20,6 +20,22 @@ public static class SecurityTypeConverter
             Future or Futures => SecurityType.Future,
             Forward => SecurityType.Forward,
             Option => SecurityType.Option,
+            _ => SecurityType.Unknown,
+        };
+    }
+
+    public static SecurityType ParseSubType(string? str)
+    {
+        if (str == null)
+            return SecurityType.Unknown;
+
+        str = str.Trim().ToUpperInvariant();
+        if (StockTypes.Contains(str))
+            return SecurityType.Equity;
+
+        return str switch
+        {
+            Crypto => SecurityType.Crypto,
             _ => SecurityType.Unknown,
         };
     }

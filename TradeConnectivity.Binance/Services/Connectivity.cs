@@ -9,7 +9,7 @@ public class Connectivity : IExternalConnectivityManagement
     private const string ProdWs = "wss://stream.binance.com:9443";
 
     private const string TestHttps = "https://testnet.binance.vision";
-    private const string TestWs = "wss://testnet.binance.vision/ws";
+    private const string TestWs = "wss://testnet.binance.vision";
 
     public string RootUrl { get; protected set; }
 

@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeLogicCore.Services;
@@ -16,6 +17,26 @@ public interface IOrderService
     /// Invoked when an order is successfully cancelled.
     /// </summary>
     event Action<Order>? OrderCancelled;
+
+    /// <summary>
+    /// Invoked when an order is successfully closed.
+    /// </summary>
+    event Action OrderClosed;
+
+    /// <summary>
+    /// Invoked when a stop-loss order is successfully triggered.
+    /// </summary>
+    event Action OrderStopLossed;
+
+    /// <summary>
+    /// Invoked when a take-profit order is successfully triggered.
+    /// </summary>
+    event Action OrderTookProfit;
+
+    /// <summary>
+    /// Invoked when an order was sent but a failure message received from external.
+    /// </summary>
+    event Action OrderSendingFailed;
 
     /// <summary>
     /// Invoked when any order changes are received.
@@ -60,6 +81,15 @@ public interface IOrderService
     /// <param name="order"></param>
     /// <param name="isFakeOrder"></param>
     void SendOrder(Order order, bool isFakeOrder = true);
+
+    /// <summary>
+    /// Place an order by selling everything in a position.
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="type"></param>
+    /// <param name="price"></param>
+    /// <param name="timeInForce"></param>
+    void CreateCloseOrderAndSend(Position position, OrderType type, decimal price = decimal.MinValue, TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
 
     /// <summary>
     /// Cancel an order without waiting for the result.

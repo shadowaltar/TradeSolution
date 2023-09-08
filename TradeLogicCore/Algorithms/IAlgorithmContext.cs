@@ -1,11 +1,14 @@
 ﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
 public interface IAlgorithmContext<T>
 {
-    Portfolio Portfolio { get; }
+    IServices Services { get; }
 
     List<Security> SecurityPool { get; }
+    
+    bool IsBackTesting { get; }
 }

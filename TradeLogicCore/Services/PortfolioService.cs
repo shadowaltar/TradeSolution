@@ -1,7 +1,7 @@
 ﻿using Common;
 using log4net;
-using System.Runtime.InteropServices;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -13,6 +13,8 @@ public class PortfolioService : IPortfolioService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IdGenerator _positionIdGenerator = new("PositionIdGen");
+    private readonly IExternalExecutionManagement _execution;
+    private readonly IExternalAccountManagement _accountManagement;
     private readonly Context _context;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
@@ -22,10 +24,9 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly Dictionary<long, Position> _closedPositions = new();
     private readonly object _lock = new();
 
-    public IExternalExecutionManagement Execution { get; }
-    public IExternalAccountManagement AccountManagement { get; }
+    public Portfolio InitialPortfolio { get; private set; }
 
-    public decimal RemainingBalance { get; private set; }
+    public Portfolio Portfolio { get; private set; }
 
     public event Action<Position>? PositionCreated;
     public event Action<Position>? PositionUpdated;
@@ -34,16 +35,14 @@ public class PortfolioService : IPortfolioService, IDisposable
     public PortfolioService(IExternalExecutionManagement externalExecution,
                             IExternalAccountManagement externalAccountManagement,
                             Context context,
-                            IOrderService orderService,
-                            ITradeService tradeService,
-                            Persistence persistence)
+                            IServices services)
     {
-        Execution = externalExecution;
-        AccountManagement = externalAccountManagement;
+        _execution = externalExecution;
+        _accountManagement = externalAccountManagement;
         _context = context;
-        _orderService = orderService;
-        _tradeService = tradeService;
-        _persistence = persistence;
+        _orderService = services.Order;
+        _tradeService = services.Trade;
+        _persistence = services.Persistence;
         _tradeService.NextTrade += OnNewTrade;
     }
 
@@ -132,14 +131,24 @@ public class PortfolioService : IPortfolioService, IDisposable
         throw new NotImplementedException();
     }
 
-    public List<Position> GetPositions(string externalName, SecurityType securityType)
+    public Position? GetPosition(int securityId)
     {
-        throw new NotImplementedException();
+        return Portfolio.Positions!.GetOrDefault(securityId);
     }
 
-    public List<ProfitLoss> GetRealizedPnl(Security security, DateTime rangeStart, DateTime rangeEnd)
+    public Position? GetAsset(int assetId)
     {
-        throw new NotImplementedException();
+        return Portfolio.Assets!.GetOrDefault(assetId);
+    }
+
+    public List<Position> GetPositions()
+    {
+        return Portfolio.Positions.Values.OrderBy(p => p.SecurityCode).ToList();
+    }
+
+    public decimal GetRealizedPnl(Security security)
+    {
+        return Portfolio.Positions!.GetOrDefault(security.Id, null)?.RealizedPnl ?? 0;
     }
 
     public ProfitLoss GetUnrealizedPnl(Security security)
@@ -149,7 +158,14 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task Initialize()
     {
-        await Execution.Subscribe();
+        await _execution.Subscribe();
+
+        var account = _context.Account
+            ?? throw new InvalidOperationException("Must login an account before initializing portfolio");
+
+        // must be two different instances
+        InitialPortfolio = new Portfolio(account);
+        Portfolio = new Portfolio(account);
     }
 
     /// <summary>
@@ -224,12 +240,45 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public async Task<bool> Deposit(int accountId, int assetId, decimal value)
+    public decimal Realize(int securityId, decimal tradeRealizedPnl)
     {
-        throw new NotImplementedException();
+        if (Portfolio.Positions.TryGetValue(securityId , out var position))
+        {
+            position.RealizedPnl += tradeRealizedPnl;
+            return position.RealizedPnl;
+        }
+        return decimal.MinValue;
     }
 
-    public async Task<bool> Withdraw(int accountId, int assetId, decimal value)
+    public async Task<bool> Deposit(int assetId, decimal quantity)
+    {
+        var asset = GetAsset(assetId);
+        if (asset != null)
+        {
+            asset.Quantity += quantity;
+            // TODO external logic
+            return true;
+        }
+        return false;
+    }
+
+    public async Task<bool> Withdraw(int assetId, decimal quantity)
+    {
+        var asset = GetAsset(assetId);
+        if (asset != null)
+        {
+            if (asset.Quantity < quantity)
+            {
+                return false;
+            }
+            asset.Quantity -= quantity;
+            // TODO external logic
+            return true;
+        }
+        return false;
+    }
+
+    public Task Initialize(Account currentAccount)
     {
         throw new NotImplementedException();
     }
