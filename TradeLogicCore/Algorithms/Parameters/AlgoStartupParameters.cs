@@ -5,7 +5,8 @@ using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Algorithms.Parameters;
 
-public record AlgoStartupParameters(string UserName,
+public record AlgoStartupParameters(bool IsBackTesting,
+                                    string UserName,
                                     string AccountName,
                                     EnvironmentType Environment,
                                     ExchangeType Exchange,

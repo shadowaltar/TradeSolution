@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Attributes;
 
 namespace TradeCommon.Essentials.Instruments;
 
@@ -16,6 +17,12 @@ public class FxSecurityInfo
 
     public double? MaxLotSize { get; set; }
     public double? MinNotional { get; set; }
+
+    [UpsertIgnore,SelectIgnore,InsertIgnore]
+    public Security? BaseAsset { get; set; }
+
+    [UpsertIgnore, SelectIgnore, InsertIgnore]
+    public Security? QuoteAsset { get; set; }
 
     public override bool Equals(object? obj)
     {

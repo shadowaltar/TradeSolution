@@ -8,20 +8,22 @@ namespace TradeLogicCore.Algorithms.EnterExit;
 public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where T : IAlgorithmVariables
 {
     private static readonly ILog _log = Logger.New();
+    public IAlgorithm<T> Algorithm { get; }
     public IPositionSizingAlgoLogic<T> Sizing { get; }
     public ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
-    public SimpleEnterPositionAlgoLogic(IPositionSizingAlgoLogic<T> sizing)
+    public SimpleEnterPositionAlgoLogic(IAlgorithm<T> algorithm)
     {
-        Sizing = sizing;
+        Sizing = algorithm.Sizing;
     }
 
-    public void Open(IAlgorithmContext<T> context, AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
+    public void Open(AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice)
     {
-        var securityId = current.
+        var securityId = current.SecurityId;
         current.IsLong = true;
         current.LongCloseType = CloseType.None;
         // TODO current sizing happens here
+        var asset = Algorithm.Services.Portfolio.GetAsset(securityId);
         var size = Sizing.GetSize(context.Portfolio.FreeCash, current, last, enterPrice, enterTime);
         current.Quantity = size;
         current.EnterPrice = enterPrice;

@@ -21,9 +21,9 @@ public record Position
     public long Id { get; set; }
 
     /// <summary>
-    /// The security id of this position.
+    /// The account id associated to this position.
     /// </summary>
-    public int SecurityId { get; set; }
+    public int AccountId { get; set; }
 
     /// <summary>
     /// The account id associated to this position.
@@ -60,12 +60,36 @@ public record Position
     /// </summary>
     public decimal Price { get; set; }
 
+    public decimal Notional { get; set; }
+
     /// <summary>
-    /// Currency of the position.
-    /// By default it is empty and it should be interpreted as the security's currency
-    /// (if it is an FX position, this returns the quote currency).
+    /// Position's security code.
     /// </summary>
-    public string? Currency { get; set; } = null;
+    public string? SecurityCode { get; set; } = null;
+
+    /// <summary>
+    /// The security id of this position.
+    /// If it is an equity position, it is the security definition Id.
+    /// If it is an fx position, it is the base-quote pair definition Id.
+    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc. 
+    /// </summary>
+    public int SecurityId { get; set; }
+
+    /// <summary>
+    /// Position base asset's Id.
+    /// If it is an equity position, it is the same as <see cref="SecurityId"/>.
+    /// If it is an fx position, it is the base asset Id.
+    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
+    /// </summary>
+    public int BaseAssetId { get; set; } = -1;
+
+    /// <summary>
+    /// Position quote asset's Id.
+    /// If it is an equity position, it is USD for US market, or HKD for HK market.
+    /// If it is an fx position, it is the quote asset Id.
+    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
+    /// </summary>
+    public int QuoteAssetId { get; set; } = -1;
 
     /// <summary>
     /// Realized pnl, which is the sum of all realized pnl from each closed trades.

@@ -13,9 +13,9 @@ namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IServices _services;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
-    private readonly ISecurityService _securityService;
 
     public User? CurrentUser { get; private set; }
 
@@ -24,14 +24,14 @@ public class AdminService : IAdminService
     public Context Context { get; }
 
     public AdminService(Context context,
+                        IServices services,
                         IExternalAccountManagement accountManagement,
-                        IExternalConnectivityManagement connectivity,
-                        ISecurityService securityService)
+                        IExternalConnectivityManagement connectivity)
     {
         Context = context;
+        _services = services;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
-        _securityService = securityService;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
@@ -84,6 +84,9 @@ public class AdminService : IAdminService
 
         Context.User = CurrentUser;
         Context.Account = CurrentAccount;
+
+        // setup portfolio
+        _services.Portfolio.Initialize(CurrentAccount);
 
         return ResultCode.LoginUserAndAccountOk;
     }
@@ -139,7 +142,7 @@ public class AdminService : IAdminService
 
         if (accountName.IsBlank()) return null;
 
-        var assets = _securityService.GetAssets(Context.Exchange);
+        var assets = _services.Security.GetAssets(Context.Exchange);
 
         if (!requestExternal)
         {

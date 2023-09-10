@@ -8,6 +8,10 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
     private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
 
+    public SimpleSecurityScreeningAlgoLogic(MovingAverageCrossing movingAverageCrossing)
+    {
+    }
+
     public bool CheckIsPicked(int securityId)
     {
         lock (_pickedPool)

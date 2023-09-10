@@ -8,9 +8,6 @@ public class SecurityService : ISecurityService
 {
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
-    private readonly Dictionary<int, Security> _fxToBaseAssets = new();
-    private readonly Dictionary<int, Security> _fxToQuoteAssets = new();
-
 
     private bool _requestedExternalOnce = false;
 
@@ -88,12 +85,18 @@ public class SecurityService : ISecurityService
         }
     }
 
+    public async Task<Security?> GetSecurity(string code, string exchange, string securityType, bool requestExternal = false)
+    {
+        var exchangeType = ExchangeTypeConverter.Parse(exchange);
+        var secType = SecurityTypeConverter.Parse(securityType);
+        return await GetSecurity(code, exchangeType, secType, requestExternal);
+    }
+
     public async Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType, bool requestExternal = false)
     {
         if (!_requestedExternalOnce || requestExternal)
         {
-            var exchStr = ExchangeTypeConverter.ToString(exchange);
-            var security = await Storage.ReadSecurity(exchStr, code, securityType);
+            var security = await Storage.ReadSecurity(exchange, code, securityType);
             if (security != null)
                 RefreshCache(security);
             return security;
@@ -137,7 +140,7 @@ public class SecurityService : ISecurityService
     {
         lock (_securities)
         {
-            var fxSecurities = new Dictionary<string, Security>(securities.Count);
+            Dictionary<string, Security> fxSecurities = new(securities.Count);
             for (int i = 0; i < securities.Count; i++)
             {
                 var s = securities[i];
@@ -149,23 +152,30 @@ public class SecurityService : ISecurityService
                 if (secType == SecurityType.Fx)
                     fxSecurities[s.Code] = s;
             }
-            foreach (var fx in fxSecurities.Values)
+            foreach (var security in _securities.Values)
             {
-                if (fx.FxInfo?.IsAsset ?? false)
+                if (!security.Currency.IsBlank())
                 {
-                    // asset's quote asset is itself
-                    // no base asset
-                    _fxToQuoteAssets[fx.Id] = fx;
+                    security.CurrencyAsset = fxSecurities!.GetOrDefault(security.Currency);
                 }
-                if (fx.FxInfo != null)
+                if (security.FxInfo != null)
                 {
-                    if (!fx.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(fx.FxInfo.BaseCurrency, out var baseAsset))
+                    if (!security.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.BaseCurrency, out var baseAsset))
                     {
-                        _fxToBaseAssets[fx.Id] = baseAsset;
+                        security.FxInfo.BaseAsset = baseAsset;
                     }
-                    if (!fx.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(fx.FxInfo.QuoteCurrency, out var quoteAsset))
+                    if (!security.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.QuoteCurrency, out var quoteAsset))
                     {
-                        _fxToQuoteAssets[fx.Id] = quoteAsset;
+                        security.FxInfo.QuoteAsset = quoteAsset;
+                        security.CurrencyAsset = quoteAsset;
+                    }
+                    if (security.FxInfo.IsAsset)
+                    {
+                        // asset's quote asset is itself
+                        // no base asset
+                        security.FxInfo.BaseAsset = null;
+                        security.FxInfo.QuoteAsset = security;
+                        security.CurrencyAsset = security;
                     }
                 }
             }
@@ -178,6 +188,18 @@ public class SecurityService : ISecurityService
         {
             _securities[s.Id] = s;
             _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), SecurityTypeConverter.Parse(s.Type))] = s.Id;
+        }
+    }
+
+    private void AssociateAssetToSecurities()
+    {
+        foreach (var security in _securities.Values)
+        {
+            var exchange = ExchangeTypeConverter.Parse(security.Exchange);
+            if (security.FxInfo?.BaseCurrency != null)
+            {
+                GetSecurity(security.FxInfo.BaseCurrency, security.Exchange, security.Type);
+            }
         }
     }
 }

@@ -8,19 +8,22 @@ namespace TradeCommon.Essentials.Portfolios;
 public record Portfolio
 {
     public Dictionary<int, Position> Positions { get; } = new();
-    public Dictionary<int, decimal> InitialQuantities { get; } = new();
+
+    public Dictionary<int, Position> Assets { get; } = new();
 
     public Portfolio(Account account)
     {
         var start = DateTime.UtcNow;
         foreach (var balance in account.Balances)
         {
-            var p = new Position
+            var position = new Position
             {
+                Id = -1,
                 AccountId = balance.AccountId,
                 SecurityId = balance.AssetId,
-                Currency = balance.AssetCode,
-                Id = -1,
+                SecurityCode = balance.AssetCode,
+                BaseAssetId = balance.AssetId,
+                QuoteAssetId = balance.AssetId,
                 Price = 0,
                 Quantity = balance.FreeAmount,
                 LockQuantity = balance.LockedAmount,
@@ -28,18 +31,8 @@ public record Portfolio
                 StartTime = start,
                 UpdateTime = start,
             };
-            Positions[balance.AssetId] = p;
-            InitialQuantities[balance.AssetId] = balance.FreeAmount;
+            Assets[position.SecurityId] = position;
         }
-    }
-
-    public decimal GetInitialFreeAmount(int securityId)
-    {
-        if (InitialQuantities.TryGetValue(securityId, out var q))
-        {
-            return q;
-        }
-        return 0;
     }
 
     public decimal GetNotional(int securityId)

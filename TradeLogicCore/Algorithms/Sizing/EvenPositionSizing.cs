@@ -1,29 +1,32 @@
-﻿using TradeCommon.Essentials.Portfolios;
-using TradeDataCore.Instruments;
+﻿using TradeCommon.Essentials.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Sizing;
 public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
 {
     private readonly IPortfolioService _portfolioService;
-    private readonly ISecurityService _securityService;
 
-    public EvenPositionSizing(IPortfolioService portfolioService,
-        ISecurityService securityService)
+    public EvenPositionSizing(IAlgorithm<T> mainAlgo)
     {
-        _portfolioService = portfolioService;
-        _securityService = securityService;
+        MainAlgo = mainAlgo;
+        _portfolioService = MainAlgo.Context.Services.Portfolio;
     }
 
-    public decimal GetAvailableNewPositionQuantity(int securityId, int maxConcurrentPositionCount)
+    public IAlgorithm<T> MainAlgo { get; }
+
+    public decimal GetAvailableNewPositionQuantity(Security security, int maxConcurrentPositionCount)
     {
         var positions = _portfolioService.GetOpenPositions();
-        var freeBalance = _portfolioService.RemainingBalance;
+        var asset = security.EnsureCurrencyAsset();
+        var assetPosition = _portfolioService.GetAsset(asset.Id);
+        if (assetPosition == null)
+            return 0; // the account holds no such currency / asset for trading
+        var freeBalance = assetPosition.Quantity;
 
         var availableNewPositionCount = Math.Max(maxConcurrentPositionCount - positions.Count, 0);
 
         if (freeBalance > 0)
-            return LotRounding(securityId, freeBalance / availableNewPositionCount);
+            return LotRounding(security.Id, freeBalance / availableNewPositionCount);
 
         return 0;
     }

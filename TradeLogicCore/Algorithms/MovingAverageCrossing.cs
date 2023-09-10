@@ -8,6 +8,7 @@ using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -19,7 +20,9 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     private readonly SimpleMovingAverage _slowMa;
     private readonly OpenPositionPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
 
-    public IAlgorithmContext<MacVariables> Context { get; set; }
+    public IAlgorithmContext<MacVariables> Context { get; }
+
+    public IServices Services => Context.Services;
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
@@ -30,14 +33,18 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public IExitPositionAlgoLogic<MacVariables> Exiting { get; }
     public ISecurityScreeningAlgoLogic Screening { get; set; }
 
-    public MovingAverageCrossing(int fast, int slow, decimal stopLossRatio, IPositionSizingAlgoLogic<MacVariables> sizing = null)
+    public MovingAverageCrossing(int fast,
+                                 int slow,
+                                 decimal stopLossRatio,
+                                 decimal takeProfitRatio,
+                                 IPositionSizingAlgoLogic<MacVariables>? sizing = null)
     {
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
 
-        Sizing = new SimplePositionSizing<MacVariables>();
-        Screening = new SimpleSecurityScreeningAlgoLogic();
-        Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(Sizing);
-        Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(stopLossRatio);
+        Sizing = new SimplePositionSizing<MacVariables>(this);
+        Screening = new SimpleSecurityScreeningAlgoLogic(this);
+        Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(this);
+        Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(this, stopLossRatio, takeProfitRatio);
 
         FastParam = fast;
         SlowParam = slow;
