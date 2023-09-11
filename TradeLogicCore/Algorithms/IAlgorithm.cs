@@ -14,7 +14,7 @@ public interface IAlgorithm<T> where T : IAlgorithmVariables
     IPositionSizingAlgoLogic<T> Sizing { get; }
     IEnterPositionAlgoLogic<T> Entering { get; }
     IExitPositionAlgoLogic<T> Exiting { get; }
-    ISecurityScreeningAlgoLogic Screening { get; }
+    ISecurityScreeningAlgoLogic<T> Screening { get; }
 
     T CalculateVariables(decimal price, AlgoEntry<T>? last);
 

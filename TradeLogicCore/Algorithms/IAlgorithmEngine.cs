@@ -31,7 +31,7 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
 
     IExitPositionAlgoLogic<T> ExitLogic { get; }
 
-    ISecurityScreeningAlgoLogic Screening { get; }
+    ISecurityScreeningAlgoLogic<T> Screening { get; }
 
     /// <summary>
     /// Total signal count being processed. It is usually the count of prices / ticks.

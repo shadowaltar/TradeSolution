@@ -4,12 +4,12 @@ namespace TradeLogicCore.Algorithms;
 
 public class SimplePositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
 {
-    public SimplePositionSizing(IAlgorithm<T> mainAlgo)
+    public SimplePositionSizing(IAlgorithm<T> algorithm)
     {
-        MainAlgo = mainAlgo;
+        Algorithm = algorithm;
     }
 
-    public IAlgorithm<T> MainAlgo { get; }
+    public IAlgorithm<T> Algorithm { get; }
 
     public decimal GetSize(decimal availableCash, AlgoEntry<T> current, AlgoEntry<T> last, decimal price, DateTime time)
     {

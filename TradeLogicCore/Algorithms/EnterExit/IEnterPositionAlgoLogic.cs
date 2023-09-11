@@ -10,5 +10,10 @@ public interface IEnterPositionAlgoLogic<T> where T : IAlgorithmVariables
    
     ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
-    void Open(AlgoEntry<T> current, AlgoEntry<T> last, decimal enterPrice, DateTime enterTime, decimal stopLossPrice);
+    void Open(AlgoEntry<T> current,
+              AlgoEntry<T> last,
+              decimal enterPrice,
+              DateTime enterTime,
+              decimal stopLossPrice,
+              decimal takeProfitPrice);
 }

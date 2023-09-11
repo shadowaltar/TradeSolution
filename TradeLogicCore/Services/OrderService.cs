@@ -3,6 +3,7 @@ using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
@@ -30,6 +31,10 @@ public class OrderService : IOrderService, IDisposable
     public event Action<Order>? AfterOrderSent;
     public event Action<Order>? OrderCancelled;
     public event Action<Order>? NextOrder;
+    public event Action? OrderClosed;
+    public event Action? OrderStoppedLost;
+    public event Action? OrderTookProfit;
+    public event Action? OrderSendingFailed;
 
     public OrderService(IExternalExecutionManagement execution,
                         Context context,
@@ -274,6 +279,11 @@ public class OrderService : IOrderService, IDisposable
     }
 
     public void CloseAllOpenPositions()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void CreateCloseOrderAndSend(Position position, OrderType type, decimal price = decimal.MinValue, TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
     {
         throw new NotImplementedException();
     }

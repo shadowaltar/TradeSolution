@@ -26,11 +26,6 @@ public record Position
     public int AccountId { get; set; }
 
     /// <summary>
-    /// The account id associated to this position.
-    /// </summary>
-    public int AccountId { get; set; }
-
-    /// <summary>
     /// The time which the position is established.
     /// It should be the first trade fills.
     /// </summary>

@@ -21,22 +21,22 @@ public interface IOrderService
     /// <summary>
     /// Invoked when an order is successfully closed.
     /// </summary>
-    event Action OrderClosed;
+    event Action? OrderClosed;
 
     /// <summary>
     /// Invoked when a stop-loss order is successfully triggered.
     /// </summary>
-    event Action OrderStopLossed;
+    event Action? OrderStoppedLost;
 
     /// <summary>
     /// Invoked when a take-profit order is successfully triggered.
     /// </summary>
-    event Action OrderTookProfit;
+    event Action? OrderTookProfit;
 
     /// <summary>
     /// Invoked when an order was sent but a failure message received from external.
     /// </summary>
-    event Action OrderSendingFailed;
+    event Action? OrderSendingFailed;
 
     /// <summary>
     /// Invoked when any order changes are received.

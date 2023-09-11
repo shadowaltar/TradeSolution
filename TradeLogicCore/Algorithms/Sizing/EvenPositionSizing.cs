@@ -8,11 +8,11 @@ public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgo
 
     public EvenPositionSizing(IAlgorithm<T> mainAlgo)
     {
-        MainAlgo = mainAlgo;
-        _portfolioService = MainAlgo.Context.Services.Portfolio;
+        Algorithm = mainAlgo;
+        _portfolioService = Algorithm.Context.Services.Portfolio;
     }
 
-    public IAlgorithm<T> MainAlgo { get; }
+    public IAlgorithm<T> Algorithm { get; }
 
     public decimal GetAvailableNewPositionQuantity(Security security, int maxConcurrentPositionCount)
     {

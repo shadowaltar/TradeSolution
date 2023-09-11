@@ -5,6 +5,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
 using TradeDataCore.Importing.Yahoo;
 using Common;
+using TradePort.Utils;
 
 namespace TradePort.Controllers;
 
@@ -39,13 +40,13 @@ public class StaticDataController : Controller
     }
 
     /// <summary>
-    /// Get all security definitions in exchange.
+    /// Get all security definitions in exchangeStr.
     /// </summary>
     /// <param name="exchange"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="limit"></param>
     /// <returns></returns>
-    [HttpGet("securities/{exchange}")]
+    [HttpGet("securities/{exchangeStr}")]
     public async Task<IActionResult> GetSecurities(
         string exchange = ExternalNames.Binance,
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
@@ -63,19 +64,18 @@ public class StaticDataController : Controller
     /// <summary>
     /// Get single security definition.
     /// </summary>
-    /// <param name="exchange">Exchange abbreviation.</param>
-    /// <param name="code">Security Code defined by exchange.</param>
+    /// <param name="exchangeStr">Exchange abbreviation.</param>
+    /// <param name="code">Security Code defined by exchangeStr.</param>
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
-    [HttpGet("securities/{exchange}/{code}")]
+    [HttpGet("securities/{exchangeStr}/{code}")]
     public async Task<IActionResult> GetSecurity(
-        string exchange = ExternalNames.Binance,
+        string exchangeStr = ExternalNames.Binance,
         string code = "BTCUSDT",
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(exchangeStr, out ExchangeType exchange, out br)) return br;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
         return Ok(security);
@@ -84,19 +84,18 @@ public class StaticDataController : Controller
     /// <summary>
     /// Get single security's financial stats.
     /// </summary>
-    /// <param name="exchange">Exchange abbreviation.</param>
-    /// <param name="code">Security Code defined by exchange.</param>
+    /// <param name="exchangeStr">Exchange abbreviation.</param>
+    /// <param name="code">Security Code.</param>
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
-    [HttpGet("financial-stats/{exchange}/{code}")]
+    [HttpGet("financial-stats/{exchangeStr}/{code}")]
     public async Task<IActionResult> GetFinancialStats(
-        string exchange = ExternalNames.Binance,
+        string exchangeStr = ExternalNames.Binance,
         string code = "BTCUSDT",
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(exchangeStr, out ExchangeType exchange, out br)) return br;
 
         var security = await Storage.ReadSecurity(exchange, code, secType);
         if (security == null)
@@ -113,9 +112,7 @@ public class StaticDataController : Controller
     public async Task<IActionResult> GetAndSaveBinanceSecurityDefinition(
         [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
 
         var reader = new TradeDataCore.Importing.Binance.DefinitionReader();
         var securities = await reader.ReadAndSave(secType);
@@ -140,10 +137,10 @@ public class StaticDataController : Controller
     }
 
     /// <summary>
-    /// Gets all security stats in the exchange and save to database.
+    /// Gets all security stats in the exchangeStr and save to database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("financial-stats/{exchange}/get-and-save-all")]
+    [HttpGet("financial-stats/{exchangeStr}/get-and-save-all")]
     public async Task<IActionResult> GetAndSaveHongKongSecurityStats(string exchange = ExternalNames.Hkex,
         [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {

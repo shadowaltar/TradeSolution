@@ -3,13 +3,16 @@ using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms.Screening;
 
-public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
+public class SimpleSecurityScreeningAlgoLogic<T> : ISecurityScreeningAlgoLogic<T>
 {
     private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
 
-    public SimpleSecurityScreeningAlgoLogic(MovingAverageCrossing movingAverageCrossing)
+    public IAlgorithm<T> Algorithm { get; }
+
+    public SimpleSecurityScreeningAlgoLogic(IAlgorithm<T> algorithm)
     {
+        Algorithm = algorithm;
     }
 
     public bool CheckIsPicked(int securityId)

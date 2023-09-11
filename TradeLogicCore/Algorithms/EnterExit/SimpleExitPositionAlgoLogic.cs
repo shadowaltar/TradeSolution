@@ -34,8 +34,8 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 
         _orderService.OrderClosed -= OnCloseOrderAcknowledged;
         _orderService.OrderClosed += OnCloseOrderAcknowledged;
-        _orderService.OrderStopLossed -= OnStopLossTriggered;
-        _orderService.OrderStopLossed += OnStopLossTriggered;
+        _orderService.OrderStoppedLost -= OnStopLossTriggered;
+        _orderService.OrderStoppedLost += OnStopLossTriggered;
         _orderService.OrderTookProfit -= OnTakeProfitTriggered;
         _orderService.OrderTookProfit += OnTakeProfitTriggered;
     }

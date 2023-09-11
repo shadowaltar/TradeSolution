@@ -24,26 +24,27 @@ public class PriceController : Controller
     private static readonly ILog _log = Logger.New();
 
     /// <summary>
-    /// Get prices given exchange, code, interval and start time.
+    /// Get prices given exchangeStr, code, interval and start time.
     /// </summary>
-    /// <param name="exchange"></param>
+    /// <param name="exchangeStr"></param>
     /// <param name="code"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="intervalStr"></param>
     /// <param name="startStr">In yyyyMMdd</param>
     /// <param name="endStr">In yyyyMMdd</param>
     /// <returns></returns>
-    [HttpGet("{exchange}/{code}")]
-    public async Task<ActionResult> GetPrices(string exchange = ExternalNames.Hkex,
-        string code = "00001",
-        [FromQuery(Name = "sec-type")] string secTypeStr = nameof(SecurityType.Equity),
-        [FromQuery(Name = "interval")] string intervalStr = "1d",
-        [FromQuery(Name = "start")] string startStr = "20230101",
-        [FromQuery(Name = "end")] string? endStr = null)
+    [HttpGet("{exchangeStr}/{code}")]
+    public async Task<ActionResult> GetPrices(string exchangeStr = ExternalNames.Hkex,
+                                              string code = "00001",
+                                              [FromQuery(Name = "sec-type")] string secTypeStr = nameof(SecurityType.Equity),
+                                              [FromQuery(Name = "interval")] string intervalStr = "1d",
+                                              [FromQuery(Name = "start")] string startStr = "20230101",
+                                              [FromQuery(Name = "end")] string? endStr = null)
     {
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(exchangeStr, out ExchangeType exchange, out br)) return br;
         DateTime end = DateTime.UtcNow;
         if (endStr != null && ControllerValidator.IsBadOrParse(endStr, out end, out br)) return br;
 
@@ -55,7 +56,7 @@ public class PriceController : Controller
     }
 
     /// <summary>
-    /// Get prices from Yahoo given exchange, code, interval and start time.
+    /// Get prices from Yahoo given exchangeStr, code, interval and start time.
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="exchangeStr"></param>
@@ -64,7 +65,7 @@ public class PriceController : Controller
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
     /// <returns></returns>
-    [HttpGet("yahoo/{exchange}/{code}")]
+    [HttpGet("yahoo/{exchangeStr}/{code}")]
     public async Task<ActionResult> GetPriceFromYahoo([FromServices] ISecurityService securityService,
                                                       string exchangeStr = ExternalNames.Hkex,
                                                       string code = "00001",
@@ -234,7 +235,7 @@ public class PriceController : Controller
     }
 
     /// <summary>
-    /// Gets one security price data from Yahoo in this exchange and save to database.
+    /// Gets one security price data from Yahoo in this exchangeStr and save to database.
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="exchangeStr"></param>
@@ -243,9 +244,9 @@ public class PriceController : Controller
     /// <param name="intervalStr"></param>
     /// <param name="rangeStr"></param>
     /// <returns></returns>
-    [HttpGet("{exchange}/get-and-save-one")]
+    [HttpGet("{exchangeStr}/get-and-save-one")]
     public async Task<ActionResult> GetAndSaveHongKongOne([FromServices] ISecurityService securityService,
-                                                          [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Hkex,
+                                                          [FromQuery(Name = "exchangeStr")] string exchangeStr = ExternalNames.Hkex,
                                                           string code = "00001",
                                                           [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
                                                           [FromQuery(Name = "interval")] string intervalStr = "1h",
@@ -266,13 +267,13 @@ public class PriceController : Controller
         {
             await Storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
             var count = await Storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
-            Console.WriteLine($"Code {security.Code} exchange {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
+            Console.WriteLine($"Code {security.Code} exchangeStr {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
     }
 
     /// <summary>
-    /// Download all prices of all securities as JSON from the given exchange.
+    /// Download all prices of all securities as JSON from the given exchangeStr.
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="exchangeStr"></param>
@@ -281,9 +282,9 @@ public class PriceController : Controller
     /// <param name="concatenatedSymbols">Optional security code filter, case-insensitive, comma-delimited: 00001,00002 or BTCUSDT,BTCTUSD, etc.</param>
     /// <param name="rangeStr">Case-insensitive, 1mo, 1y, 6mo etc.</param>
     /// <returns></returns>
-    [HttpGet("{exchange}/download-json")]
+    [HttpGet("{exchangeStr}/download-json")]
     public async Task<ActionResult> DownloadAll([FromServices] ISecurityService securityService,
-                                                [FromRoute(Name = "exchange")] string exchangeStr = "binance",
+                                                [FromRoute(Name = "exchangeStr")] string exchangeStr = "binance",
                                                 [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
                                                 [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                 [FromQuery(Name = "symbols")] string? concatenatedSymbols = "",
