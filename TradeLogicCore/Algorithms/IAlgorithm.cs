@@ -3,14 +3,12 @@ using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
-using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
 public interface IAlgorithm<T> where T : IAlgorithmVariables
 {
-    IAlgorithmContext<T> Context { get; }
-    IServices Services { get; }
+    IAlgorithmContext<T> AlgorithmContext { get; }
     IPositionSizingAlgoLogic<T> Sizing { get; }
     IEnterPositionAlgoLogic<T> Entering { get; }
     IExitPositionAlgoLogic<T> Exiting { get; }

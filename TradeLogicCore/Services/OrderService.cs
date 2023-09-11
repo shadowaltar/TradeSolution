@@ -282,9 +282,4 @@ public class OrderService : IOrderService, IDisposable
     {
         throw new NotImplementedException();
     }
-
-    public void CreateCloseOrderAndSend(Position position, OrderType type, decimal price = decimal.MinValue, TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
-    {
-        throw new NotImplementedException();
-    }
 }

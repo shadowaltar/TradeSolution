@@ -23,7 +23,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     private readonly int _engineThreadId;
     private readonly IntervalType _intervalType;
     private readonly TimeSpan _interval;
-    private readonly IdGenerator _idGenerator;
+    private readonly IdGenerator _algoEntryIdGen;
+    private readonly IdGenerator _positionIdGen;
 
     private IReadOnlyDictionary<int, Security> _pickedSecurities;
 
@@ -55,6 +56,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
 
     public event Action ReachedDesignatedEndTime;
+
+    public Context Context { get; }
 
     public IServices Services { get; }
 
@@ -97,8 +100,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     public Dictionary<long, AlgoEntry<T>> OpenedEntries => throw new NotImplementedException();
 
-    public AlgorithmEngine(IServices services, IAlgorithm<T> algorithm)
+    public AlgorithmEngine(Context context, IServices services, IAlgorithm<T> algorithm)
     {
+        Context = context;
         Services = services;
 
         _engineThreadId = Environment.CurrentManagedThreadId;
@@ -109,7 +113,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         ExitLogic = algorithm.Exiting;
         Screening = algorithm.Screening;
 
-        _idGenerator = new IdGenerator("AlgoEntryIdGen");
+        _algoEntryIdGen = IdGenerators.Get<AlgoEntry>();
+        _positionIdGen = IdGenerators.Get<Position>();
     }
 
     public List<AlgoEntry<T>> GetAllEntries(int securityId)
@@ -182,7 +187,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         foreach (var security in pickedSecurities.Values)
         {
             var currencyAsset = security.EnsureCurrencyAsset();
-            var assetPosition = Services.Portfolio.GetAsset(currencyAsset.Id);
+            var assetPosition = Services.Portfolio.GetAssetPosition(currencyAsset.Id);
             if (assetPosition == null || assetPosition.Quantity <= 0)
             {
                 _log.Warn($"Cannot trade the picked security {security.Code}; the account may not have enough free asset to trade.");
@@ -304,7 +309,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         var price = ohlcPrice.C;
 
         var entryPositionId = lastEntry?.PositionId ?? 0;
-        var entry = new AlgoEntry<T>(_idGenerator.NewTimeBasedId, security)
+        var entry = new AlgoEntry<T>(_algoEntryIdGen.NewTimeBasedId, security)
         {
             SecurityId = securityId,
             PositionId = entryPositionId,
@@ -343,14 +348,14 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         var toCloseLong = Algorithm.IsCloseLongSignal(entry, lastEntry, ohlcPrice, _lastOhlcPrice);
         entry.LongSignal = toLong ? SignalType.Open : toCloseLong ? SignalType.Close : SignalType.Hold;
 
-        TryOpenLong(entry, lastEntry, security, ohlcPrice, _intervalType, ref entryPositionId);
+        TryOpenLong(entry, lastEntry, security, ohlcPrice, _intervalType);
         TryCloseLong(entry, security, ohlcPrice, _intervalType);
 
         var toShort = Algorithm.IsShortSignal(entry, lastEntry, ohlcPrice, _lastOhlcPrice);
         var toCloseShort = Algorithm.IsCloseShortSignal(entry, lastEntry, ohlcPrice, _lastOhlcPrice);
         entry.ShortSignal = toShort ? SignalType.Open : toCloseShort ? SignalType.Close : SignalType.Hold;
 
-        TryOpenShort(entry, lastEntry, security, ohlcPrice, _intervalType, ref entryPositionId);
+        TryOpenShort(entry, lastEntry, security, ohlcPrice, _intervalType);
         TryCloseShort(entry, security, ohlcPrice, _intervalType);
 
         lastEntry = entry;
@@ -365,9 +370,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
         if (lastEntry != null && lastEntry.IsLong)
         {
-            _log.Info("Discard any opened entry at the end of back-testing.");
-            Portfolio.FreeCash += lastEntry.EnterPrice.Value * lastEntry.Quantity;
-            Portfolio.Notional = Portfolio.FreeCash;
+            _log.Info("Close any opened entry at the end of back-testing.");
+            TryCloseLong(entry, security, ohlcPrice, _intervalType);
+            TryCloseShort(entry, security, ohlcPrice, _intervalType);
         }
 
         if (lastEntry != null && lastEntry.IsShort)
@@ -419,23 +424,23 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
             switch (timeRange.WhenToStart)
             {
                 case AlgoStartTimeType.Designated:
+                {
+                    if (start.IsValid())
                     {
-                        if (start.IsValid())
+                        var r = CanStart(start, DesignatedStopTime, now);
+                        if (r)
                         {
-                            var r = CanStart(start, DesignatedStopTime, now);
-                            if (r)
-                            {
-                                _runningState = AlgoRunningState.Running;
-                                _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
-                                return true;
-                            }
+                            _runningState = AlgoRunningState.Running;
+                            _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
+                            return true;
                         }
-                        else
-                        {
-                            _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
-                        }
-                        return false;
                     }
+                    else
+                    {
+                        _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
+                    }
+                    return false;
+                }
                 case AlgoStartTimeType.Immediately:
                     _runningState = AlgoRunningState.Running;
                     _log.Info($"Engine starts running immediately.");
@@ -461,27 +466,27 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                     }
                     return false;
                 case AlgoStartTimeType.NextStartOfLocalDay:
+                {
+                    _runningState = AlgoRunningState.Stopped;
+                    var localNow = DateTime.Now;
+                    if (start > localNow)
                     {
-                        _runningState = AlgoRunningState.Stopped;
-                        var localNow = DateTime.Now;
-                        if (start > localNow)
+                        var stopTime = DesignatedStopTime;
+                        if (stopTime != null)
+                            stopTime = stopTime.Value.ToLocalTime();
+                        var r = CanStart(start, stopTime, localNow);
+                        if (r)
                         {
-                            var stopTime = DesignatedStopTime;
-                            if (stopTime != null)
-                                stopTime = stopTime.Value.ToLocalTime();
-                            var r = CanStart(start, stopTime, localNow);
-                            if (r)
-                            {
-                                _runningState = AlgoRunningState.Running;
-                                return true;
-                            }
+                            _runningState = AlgoRunningState.Running;
+                            return true;
                         }
-                        else
-                        {
-                            _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
-                        }
-                        return false;
                     }
+                    else
+                    {
+                        _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
+                    }
+                    return false;
+                }
                 case AlgoStartTimeType.NextMarketOpens:
                     // TODO, need market meta data
                     return false;
@@ -643,9 +648,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
             Algorithm.BeforeStopLossLong(entry);
 
             // assuming always stopped loss at the stopLossPrice
-            ExitLogic.StopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
-            Portfolio.Notional = CalculateNotional();
-            Portfolio.FreeCash += entry.Notional;
+            ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
+            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
@@ -659,14 +663,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     private bool BackTestCheckShortStopLoss(AlgoEntry<T> entry, AlgoEntry<T> lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
-        if (entry.IsShort && ohlcPrice.H >= entry.SLPrice)
+        if (IsBackTesting && entry.IsShort && ohlcPrice.H >= entry.SLPrice)
         {
             Algorithm.BeforeStopLossLong(entry);
 
             // assuming always stopped loss at the stopLossPrice
-            ExitLogic.StopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
-            Portfolio.Notional = CalculateNotional();
-            Portfolio.FreeCash += entry.Notional;
+            ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
+            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
@@ -677,28 +680,32 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         return false;
     }
 
-    private bool TryOpenLong(AlgoEntry<T> entry, AlgoEntry<T> lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType, ref int sequenceNum)
+    private bool TryOpenLong(AlgoEntry<T> entry, AlgoEntry<T> lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (!entry.IsLong && entry.LongCloseType == CloseType.None && entry.LongSignal == SignalType.Open)
         {
             Algorithm.BeforeOpeningLong(entry);
 
-            sequenceNum++;
             var endTimeOfBar = GetOhlcEndTime(ohlcPrice, intervalType);
-            var sl = GetStopLoss(ohlcPrice, security);
-            var quoteAsset = security.CurrencyAsset;
-            if (quoteAsset == null) throw Exceptions.ThrowMissingQuoteAsset(security.Code);
-            var assetPosition = Services.Portfolio.GetAsset(quoteAsset.Id);
-            if (quoteAsset == null) throw Exceptions.ThrowMissingAssetPosition(security.Code);
-            EnterLogic.Open(entry, lastEntry, ohlcPrice.C, endTimeOfBar, sl, tp);
-            entry.PositionId = sequenceNum;
-            assetPosition.Quantity -= entry.Quantity;
-            Portfolio.FreeCash -= entry.Notional;
+            var sl = GetStopLoss(ohlcPrice, Side.Buy, security);
+            var tp = GetTakeProfit(ohlcPrice, Side.Buy, security);
+            var assetPosition = Services.Portfolio.GetPositionRelatedCurrencyAsset(entry.SecurityId);
 
-            _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
-            _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-            _totalCurrentOpenPositions++;
-            _totalOpenedPositions++;
+            if (IsBackTesting)
+            {
+                EnterLogic.BackTestOpen(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
+                Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
+                entry.PositionId = _positionIdGen.NewInt;
+
+                _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
+                _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
+                _totalCurrentOpenPositions++;
+            }
+            else
+            {
+                EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
+            }
+
             Algorithm.AfterLongOpened(entry);
             return true;
         }
@@ -711,14 +718,15 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         {
             Algorithm.BeforeClosingLong(entry);
 
-            ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            if (IsBackTesting)
+            {
+                ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+                Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
-            Portfolio.Notional = CalculateNotional();
-            Portfolio.FreeCash += entry.Notional;
-
-            _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
-            _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-            _totalCurrentOpenPositions--;
+                _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
+                _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
+                _totalCurrentOpenPositions--;
+            }
 
             Algorithm.AfterLongClosed(entry);
             return true;
@@ -726,23 +734,29 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         return false;
     }
 
-    private bool TryOpenShort(AlgoEntry<T> entry, AlgoEntry<T> lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType, ref int sequenceNum)
+    private bool TryOpenShort(AlgoEntry<T> entry, AlgoEntry<T> lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (!entry.IsShort && entry.ShortCloseType == CloseType.None && entry.ShortSignal == SignalType.Open)
         {
             Algorithm.BeforeOpeningShort(entry);
+            var endTimeOfBar = GetOhlcEndTime(ohlcPrice, intervalType);
+            var sl = GetStopLoss(ohlcPrice, Side.Sell, security);
+            var tp = GetTakeProfit(ohlcPrice, Side.Sell, security);
 
-            sequenceNum++;
+            if (IsBackTesting)
+            {
+                EnterLogic.BackTestOpen(entry, lastEntry, ohlcPrice.C, Side.Sell, endTimeOfBar, sl, tp);
+                Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
+                entry.PositionId = _positionIdGen.NewInt;
 
-            EnterLogic.Open(entry, lastEntry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType), GetStopLoss(ohlcPrice, security));
-            entry.PositionId = sequenceNum;
-            Portfolio.FreeCash -= entry.Notional;
-
-            _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
-            _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-            _totalCurrentOpenPositions++;
-            _totalOpenedPositions++;
-
+                _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
+                _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
+                _totalCurrentOpenPositions++;
+            }
+            else
+            {
+                EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Sell, endTimeOfBar, sl, tp);
+            }
             Algorithm.AfterShortOpened(entry);
             return true;
         }
@@ -755,10 +769,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         {
             Algorithm.BeforeClosingShort(entry);
 
-            ExitLogic.Close(this, entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
-
-            Portfolio.Notional = CalculateNotional();
-            Portfolio.FreeCash += entry.Notional;
+            ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
@@ -770,28 +782,31 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         return false;
     }
 
-    private decimal CalculateNotional(int securityId)
+    private decimal GetStopLoss(OhlcPrice price, Side side, Security security)
     {
-        if (_openedEntriesBySecurityIds.TryGetValue(securityId, out var algoEntries))
+        decimal slRatio = side switch
         {
-
-        }
-        return Portfolio.FreeCash + _openedEntriesBySecurityIds.Values.SelectMany(i => i.Values).Sum(p => p.Notional);
+            Side.Buy => ExitLogic.LongStopLossRatio,
+            Side.Sell => ExitLogic.ShortStopLossRatio,
+            _ => throw Exceptions.InvalidSide(),
+        };
+        return decimal.Round(price.C * (1 - slRatio), security.PricePrecision, MidpointRounding.ToPositiveInfinity);
     }
 
-    private decimal GetStopLoss(OhlcPrice price, Security security)
+    private decimal GetTakeProfit(OhlcPrice price, Side side, Security security)
     {
-        return decimal.Round(price.C * (1 - ExitLogic.StopLossRatio), security.PricePrecision, MidpointRounding.ToPositiveInfinity);
+        decimal tpRatio = side switch
+        {
+            Side.Buy => ExitLogic.LongTakeProfitRatio,
+            Side.Sell => ExitLogic.ShortTakeProfitRatio,
+            _ => throw Exceptions.InvalidSide(),
+        };
+        return decimal.Round(price.C * (1 + tpRatio), security.PricePrecision, MidpointRounding.ToNegativeInfinity);
     }
 
-    private decimal GetTakeProfit(OhlcPrice price, Security security)
+    private static DateTime GetOhlcEndTime(OhlcPrice price, IntervalType intervalType)
     {
-        return decimal.Round(price.C * (1 - ExitLogic.TakeProfitRatio), security.PricePrecision, MidpointRounding.ToNegativeInfinity);
-    }
-
-    private DateTime GetOhlcEndTime(OhlcPrice? price, IntervalType intervalType)
-    {
-        return price == null ? DateTime.MinValue : price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
+        return price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
     }
 
     protected void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, Security security, decimal currentPrice)

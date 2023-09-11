@@ -25,19 +25,36 @@ public interface IPortfolioService
     Position? GetPosition(int securityId);
 
     /// <summary>
-    /// Get asset's positoin given its asset (security) ID.
+    /// Get asset's position given its asset (security) ID.
     /// </summary>
     /// <param name="assetId"></param>
     /// <returns></returns>
-    Position? GetAsset(int assetId);
+    Position GetAssetPosition(int assetId);
 
     /// <summary>
-    /// Realize the pnl from the trade just closed, related to a specific security.
+    /// Get asset's position given a position's security ID.
     /// </summary>
     /// <param name="securityId"></param>
-    /// <param name="tradeRealizedPnl"></param>
     /// <returns></returns>
-    decimal Realize(int securityId, decimal tradeRealizedPnl);
+    Position GetPositionRelatedCurrencyAsset(int securityId);
+
+    /// <summary>
+    /// Spend the free quantity in the related asset position given a security Id.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <param name="quantity"></param>
+    /// <returns></returns>
+    void SpendAsset(int securityId, decimal quantity);
+
+    /// <summary>
+    /// Realize the pnl from the trade just closed, related to a specific security;
+    /// then set the quantity and notional value of its related asset position.
+    /// Returns the new total realized pnl of this security.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <param name="realizedPnl"></param>
+    /// <returns></returns>
+    decimal Realize(int securityId, decimal realizedPnl);
 
     List<Position> GetPositions();
 

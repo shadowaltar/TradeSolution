@@ -1,5 +1,4 @@
-﻿using TradeCommon.Essentials.Portfolios;
-using Common.Attributes;
+﻿using Common.Attributes;
 using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms;
@@ -7,17 +6,13 @@ namespace TradeLogicCore.Algorithms;
 /// <summary>
 /// Class which records prop algo execution.
 /// </summary>
-/// <typeparam name="T"></typeparam>
-public record AlgoEntry<T>([UpsertIgnore] long Id,
-                           [UpsertIgnore, InsertIgnore, SelectIgnore] Security Security)
+public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, SelectIgnore] Security Security)
 {
     public int PositionId { get; set; }
 
     public int SecurityId { get; set; } = -1;
 
     public required DateTime Time { get; set; }
-
-    public required T Variables { get; set; }
 
     /// <summary>
     /// Current price. Usually the close of OHLC price object.
@@ -49,6 +44,7 @@ public record AlgoEntry<T>([UpsertIgnore] long Id,
     public decimal? EnterPrice { get; set; }
     public decimal? ExitPrice { get; set; }
     public decimal? SLPrice { get; set; }
+    public decimal? TPPrice { get; set; }
     public DateTime? EnterTime { get; set; }
     public TimeSpan? Elapsed { get; set; }
 
@@ -77,6 +73,16 @@ public record AlgoEntry<T>([UpsertIgnore] long Id,
     ///// Gets / sets the portfolio snapshot related to current entry.
     ///// </summary>
     //public Portfolio? Portfolio { get; set; }
+}
+
+public record AlgoEntry<T> : AlgoEntry
+{
+    public AlgoEntry([UpsertIgnore] long Id, [InsertIgnore, SelectIgnore, UpsertIgnore] Security Security) : base(Id, Security)
+    {
+    }
+
+
+    public required T Variables { get; set; }
 }
 
 public enum SignalType

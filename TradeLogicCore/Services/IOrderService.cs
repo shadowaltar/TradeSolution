@@ -83,15 +83,6 @@ public interface IOrderService
     void SendOrder(Order order, bool isFakeOrder = true);
 
     /// <summary>
-    /// Place an order by selling everything in a position.
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="type"></param>
-    /// <param name="price"></param>
-    /// <param name="timeInForce"></param>
-    void CreateCloseOrderAndSend(Position position, OrderType type, decimal price = decimal.MinValue, TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-
-    /// <summary>
     /// Cancel an order without waiting for the result.
     /// </summary>
     /// <param name="orderId"></param>

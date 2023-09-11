@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Services;
 
@@ -13,24 +14,35 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
     private readonly IAlgorithmContext<T> _algoContext;
     private readonly IOrderService _orderService;
     private readonly IPortfolioService _portfolioService;
+    private readonly IdGenerator _orderIdGen;
+
+    public IAlgorithm<T> Algorithm { get; }
 
     public ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
-    public decimal StopLossRatio { get; }
+    public decimal LongStopLossRatio { get; }
 
-    public decimal TakeProfitRatio { get; }
+    public decimal LongTakeProfitRatio { get; }
 
-    public IAlgorithm<T> MainAlgo { get; }
+    public decimal ShortStopLossRatio { get; }
 
-    public SimpleExitPositionAlgoLogic(IAlgorithm<T> mainAlgo, decimal stopLossRatio, decimal takeProfitRatio)
+    public decimal ShortTakeProfitRatio { get; }
+
+    public SimpleExitPositionAlgoLogic(IAlgorithm<T> algorithm,
+                                       decimal longSL = decimal.MinValue,
+                                       decimal longTP = decimal.MinValue,
+                                       decimal shortSL = decimal.MinValue,
+                                       decimal shortTP = decimal.MinValue)
     {
-        MainAlgo = mainAlgo;
-        _algoContext = mainAlgo.Context;
+        Algorithm = algorithm;
+        _algoContext = algorithm.AlgorithmContext;
         _orderService = _algoContext.Services.Order;
         _portfolioService = _algoContext.Services.Portfolio;
 
-        StopLossRatio = stopLossRatio;
-        TakeProfitRatio = takeProfitRatio;
+        LongStopLossRatio = longSL;
+        LongTakeProfitRatio = longTP;
+        ShortStopLossRatio = shortSL;
+        ShortTakeProfitRatio = shortTP;
 
         _orderService.OrderClosed -= OnCloseOrderAcknowledged;
         _orderService.OrderClosed += OnCloseOrderAcknowledged;
@@ -38,29 +50,45 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         _orderService.OrderStoppedLost += OnStopLossTriggered;
         _orderService.OrderTookProfit -= OnTakeProfitTriggered;
         _orderService.OrderTookProfit += OnTakeProfitTriggered;
+
+        _orderIdGen = IdGenerators.Get<Order>();
     }
 
     public void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
-        if (_algoContext.IsBackTesting)
+        if (_algoContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
+
+        var position = _portfolioService.GetPosition(current.PositionId);
+        if (position == null)
         {
-            BackTestClose(current, exitPrice, exitTime);
-              }
-        else
-        {
-            var position = _portfolioService.GetPosition(current.PositionId);
-            if (position == null)
-            {
-                _log.Error($"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.");
-                return;
-            }
-            _orderService.CreateCloseOrderAndSend(position, OrderType.Market, decimal.MinValue, TimeInForceType.GoodTillCancel); ;
+            _log.Error($"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.");
+            return;
         }
+        var order = new Order
+        {
+            Id = _orderIdGen.NewTimeBasedId,
+            AccountId = position.AccountId,
+            SecurityCode = current.Security.Code,
+            SecurityId = position.SecurityId,
+            BrokerId = _algoContext.Context.BrokerId,
+            CreateTime = exitTime,
+            ExchangeId = _algoContext.Context.ExchangeId,
+            Quantity = position.Quantity,
+            Side = Side.Sell,
+            Status = OrderStatus.Submitting,
+            TimeInForce = TimeInForceType.GoodTillCancel,            
+            Price = exitPrice,
+            Type = OrderType.Limit,
+        };
+        _orderService.SendOrder(order);
     }
 
-    private void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
+    public void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
-        Assertion.ShallNever(current.EnterPrice == null || current.EnterPrice == 0);
+        if (!_algoContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
+
+        Assertion.ShallNever(current.EnterPrice is null or 0);
+
         if (exitPrice == 0 || !exitPrice.IsValid() || exitTime == DateTime.MinValue)
         {
             _log.Warn("Invalid arguments.");
@@ -70,15 +98,15 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         var enterPrice = current.EnterPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
 
-        Assertion.ShallNever(r < StopLossRatio * -1);
-
         if (current.IsLong)
         {
+            Assertion.ShallNever(r < LongStopLossRatio * -1);
             current.IsLong = false;
             current.LongCloseType = CloseType.Normal;
         }
         if (current.IsShort)
         {
+            Assertion.ShallNever(r < ShortStopLossRatio * -1);
             current.IsShort = false;
             current.ShortCloseType = CloseType.Normal;
         }
@@ -93,10 +121,9 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         FeeLogic?.ApplyFee(current);
 
         _log.Info($"action=close|p1={current.ExitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
-
     }
 
-    public void StopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
+    public void BackTestStopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
     {
         var enterPrice = current.EnterPrice!.Value;
         var exitPrice = current.SLPrice!.Value;
@@ -120,7 +147,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         current.Notional = current.Quantity * exitPrice;
 
         _log.Info($"action=stopLoss|p1={exitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
-        Assertion.ShallNever(r < StopLossRatio * -1);
+        Assertion.ShallNever(r < LongStopLossRatio * -1);
     }
 
     public void OnCloseOrderAcknowledged()
@@ -134,6 +161,11 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
     }
 
     public void OnTakeProfitTriggered()
+    {
+        throw new NotImplementedException();
+    }
+
+    void IExitPositionAlgoLogic<T>.BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
         throw new NotImplementedException();
     }

@@ -1,13 +1,8 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
-using Iced.Intel;
 using log4net;
 using log4net.Config;
-using Microsoft.CodeAnalysis.Text;
-using Microsoft.Diagnostics.Symbols;
 using OfficeOpenXml;
-using System;
 using System.Diagnostics;
 using System.Text;
 using TradeCommon.Calculations;
@@ -104,11 +99,13 @@ public class Program
                 //default:
                 //    return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgoStartupParameters(adminService.CurrentUser.Name,
+        var parameters = new AlgoStartupParameters(true, adminService.CurrentUser.Name,
             adminService.CurrentAccount.Name, core.Environment, core.Exchange, core.Broker, interval,
             new List<Security> { security }, algoTimeRange);
 
-        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss) { Screening = new SingleSecurityLogic(security) };
+        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss);
+        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+        algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
 
         Thread.Sleep(TimeSpan.FromMinutes(10));
@@ -131,9 +128,10 @@ public class Program
             return;
         }
         var securityPool = new List<Security> { security };
-        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m) { Screening = new SingleSecurityLogic(security) };
-
-        var parameters = new AlgoStartupParameters(_testUserName, account.Name, _environment, _exchange, _broker,
+        var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
+        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+        algorithm.Screening = screening;
+        var parameters = new AlgoStartupParameters(true, _testUserName, account.Name, _environment, _exchange, _broker,
             IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
 
         var loginResult = await services.Admin.Login(parameters.UserName, _testPassword, parameters.AccountName, parameters.Environment);
@@ -283,6 +281,9 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
+        await services.Admin.Login(_testUserName, _testPassword, _testAccountName, _environment);
+        var context = Dependencies.ComponentContext.Resolve<Context>();
+
         //var filter = "00001,00002,00005";
 
         var securities = await securityService.GetSecurities(SecurityType.Fx, ExchangeType.Binance);
@@ -317,11 +318,18 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
+                    var asset = security.EnsureCurrencyAsset();
+                    var assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                    var initQuantity = assetPosition.Quantity.ToDouble();
                     var securityPool = new List<Security> { security };
-                    var algorithm = new Rumi(fast, slow, rumi, sl) { Screening = new SingleSecurityLogic(security) };
-                    var engine = new AlgorithmEngine<RumiVariables>(services, algorithm);
+
+                    var algorithm = new Rumi(fast, slow, rumi, sl);
+                    var screening = new SingleSecurityLogic<RumiVariables>(algorithm, security);
+                    algorithm.Screening = screening;
+
+                    var engine = new AlgorithmEngine<RumiVariables>(context, services, algorithm);
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoStartParams = new AlgoStartupParameters(_testUserName, _testAccountName,
+                    var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
                         _environment, _exchange, _broker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
 
@@ -329,19 +337,19 @@ public class Program
                     if (entries.IsNullOrEmpty())
                         continue;
 
-                    if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
+                    if (entries.Count == 0)
                     {
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    var initFreeAmount = engine.InitialFreeAmounts.GetOrDefault(security.Id, 0);
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(initFreeAmount.ToDouble(), engine.Portfolio.Notional.ToDouble(), start, end);
+                    assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                    var endQuantity = assetPosition.Quantity.ToDouble();
+                    var annualizedReturn = Metrics.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                     if (annualizedReturn == 0)
                     {
                         _log.Info($"No trades at all: {security.Code}");
                         continue;
                     }
-
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
                     var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
@@ -351,7 +359,7 @@ public class Program
                         security.Code,
                         security.Name,
                         intervalStr,
-                        engine.Portfolio.FreeCash,
+                        endQuantity,
                         Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
                         annualizedReturn.ToString("P4"),
                         tradeCount,
@@ -425,6 +433,9 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
+        await services.Admin.Login(_testUserName, _testPassword, _testAccountName, _environment);
+        var context = Dependencies.ComponentContext.Resolve<Context>();
+
         var filter = "ETHUSDT";
         //var filter = "ETHUSDT";
         var filterCodes = filter.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -470,17 +481,18 @@ public class Program
                 foreach (var interval in intervalTypes)
                 {
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
-                    foreach (var sl in stopLosses)
+                    foreach (var stopLoss in stopLosses)
                     {
-
-                        var initCash = 1000;
-
-
+                        var asset = security.EnsureCurrencyAsset();
+                        var assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                        var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
-                        var algo = new MovingAverageCrossing(fast, slow, sl) { Screening = new SingleSecurityLogic(security) };
-                        var engine = new AlgorithmEngine<MacVariables>(services, algo);
+                        var algorithm = new MovingAverageCrossing(fast, slow, stopLoss);
+                        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+                        algorithm.Screening = screening;
+                        var engine = new AlgorithmEngine<MacVariables>(context, services, algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                        var algoStartParams = new AlgoStartupParameters(_testUserName, _testAccountName,
+                        var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
                             _environment, _exchange, _broker, interval, securityPool, timeRange);
 
                         await engine.Run(algoStartParams);
@@ -489,20 +501,22 @@ public class Program
                         if (entries.IsNullOrEmpty())
                             continue;
 
-                        if (engine.Portfolio.FreeCash == engine.Portfolio.InitialFreeCash)
+                        if (entries.Count == 0)
                         {
                             _log.Info($"No trades at all: {security.Code} {security.Name}");
                             continue;
                         }
-                        var endNotional = engine.Portfolio.Notional.ToDouble();
-                        var annualizedReturn = Metrics.GetAnnualizedReturn(initCash, endNotional, start, end);
+
+                        assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                        var endQuantity = assetPosition.Quantity.ToDouble();
+                        var annualizedReturn = Metrics.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                         if (annualizedReturn == 0)
                         {
                             _log.Info($"No trades at all: {security.Code}");
                             continue;
                         }
                         // write detail file
-                        var detailFilePath = Path.Combine(folder, $"{security.Code}-{start:yyyyMMdd}-{end:yyyyMMdd}-{endNotional}-{intervalStr}.csv");
+                        var detailFilePath = Path.Combine(folder, $"{security.Code}-{start:yyyyMMdd}-{end:yyyyMMdd}-{endQuantity}-{intervalStr}.csv");
                         Csv.Write(columns, entries, detailFilePath);
 
                         var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
@@ -512,10 +526,10 @@ public class Program
                             start,
                             end,
                             intervalStr,
-                            sl,
+                            stopLoss,
                             security.Code,
                             security.Name,
-                            engine.Portfolio.FreeCash,
+                            endQuantity,
                             Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
                             annualizedReturn.ToString("P4"),
                             tradeCount,

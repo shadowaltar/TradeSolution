@@ -3,17 +3,23 @@
 namespace TradeLogicCore.Algorithms.EnterExit;
 public interface IExitPositionAlgoLogic<T> where T : IAlgorithmVariables
 {
-    IAlgorithm<T> MainAlgo { get; }
+    IAlgorithm<T> Algorithm { get; }
 
-    decimal StopLossRatio { get; }
+    decimal LongStopLossRatio { get; }
 
-    decimal TakeProfitRatio { get; }
+    decimal LongTakeProfitRatio { get; }
+
+    decimal ShortStopLossRatio { get; }
+
+    decimal ShortTakeProfitRatio { get; }
 
     ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
     void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
 
-    void StopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
+    void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
+
+    void BackTestStopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
 
     void OnCloseOrderAcknowledged();
 

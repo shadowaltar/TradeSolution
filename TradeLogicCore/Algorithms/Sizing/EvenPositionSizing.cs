@@ -9,7 +9,7 @@ public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgo
     public EvenPositionSizing(IAlgorithm<T> mainAlgo)
     {
         Algorithm = mainAlgo;
-        _portfolioService = Algorithm.Context.Services.Portfolio;
+        _portfolioService = Algorithm.AlgorithmContext.Services.Portfolio;
     }
 
     public IAlgorithm<T> Algorithm { get; }
@@ -18,7 +18,7 @@ public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgo
     {
         var positions = _portfolioService.GetOpenPositions();
         var asset = security.EnsureCurrencyAsset();
-        var assetPosition = _portfolioService.GetAsset(asset.Id);
+        var assetPosition = _portfolioService.GetAssetPosition(asset.Id);
         if (assetPosition == null)
             return 0; // the account holds no such currency / asset for trading
         var freeBalance = assetPosition.Quantity;

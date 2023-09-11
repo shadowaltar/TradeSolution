@@ -16,14 +16,36 @@ public static class CollectionExtensions
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Action<TK, TV>? afterCreated)
+    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Func<TV> createAction, Action<TK, TV>? afterCreated = null)
         where TK : notnull
-        where TV : new()
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (map.TryGetValue(key, out var value))
             return value;
-        value = new TV();
+        value = createAction.Invoke();
+        map[key] = value;
+        afterCreated?.Invoke(key, value);
+        return value;
+    }
+
+    /// <summary>
+    /// Get value by a key from the dictionary. If no matching key,
+    /// create a new instance and save into the dictionary using the given key.
+    /// </summary>
+    /// <typeparam name="TK"></typeparam>
+    /// <typeparam name="TV"></typeparam>
+    /// <param name="map"></param>
+    /// <param name="key"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Action<TK, TV>? afterCreated = null)
+        where TV : new()
+        where TK : notnull
+    {
+        if (key == null) throw new ArgumentNullException(nameof(key));
+        if (map.TryGetValue(key, out var value))
+            return value;
+        value = new();
         map[key] = value;
         afterCreated?.Invoke(key, value);
         return value;

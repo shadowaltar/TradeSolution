@@ -11,4 +11,5 @@ public interface ISecurityService
     Task<Security?> GetSecurity(string code, string exchange, string securityType, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType, bool requestExternal = false);
     Task<Security?> GetSecurity(int securityId, bool requestExternal = false);
+    Security GetSecurity(int securityId);
 }

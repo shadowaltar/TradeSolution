@@ -39,3 +39,16 @@ public class IdGenerator
         return Name;
     }
 }
+
+public class IdGenerators
+{
+    private static readonly Dictionary<Type, IdGenerator> _idGenerators = new();
+    public static IdGenerator Get<T>()
+    {
+        lock (_idGenerators)
+        {
+            var t = typeof(T);
+            return _idGenerators.GetOrCreate(t, () => new IdGenerator(t.Name + "IdGen"));
+        }
+    }
+}

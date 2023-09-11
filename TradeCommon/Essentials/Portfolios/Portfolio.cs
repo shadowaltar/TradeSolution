@@ -9,7 +9,7 @@ public record Portfolio
 {
     public Dictionary<int, Position> Positions { get; } = new();
 
-    public Dictionary<int, Position> Assets { get; } = new();
+    public Dictionary<int, Position> AssetPositions { get; } = new();
 
     public Portfolio(Account account)
     {
@@ -31,7 +31,7 @@ public record Portfolio
                 StartTime = start,
                 UpdateTime = start,
             };
-            Assets[position.SecurityId] = position;
+            AssetPositions[position.SecurityId] = position;
         }
     }
 

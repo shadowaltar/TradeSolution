@@ -6,6 +6,8 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService, IDisposable
@@ -18,6 +20,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly Context _context;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
+    private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, long> _orderToPositionIds = new();
     private readonly Dictionary<long, Position> _openPositions = new();
@@ -42,6 +45,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         _context = context;
         _orderService = services.Order;
         _tradeService = services.Trade;
+        _securityService = services.Security;
         _persistence = services.Persistence;
         _tradeService.NextTrade += OnNewTrade;
     }
@@ -136,9 +140,16 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.Positions!.GetOrDefault(securityId);
     }
 
-    public Position? GetAsset(int assetId)
+    public Position? GetAssetPosition(int assetId)
     {
-        return Portfolio.Assets!.GetOrDefault(assetId);
+        return Portfolio.AssetPositions!.GetOrDefault(assetId) ?? throw Exceptions.MissingAssetPosition(assetId.ToString());
+    }
+
+    public Position GetPositionRelatedCurrencyAsset(int securityId)
+    {
+        var security = _securityService.GetSecurity(securityId);
+        var currencyAsset = security.EnsureCurrencyAsset();
+        return GetAssetPosition(currencyAsset.Id) ?? throw Exceptions.MissingAssetPosition(currencyAsset.Code);
     }
 
     public List<Position> GetPositions()
@@ -240,11 +251,23 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public decimal Realize(int securityId, decimal tradeRealizedPnl)
+    public void SpendAsset(int securityId, decimal quantity)
     {
-        if (Portfolio.Positions.TryGetValue(securityId , out var position))
+        var assetPosition = GetPositionRelatedCurrencyAsset(securityId);
+        assetPosition.Quantity -= quantity;
+        assetPosition.Notional -= quantity;
+    }
+
+    public decimal Realize(int securityId, decimal realizedPnl)
+    {
+        if (Portfolio.Positions.TryGetValue(securityId, out var position))
         {
-            position.RealizedPnl += tradeRealizedPnl;
+            position.RealizedPnl += realizedPnl;
+
+            var assetPosition = GetPositionRelatedCurrencyAsset(securityId);
+            assetPosition.Quantity += realizedPnl;
+            assetPosition.Notional += realizedPnl;
+
             return position.RealizedPnl;
         }
         return decimal.MinValue;
@@ -252,7 +275,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task<bool> Deposit(int assetId, decimal quantity)
     {
-        var asset = GetAsset(assetId);
+        var asset = GetAssetPosition(assetId);
         if (asset != null)
         {
             asset.Quantity += quantity;
@@ -264,7 +287,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task<bool> Withdraw(int assetId, decimal quantity)
     {
-        var asset = GetAsset(assetId);
+        var asset = GetAssetPosition(assetId);
         if (asset != null)
         {
             if (asset.Quantity < quantity)

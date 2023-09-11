@@ -2,6 +2,7 @@
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
@@ -125,10 +126,15 @@ public class SecurityService : ISecurityService
         }
         else
         {
-            lock (_securities)
-            {
-                return _securities.GetValueOrDefault(securityId);
-            }
+            return GetSecurity(securityId);
+        }
+    }
+
+    public Security GetSecurity(int securityId)
+    {
+        lock (_securities)
+        {
+            return _securities.GetValueOrDefault(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);
         }
     }
 
@@ -188,18 +194,6 @@ public class SecurityService : ISecurityService
         {
             _securities[s.Id] = s;
             _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), SecurityTypeConverter.Parse(s.Type))] = s.Id;
-        }
-    }
-
-    private void AssociateAssetToSecurities()
-    {
-        foreach (var security in _securities.Values)
-        {
-            var exchange = ExchangeTypeConverter.Parse(security.Exchange);
-            if (security.FxInfo?.BaseCurrency != null)
-            {
-                GetSecurity(security.FxInfo.BaseCurrency, security.Exchange, security.Type);
-            }
         }
     }
 }

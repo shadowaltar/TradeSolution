@@ -34,7 +34,7 @@ public class Security
     /// <returns></returns>
     public Security EnsureCurrencyAsset()
     {
-        return CurrencyAsset ?? FxInfo?.QuoteAsset ?? throw Exceptions.ThrowMissingQuoteAsset(Code);
+        return CurrencyAsset ?? FxInfo?.QuoteAsset ?? throw Exceptions.MissingQuoteAsset(Code);
     }
 
     public override string ToString()

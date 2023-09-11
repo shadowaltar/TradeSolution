@@ -5,6 +5,7 @@ using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -16,7 +17,9 @@ public class Rumi : IAlgorithm<RumiVariables>
     private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
 
-    public IAlgorithmContext<RumiVariables> Context { get; set; }
+    public IAlgorithmContext<RumiVariables> AlgorithmContext { get; set; }
+
+    public IServices Services => AlgorithmContext.Services;
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;

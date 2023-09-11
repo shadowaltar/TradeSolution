@@ -8,7 +8,6 @@ using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
-using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -20,9 +19,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     private readonly SimpleMovingAverage _slowMa;
     private readonly OpenPositionPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
 
-    public IAlgorithmContext<MacVariables> Context { get; }
-
-    public IServices Services => Context.Services;
+    public IAlgorithmContext<MacVariables> AlgorithmContext { get; }
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
@@ -35,16 +32,19 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
     public MovingAverageCrossing(int fast,
                                  int slow,
-                                 decimal stopLossRatio,
-                                 decimal takeProfitRatio,
-                                 IPositionSizingAlgoLogic<MacVariables>? sizing = null)
+                                 decimal stopLossRatio = decimal.MinValue,
+                                 decimal takeProfitRatio = decimal.MinValue,
+                                 IPositionSizingAlgoLogic<MacVariables>? sizing = null,
+                                 ISecurityScreeningAlgoLogic<MacVariables>? screening = null,
+                                 IEnterPositionAlgoLogic<MacVariables>? entering = null,
+                                 IExitPositionAlgoLogic<MacVariables>? exiting = null)
     {
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
 
-        Sizing = new SimplePositionSizing<MacVariables>(this);
-        Screening = new SimpleSecurityScreeningAlgoLogic<MacVariables>(this);
-        Entering = new SimpleEnterPositionAlgoLogic<MacVariables>(this);
-        Exiting = new SimpleExitPositionAlgoLogic<MacVariables>(this, stopLossRatio, takeProfitRatio);
+        Sizing = sizing ?? new SimplePositionSizing<MacVariables>(this);
+        Screening = screening ?? new SimpleSecurityScreeningAlgoLogic<MacVariables>(this);
+        Entering = entering ?? new SimpleEnterPositionAlgoLogic<MacVariables>(this);
+        Exiting = exiting ?? new SimpleExitPositionAlgoLogic<MacVariables>(this, stopLossRatio, takeProfitRatio);
 
         FastParam = fast;
         SlowParam = slow;
@@ -65,7 +65,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         {
             Entering.FeeLogic = null;
         }
-    } 
+    }
 
     public MacVariables CalculateVariables(decimal price, AlgoEntry<MacVariables>? last)
     {
