@@ -11,10 +11,11 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IAlgorithmContext<T> _algoContext;
+    private readonly Context _context;
     private readonly IOrderService _orderService;
     private readonly IPortfolioService _portfolioService;
     private readonly IdGenerator _orderIdGen;
+    private IAlgorithmEngine<T> _algoContext => _context.GetEngine<T>();
 
     public IAlgorithm<T> Algorithm { get; }
 
@@ -28,16 +29,15 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 
     public decimal ShortTakeProfitRatio { get; }
 
-    public SimpleExitPositionAlgoLogic(IAlgorithm<T> algorithm,
+    public SimpleExitPositionAlgoLogic(Context context,
                                        decimal longSL = decimal.MinValue,
                                        decimal longTP = decimal.MinValue,
                                        decimal shortSL = decimal.MinValue,
                                        decimal shortTP = decimal.MinValue)
     {
-        Algorithm = algorithm;
-        _algoContext = algorithm.AlgorithmContext;
-        _orderService = _algoContext.Services.Order;
-        _portfolioService = _algoContext.Services.Portfolio;
+        _context = context;
+        _orderService = context.Services.Order;
+        _portfolioService = context.Services.Portfolio;
 
         LongStopLossRatio = longSL;
         LongTakeProfitRatio = longTP;
@@ -56,9 +56,9 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 
     public void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
-        if (_algoContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
+        if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
-        var position = _portfolioService.GetPosition(current.PositionId);
+        var position = _portfolioService.GetPosition(current.SecurityId);
         if (position == null)
         {
             _log.Error($"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.");
@@ -70,13 +70,13 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
             AccountId = position.AccountId,
             SecurityCode = current.Security.Code,
             SecurityId = position.SecurityId,
-            BrokerId = _algoContext.Context.BrokerId,
+            BrokerId = _context.BrokerId,
             CreateTime = exitTime,
-            ExchangeId = _algoContext.Context.ExchangeId,
+            ExchangeId = _context.ExchangeId,
             Quantity = position.Quantity,
             Side = Side.Sell,
             Status = OrderStatus.Submitting,
-            TimeInForce = TimeInForceType.GoodTillCancel,            
+            TimeInForce = TimeInForceType.GoodTillCancel,
             Price = exitPrice,
             Type = OrderType.Limit,
         };
@@ -85,7 +85,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
 
     public void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
-        if (!_algoContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
+        if (!_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
 
         Assertion.ShallNever(current.EnterPrice is null or 0);
 

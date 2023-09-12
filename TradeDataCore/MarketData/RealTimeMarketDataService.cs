@@ -9,6 +9,7 @@ using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
+using static TradeCommon.Utils.Delegates;
 
 namespace TradeDataCore.MarketData;
 public class RealTimeMarketDataService : IMarketDataService, IDisposable
@@ -19,7 +20,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public IExternalQuotationManagement External => _external;
 
-    public event Action<int, OhlcPrice>? NextOhlc;
+    public event OhlcPriceReceivedCallback? NextOhlc;
     public event Action<int, Tick>? NextTick;
     public event Action<int>? HistoricalPriceEnd;
 
@@ -37,9 +38,9 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         _external.NextOhlc += OnNextOhlc;
     }
 
-    private void OnNextOhlc(int securityId, OhlcPrice price)
+    private void OnNextOhlc(int securityId, OhlcPrice price, bool isComplete)
     {
-        NextOhlc?.Invoke(securityId, price);
+        NextOhlc?.Invoke(securityId, price, isComplete);
     }
 
     public async Task Initialize()
@@ -70,22 +71,20 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
         if (Conditions.AllNotNull(start, end) && end < DateTime.UtcNow && start < end)
         {
-            //if (!_historicalMarketDataService.HasSubscription)
+            await Task.Run(async () =>
             {
-                await Task.Run(async () =>
+                var count = 0;
+                var id = security.Id;
+                await foreach (var p in _historicalMarketDataService.GetAsync(security, interval, start.Value, end.Value))
                 {
-                    var count = 0;
-                    var id = security.Id;
-                    await foreach (var p in _historicalMarketDataService.GetAsync(security, interval, start.Value, end.Value))
-                    {
-                        OnNextHistoricalPrice(id, interval, p);
-                        count++;
-                    }
-                    HistoricalPriceEnd?.Invoke(count);
-                });
-            }
+                    OnNextHistoricalPrice(id, interval, p);
+                    count++;
+                }
+                HistoricalPriceEnd?.Invoke(count);
+            });
             return ExternalConnectionStates.SubscribedHistoricalOhlcOk(security, start.Value, end.Value);
         }
+
         if (Conditions.AllNull(start, end))
         {
             var c = CountOhlcSubscription(security.Id, interval, 1);
@@ -100,7 +99,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
                 return ExternalConnectionStates.AlreadySubscribedRealTimeOhlc(security, interval);
             }
         }
-        throw new InvalidOperationException("Unexpected time range condition.");
+        throw Exceptions.InvalidTimeRange(start, end);
     }
 
     /// <summary>
@@ -153,7 +152,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
             var state = await _external.UnsubscribeOhlc(security, key.interval);
             states.Add(state);
         }
-        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(states); 
+        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(states);
     }
 
     public Task<ExternalConnectionState> UnsubscribeAllTicks()

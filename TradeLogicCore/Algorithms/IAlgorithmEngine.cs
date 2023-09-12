@@ -1,7 +1,5 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
@@ -11,27 +9,9 @@ namespace TradeLogicCore.Algorithms;
 
 public interface IAlgorithmEngine
 {
-    Task<int> Run(AlgoStartupParameters parameters);
-    Task Stop();
-}
-
-public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
-{
-    event Action ReachedDesignatedEndTime;
-
-    IAlgorithm<T> Algorithm { get; }
-
     User? User { get; }
 
     Account? Account { get; }
-
-    IPositionSizingAlgoLogic<T> Sizing { get; }
-
-    IEnterPositionAlgoLogic<T> EnterLogic { get; }
-
-    IExitPositionAlgoLogic<T> ExitLogic { get; }
-
-    ISecurityScreeningAlgoLogic<T> Screening { get; }
 
     /// <summary>
     /// Total signal count being processed. It is usually the count of prices / ticks.
@@ -55,6 +35,27 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
     bool ShouldCloseOpenPositionsWhenStopped { get; }
 
     AlgoStopTimeType WhenToStopOrHalt { get; }
+    
+    AlgoStartupParameters Parameters { get; }
+
+    Task<int> Run(AlgoStartupParameters parameters);
+
+    Task Stop();
+}
+
+public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
+{
+    event Action ReachedDesignatedEndTime;
+
+    IAlgorithm<T> Algorithm { get; }
+
+    IPositionSizingAlgoLogic<T> Sizing { get; }
+
+    IEnterPositionAlgoLogic<T> EnterLogic { get; }
+
+    IExitPositionAlgoLogic<T> ExitLogic { get; }
+
+    ISecurityScreeningAlgoLogic<T> Screening { get; }
 
     /// <summary>
     /// Gets all the algo entries created during engine execution.

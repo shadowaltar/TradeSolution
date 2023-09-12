@@ -29,7 +29,6 @@ public class PortfolioServiceTests
         var trades = new List<Trade>();
         var service = new PortfolioService(
             Mock.Of<IExternalExecutionManagement>(),
-            Mock.Of<IExternalAccountManagement>(),
             Mock.Of<Context>(),
             Mock.Of<IOrderService>(),
             Mock.Of<ITradeService>(),

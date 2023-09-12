@@ -8,13 +8,6 @@ public class SimpleSecurityScreeningAlgoLogic<T> : ISecurityScreeningAlgoLogic<T
     private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();
 
-    public IAlgorithm<T> Algorithm { get; }
-
-    public SimpleSecurityScreeningAlgoLogic(IAlgorithm<T> algorithm)
-    {
-        Algorithm = algorithm;
-    }
-
     public bool CheckIsPicked(int securityId)
     {
         lock (_pickedPool)

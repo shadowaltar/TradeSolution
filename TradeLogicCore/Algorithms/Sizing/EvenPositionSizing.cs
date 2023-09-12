@@ -5,11 +5,11 @@ namespace TradeLogicCore.Algorithms.Sizing;
 public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
 {
     private readonly IPortfolioService _portfolioService;
+    private readonly Context _context;
 
-    public EvenPositionSizing(IAlgorithm<T> mainAlgo)
+    public EvenPositionSizing(Context context)
     {
-        Algorithm = mainAlgo;
-        _portfolioService = Algorithm.AlgorithmContext.Services.Portfolio;
+        _context = context;
     }
 
     public IAlgorithm<T> Algorithm { get; }

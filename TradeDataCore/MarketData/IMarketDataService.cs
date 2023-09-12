@@ -3,14 +3,16 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using static TradeCommon.Utils.Delegates;
 
 namespace TradeDataCore.MarketData;
 public interface IMarketDataService
 {
     /// <summary>
     /// Event when next OHLC price is fetched. Returns security Id and the price instance.
+    /// Parameters: securityId, price, is the price at end of bar.
     /// </summary>
-    event Action<int, OhlcPrice> NextOhlc;
+    event OhlcPriceReceivedCallback NextOhlc;
     /// <summary>
     /// Event when next tick price is fetched. Returns security Id and the price instance.
     /// </summary>

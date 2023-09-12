@@ -8,7 +8,7 @@ public interface IExternalQuotationManagement
 {
     string Name { get; }
 
-    public event Action<int, OhlcPrice>? NextOhlc;
+    public event Action<int, OhlcPrice, bool>? NextOhlc;
 
     public event Action<int, OrderBook>? NextOrderBook;
 

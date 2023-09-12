@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 
@@ -35,10 +36,19 @@ public static class WebSocketHelper
         return null;
     }
 
-    public static void Receive(this ClientWebSocket ws, Action<byte[]> parseResultFunc)
+    /// <summary>
+    /// Listen to a URI using web-socket.
+    /// </summary>
+    /// <param name="uri"></param>
+    /// <param name="parseResultFunc"></param>
+    /// <returns></returns>
+    public static ClientWebSocket Listen(this Uri uri, Action<byte[]> parseResultFunc)
     {
+        ClientWebSocket ws = new();
+
         _ = Task.Factory.StartNew(async t =>
         {
+            await ws.ConnectAsync(uri, default);
             var buffer = new byte[1024];
             var bytes = new List<byte>();
             var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), default);
@@ -56,6 +66,8 @@ public static class WebSocketHelper
                 result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             }
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
+
+        return ws;
     }
 
     public static async Task Send(this ClientWebSocket ws, string payload)

@@ -13,10 +13,9 @@ namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService, IDisposable
 {
     private static readonly ILog _log = Logger.New();
-
+    private readonly IdGenerator _orderIdGenerator;
     private readonly IdGenerator _positionIdGenerator;
     private readonly IExternalExecutionManagement _execution;
-    private readonly IExternalAccountManagement _accountManagement;
     private readonly Context _context;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
@@ -36,7 +35,6 @@ public class PortfolioService : IPortfolioService, IDisposable
     public event Action<Position>? PositionClosed;
 
     public PortfolioService(IExternalExecutionManagement externalExecution,
-                            IExternalAccountManagement externalAccountManagement,
                             Context context,
                             IOrderService orderService,
                             ITradeService tradeService,
@@ -44,7 +42,6 @@ public class PortfolioService : IPortfolioService, IDisposable
                             Persistence persistence)
     {
         _execution = externalExecution;
-        _accountManagement = externalAccountManagement;
         _context = context;
         _orderService = orderService;
         _tradeService = tradeService;
@@ -53,6 +50,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
         _tradeService.NextTrade += OnNewTrade;
 
+        _orderIdGenerator = IdGenerators.Get<Order>();
         _positionIdGenerator = IdGenerators.Get<Position>();
     }
 
@@ -146,7 +144,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.Positions!.GetOrDefault(securityId);
     }
 
-    public Position? GetAssetPosition(int assetId)
+    public Position GetAssetPosition(int assetId)
     {
         return Portfolio.AssetPositions!.GetOrDefault(assetId) ?? throw Exceptions.MissingAssetPosition(assetId.ToString());
     }
@@ -161,6 +159,30 @@ public class PortfolioService : IPortfolioService, IDisposable
     public List<Position> GetPositions()
     {
         return Portfolio.Positions.Values.OrderBy(p => p.SecurityCode).ToList();
+    }
+
+    public void CloseAllPositions()
+    {
+        // TODO
+        foreach (var (positionId, position) in _openPositions)
+        {
+            var order = new Order
+            {
+                Id = _orderIdGenerator.NewTimeBasedId,
+                AccountId = position.AccountId,
+                SecurityId = position.SecurityId,
+                BrokerId = _context.BrokerId,
+                ExchangeId = _context.ExchangeId,
+                CreateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow,
+                Quantity = position.Quantity,
+                Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
+                Type = OrderType.Market,
+                TimeInForce = TimeInForceType.GoodTillCancel,
+                Status = OrderStatus.Submitting,                
+            };
+            _orderService.SendOrder(order);
+        }
     }
 
     public decimal GetRealizedPnl(Security security)

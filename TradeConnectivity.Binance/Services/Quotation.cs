@@ -10,13 +10,11 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Common;
 
 namespace TradeConnectivity.Binance.Services;
 public class Quotation : IExternalQuotationManagement
 {
     private static readonly ILog _log = Logger.New();
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IExternalConnectivityManagement _connectivity;
     private readonly HttpClient _httpClient;
     private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
@@ -26,17 +24,14 @@ public class Quotation : IExternalQuotationManagement
 
     public string Name => ExternalNames.Binance;
 
-    public event Action<int, OhlcPrice>? NextOhlc;
+    public event Action<int, OhlcPrice, bool>? NextOhlc;
     public event Action<int, OrderBook>? NextOrderBook;
 
     public Quotation(IExternalConnectivityManagement connectivity,
                      HttpClient httpClient,
                      ApplicationContext context)
     {
-        if (context.IsExternalProhibited)
-            _httpClient = new FakeHttpClient();
-        else
-            _httpClient = httpClient;
+        _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
     }
 
@@ -64,18 +59,17 @@ public class Quotation : IExternalQuotationManagement
         var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(intervalType).ToLowerInvariant()}";
         Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={wsName}");
 
-        ClientWebSocket ws = new();
-        _webSockets[wsName] = ws;
 
         var intervals = _registeredIntervals.GetOrCreate(security.Id);
         intervals.Add(intervalType);
 
-        await ws.ConnectAsync(uri, default);
-
+        bool isComplete = false;
         var broker = _messageBrokers.GetOrCreate((security.Id, intervalType), (k, v) => v.Run());
-        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price); // broker.Dispose() will clear this up if needed
+        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price, isComplete); // broker.Dispose() will clear this up if needed
 
-        ws.Receive(OnReceivedString);
+        var webSocket = uri.Listen(OnReceivedString);
+        _webSockets[wsName] = webSocket;
+
         var message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
         _log.Info(message);
         return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeMarketData, message);
@@ -95,7 +89,7 @@ public class Quotation : IExternalQuotationManagement
                 var kLineNode = dataNode["k"]!.AsObject();
                 var start = DateUtils.FromUnixMs(kLineNode["t"]!.GetValue<long>());
 
-                var isComplete = kLineNode.GetBoolean("x");
+                isComplete = kLineNode.GetBoolean("x");
 
                 var o = kLineNode["o"]!.GetValue<string>().ParseDecimal();
                 var h = kLineNode["h"]!.GetValue<string>().ParseDecimal();

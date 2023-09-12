@@ -126,6 +126,7 @@ public class ExecutionController : Controller
 
     [HttpPost("algos/mac/start")]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
+                                            [FromServices] Context context,
                                             [FromServices] ISecurityService securityService,
                                             [FromServices] IAdminService adminService,
                                             [FromForm(Name = "admin-password")] string adminPassword,
@@ -179,8 +180,8 @@ public class ExecutionController : Controller
                                                    interval,
                                                    new List<Security> { security },
                                                    algoTimeRange);
-        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss, takeProfit);
-        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+        var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
+        var screening = new SingleSecurityLogic<MacVariables>(context, security);
         algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
         return Ok(guid);

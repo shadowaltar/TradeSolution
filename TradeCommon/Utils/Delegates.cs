@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -17,4 +18,6 @@ public static class Delegates
 
     public delegate void BalanceChangedCallback(List<Balance> balances);
     public delegate void TransferredCallback(TransferAction transferAction);
+
+    public delegate void OhlcPriceReceivedCallback(int securityId, OhlcPrice price, bool isComplete);
 }

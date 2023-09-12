@@ -31,14 +31,26 @@ public class Program
 
     private static readonly int _maxPrintCount = 10;
 
+    //private static readonly string _testUserName = "test";
+    //private static readonly string _testPassword = "testtest";
+    //private static readonly string _testEmail = "test@test.com";
+    //private static readonly string _testAccountName = "test";
+    //private static readonly string _testAccountType = "spot";
+    //private static readonly EnvironmentType _testEnvironment = EnvironmentType.Test;
+
     private static readonly string _testUserName = "test";
     private static readonly string _testPassword = "testtest";
-    private static readonly string _testEmail = "test@test.com";
-    private static readonly string _testAccountName = "test";
+    private static readonly string _testEmail = "1688996631782681271@testnet.binance.vision";
+    private static readonly string _testAccountName = "spot";
     private static readonly string _testAccountType = "spot";
+    private static readonly DateTime _testStart = new DateTime(2022, 1, 1);
+    private static readonly DateTime _testEnd = new DateTime(2023, 7, 1);
+
+    private static readonly EnvironmentType _testEnvironment = EnvironmentType.Uat;
+
     private static readonly BrokerType _testBroker = BrokerType.Binance;
     private static readonly ExchangeType _testExchange = ExchangeType.Binance;
-    private static readonly EnvironmentType _testEnvironment = EnvironmentType.Test;
+
     private static string _fakeSecretFileContent;
     private static string _fakeSecretFilePath;
 
@@ -60,19 +72,22 @@ public class Program
     private static async Task RunMacMimicWebService()
     {
         // mimic set env + login
-        var exchange = ExchangeType.Binance;
+
         var environment = _testEnvironment;
         var userName = _testUserName;
         var accountName = _testAccountName;
         var accountType = _testAccountType;
         var password = _testPassword;
         var email = _testEmail;
+
+        var exchange = ExchangeType.Binance;
         var symbol = "BTCBUSD";
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
         var slowMa = 7;
         var stopLoss = 0.0005m;
+        var takeProfit = 0.0005m;
         _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";
         _fakeSecretFilePath = Path.Combine(Constants.DatabaseFolder, $"{Environments.ToString(environment)}_{userName}_{accountName}");
 
@@ -81,40 +96,34 @@ public class Program
         var adminService = Dependencies.ComponentContext.Resolve<IAdminService>();
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var services = Dependencies.ComponentContext.Resolve<IServices>();
+        var context = Dependencies.ComponentContext.Resolve<Context>();
 
         var broker = ExternalNames.Convert(exchange);
         services.Admin.Initialize(environment, exchange, broker);
 
-        var security = await securityService.GetSecurity(symbol, services.Context.Exchange, secType);
+        var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         //if (security == null) return BadRequest("Invalid or missing security.");
 
-        var result = await Login(services, userName, password, email, accountName, accountType, services.Context.Environment, security);
+        var result = await Login(services, userName, password, email, accountName, accountType, context.Environment, security);
 
         var core = Dependencies.ComponentContext.Resolve<Core>();
 
         AlgoEffectiveTimeRange algoTimeRange = null;
         switch (core.Environment)
         {
-            //case EnvironmentType.Prod:
-            //    algoTimeRange = AlgoEffectiveTimeRange.ForProduction(interval);
-            //    break;
-            //case EnvironmentType.Test:
-            //    if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
-            //    if (ControllerValidator.IsBadOrParse(endStr, out DateTime end, out br)) return br;
-            //    algoTimeRange = AlgoEffectiveTimeRange.ForBackTesting(start, end);
-            //    break;
+            case EnvironmentType.Test:
+                algoTimeRange = AlgoEffectiveTimeRange.ForBackTesting(_testStart, _testEnd);
+                break;
             case EnvironmentType.Uat:
                 algoTimeRange = AlgoEffectiveTimeRange.ForPaperTrading(interval);
                 break;
-                //default:
-                //    return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgoStartupParameters(true, adminService.CurrentUser.Name,
+        var parameters = new AlgoStartupParameters(false, adminService.CurrentUser.Name,
             adminService.CurrentAccount.Name, core.Environment, core.Exchange, core.Broker, interval,
             new List<Security> { security }, algoTimeRange);
-
-        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss);
-        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+        _log.Info("Execute algorithm with parameters: " + parameters);
+        var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
+        var screening = new SingleSecurityLogic<MacVariables>(context, security);
         algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
 
@@ -132,23 +141,23 @@ public class Program
             {
                 case ResultCode.GetSecretFailed:
                 case ResultCode.SecretMalformed:
-                    {
-                        File.Delete(_fakeSecretFilePath);
-                        File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
-                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                        break;
-                    }
+                {
+                    File.Delete(_fakeSecretFilePath);
+                    File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                    break;
+                }
                 case ResultCode.GetAccountFailed:
-                    {
-                        var account = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                        break;
-                    }
+                {
+                    var account = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                    break;
+                }
                 case ResultCode.AccountHasNoAsset:
-                    {
-                        var balance = await services.Portfolio.Deposit(security.CurrencyAsset.Id, 1000m);
-                        break;
-                    }
+                {
+                    var balance = await services.Portfolio.Deposit(security.CurrencyAsset.Id, 1000m);
+                    break;
+                }
             }
         }
         return result;
@@ -228,6 +237,7 @@ public class Program
         var printCount = 0;
         var dataService = Dependencies.ComponentContext.Resolve<IMarketDataService>();
         var interval = IntervalType.OneMinute;
+        dataService.NextOhlc -= OnNewOhlc;
         dataService.NextOhlc += OnNewOhlc;
         await dataService.SubscribeOhlc(security, interval);
         while (printCount < _maxPrintCount)
@@ -236,7 +246,7 @@ public class Program
         }
         await dataService.UnsubscribeOhlc(security, interval);
 
-        void OnNewOhlc(int securityId, OhlcPrice price)
+        void OnNewOhlc(int securityId, OhlcPrice price, bool isComplete)
         {
             printCount++;
             if (security != null && security.Id != securityId)
@@ -363,11 +373,13 @@ public class Program
                     var initQuantity = assetPosition.Quantity.ToDouble();
                     var securityPool = new List<Security> { security };
 
-                    var algorithm = new Rumi(fast, slow, rumi, sl);
-                    var screening = new SingleSecurityLogic<RumiVariables>(algorithm, security);
+                    var algorithm = new Rumi(context, fast, slow, rumi, sl);
+                    var screening = new SingleSecurityLogic<RumiVariables>(context, security);
                     algorithm.Screening = screening;
 
-                    var engine = new AlgorithmEngine<RumiVariables>(services, algorithm);
+                    var engine = new AlgorithmEngine<RumiVariables>(context);
+                    engine.SetAlgorithm(algorithm);
+
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
                         _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
@@ -527,10 +539,11 @@ public class Program
                         var assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
-                        var algorithm = new MovingAverageCrossing(fast, slow, stopLoss);
-                        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+                        var algorithm = new MovingAverageCrossing(context, fast, slow, stopLoss);
+                        var screening = new SingleSecurityLogic<MacVariables>(context, security);
                         algorithm.Screening = screening;
-                        var engine = new AlgorithmEngine<MacVariables>(services, algorithm);
+                        var engine = new AlgorithmEngine<MacVariables>(context);
+                        engine.SetAlgorithm(algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                         var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
                             _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);

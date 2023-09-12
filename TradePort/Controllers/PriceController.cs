@@ -157,7 +157,7 @@ public class PriceController : Controller
         if (symbols == null || symbols.Count == 0)
             return BadRequest("Missing symbols (delimited by ',').");
 
-        var securities = await securityService.GetSecurities(secType, ExchangeType.Binance);
+        var securities = await securityService.GetSecurities(secType, ExchangeType.Binance, true);
         securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         if (securities.IsNullOrEmpty()) return BadRequest("Missing security.");
 

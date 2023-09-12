@@ -76,9 +76,12 @@ public class Core
         var guid = Guid.NewGuid();
         _ = Task.Factory.StartNew(async () =>
         {
-            var engine = new AlgorithmEngine<T>(_services, algorithm);
+            var engine = new AlgorithmEngine<T>(Context);
+            engine.SetAlgorithm(algorithm);
+
             _engines[guid] = engine;
             await engine.Run(parameters); // this is a blocking call
+
         }, TaskCreationOptions.LongRunning);
 
         _algorithms[guid] = new AlgoMetaInfo(guid, algorithm.GetType().Name, parameters);

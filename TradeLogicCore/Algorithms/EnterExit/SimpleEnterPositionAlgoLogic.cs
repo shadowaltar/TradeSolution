@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using System.Drawing;
+using System.Security.Cryptography;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -14,24 +15,30 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IPortfolioService _portfolioService;
-    private readonly IOrderService _orderService;
+    private IPortfolioService _portfolioService => _context.Services.Portfolio;
+    private IOrderService _orderService => _context.Services.Order;
+
     private readonly IdGenerator _orderIdGen;
+    private readonly Context _context;
 
-    public IAlgorithm<T> Algorithm { get; }
+    private IPositionSizingAlgoLogic<T> _sizing;
+    private IAlgorithmEngine<T> _algorithmEngine;
 
-    public IPositionSizingAlgoLogic<T> Sizing { get; }
+    public IPositionSizingAlgoLogic<T> Sizing
+    {
+        get
+        {
+            _sizing ??= _context.GetAlgorithm<T>().Sizing;
+            return _sizing;
+        }
+    }
 
     public ITransactionFeeLogic<T>? FeeLogic { get; set; }
 
-    public SimpleEnterPositionAlgoLogic(IAlgorithm<T> algorithm)
+    public SimpleEnterPositionAlgoLogic(Context context)
     {
-        Sizing = algorithm.Sizing;
-        Algorithm = algorithm;
-        _portfolioService = algorithm.AlgorithmContext.Services.Portfolio;
-        _orderService = algorithm.AlgorithmContext.Services.Order;
-
         _orderIdGen = IdGenerators.Get<Order>();
+        _context = context;
     }
 
     public Order Open(AlgoEntry<T> current,
@@ -42,25 +49,23 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
                       decimal stopLossPrice,
                       decimal takeProfitPrice)
     {
-        if (Algorithm.AlgorithmContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
+        if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         var securityId = current.SecurityId;
         var asset = _portfolioService.GetPositionRelatedCurrencyAsset(securityId);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
         var now = DateTime.UtcNow;
-        var context = Algorithm.AlgorithmContext.Context;
-
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
             SecurityId = securityId,
             AccountId = asset.AccountId,
-            BrokerId = context.BrokerId,
+            BrokerId = _context.BrokerId,
             Side = side,
             CreateTime = now,
             UpdateTime = now,
-            ExchangeId = context.ExchangeId,
+            ExchangeId = _context.ExchangeId,
             Type = OrderType.Limit,
             Price = 0,
             Quantity = size,
@@ -78,7 +83,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
                              decimal stopLossPrice,
                              decimal takeProfitPrice)
     {
-        if (!Algorithm.AlgorithmContext.IsBackTesting) return;
+        if (!_context.IsBackTesting) return;
 
         var securityId = current.SecurityId;
         current.IsLong = true;

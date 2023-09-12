@@ -20,7 +20,6 @@ public partial class Storage
     /// <param name="typeCodes"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    /// <exception cref="NotImplementedException"></exception>
     public static async Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes)
     {
         var entries = new DataTable();

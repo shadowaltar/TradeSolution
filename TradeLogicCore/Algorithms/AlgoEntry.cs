@@ -8,7 +8,7 @@ namespace TradeLogicCore.Algorithms;
 /// </summary>
 public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, SelectIgnore] Security Security)
 {
-    public int PositionId { get; set; }
+    public long PositionId { get; set; }
 
     public int SecurityId { get; set; } = -1;
 
@@ -61,7 +61,7 @@ public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, Sel
     /// </summary>
     public decimal RealizedPnl { get; set; }
     /// <summary>
-    /// Unrealized PNL of this entry which is still opened. (Exit Price - Current Price) * Quantity held.
+    /// Unrealized PNL of this entry which is still opened. (Current Price - Enter Price) * Quantity held.
     /// </summary>
     public decimal UnrealizedPnl { get; set; }
     /// <summary>

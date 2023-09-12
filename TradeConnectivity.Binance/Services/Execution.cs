@@ -210,7 +210,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// </summary>
     /// <param name="order"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public async Task<ExternalQueryState> CancelAllOrders(Security security)
     {
         if (!ValidateSecurity(security, ActionType.CancelOrder, out var errorState))
@@ -396,7 +395,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// </summary>
     /// <param name="updatedOrder"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public async Task<ExternalQueryState> UpdateOrder(Order updatedOrder)
     {
         // TODO Not Tested
@@ -475,7 +473,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// <param name="start"></param>
     /// <param name="end"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public async Task<ExternalQueryState> GetTrades(Security security,
                                                     long orderId = long.MinValue,
                                                     DateTime? start = null,
@@ -545,10 +542,9 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         // subscribe to the listen key in order to listen to order/trade/account changes
         Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={_listenKey}");
-        ClientWebSocket ws = new();
-        _webSockets[_listenKey] = ws;
-        ws.Receive(ParseUserStreamingData);
-        await ws.ConnectAsync(uri, default);
+
+        var webSocket = uri.Listen(ParseUserStreamingData);
+        _webSockets[_listenKey] = webSocket;
 
         var message = $"Subscribed to user streaming data, listen-key: {_listenKey}";
         _log.Info(message);

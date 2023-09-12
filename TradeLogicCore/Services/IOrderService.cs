@@ -1,5 +1,4 @@
 ﻿using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeLogicCore.Services;
@@ -92,11 +91,6 @@ public interface IOrderService
     /// Cancel all open orders.
     /// </summary>
     void CancelAllOpenOrders();
-
-    /// <summary>
-    /// Close all open positions by market price.
-    /// </summary>
-    void CloseAllOpenPositions();
 
     /// <summary>
     /// Create an order without any validation.

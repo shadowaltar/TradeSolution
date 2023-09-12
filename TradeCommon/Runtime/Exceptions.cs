@@ -50,4 +50,19 @@ public static class Exceptions
     {
         return new InvalidOperationException($"Context is not initialized.");
     }
+
+    public static Exception MissingAlgorithm()
+    {
+        return new InvalidOperationException($"Algorithm is not set properly.");
+    }
+
+    public static Exception MissingAlgorithmEngine()
+    {
+        return new InvalidOperationException($"Algorithm engine is not set properly.");
+    }
+
+    public static Exception InvalidTimeRange(DateTime? start, DateTime? end)
+    {
+        return new InvalidOperationException($"Time range is invalid; start {start}, end {end}");
+    }
 }

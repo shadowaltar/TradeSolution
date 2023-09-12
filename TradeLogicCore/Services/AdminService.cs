@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using log4net;
 using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
@@ -14,6 +15,7 @@ namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IComponentContext _container;
     private readonly ISecurityService _securityService;
     private readonly IPortfolioService _portfolioService;
     private readonly IExternalAccountManagement _accountManagement;
@@ -26,12 +28,14 @@ public class AdminService : IAdminService
     public Context Context { get; }
 
     public AdminService(Context context,
+                        IComponentContext container,
                         ISecurityService securityService,
                         IPortfolioService portfolioService,
                         IExternalAccountManagement accountManagement,
                         IExternalConnectivityManagement connectivity)
     {
         Context = context;
+        _container = container;
         _securityService = securityService;
         _portfolioService = portfolioService;
         _accountManagement = accountManagement;
@@ -40,7 +44,7 @@ public class AdminService : IAdminService
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        Context.Initialize(environment, exchange, broker);
+        Context.Initialize(_container, environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
         _securityService.Initialize();
     }

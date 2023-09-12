@@ -6,9 +6,9 @@ using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
 
-public interface IAlgorithm<T> where T : IAlgorithmVariables
+public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables
 {
-    IAlgorithmContext<T> AlgorithmContext { get; }
+    IAlgorithmEngine<T> Engine { get; }
     IPositionSizingAlgoLogic<T> Sizing { get; }
     IEnterPositionAlgoLogic<T> Entering { get; }
     IExitPositionAlgoLogic<T> Exiting { get; }
@@ -27,10 +27,10 @@ public interface IAlgorithm<T> where T : IAlgorithmVariables
     void BeforeSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
     void AfterSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
-    void BeforeAlgoExecution(IAlgorithmContext<T> context) { }
-    void AfterAlgoExecution(IAlgorithmContext<T> context) { }
-    void BeforeProcessingSecurity(IAlgorithmContext<T> context, Security security) { }
-    void AfterProcessingSecurity(IAlgorithmContext<T> context, Security security) { }
+    void BeforeAlgoExecution() { }
+    void AfterAlgoExecution() { }
+    void BeforeProcessingSecurity(Security security) { }
+    void AfterProcessingSecurity(Security security) { }
     void BeforeOpeningLong(AlgoEntry<T> entry) { }
     void AfterLongOpened(AlgoEntry<T> entry) { }
     void BeforeClosingLong(AlgoEntry<T> entry) { }
@@ -45,4 +45,8 @@ public interface IAlgorithm<T> where T : IAlgorithmVariables
     void AfterShortClosed(AlgoEntry<T> entry) { }
     void BeforeStopLossShort(AlgoEntry<T> entry) { }
     void AfterStopLossShort(AlgoEntry<T> entry) { }
+}
+
+public interface IAlgorithm
+{
 }

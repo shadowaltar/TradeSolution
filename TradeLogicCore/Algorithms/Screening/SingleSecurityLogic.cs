@@ -1,17 +1,17 @@
 ﻿using TradeCommon.Essentials.Instruments;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Screening;
 
 public class SingleSecurityLogic<T> : ISecurityScreeningAlgoLogic<T> where T : IAlgorithmVariables
 {
+    private readonly Context _context;
     private Security? _security;
     private readonly Dictionary<int, Security> _securities = new(1);
 
-    public IAlgorithm<T> Algorithm { get; }
-
-    public SingleSecurityLogic(IAlgorithm<T> algorithm, Security? security)
+    public SingleSecurityLogic(Context context, Security? security)
     {
-        Algorithm = algorithm;
+        _context = context;
         _security = security;
         if (security != null)
             _securities = new Dictionary<int, Security> { { security.Id, security } };

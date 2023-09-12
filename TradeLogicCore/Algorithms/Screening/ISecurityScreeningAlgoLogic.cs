@@ -3,8 +3,6 @@
 namespace TradeLogicCore.Algorithms.Screening;
 public interface ISecurityScreeningAlgoLogic<T> where T : IAlgorithmVariables
 {
-    IAlgorithm<T> Algorithm { get; }
-
     void SetAndPick(IDictionary<int, Security> securityPool);
 
     IReadOnlyDictionary<int, Security> GetPickedOnes();

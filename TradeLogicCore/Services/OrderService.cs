@@ -3,11 +3,9 @@ using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
@@ -276,10 +274,5 @@ public class OrderService : IOrderService, IDisposable
             StrategyId = Constants.ManualTradingStrategyId,
             TimeInForce = timeInForce,
         };
-    }
-
-    public void CloseAllOpenPositions()
-    {
-        throw new NotImplementedException();
     }
 }

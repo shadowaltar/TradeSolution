@@ -63,7 +63,6 @@ public class SqlReader<T> : IDisposable where T : new()
     /// <param name="type"></param>
     /// <param name="name"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     private object? Get(Type type, string name)
     {
         if (type == typeof(string))
