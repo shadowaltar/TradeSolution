@@ -1,5 +1,4 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using log4net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
@@ -8,28 +7,22 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
-using TradeConnectivity.Binance.Utils;
+using TradeConnectivity.CryptoSimulator.Utils;
 
-namespace TradeConnectivity.Binance.Services;
+namespace TradeConnectivity.CryptoSimulator.Services;
 public class AccountManager : IExternalAccountManagement
 {
     private static readonly ILog _log = Logger.New();
     private static readonly List<string> _accountTypes = new() { "SPOT", "MARGIN", "FUTURES" };
     private readonly IExternalConnectivityManagement _connectivity;
-    private readonly HttpClient _httpClient;
+    private readonly FakeHttpClient _httpClient;
     private readonly KeyManager _keyManager;
     private readonly RequestBuilder _requestBuilder;
 
-    public AccountManager(IExternalConnectivityManagement connectivity,
-                          HttpClient httpClient,
-                          ApplicationContext context,
-                          KeyManager keyManager)
+    public AccountManager(IExternalConnectivityManagement connectivity, FakeHttpClient httpClient, KeyManager keyManager)
     {
-        if (context.IsExternalProhibited)
-            _httpClient = new FakeHttpClient();
-        else
-            _httpClient = httpClient;
         _connectivity = connectivity;
+        _httpClient = httpClient;
         _keyManager = keyManager;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
     }

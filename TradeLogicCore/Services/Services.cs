@@ -5,7 +5,7 @@ using TradeDataCore.MarketData;
 namespace TradeLogicCore.Services;
 public class Services : IServices
 {
-    public Services(/*Context context,*/
+    public Services(Context context,
                     Persistence persistence,
                     IAdminService admin,
                     IPortfolioService portfolio,
@@ -15,7 +15,7 @@ public class Services : IServices
                     IHistoricalMarketDataService historicalMarketDataService,
                     IMarketDataService marketDataService)
     {
-        //Context = context;
+        Context = context;
         Persistence = persistence;
         Admin = admin;
         Portfolio = portfolio;
@@ -26,7 +26,7 @@ public class Services : IServices
         MarketData = marketDataService;
     }
 
-    //public Context Context { get; }
+    public Context Context { get; }
 
     public Persistence Persistence { get; }
 

@@ -3,6 +3,7 @@ using log4net;
 using System.Drawing;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
@@ -33,15 +34,15 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public void Open(AlgoEntry<T> current,
-                     AlgoEntry<T> last,
-                     decimal enterPrice,
-                     Side side,
-                     DateTime enterTime,
-                     decimal stopLossPrice,
-                     decimal takeProfitPrice)
+    public Order Open(AlgoEntry<T> current,
+                      AlgoEntry<T> last,
+                      decimal enterPrice,
+                      Side side,
+                      DateTime enterTime,
+                      decimal stopLossPrice,
+                      decimal takeProfitPrice)
     {
-        if (Algorithm.AlgorithmContext.IsBackTesting) return;
+        if (Algorithm.AlgorithmContext.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         var securityId = current.SecurityId;
         var asset = _portfolioService.GetPositionRelatedCurrencyAsset(securityId);
@@ -66,6 +67,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
             SecurityCode = current.Security.Code,
         };
         _orderService.SendOrder(order);
+        return order;
     }
 
     public void BackTestOpen(AlgoEntry<T> current,
@@ -85,16 +87,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
         var asset = _portfolioService.GetPositionRelatedCurrencyAsset(securityId);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
-        current.Quantity = size;
-        current.EnterPrice = enterPrice;
-        current.EnterTime = enterTime;
-        current.ExitPrice = 0;
-        current.Elapsed = TimeSpan.Zero;
-        current.RealizedPnl = 0;
-        current.UnrealizedPnl = 0;
-        current.RealizedReturn = 0;
-        current.SLPrice = stopLossPrice;
-        current.Notional = current.Quantity * enterPrice;
+        SyncOpenOrderToEntry(current, size, enterPrice, enterTime, stopLossPrice, takeProfitPrice);
 
         // apply fee when a new position is opened
         FeeLogic?.ApplyFee(current);
@@ -102,7 +95,7 @@ public class SimpleEnterPositionAlgoLogic<T> : IEnterPositionAlgoLogic<T> where 
         _log.Info($"action=open|time0={current.EnterTime:yyMMdd-HHmm}|p0={current.EnterPrice}|q={current.Quantity}");
     }
 
-    public void ConfirmOpen(AlgoEntry<T> current, decimal size, decimal enterPrice, DateTime enterTime, decimal stopLossPrice, decimal takeProfitPrice)
+    public void SyncOpenOrderToEntry(AlgoEntry<T> current, decimal size, decimal enterPrice, DateTime enterTime, decimal stopLossPrice, decimal takeProfitPrice)
     {
         // this method should take care of multiple fills
         current.Quantity = size;

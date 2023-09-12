@@ -1,18 +1,25 @@
 ﻿using Common;
 using log4net;
+using System.Net.Http;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
 
 namespace TradeConnectivity.Binance.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalConnectivityManagement _connectivity;
+    private readonly HttpClient _httpClient;
 
-    public HistoricalMarketData(IExternalConnectivityManagement connectivity)
+    public HistoricalMarketData(IExternalConnectivityManagement connectivity, HttpClient httpClient, ApplicationContext context)
     {
+        if (context.IsExternalProhibited)
+            _httpClient = new FakeHttpClient();
+        else
+            _httpClient = httpClient;
         _connectivity = connectivity;
     }
 
@@ -45,13 +52,12 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         var endMs = end.ToUnixMs();
 
         string url = UpdateTimeFrame(code, intervalStr, startMs, endMs);
-        using var httpClient = new HttpClient();
 
         var prices = new List<OhlcPrice>();
         long lastEndMs = 0l;
         while (lastEndMs < endMs)
         {
-            var jo = await httpClient.ReadJsonArray(url, _log);
+            var jo = await _httpClient.ReadJsonArray(url, _log);
             if (jo == null || jo.Count == 0)
                 break;
 

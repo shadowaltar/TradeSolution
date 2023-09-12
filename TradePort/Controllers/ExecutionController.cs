@@ -129,13 +129,13 @@ public class ExecutionController : Controller
                                             [FromServices] ISecurityService securityService,
                                             [FromServices] IAdminService adminService,
                                             [FromForm(Name = "admin-password")] string adminPassword,
-                                            [FromRoute(Name = "account")] string accountName = "test",
                                             [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                             [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
                                             [FromQuery(Name = "interval")] string intervalStr = "1d",
                                             [FromQuery(Name = "fast-ma")] int fastMa = 3,
                                             [FromQuery(Name = "slow-ma")] int slowMa = 7,
                                             [FromQuery(Name = "stop-loss")] decimal stopLoss = 0.0005m,
+                                            [FromQuery(Name = "take-profit")] decimal takeProfit = 0.0005m,
                                             [FromQuery(Name = "back-test-start")] string? startStr = "",
                                             [FromQuery(Name = "back-test-end")] string? endStr = "")
     {
@@ -144,7 +144,8 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(fastMa, out br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(slowMa, out br)) return br;
-        if (ControllerValidator.IsDecimalNegativeOrZero(stopLoss, out br)) return br;
+        if (ControllerValidator.IsDecimalNegative(stopLoss, out br)) return br;
+        if (ControllerValidator.IsDecimalNegative(takeProfit, out br)) return br;
 
         if (adminService.CurrentUser == null || adminService.CurrentAccount == null)
             return BadRequest("Must login user and account");
@@ -169,7 +170,8 @@ public class ExecutionController : Controller
             default:
                 return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgoStartupParameters(adminService.CurrentUser.Name,
+        var parameters = new AlgoStartupParameters(core.Environment == EnvironmentType.Test,
+                                                   adminService.CurrentUser.Name,
                                                    adminService.CurrentAccount.Name,
                                                    core.Environment,
                                                    core.Exchange,
@@ -177,8 +179,9 @@ public class ExecutionController : Controller
                                                    interval,
                                                    new List<Security> { security },
                                                    algoTimeRange);
-
-        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss) { Screening = new SingleSecurityLogic(security) };
+        var algorithm = new MovingAverageCrossing(fastMa, slowMa, stopLoss, takeProfit);
+        var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
+        algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
         return Ok(guid);
     }

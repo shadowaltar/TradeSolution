@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -13,7 +14,8 @@ namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
-    private readonly IServices _services;
+    private readonly ISecurityService _securityService;
+    private readonly IPortfolioService _portfolioService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
 
@@ -24,12 +26,14 @@ public class AdminService : IAdminService
     public Context Context { get; }
 
     public AdminService(Context context,
-                        IServices services,
+                        ISecurityService securityService,
+                        IPortfolioService portfolioService,
                         IExternalAccountManagement accountManagement,
                         IExternalConnectivityManagement connectivity)
     {
         Context = context;
-        _services = services;
+        _securityService = securityService;
+        _portfolioService = portfolioService;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
     }
@@ -38,6 +42,7 @@ public class AdminService : IAdminService
     {
         Context.Initialize(environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
+        _securityService.Initialize();
     }
 
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
@@ -75,7 +80,7 @@ public class AdminService : IAdminService
         if (externalLoginResult != ResultCode.LoginUserAndAccountOk)
         {
             _log.Error($"Failed to login account {accountName} with user {user.Name}.");
-            return ResultCode.LoginUserAndAccountFailed;
+            return externalLoginResult;
         }
         _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
 
@@ -86,8 +91,13 @@ public class AdminService : IAdminService
         Context.Account = CurrentAccount;
 
         // setup portfolio
-        _services.Portfolio.Initialize(CurrentAccount);
+        await _portfolioService.Initialize();
 
+        if (account.Balances.IsNullOrEmpty())
+        {
+            _log.Warn($"Account {accountName} has no assets.");
+            return ResultCode.AccountHasNoAsset;
+        }
         return ResultCode.LoginUserAndAccountOk;
     }
 
@@ -142,7 +152,7 @@ public class AdminService : IAdminService
 
         if (accountName.IsBlank()) return null;
 
-        var assets = _services.Security.GetAssets(Context.Exchange);
+        var assets = _securityService.GetAssets(Context.Exchange);
 
         if (!requestExternal)
         {

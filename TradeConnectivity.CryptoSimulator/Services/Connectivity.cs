@@ -5,8 +5,35 @@ namespace TradeConnectivity.CryptoSimulator.Services;
 
 public class Connectivity : IExternalConnectivityManagement
 {
-    public void SetEnvironment(EnvironmentType environmentType)
+    private const string ProdHttps = "https://api.binance.vision";
+    private const string ProdWs = "wss://stream.binance.com:9443";
+
+    private const string TestHttps = "https://testnet.binance.vision";
+    private const string TestWs = "wss://testnet.binance.vision";
+
+    public string RootUrl { get; protected set; }
+
+    public string RootWebSocketUrl { get; protected set; }
+
+    public Connectivity()
     {
-        throw new NotImplementedException();
+        SetEnvironment(EnvironmentType.Test);
+    }
+
+    public void SetEnvironment(EnvironmentType environment)
+    {
+        switch (environment)
+        {
+            case EnvironmentType.Test:
+            case EnvironmentType.Uat:
+                RootUrl = TestHttps;
+                RootWebSocketUrl = TestWs;
+                break;
+            case EnvironmentType.Prod:
+                RootUrl = ProdHttps;
+                RootWebSocketUrl = ProdWs;
+                break;
+            default: throw new ArgumentException("Invalid environment type", nameof(environment));
+        }
     }
 }

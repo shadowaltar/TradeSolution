@@ -29,10 +29,15 @@ public class Quotation : IExternalQuotationManagement
     public event Action<int, OhlcPrice>? NextOhlc;
     public event Action<int, OrderBook>? NextOrderBook;
 
-    public Quotation(IExternalConnectivityManagement connectivity, HttpClient httpClient)
+    public Quotation(IExternalConnectivityManagement connectivity,
+                     HttpClient httpClient,
+                     ApplicationContext context)
     {
+        if (context.IsExternalProhibited)
+            _httpClient = new FakeHttpClient();
+        else
+            _httpClient = httpClient;
         _connectivity = connectivity;
-        _httpClient = httpClient;
     }
 
     public async Task<ExternalConnectionState> Initialize()

@@ -55,7 +55,9 @@ public static class Dependencies
             builder.RegisterSingleton<IAlgorithmService, AlgorithmService>();
             builder.RegisterSingleton<IAdminService, AdminService>();
 
-            builder.RegisterSingleton<Context>();
+            var context = new Context();
+            builder.RegisterSingletonInstance<Context>(context);
+            builder.RegisterSingletonInstance<ApplicationContext>(context);
             builder.RegisterSingleton<Core>();
             builder.RegisterSingleton<IServices, Services.Services>();
         }

@@ -9,19 +9,37 @@ public class SecurityService : ISecurityService
 {
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
+    private readonly ApplicationContext _context;
 
-    private bool _requestedExternalOnce = false;
+    private bool _isInitialized;
 
-    public async Task<List<Security>> GetAllSecurities(bool requestExternal = false)
+    public SecurityService(ApplicationContext context)
     {
-        if (!_requestedExternalOnce || requestExternal)
-        {
-            // TODO fix the sync to further minimize multiple database read
-            _requestedExternalOnce = true;
+        _context = context;
+    }
 
-            var securities = await Storage.ReadSecurities();
-            RefreshCache(securities);
-            return securities;
+    public async Task<List<Security>> Initialize()
+    {
+        if (!_context.IsInitialized) throw Exceptions.ContextNotInitialized();
+        if (_isInitialized) return _securities.Values.ToList();
+
+        var secTypes = Enum.GetValues<SecurityType>();
+        List<Security> securities = new();
+        foreach (var secType in secTypes)
+        {
+            securities.AddRange(await Storage.ReadSecurities(secType));
+        }
+        RefreshCache(securities);
+
+        _isInitialized = true;
+        return securities;
+    }
+
+    public async Task<List<Security>> GetAllSecurities(bool requestDatabase = false)
+    {
+        if (requestDatabase)
+        {
+            return await Initialize();
         }
         else
         {
@@ -34,10 +52,10 @@ public class SecurityService : ISecurityService
 
     public async Task<List<Security>> GetSecurities(SecurityType secType,
                                                     ExchangeType exchange = ExchangeType.Unknown,
-                                                    bool requestExternal = false)
+                                                    bool requestDatabase = false)
     {
         var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
-        if (!_requestedExternalOnce || requestExternal)
+        if (requestDatabase)
         {
             var securities = await Storage.ReadSecurities(secType, exchStr);
             RefreshCache(securities);
@@ -56,8 +74,6 @@ public class SecurityService : ISecurityService
 
     public List<Security> GetAssets(ExchangeType exchange = ExchangeType.Unknown)
     {
-        if (!_requestedExternalOnce)
-            AsyncHelper.RunSync(() => GetAllSecurities(true));
         var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
         lock (_securities)
         {
@@ -69,7 +85,7 @@ public class SecurityService : ISecurityService
 
     public async Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false)
     {
-        if (!_requestedExternalOnce || requestExternal)
+        if (requestExternal)
         {
             var securities = await Storage.ReadSecurities(securityIds);
             RefreshCache(securities);
@@ -95,11 +111,13 @@ public class SecurityService : ISecurityService
 
     public async Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType, bool requestExternal = false)
     {
-        if (!_requestedExternalOnce || requestExternal)
+        if (requestExternal)
         {
             var security = await Storage.ReadSecurity(exchange, code, securityType);
             if (security != null)
-                RefreshCache(security);
+            {
+                await GetAllSecurities();
+            }
             return security;
         }
         else
@@ -114,7 +132,7 @@ public class SecurityService : ISecurityService
 
     public async Task<Security?> GetSecurity(int securityId, bool requestExternal = false)
     {
-        if (!_requestedExternalOnce || requestExternal)
+        if (requestExternal)
         {
             var securities = await Storage.ReadSecurities(new List<int> { securityId });
             if (!securities.IsNullOrEmpty())
@@ -174,6 +192,7 @@ public class SecurityService : ISecurityService
                     {
                         security.FxInfo.QuoteAsset = quoteAsset;
                         security.CurrencyAsset = quoteAsset;
+                        security.Currency = security.FxInfo.QuoteCurrency;
                     }
                     if (security.FxInfo.IsAsset)
                     {
@@ -182,6 +201,7 @@ public class SecurityService : ISecurityService
                         security.FxInfo.BaseAsset = null;
                         security.FxInfo.QuoteAsset = security;
                         security.CurrencyAsset = security;
+                        security.Currency = security.Code;
                     }
                 }
             }

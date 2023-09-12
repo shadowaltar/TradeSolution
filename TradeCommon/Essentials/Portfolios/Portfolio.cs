@@ -11,6 +11,8 @@ public record Portfolio
 
     public Dictionary<int, Position> AssetPositions { get; } = new();
 
+    public int AccountId { get; }
+
     public Portfolio(Account account)
     {
         var start = DateTime.UtcNow;
@@ -33,6 +35,7 @@ public record Portfolio
             };
             AssetPositions[position.SecurityId] = position;
         }
+        AccountId = account.Id;
     }
 
     public decimal GetNotional(int securityId)

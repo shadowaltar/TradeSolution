@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Runtime;
+﻿using Microsoft.Identity.Client;
+
+namespace TradeCommon.Runtime;
 
 public static class Exceptions
 {
@@ -22,6 +24,11 @@ public static class Exceptions
         return new InvalidOperationException($"The portfolio must hold an asset with code = {assetCode}.");
     }
 
+    public static InvalidOperationException MissingAssetPosition(int assetId)
+    {
+        return new InvalidOperationException($"The portfolio must hold an asset with id = {assetId}.");
+    }
+
     public static Exception InvalidSide()
     {
         return new InvalidOperationException($"Must specify buy(long) or sell(short) here.");
@@ -32,5 +39,15 @@ public static class Exceptions
         if (mustBeInBackTestMode)
             return new InvalidOperationException($"Must be in back-test mode here.");
         return new InvalidOperationException($"Must not be in back-test mode here.");
+    }
+
+    public static Exception MissingBalance(int accountId, int assetId)
+    {
+        return new InvalidOperationException($"Balance entry should exists: Account {accountId}; Asset {assetId}.");
+    }
+
+    public static Exception ContextNotInitialized()
+    {
+        return new InvalidOperationException($"Context is not initialized.");
     }
 }

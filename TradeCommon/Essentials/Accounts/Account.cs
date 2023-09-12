@@ -18,7 +18,6 @@ public class Account
     /// </summary>
     [UpsertIgnore]
     [AutoIncrementOnInsert]
-    [NotNegative]
     public int Id { get; set; }
 
     /// <summary>

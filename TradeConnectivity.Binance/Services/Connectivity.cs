@@ -1,23 +1,33 @@
-﻿using TradeCommon.Externals;
+﻿using System.Net.Http;
+using TradeCommon.Externals;
 using TradeCommon.Runtime;
 
 namespace TradeConnectivity.Binance.Services;
 
 public class Connectivity : IExternalConnectivityManagement
 {
-    private const string ProdHttps = "https://api.binance.vision";
-    private const string ProdWs = "wss://stream.binance.com:9443";
+    private string ProdHttps = "https://api.binance.vision";
+    private string ProdWs = "wss://stream.binance.com:9443";
 
-    private const string TestHttps = "https://testnet.binance.vision";
-    private const string TestWs = "wss://testnet.binance.vision";
+    private string TestHttps = "https://testnet.binance.vision";
+    private string TestWs = "wss://testnet.binance.vision";
 
     public string RootUrl { get; protected set; }
 
     public string RootWebSocketUrl { get; protected set; }
 
-    public Connectivity()
+    public Connectivity(ApplicationContext context)
     {
         SetEnvironment(EnvironmentType.Test);
+
+        if (context.IsExternalProhibited)
+        {
+            ProdHttps = "https://not.exist";
+            ProdWs = "wss://not.exist:9443";
+
+            TestHttps = "https://test.not.exist";
+            TestWs = "wss://test.not.exist";
+        }
     }
 
     public void SetEnvironment(EnvironmentType environment)

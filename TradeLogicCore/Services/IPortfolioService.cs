@@ -13,6 +13,12 @@ public interface IPortfolioService
 
     Portfolio Portfolio { get; }
 
+    /// <summary>
+    /// Initialize portfolio service.
+    /// Expected to be executed after account and user are specified
+    /// (usually via <see cref="IAdminService.Login(string, string?, string?, TradeCommon.Runtime.EnvironmentType)"/>).
+    /// </summary>
+    /// <returns></returns>
     Task Initialize();
 
     List<Position> GetOpenPositions();
@@ -71,7 +77,24 @@ public interface IPortfolioService
 
     bool Validate(Order order);
 
-    Task<bool> Deposit(int assetId, decimal quantity);
+    /// <summary>
+    /// Deposit assets to current account's specific balance indicated by <paramref name="assetId"/>.
+    /// If asset is not found, throws exception.
+    /// </summary>
+    /// <param name="assetId"></param>
+    /// <param name="quantity"></param>
+    /// <returns></returns>
+    Task<Balance?> Deposit(int assetId, decimal quantity);
 
-    Task<bool> Withdraw(int assetId, decimal quantity);
+    /// <summary>
+    /// Deposit assets to specific account's specific balance indicated by <paramref name="accountId"/> and <paramref name="assetId"/>.
+    /// If targeting current account and asset is not found, throws exception; otherwise returns null.
+    /// </summary>
+    /// <param name="accountId"></param>
+    /// <param name="assetId"></param>
+    /// <param name="quantity"></param>
+    /// <returns></returns>
+    Task<Balance?> Deposit(int accountId, int assetId, decimal quantity);
+
+    Task<Balance?> Withdraw(int assetId, decimal quantity);
 }

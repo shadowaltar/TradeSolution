@@ -47,6 +47,7 @@ public enum ResultCode
     GetAccountFailed,
     GetSomeAccountsFailed,
     AccountNotOwnedByUser,
+    AccountHasNoAsset,
     LoginUserFailed,
     LoginAccountFailed,
     LoginUserAndAccountFailed,

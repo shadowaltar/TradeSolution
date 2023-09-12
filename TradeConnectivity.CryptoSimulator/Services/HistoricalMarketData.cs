@@ -9,14 +9,19 @@ namespace TradeConnectivity.CryptoSimulator.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IExternalConnectivityManagement _connectivity;
+
+    public HistoricalMarketData(IExternalConnectivityManagement connectivity)
+    {
+        _connectivity = connectivity;
+    }
 
     public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
         var results = new Dictionary<int, List<OhlcPrice>>();
         await Parallel.ForEachAsync(securities, async (security, ct) =>
         {
-            var code = security.Code;
-            var prices = await ReadPrices(code, start, end, intervalType);
+            var prices = await ReadPrices(security, start, end, intervalType);
             if (prices == null)
                 return;
             lock (results)
@@ -25,11 +30,12 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         return results;
     }
 
-    public async Task<List<OhlcPrice>?> ReadPrices(string code, DateTime start, DateTime end, IntervalType intervalType)
+    public async Task<List<OhlcPrice>?> ReadPrices(Security security, DateTime start, DateTime end, IntervalType intervalType)
     {
-        static string UpdateTimeFrame(string c, string i, long s, long e) =>
-            $"https://data-api.binance.vision/api/v3/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
+        string UpdateTimeFrame(string c, string i, long s, long e) =>
+            $"{_connectivity.RootUrl}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
 
+        var code = security.Code;
         var intervalStr = IntervalTypeConverter.ToIntervalString(intervalType);
         if (end > DateTime.UtcNow)
         {
@@ -45,7 +51,7 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         long lastEndMs = 0l;
         while (lastEndMs < endMs)
         {
-            var jo = await HttpHelper.ReadJsonArray(url, httpClient, _log);
+            var jo = await httpClient.ReadJsonArray(url, _log);
             if (jo == null || jo.Count == 0)
                 break;
 
@@ -55,11 +61,11 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
                 if (array == null)
                     continue;
                 var barStartMs = array[0]!.GetValue<long>();
-                var open = array[1]!.GetValue<string>().ParseDecimal();
-                var high = array[2]!.GetValue<string>().ParseDecimal();
-                var low = array[3]!.GetValue<string>().ParseDecimal();
-                var close = array[4]!.GetValue<string>().ParseDecimal();
-                var volume = array[5]!.GetValue<string>().ParseDecimal();
+                var open = array[1]!.GetValue<string>().ParseDecimal(security.PricePrecision);
+                var high = array[2]!.GetValue<string>().ParseDecimal(security.PricePrecision);
+                var low = array[3]!.GetValue<string>().ParseDecimal(security.PricePrecision);
+                var close = array[4]!.GetValue<string>().ParseDecimal(security.PricePrecision);
+                var volume = array[5]!.GetValue<string>().ParseDecimal(security.QuantityPrecision);
                 var barEndMs = array[6]!.GetValue<long>();
 
                 lastEndMs = barEndMs; // binance always set candle's end time one ms smaller than next start time

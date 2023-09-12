@@ -1,5 +1,7 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
@@ -21,12 +23,15 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
     private readonly AutoResetEvent _signal = new(false);
 
     private readonly int _engineThreadId;
+
     private readonly IntervalType _intervalType;
     private readonly TimeSpan _interval;
     private readonly IdGenerator _algoEntryIdGen;
     private readonly IdGenerator _positionIdGen;
 
     private IReadOnlyDictionary<int, Security> _pickedSecurities;
+
+    private readonly Persistence _persistence;
 
     /// <summary>
     /// Caches algo-entries related to last time frame.
@@ -55,7 +60,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
 
-    public event Action ReachedDesignatedEndTime;
+    public event Action? ReachedDesignatedEndTime;
 
     public Context Context { get; }
 
@@ -100,10 +105,11 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     public Dictionary<long, AlgoEntry<T>> OpenedEntries => throw new NotImplementedException();
 
-    public AlgorithmEngine(Context context, IServices services, IAlgorithm<T> algorithm)
+    public AlgorithmEngine(IServices services, IAlgorithm<T> algorithm)
     {
-        Context = context;
+        Context = services.Context;
         Services = services;
+        _persistence = services.Persistence;
 
         _engineThreadId = Environment.CurrentManagedThreadId;
 
@@ -162,10 +168,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         // initialize portfolio, and connect to external
         await Services.Portfolio.Initialize();
 
-        //InitialFreeAmounts.AddRange(Account.Balances, b => b.AssetId, b => b.FreeAmount);
-        //if (InitialFreeAmounts.All(t => t.Value == 0))
-        //    return 0;
-
         ShouldCloseOpenPositionsWhenHalted = parameters.ShouldCloseOpenPositionsWhenHalted;
         ShouldCloseOpenPositionsWhenStopped = parameters.ShouldCloseOpenPositionsWhenStopped;
 
@@ -177,6 +179,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         Services.Order.NextOrder += OnNextOrder;
         Services.Trade.NextTrade -= OnNextTrade;
         Services.Trade.NextTrade += OnNextTrade;
+
+        // close opened positions
+        CloseAllOpenPositions();
 
         // pick security to trade
         // check associated asset's position, and map any existing position into algo entry
@@ -193,13 +198,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                 _log.Warn($"Cannot trade the picked security {security.Code}; the account may not have enough free asset to trade.");
                 continue;
             }
-            var position = Services.Portfolio.GetPosition(security.Id);
-            if (position != null)
-            {
-                // TODO simplified the logic such that if any open position, just close it
-                Services.Order.CreateCloseOrderAndSend(position, OrderType.Market, 0, TimeInForceType.GoodTillCancel);
-            }
-
             await Services.MarketData.SubscribeOhlc(security, Interval);
             subscriptionCount++;
         }
@@ -207,6 +205,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
+
         _log.Info("Algorithm Engine execution ends, processed " + TotalSignalCount);
         return TotalSignalCount;
     }
@@ -424,23 +423,23 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
             switch (timeRange.WhenToStart)
             {
                 case AlgoStartTimeType.Designated:
-                {
-                    if (start.IsValid())
                     {
-                        var r = CanStart(start, DesignatedStopTime, now);
-                        if (r)
+                        if (start.IsValid())
                         {
-                            _runningState = AlgoRunningState.Running;
-                            _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
-                            return true;
+                            var r = CanStart(start, DesignatedStopTime, now);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
+                                return true;
+                            }
                         }
+                        else
+                        {
+                            _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
+                        }
+                        return false;
                     }
-                    else
-                    {
-                        _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
-                    }
-                    return false;
-                }
                 case AlgoStartTimeType.Immediately:
                     _runningState = AlgoRunningState.Running;
                     _log.Info($"Engine starts running immediately.");
@@ -466,27 +465,27 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
                     }
                     return false;
                 case AlgoStartTimeType.NextStartOfLocalDay:
-                {
-                    _runningState = AlgoRunningState.Stopped;
-                    var localNow = DateTime.Now;
-                    if (start > localNow)
                     {
-                        var stopTime = DesignatedStopTime;
-                        if (stopTime != null)
-                            stopTime = stopTime.Value.ToLocalTime();
-                        var r = CanStart(start, stopTime, localNow);
-                        if (r)
+                        _runningState = AlgoRunningState.Stopped;
+                        var localNow = DateTime.Now;
+                        if (start > localNow)
                         {
-                            _runningState = AlgoRunningState.Running;
-                            return true;
+                            var stopTime = DesignatedStopTime;
+                            if (stopTime != null)
+                                stopTime = stopTime.Value.ToLocalTime();
+                            var r = CanStart(start, stopTime, localNow);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                return true;
+                            }
                         }
+                        else
+                        {
+                            _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
+                        }
+                        return false;
                     }
-                    else
-                    {
-                        _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
-                    }
-                    return false;
-                }
                 case AlgoStartTimeType.NextMarketOpens:
                     // TODO, need market meta data
                     return false;
@@ -523,10 +522,29 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
 
     private void OnNextOrder(Order order)
     {
+        if (order.Status == OrderStatus.Live)
+        {
+
+        }
+        else if (order.Status == OrderStatus.Cancelled)
+        {
+
+        }
+        else if (order.Status == OrderStatus.PartialFilled)
+        {
+
+        }
+        else if (order.Status == OrderStatus.Filled)
+        {
+            var lastEntry = _lastEntryBySecurityIds.GetValueOrDefault(order.SecurityId);
+            EnterLogic.con
+        }
+        _persistence.Enqueue(new PersistenceTask<Order>(order));
     }
 
     private void OnNextTrade(Trade trade)
     {
+        _persistence.Enqueue(new PersistenceTask<Trade>(trade));
     }
 
     private void OnHistoricalPriceEnd(int priceCount)
@@ -703,7 +721,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
             }
             else
             {
-                EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
+                var order = EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
+                _openOrders.Add(order.Id, order);
             }
 
             Algorithm.AfterLongOpened(entry);
@@ -865,12 +884,4 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T>, IAlgorithmContext<T> wher
         Services.Order.CancelAllOpenOrders();
         Services.Order.CloseAllOpenPositions();
     }
-}
-
-public enum AlgoRunningState
-{
-    NotYetStarted,
-    Running,
-    Halted,
-    Stopped
 }

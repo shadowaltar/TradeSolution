@@ -1,6 +1,7 @@
 ﻿using log4net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
+using TradeCommon.Externals;
 
 namespace Common;
 public static class HttpHelper
@@ -91,6 +92,11 @@ public static class HttpHelper
 
     public static async Task<(HttpResponseMessage response, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request)
     {
+        // route to the fake client
+        if (client is FakeHttpClient fakeClient)
+        {
+            return await fakeClient.TimedSendAsync(request);
+        }
         var swInner = Stopwatch.StartNew();
         var response = await client.SendAsync(request);
         swInner.Stop();

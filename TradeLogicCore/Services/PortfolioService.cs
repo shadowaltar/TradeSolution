@@ -14,7 +14,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IdGenerator _positionIdGenerator = new("PositionIdGen");
+    private readonly IdGenerator _positionIdGenerator;
     private readonly IExternalExecutionManagement _execution;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly Context _context;
@@ -38,16 +38,22 @@ public class PortfolioService : IPortfolioService, IDisposable
     public PortfolioService(IExternalExecutionManagement externalExecution,
                             IExternalAccountManagement externalAccountManagement,
                             Context context,
-                            IServices services)
+                            IOrderService orderService,
+                            ITradeService tradeService,
+                            ISecurityService securityService,
+                            Persistence persistence)
     {
         _execution = externalExecution;
         _accountManagement = externalAccountManagement;
         _context = context;
-        _orderService = services.Order;
-        _tradeService = services.Trade;
-        _securityService = services.Security;
-        _persistence = services.Persistence;
+        _orderService = orderService;
+        _tradeService = tradeService;
+        _securityService = securityService;
+        _persistence = persistence;
+
         _tradeService.NextTrade += OnNewTrade;
+
+        _positionIdGenerator = IdGenerators.Get<Position>();
     }
 
     private void OnNewTrade(Trade trade)
@@ -169,10 +175,10 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task Initialize()
     {
-        await _execution.Subscribe();
-
         var account = _context.Account
             ?? throw new InvalidOperationException("Must login an account before initializing portfolio");
+
+        await _execution.Subscribe();
 
         // must be two different instances
         InitialPortfolio = new Portfolio(account);
@@ -273,36 +279,82 @@ public class PortfolioService : IPortfolioService, IDisposable
         return decimal.MinValue;
     }
 
-    public async Task<bool> Deposit(int assetId, decimal quantity)
+    public async Task<Balance> Deposit(int assetId, decimal quantity)
     {
+        // TODO external logic!
         var asset = GetAssetPosition(assetId);
         if (asset != null)
         {
             asset.Quantity += quantity;
             // TODO external logic
-            return true;
+
+            var balances = await Storage.ReadBalances(Portfolio.AccountId);
+            var balance = balances.FirstOrDefault(b => b.AssetId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
+            return balance;
         }
-        return false;
+        throw Exceptions.MissingAssetPosition(assetId);
     }
 
-    public async Task<bool> Withdraw(int assetId, decimal quantity)
+    public async Task<Balance?> Deposit(int accountId, int assetId, decimal quantity)
     {
+        // TODO external logic!
+        var balances = await Storage.ReadBalances(accountId);
+        var balance = balances.FirstOrDefault(b => b.AssetId == assetId);
+        if (balance == null)
+        {
+            balance = new Balance
+            {
+                AccountId = accountId,
+                AssetCode = _securityService.GetSecurity(assetId).Code,
+                AssetId = assetId,
+                FreeAmount = quantity,
+                LockedAmount = 0,
+                SettlingAmount = 0,
+                UpdateTime = DateTime.UtcNow,
+            };
+            if (await Storage.InsertBalance(balance, false) > 0)
+                return balance;
+            else
+            {
+                if (Portfolio.AccountId == accountId)
+                    throw Exceptions.MissingAssetPosition(assetId);
+                else
+                    return null;
+            }
+        }
+        else
+        {
+            balance.FreeAmount += quantity;
+            if (await Storage.InsertBalance(balance, true) > 0)
+                return balance;
+            else
+            {
+                if (Portfolio.AccountId == accountId)
+                    throw Exceptions.MissingAssetPosition(assetId);
+                else
+                    return null;
+            }
+        }
+    }
+
+    public async Task<Balance?> Withdraw(int assetId, decimal quantity)
+    {
+        // TODO external logic!
         var asset = GetAssetPosition(assetId);
         if (asset != null)
         {
             if (asset.Quantity < quantity)
             {
-                return false;
+                _log.Error($"Attempt to withdraw quantity more than the free amount. Requested: {quantity}, free amount: {asset.Quantity}.");
+                return null;
             }
             asset.Quantity -= quantity;
-            // TODO external logic
-            return true;
+            _log.Info($"Withdrew {quantity} quantity from current account. Remaining free amount: {asset.Quantity}.");
+            var balances = await Storage.ReadBalances(Portfolio.AccountId);
+            var balance = balances.FirstOrDefault(b => b.AssetId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
+            balance.FreeAmount -= quantity;
+            return balance;
         }
-        return false;
-    }
-
-    public Task Initialize(Account currentAccount)
-    {
-        throw new NotImplementedException();
+        throw Exceptions.MissingAssetPosition(assetId);
     }
 }
