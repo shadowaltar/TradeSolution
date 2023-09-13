@@ -1,10 +1,8 @@
 ﻿using TradeLogicCore.Algorithms.FeeCalculation;
 
 namespace TradeLogicCore.Algorithms.EnterExit;
-public interface IExitPositionAlgoLogic<T> where T : IAlgorithmVariables
+public interface IExitPositionAlgoLogic
 {
-    IAlgorithm<T> Algorithm { get; }
-
     decimal LongStopLossRatio { get; }
 
     decimal LongTakeProfitRatio { get; }
@@ -13,13 +11,13 @@ public interface IExitPositionAlgoLogic<T> where T : IAlgorithmVariables
 
     decimal ShortTakeProfitRatio { get; }
 
-    ITransactionFeeLogic<T>? FeeLogic { get; set; }
+    ITransactionFeeLogic? FeeLogic { get; set; }
 
-    void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
+    void Close(AlgoEntry current, decimal exitPrice, DateTime exitTime);
 
-    void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime);
+    void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime);
 
-    void BackTestStopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime);
+    void BackTestStopLoss(AlgoEntry current, AlgoEntry last, DateTime exitTime);
 
     void OnCloseOrderAcknowledged();
 

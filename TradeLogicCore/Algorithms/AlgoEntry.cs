@@ -68,11 +68,6 @@ public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, Sel
     /// Fee incurred when enter and/or exit a position.
     /// </summary>
     public decimal Fee { get; set; }
-
-    ///// <summary>
-    ///// Gets / sets the portfolio snapshot related to current entry.
-    ///// </summary>
-    //public Portfolio? Portfolio { get; set; }
 }
 
 public record AlgoEntry<T> : AlgoEntry
@@ -80,7 +75,6 @@ public record AlgoEntry<T> : AlgoEntry
     public AlgoEntry([UpsertIgnore] long Id, [InsertIgnore, SelectIgnore, UpsertIgnore] Security Security) : base(Id, Security)
     {
     }
-
 
     public required T Variables { get; set; }
 }

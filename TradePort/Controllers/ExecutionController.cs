@@ -181,7 +181,7 @@ public class ExecutionController : Controller
                                                    new List<Security> { security },
                                                    algoTimeRange);
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
-        var screening = new SingleSecurityLogic<MacVariables>(context, security);
+        var screening = new SingleSecurityLogic(context, security);
         algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
         return Ok(guid);

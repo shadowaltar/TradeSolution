@@ -1,6 +1,6 @@
 ﻿namespace TradeLogicCore.Algorithms.FeeCalculation;
 
-public interface ITransactionFeeLogic<T> where T : IAlgorithmVariables
+public interface ITransactionFeeLogic
 {
-    abstract decimal ApplyFee(AlgoEntry<T> current);
+    abstract decimal ApplyFee(AlgoEntry current);
 }

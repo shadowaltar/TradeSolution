@@ -3,7 +3,7 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Screening;
 
-public class SingleSecurityLogic<T> : ISecurityScreeningAlgoLogic<T> where T : IAlgorithmVariables
+public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 {
     private readonly Context _context;
     private Security? _security;

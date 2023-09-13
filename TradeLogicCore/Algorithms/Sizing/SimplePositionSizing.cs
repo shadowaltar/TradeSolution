@@ -2,9 +2,9 @@
 
 namespace TradeLogicCore.Algorithms;
 
-public class SimplePositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
+public class SimplePositionSizing : IPositionSizingAlgoLogic
 {
-    public decimal GetSize(decimal availableCash, AlgoEntry<T> current, AlgoEntry<T> last, decimal price, DateTime time)
+    public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry last, decimal price, DateTime time)
     {
         // a simple one which invest all and without lot-size rounding
         var setAside = 0m;

@@ -123,7 +123,7 @@ public class Program
             new List<Security> { security }, algoTimeRange);
         _log.Info("Execute algorithm with parameters: " + parameters);
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
-        var screening = new SingleSecurityLogic<MacVariables>(context, security);
+        var screening = new SingleSecurityLogic(context, security);
         algorithm.Screening = screening;
         var guid = await core.StartAlgorithm(parameters, algorithm);
 
@@ -374,7 +374,7 @@ public class Program
                     var securityPool = new List<Security> { security };
 
                     var algorithm = new Rumi(context, fast, slow, rumi, sl);
-                    var screening = new SingleSecurityLogic<RumiVariables>(context, security);
+                    var screening = new SingleSecurityLogic(context, security);
                     algorithm.Screening = screening;
 
                     var engine = new AlgorithmEngine<RumiVariables>(context);
@@ -540,7 +540,7 @@ public class Program
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
                         var algorithm = new MovingAverageCrossing(context, fast, slow, stopLoss);
-                        var screening = new SingleSecurityLogic<MacVariables>(context, security);
+                        var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
                         var engine = new AlgorithmEngine<MacVariables>(context);
                         engine.SetAlgorithm(algorithm);

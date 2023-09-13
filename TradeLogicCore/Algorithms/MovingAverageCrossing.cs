@@ -18,7 +18,6 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
 
     private readonly SimpleMovingAverage _fastMa;
     private readonly SimpleMovingAverage _slowMa;
-    private readonly OpenPositionPercentageFeeLogic<MacVariables> _upfrontFeeLogic;
     private readonly Context _context;
 
     public IAlgorithmEngine<MacVariables> Engine { get; }
@@ -27,28 +26,30 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public int SlowParam { get; } = 5;
     public decimal StopLossRatio { get; } = 0.02m;
 
-    public IPositionSizingAlgoLogic<MacVariables> Sizing { get; }
-    public IEnterPositionAlgoLogic<MacVariables> Entering { get; }
-    public IExitPositionAlgoLogic<MacVariables> Exiting { get; }
-    public ISecurityScreeningAlgoLogic<MacVariables> Screening { get; set; }
+    public IPositionSizingAlgoLogic Sizing { get; }
+    public IEnterPositionAlgoLogic Entering { get; }
+    public IExitPositionAlgoLogic Exiting { get; }
+    public ISecurityScreeningAlgoLogic Screening { get; set; }
+
+    private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
 
     public MovingAverageCrossing(Context context,
                                  int fast,
                                  int slow,
                                  decimal stopLossRatio = decimal.MinValue,
                                  decimal takeProfitRatio = decimal.MinValue,
-                                 IPositionSizingAlgoLogic<MacVariables>? sizing = null,
-                                 ISecurityScreeningAlgoLogic<MacVariables>? screening = null,
-                                 IEnterPositionAlgoLogic<MacVariables>? entering = null,
-                                 IExitPositionAlgoLogic<MacVariables>? exiting = null)
+                                 IPositionSizingAlgoLogic? sizing = null,
+                                 ISecurityScreeningAlgoLogic? screening = null,
+                                 IEnterPositionAlgoLogic? entering = null,
+                                 IExitPositionAlgoLogic? exiting = null)
     {
         _context = context;
 
-        _upfrontFeeLogic = new OpenPositionPercentageFeeLogic<MacVariables>();
-        Sizing = sizing ?? new SimplePositionSizing<MacVariables>();
-        Screening = screening ?? new SimpleSecurityScreeningAlgoLogic<MacVariables>();
-        Entering = entering ?? new SimpleEnterPositionAlgoLogic<MacVariables>(_context);
-        Exiting = exiting ?? new SimpleExitPositionAlgoLogic<MacVariables>(_context, stopLossRatio, takeProfitRatio);
+        _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
+        Sizing = sizing ?? new SimplePositionSizing();
+        Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
+        Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
+        Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, stopLossRatio, takeProfitRatio);
         FastParam = fast;
         SlowParam = slow;
         StopLossRatio = stopLossRatio;

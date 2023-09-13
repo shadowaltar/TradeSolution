@@ -34,7 +34,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Security code (will not be saved to database).
     /// </summary>
-    [UpsertIgnore, SelectIgnore]
+    [UpsertIgnore, SelectIgnore, InsertIgnore]
     public string SecurityCode { get; set; } = "";
 
     /// <summary>
@@ -78,6 +78,13 @@ public class Order : IComparable<Order>, ICloneable
     /// Status of this order
     /// </summary>
     public OrderStatus Status { get; set; } = OrderStatus.Unknown;
+
+    /// <summary>
+    /// Parent order Id.
+    /// If a system does not support stop loss / take profit order in one go,
+    /// The individual stop loss / take profit order should indicate its original order here.
+    /// </summary>
+    public long ParentOrderId { get; set; }
 
     /// <summary>
     /// Order creation time (client-side).

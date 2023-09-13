@@ -22,18 +22,26 @@ public enum OrderType
     Limit,
     /// <summary>
     /// The order becomes a market order whenever a specific price is touched at least once.
-    /// For a buy order it expects the price to rise to a certain value, vice versa.
+    /// For a buy order it expects the price to drop to a certain value, vice versa.
     /// </summary>
     [Description("STOP_LOSS")]
     Stop,
     /// <summary>
     /// The order becomes a limit order whenever a specific price is touched at least once.
-    /// For a buy order it expects the price to rice to a certain value, vice versa.
+    /// For a buy order it expects the price to drop to a certain value, vice versa.
     /// </summary>
     [Description("STOP_LOSS_LIMIT")]
     StopLimit,
+    /// <summary>
+    /// The order becomes a market order whenever a specific price is touched at least once.
+    /// For a buy order it expects the price to rise to a certain value, vice versa.
+    /// </summary>
     [Description("TAKE_PROFIT")]
     TakeProfit,
+    /// <summary>
+    /// The order becomes a limit order whenever a specific price is touched at least once.
+    /// For a buy order it expects the price to rise to a certain value, vice versa.
+    /// </summary>
     [Description("TAKE_PROFIT_LIMIT")]
     TakeProfitLimit,
     /// <summary>

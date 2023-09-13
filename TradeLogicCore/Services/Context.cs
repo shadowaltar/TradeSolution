@@ -41,19 +41,19 @@ public class Context : ApplicationContext
         internal set => _account = value;
     }
 
-    public void InitializeAlgorithmContext<T>(IAlgorithmEngine<T> algorithmEngine, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
+    public void InitializeAlgorithmContext<T>(IAlgorithmEngine algorithmEngine, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
     {
         _algorithmEngine = algorithmEngine;
         _algorithm = algorithm;
     }
 
-    public IAlgorithm<T> GetAlgorithm<T>() where T : IAlgorithmVariables
+    public IAlgorithm GetAlgorithm()
     {
-        return _algorithm is IAlgorithm<T> result ? result : throw Exceptions.MissingAlgorithm();
+        return _algorithm is IAlgorithm result ? result : throw Exceptions.MissingAlgorithm();
     }
 
-    public IAlgorithmEngine<T> GetEngine<T>() where T : IAlgorithmVariables
+    public IAlgorithmEngine GetEngine()
     {
-        return _algorithmEngine is IAlgorithmEngine<T> result ? result : throw Exceptions.MissingAlgorithmEngine();
+        return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
     }
 }

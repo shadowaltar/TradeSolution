@@ -3,7 +3,7 @@ using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms.Screening;
 
-public class SimpleSecurityScreeningAlgoLogic<T> : ISecurityScreeningAlgoLogic<T> where T : IAlgorithmVariables
+public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
     private static readonly Dictionary<int, Security> _originalPool = new();
     private static readonly Dictionary<int, Security> _pickedPool = new();

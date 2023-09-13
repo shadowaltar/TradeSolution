@@ -1,7 +1,7 @@
 ﻿using TradeCommon.Essentials.Instruments;
 
 namespace TradeLogicCore.Algorithms.Screening;
-public interface ISecurityScreeningAlgoLogic<T> where T : IAlgorithmVariables
+public interface ISecurityScreeningAlgoLogic
 {
     void SetAndPick(IDictionary<int, Security> securityPool);
 

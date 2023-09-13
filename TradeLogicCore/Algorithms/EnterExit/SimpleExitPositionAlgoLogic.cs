@@ -7,7 +7,7 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.EnterExit;
 
-public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T : IAlgorithmVariables
+public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
 {
     private static readonly ILog _log = Logger.New();
 
@@ -15,11 +15,8 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
     private readonly IOrderService _orderService;
     private readonly IPortfolioService _portfolioService;
     private readonly IdGenerator _orderIdGen;
-    private IAlgorithmEngine<T> _algoContext => _context.GetEngine<T>();
 
-    public IAlgorithm<T> Algorithm { get; }
-
-    public ITransactionFeeLogic<T>? FeeLogic { get; set; }
+    public ITransactionFeeLogic? FeeLogic { get; set; }
 
     public decimal LongStopLossRatio { get; }
 
@@ -54,7 +51,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public void Close(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
+    public void Close(AlgoEntry current, decimal exitPrice, DateTime exitTime)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
@@ -83,7 +80,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         _orderService.SendOrder(order);
     }
 
-    public void BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
+    public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)
     {
         if (!_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
 
@@ -123,7 +120,7 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
         _log.Info($"action=close|p1={current.ExitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
     }
 
-    public void BackTestStopLoss(AlgoEntry<T> current, AlgoEntry<T> last, DateTime exitTime)
+    public void BackTestStopLoss(AlgoEntry current, AlgoEntry last, DateTime exitTime)
     {
         var enterPrice = current.EnterPrice!.Value;
         var exitPrice = current.SLPrice!.Value;
@@ -161,11 +158,6 @@ public class SimpleExitPositionAlgoLogic<T> : IExitPositionAlgoLogic<T> where T 
     }
 
     public void OnTakeProfitTriggered()
-    {
-        throw new NotImplementedException();
-    }
-
-    void IExitPositionAlgoLogic<T>.BackTestClose(AlgoEntry<T> current, decimal exitPrice, DateTime exitTime)
     {
         throw new NotImplementedException();
     }

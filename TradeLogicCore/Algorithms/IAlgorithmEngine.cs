@@ -9,6 +9,16 @@ namespace TradeLogicCore.Algorithms;
 
 public interface IAlgorithmEngine
 {
+    event Action ReachedDesignatedEndTime;
+
+    IPositionSizingAlgoLogic Sizing { get; }
+
+    IEnterPositionAlgoLogic EnterLogic { get; }
+
+    IExitPositionAlgoLogic ExitLogic { get; }
+
+    ISecurityScreeningAlgoLogic Screening { get; }
+
     User? User { get; }
 
     Account? Account { get; }
@@ -41,21 +51,16 @@ public interface IAlgorithmEngine
     Task<int> Run(AlgoStartupParameters parameters);
 
     Task Stop();
+
+    /// <summary>
+    /// Gets the algo entries currently stands for opened positions.
+    /// </summary>
+    Dictionary<long, AlgoEntry> GetOpenEntries(int securityId);
 }
 
 public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
 {
-    event Action ReachedDesignatedEndTime;
-
     IAlgorithm<T> Algorithm { get; }
-
-    IPositionSizingAlgoLogic<T> Sizing { get; }
-
-    IEnterPositionAlgoLogic<T> EnterLogic { get; }
-
-    IExitPositionAlgoLogic<T> ExitLogic { get; }
-
-    ISecurityScreeningAlgoLogic<T> Screening { get; }
 
     /// <summary>
     /// Gets all the algo entries created during engine execution.
@@ -66,9 +71,4 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
     /// Gets the algo entries only related to trading activities during engine execution.
     /// </summary>
     List<AlgoEntry<T>> GetExecutionEntries(int securityId);
-
-    /// <summary>
-    /// Gets the algo entries currently stands for opened positions.
-    /// </summary>
-    Dictionary<long, AlgoEntry<T>> GetOpenEntries(int securityId);
 }

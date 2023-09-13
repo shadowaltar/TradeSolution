@@ -252,6 +252,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     FilledQuantity REAL NOT NULL,
     Status VARCHAR(10) NOT NULL,
     Side CHAR(1) NOT NULL,
+    ParentOrderId INTEGER NOT NULL,
     StopPrice REAL DEFAULT 0 NOT NULL,
     CreateTime DATE NOT NULL,
     UpdateTime DATE NOT NULL,

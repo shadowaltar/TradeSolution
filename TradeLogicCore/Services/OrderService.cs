@@ -21,7 +21,7 @@ public class OrderService : IOrderService, IDisposable
     private readonly Dictionary<long, Order> _orders = new();
     private readonly Dictionary<long, Order> _externalOrderIdToOrders = new();
     private readonly Dictionary<long, Order> _cancelledOrders = new();
-    private readonly IdGenerator _idGenerator;
+    private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
 
     public bool IsFakeOrderSupported => _execution.IsFakeOrderSupported;
@@ -48,7 +48,7 @@ public class OrderService : IOrderService, IDisposable
         _execution.OrderCancelled += OnOrderCancelled;
         _execution.OrderReceived += OnOrderReceived;
 
-        _idGenerator = new IdGenerator("OrderIdGen");
+        _orderIdGen = new IdGenerator("OrderIdGen");
     }
 
     /// <summary>
@@ -130,7 +130,7 @@ public class OrderService : IOrderService, IDisposable
         // this new order's id may or may not be used by external
         // eg. binance uses it
         if (order.Id == 0)
-            order.Id = _idGenerator.NewTimeBasedId;
+            order.Id = _orderIdGen.NewTimeBasedId;
         if (order.CreateTime == DateTime.MinValue)
             order.CreateTime = DateTime.UtcNow;
         order.ExternalOrderId = order.Id.ReverseDigits();
@@ -252,7 +252,7 @@ public class OrderService : IOrderService, IDisposable
                                    OrderType orderType = OrderType.Limit,
                                    TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
     {
-        var id = _idGenerator.NewTimeBasedId;
+        var id = _orderIdGen.NewTimeBasedId;
         var now = DateTime.UtcNow;
         return new Order
         {

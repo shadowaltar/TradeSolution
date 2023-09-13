@@ -25,19 +25,19 @@ public class Rumi : IAlgorithm<RumiVariables>
     public int RumiParam { get; } = 1;
     public decimal StopLossRatio { get; } = 0;
 
-    public IPositionSizingAlgoLogic<RumiVariables> Sizing { get; }
-    public IEnterPositionAlgoLogic<RumiVariables> Entering { get; }
-    public IExitPositionAlgoLogic<RumiVariables> Exiting { get; }
-    public ISecurityScreeningAlgoLogic<RumiVariables> Screening { get; set; }
+    public IPositionSizingAlgoLogic Sizing { get; }
+    public IEnterPositionAlgoLogic Entering { get; }
+    public IExitPositionAlgoLogic Exiting { get; }
+    public ISecurityScreeningAlgoLogic Screening { get; set; }
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
     {
         _context = context;
 
-        Sizing = new SimplePositionSizing<RumiVariables>();
-        Screening = new SimpleSecurityScreeningAlgoLogic<RumiVariables>();
-        Entering = new SimpleEnterPositionAlgoLogic<RumiVariables>(context);
-        Exiting = new SimpleExitPositionAlgoLogic<RumiVariables>(context, stopLossRatio, decimal.MinValue);
+        Sizing = new SimplePositionSizing();
+        Screening = new SimpleSecurityScreeningAlgoLogic();
+        Entering = new SimpleEnterPositionAlgoLogic(context);
+        Exiting = new SimpleExitPositionAlgoLogic(context, stopLossRatio, decimal.MinValue);
         FastParam = fast;
         SlowParam = slow;
         RumiParam = rumi;

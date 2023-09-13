@@ -1,5 +1,5 @@
 ﻿namespace TradeLogicCore.Algorithms.Sizing;
-public interface IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
+public interface IPositionSizingAlgoLogic
 {
-    abstract decimal GetSize(decimal availableCash, AlgoEntry<T> current, AlgoEntry<T> last, decimal price, DateTime time);
+    abstract decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry last, decimal price, DateTime time);
 }

@@ -2,7 +2,7 @@
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Sizing;
-public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgorithmVariables
+public class EvenPositionSizing : IPositionSizingAlgoLogic
 {
     private readonly IPortfolioService _portfolioService;
     private readonly Context _context;
@@ -11,8 +11,6 @@ public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgo
     {
         _context = context;
     }
-
-    public IAlgorithm<T> Algorithm { get; }
 
     public decimal GetAvailableNewPositionQuantity(Security security, int maxConcurrentPositionCount)
     {
@@ -31,7 +29,7 @@ public class EvenPositionSizing<T> : IPositionSizingAlgoLogic<T> where T : IAlgo
         return 0;
     }
 
-    public decimal GetSize(decimal availableCash, AlgoEntry<T> current, AlgoEntry<T> last, decimal price, DateTime time)
+    public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry last, decimal price, DateTime time)
     {
         throw new NotImplementedException();
     }

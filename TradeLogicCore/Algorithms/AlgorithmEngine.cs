@@ -56,7 +56,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     /// <summary>
     /// Caches entries which open positions. Will be removed when a position is closed.
     /// </summary>
-    private readonly Dictionary<int, Dictionary<long, AlgoEntry<T>>> _openedEntriesBySecurityIds = new();
+    private readonly Dictionary<int, Dictionary<long, AlgoEntry>> _openedEntriesBySecurityIds = new();
 
     private int _totalCurrentOpenPositions = 0;
 
@@ -70,10 +70,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     public bool IsBackTesting { get; private set; } = true;
 
-    public IPositionSizingAlgoLogic<T> Sizing { get; protected set; }
-    public IEnterPositionAlgoLogic<T> EnterLogic { get; protected set; }
-    public IExitPositionAlgoLogic<T> ExitLogic { get; protected set; }
-    public ISecurityScreeningAlgoLogic<T> Screening { get; protected set; }
+    public IPositionSizingAlgoLogic Sizing { get; protected set; }
+    public IEnterPositionAlgoLogic EnterLogic { get; protected set; }
+    public IExitPositionAlgoLogic ExitLogic { get; protected set; }
+    public ISecurityScreeningAlgoLogic Screening { get; protected set; }
 
     public int TotalSignalCount { get; protected set; }
 
@@ -117,9 +117,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         _positionIdGen = IdGenerators.Get<Position>();
     }
 
-    public void SetAlgorithm(IAlgorithm algo)
+    public void SetAlgorithm(IAlgorithm<T> algorithm)
     {
-        var algorithm = (IAlgorithm<T>)algo;
         Context.InitializeAlgorithmContext(this, algorithm);
 
         Algorithm = algorithm;
@@ -139,7 +138,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         return _executionEntriesBySecurityIds.GetValueOrDefault(securityId) ?? new();
     }
 
-    public Dictionary<long, AlgoEntry<T>> GetOpenEntries(int securityId)
+    public Dictionary<long, AlgoEntry> GetOpenEntries(int securityId)
     {
         return _openedEntriesBySecurityIds.GetValueOrDefault(securityId) ?? new();
     }
@@ -825,7 +824,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         return price.T + IntervalTypeConverter.ToTimeSpan(intervalType);
     }
 
-    protected void CopyEntry(AlgoEntry<T> current, AlgoEntry<T> last, Security security, decimal currentPrice)
+    protected void CopyEntry(AlgoEntry current, AlgoEntry last, Security security, decimal currentPrice)
     {
         current.IsLong = last.IsLong;
         current.IsShort = last.IsShort;
