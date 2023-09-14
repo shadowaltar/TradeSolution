@@ -15,8 +15,8 @@ public class FxSecurityInfo
     public string? BaseCurrency { get; set; }
     public string? QuoteCurrency { get; set; }
 
-    public double? MaxLotSize { get; set; }
-    public double? MinNotional { get; set; }
+    public decimal? MaxLotSize { get; set; }
+    public decimal? MinNotional { get; set; }
 
     [UpsertIgnore,SelectIgnore,InsertIgnore]
     public Security? BaseAsset { get; set; }

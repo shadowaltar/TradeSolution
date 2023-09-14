@@ -289,9 +289,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
         TotalPriceEventCount++;
 
+#if DEBUG
         var threadId = Environment.CurrentManagedThreadId;
         Assertion.Shall(_engineThreadId != threadId);
-
+#endif
         Update(securityId, ohlcPrice);
     }
 
@@ -362,6 +363,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         TryLong(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
         TryShort(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
 
+        _log.Info(entry);
         lastEntry = entry;
         _lastOhlcPricesBySecurityId[securityId] = ohlcPrice;
 
@@ -465,27 +467,27 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
                     }
                     return false;
                 case AlgoStartTimeType.NextStartOfLocalDay:
+                {
+                    _runningState = AlgoRunningState.Stopped;
+                    var localNow = DateTime.Now;
+                    if (start > localNow)
                     {
-                        _runningState = AlgoRunningState.Stopped;
-                        var localNow = DateTime.Now;
-                        if (start > localNow)
+                        var stopTime = DesignatedStopTime;
+                        if (stopTime != null)
+                            stopTime = stopTime.Value.ToLocalTime();
+                        var r = CanStart(start, stopTime, localNow);
+                        if (r)
                         {
-                            var stopTime = DesignatedStopTime;
-                            if (stopTime != null)
-                                stopTime = stopTime.Value.ToLocalTime();
-                            var r = CanStart(start, stopTime, localNow);
-                            if (r)
-                            {
-                                _runningState = AlgoRunningState.Running;
-                                return true;
-                            }
+                            _runningState = AlgoRunningState.Running;
+                            return true;
                         }
-                        else
-                        {
-                            _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
-                        }
-                        return false;
                     }
+                    else
+                    {
+                        _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
+                    }
+                    return false;
+                }
                 case AlgoStartTimeType.NextMarketOpens:
                     // TODO, need market meta data
                     return false;
@@ -936,7 +938,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     private void CloseAllOpenPositions()
     {
-        Services.Order.CancelAllOpenOrders();
-        Services.Portfolio.CloseAllPositions();
+        if (Parameters == null) throw Exceptions.InvalidAlgorithmEngineState();
+
+        var securities = Parameters.SecurityPool;
+        foreach (var security in securities)
+        {
+            Services.Order.CancelAllOpenOrders(security);
+            Services.Trade.CloseAllPositions(security);
+        }
     }
 }

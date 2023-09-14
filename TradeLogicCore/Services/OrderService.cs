@@ -95,7 +95,7 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void SendOrder(Order order, bool isFakeOrder = true)
+    public void SendOrder(Order order, bool isFakeOrder = false)
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
@@ -103,7 +103,7 @@ public class OrderService : IOrderService, IDisposable
             order.Id = _orderIdGen.NewTimeBasedId;
         if (order.CreateTime == DateTime.MinValue)
             order.CreateTime = DateTime.UtcNow;
-        order.ExternalOrderId = order.Id.ReverseDigits();
+
         if (isFakeOrder && _execution is ISupportFakeOrder fakeOrderEndPoint)
         {
             fakeOrderEndPoint.SendFakeOrder(order);
@@ -136,22 +136,11 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void CancelAllOpenOrders()
+    public async Task CancelAllOpenOrders(Security security)
     {
-        var orders = _orders.ThreadSafeValues();
-        var securityIds = orders.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
-            .Select(o => o.SecurityId).ToList();
-        Task.Run(async () =>
-        {
-            var securities = await _securityService.GetSecurities(securityIds);
-            if (securities == null)
-                return;
-            foreach (var security in securities)
-            {
-                await _execution.CancelAllOrders(security);
-            }
-        });
-        _log.Info("Canceling all open orders.");
+        var state = await _execution.CancelAllOrders(security);
+        _log.Info("Canceled all open orders: " + state);
+        Persist(state);
     }
 
     public void Dispose()
@@ -278,4 +267,18 @@ public class OrderService : IOrderService, IDisposable
     }
 
     private void Persist(Order order) => _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+
+    private void Persist(ExternalQueryState state)
+    {
+        if (state.ResultCode == ResultCode.CancelOrderOk)
+        {
+            var orders = state.ContentAs<List<Order>>();
+            var order = state.ContentAs<Order>();
+            // expect to have at least one
+            if (!orders.IsNullOrEmpty())
+                _persistence.Enqueue(new PersistenceTask<Order>(orders) { ActionType = DatabaseActionType.Update });
+            if (order != null)
+                _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+        }
+    }
 }

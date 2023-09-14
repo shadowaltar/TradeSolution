@@ -1,8 +1,5 @@
 ﻿using Common;
 using log4net;
-using System.Drawing;
-using System.Security.Cryptography;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
@@ -70,6 +67,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             Price = enterPrice,
             Quantity = size,
             SecurityCode = current.Security.Code,
+            Status = OrderStatus.New,
+            TimeInForce = TimeInForceType.GoodTillCancel,
         };
         _orderService.SendOrder(order);
         orders.Add(order);
@@ -95,6 +94,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     ExchangeId = _context.ExchangeId,
                     Type = OrderType.StopLimit,
                     Price = stopLossPrice,
+                    StopPrice = (stopLossPrice + enterPrice) / 2m, // trigger price at the mid
                     Quantity = size,
                     SecurityCode = current.Security.Code,
                 };
@@ -124,6 +124,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     ExchangeId = _context.ExchangeId,
                     Type = OrderType.TakeProfitLimit,
                     Price = takeProfitPrice,
+                    StopPrice = (takeProfitPrice + enterPrice) / 2m, // trigger price at the mid
                     Quantity = size,
                     SecurityCode = current.Security.Code,
                 };

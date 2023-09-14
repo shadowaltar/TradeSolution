@@ -27,18 +27,36 @@ public static class JsonExtensions
         return node?[fieldName]?.AsValue().GetValue<int>() ?? defaultValue;
     }
 
-    public static bool GetBoolean(this JsonNode node, string? fieldName = null)
+    public static bool GetBoolean(this JsonNode node, string? fieldName = null, bool defaultValue = false)
     {
-        if (fieldName == null)
-            return node.AsValue().GetValue<bool>();
-        return node[fieldName]!.AsValue().GetValue<bool>();
+        try
+        {
+            if (fieldName == null)
+                return node.AsValue().GetValue<bool>();
+            var sub = node[fieldName];
+            if (sub == null) return defaultValue;
+            return sub.AsValue().GetValue<bool>();
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
-    public static string GetString(this JsonNode? node, string? fieldName = null, string defaultValue = "")
+    public static string GetString(this JsonNode node, string? fieldName = null, string defaultValue = "")
     {
-        if (fieldName == null)
-            return node?.AsValue().GetValue<string>() ?? defaultValue;
-        return node?[fieldName]!.AsValue().GetValue<string>() ?? defaultValue;
+        try
+        {
+            if (fieldName == null)
+                return node?.AsValue().GetValue<string>() ?? defaultValue;
+            var sub = node[fieldName];
+            if (sub == null) return defaultValue;
+            return sub.AsValue().GetValue<string>() ?? defaultValue;
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     public static decimal GetDecimal(this JsonNode? node, string? fieldName = null, decimal defaultValue = decimal.MinValue)

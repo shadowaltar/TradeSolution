@@ -286,8 +286,8 @@ WHERE
         var baseCcy = sqlHelper.GetOrDefault<string>("BaseCurrency");
         var quoteCcy = sqlHelper.GetOrDefault<string>("QuoteCurrency");
         var isMarginTradingAllowed = sqlHelper.GetOrDefault<bool>("IsMarginTradingAllowed");
-        var maxLotSize = sqlHelper.GetOrDefault<double?>("MaxLotSize");
-        var minNotional = sqlHelper.GetOrDefault<double?>("MinNotional");
+        var maxLotSize = sqlHelper.GetOrDefault<decimal?>("MaxLotSize");
+        var minNotional = sqlHelper.GetOrDefault<decimal?>("MinNotional");
         if (baseCcy != null && quoteCcy != null)
         {
             var fxInfo = new FxSecurityInfo

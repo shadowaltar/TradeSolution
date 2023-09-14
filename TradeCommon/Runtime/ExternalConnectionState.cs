@@ -12,7 +12,7 @@ using TradeCommon.Essentials.Trading;
 
 namespace TradeCommon.Runtime;
 
-public class ExternalConnectionState
+public record ExternalConnectionState
 {
     public SubscriptionType Type { get; set; }
     public ActionType Action { get; set; }
@@ -23,11 +23,11 @@ public class ExternalConnectionState
     public List<ExternalConnectionState>? SubStates { get; set; }
     public override string ToString()
     {
-        return $"ConnState [{Type}] action [{Action}] [{ResultCode}][{UniqueConnectionId}]";
+        return $"ConnectState [{Type}] action [{Action}] [{ResultCode}][{UniqueConnectionId}]";
     }
 }
 
-public class ExternalQueryState : INetworkTimeState
+public record ExternalQueryState : INetworkTimeState
 {
     public object? Content { get; set; }
 
@@ -76,7 +76,7 @@ public class ExternalQueryState : INetworkTimeState
 
     public override string ToString()
     {
-        return $"State Time[{NetworkRoundtripTime}ms/{TotalTime}ms] Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
+        return $"QueryState Time[{NetworkRoundtripTime}ms/{TotalTime}ms] Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
     }
 
     public ExternalQueryState SetDescription(string description)
@@ -228,7 +228,7 @@ public static class ExternalQueryStates
     {
         return new ExternalQueryState
         {
-            Content = trades.Count == 0 ? null : trades.Count == 1 ? trades[0] : trades,
+            Content = trades.IsNullOrEmpty() ? trades : trades.Count == 1 ? trades[0] : trades,
             ResponsePayload = content,
             Action = ActionType.GetTrade,
             ExternalId = BrokerId,
@@ -258,19 +258,19 @@ public static class ExternalQueryStates
     public static ExternalQueryState CancelOrders(string securityCode,
                                                   string content,
                                                   string connId,
-                                                  params Order[] orders)
+                                                  List<Order>? orders = null, Order? order = null)
     {
         var isOk = content != "" && content != "{}";
 
         return new ExternalQueryState
         {
-            Content = orders,
+            Content = order != null ? order : orders,
             ResponsePayload = content,
             Action = ActionType.CancelOrder,
             ExternalId = BrokerId,
             ResultCode = isOk ? ResultCode.CancelOrderOk : ResultCode.CancelOrderFailed,
             UniqueConnectionId = connId,
-            Description = "Cancelled all orders of security " + securityCode,
+            Description = $"Cancelled {(order != null ? 1 : orders?.Count)} orders of security " + securityCode,
         };
     }
 
@@ -289,17 +289,21 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState QueryOrders(string? code, string content, string connId, Order[] orders)
+    public static ExternalQueryState QueryOrders(string? code,
+                                                 string content,
+                                                 string connId,
+                                                 List<Order>? orders = null,
+                                                 Order? order = null)
     {
         return new ExternalQueryState
         {
-            Content = orders,
+            Content = order != null ? order : orders,
             ResponsePayload = content,
             Action = ActionType.GetOrder,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetOrderOk,
             UniqueConnectionId = connId,
-            Description = $"Got {orders.Length} open order(s)" + (code.IsBlank() ? "" : " for security: " + code),
+            Description = $"Got {(order != null ? 1 : orders?.Count)} open order(s)" + (code.IsBlank() ? "" : " for security: " + code),
         };
     }
 

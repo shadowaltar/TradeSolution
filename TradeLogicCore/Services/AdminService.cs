@@ -16,6 +16,7 @@ public class AdminService : IAdminService
     private static readonly ILog _log = Logger.New();
     private readonly IComponentContext _container;
     private readonly ISecurityService _securityService;
+    private readonly ITradeService _tradeService;
     private readonly IPortfolioService _portfolioService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
@@ -29,6 +30,7 @@ public class AdminService : IAdminService
     public AdminService(Context context,
                         IComponentContext container,
                         ISecurityService securityService,
+                        ITradeService tradeService,
                         IPortfolioService portfolioService,
                         IExternalAccountManagement accountManagement,
                         IExternalConnectivityManagement connectivity)
@@ -36,6 +38,7 @@ public class AdminService : IAdminService
         Context = context;
         _container = container;
         _securityService = securityService;
+        _tradeService = tradeService;
         _portfolioService = portfolioService;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
@@ -45,7 +48,9 @@ public class AdminService : IAdminService
     {
         Context.Initialize(_container, environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
+
         _securityService.Initialize();
+        _tradeService.Initialize();
     }
 
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)

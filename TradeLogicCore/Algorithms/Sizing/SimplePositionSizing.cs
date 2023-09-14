@@ -9,6 +9,6 @@ public class SimplePositionSizing : IPositionSizingAlgoLogic
         // a simple one which invest all and without lot-size rounding
         var setAside = 0m;
         var quantity = (availableCash - setAside) / price;
-        return quantity;
+        return current.Security.RoundLotSize(quantity);
     }
 }

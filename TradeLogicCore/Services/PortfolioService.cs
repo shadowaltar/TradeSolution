@@ -161,30 +161,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.Positions.Values.OrderBy(p => p.SecurityCode).ToList();
     }
 
-    public void CloseAllPositions()
-    {
-        // TODO
-        foreach (var (positionId, position) in _openPositions)
-        {
-            var order = new Order
-            {
-                Id = _orderIdGenerator.NewTimeBasedId,
-                AccountId = position.AccountId,
-                SecurityId = position.SecurityId,
-                BrokerId = _context.BrokerId,
-                ExchangeId = _context.ExchangeId,
-                CreateTime = DateTime.UtcNow,
-                UpdateTime = DateTime.UtcNow,
-                Quantity = position.Quantity,
-                Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
-                Type = OrderType.Market,
-                TimeInForce = TimeInForceType.GoodTillCancel,
-                Status = OrderStatus.Submitting,                
-            };
-            _orderService.SendOrder(order);
-        }
-    }
-
     public decimal GetRealizedPnl(Security security)
     {
         return Portfolio.Positions!.GetOrDefault(security.Id, null)?.RealizedPnl ?? 0;

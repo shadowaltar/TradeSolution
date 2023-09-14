@@ -87,7 +87,7 @@ public interface IOrderService
     /// </summary>
     /// <param name="order"></param>
     /// <param name="isFakeOrder"></param>
-    void SendOrder(Order order, bool isFakeOrder = true);
+    void SendOrder(Order order, bool isFakeOrder = false);
 
     /// <summary>
     /// Cancel an order without waiting for the result.
@@ -98,7 +98,7 @@ public interface IOrderService
     /// <summary>
     /// Cancel all open orders.
     /// </summary>
-    void CancelAllOpenOrders();
+    Task CancelAllOpenOrders(Security security);
 
     /// <summary>
     /// Create an order without any validation.

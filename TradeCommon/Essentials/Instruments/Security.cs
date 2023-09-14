@@ -12,7 +12,7 @@ public class Security
     public string Exchange { get; set; }
     public string Type { get; set; }
     public string? SubType { get; set; }
-    public double LotSize { get; set; }
+    public decimal LotSize { get; set; }
     public string? Currency { get; set; }
     [UpsertIgnore, InsertIgnore, SelectIgnore]
     public Security? CurrencyAsset { get; set; }
@@ -35,6 +35,15 @@ public class Security
     public Security EnsureCurrencyAsset()
     {
         return CurrencyAsset ?? FxInfo?.QuoteAsset ?? throw Exceptions.MissingQuoteAsset(Code);
+    }
+
+    public decimal RoundLotSize(decimal proposedQuantity)
+    {
+        var lotSizeReciprocal = 1 / LotSize;
+        var result = Math.Ceiling(proposedQuantity * lotSizeReciprocal) / lotSizeReciprocal;
+        if (result > proposedQuantity)
+            result -= LotSize;
+        return result;
     }
 
     public override string ToString()

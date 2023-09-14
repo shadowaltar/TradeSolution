@@ -99,7 +99,7 @@ public class Rumi : IAlgorithm<RumiVariables>
     }
 }
 
-public class RumiVariables : IAlgorithmVariables
+public record RumiVariables : IAlgorithmVariables
 {
     public decimal Fast { get; set; } = decimal.MinValue;
     public decimal Slow { get; set; } = decimal.MinValue;

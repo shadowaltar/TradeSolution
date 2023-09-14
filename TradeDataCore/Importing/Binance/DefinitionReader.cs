@@ -28,14 +28,14 @@ public class DefinitionReader
                 continue;
             var code = symbolObj.GetString("symbol");
             var filterArray = symbolObj["filters"]?.AsArray();
-            double? lotSize = null;
-            double? maxLotSize = null;
-            double? minNotional = null;
+            decimal? lotSize = null;
+            decimal? maxLotSize = null;
+            decimal? minNotional = null;
             var lotSizeFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "LOT_SIZE")?.AsObject();
             var notionalFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "NOTIONAL")?.AsObject();
-            lotSize = lotSizeFilterObj?.GetDouble("minQty");
-            maxLotSize = lotSizeFilterObj?.GetDouble("maxQty");
-            minNotional = notionalFilterObj?.GetDouble("minNotional");
+            lotSize = lotSizeFilterObj?.GetDecimal("minQty");
+            maxLotSize = lotSizeFilterObj?.GetDecimal("maxQty");
+            minNotional = notionalFilterObj?.GetDecimal("minNotional");
             var security = new Security
             {
                 Code = code,

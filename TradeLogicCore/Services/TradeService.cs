@@ -13,9 +13,11 @@ public class TradeService : ITradeService, IDisposable
     private static readonly ILog _log = Logger.New();
 
     private readonly IExternalExecutionManagement _execution;
+    private readonly Context _context;
     private readonly ISecurityService _securityService;
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
+    private readonly IdGenerator _orderIdGenerator;
     private readonly Dictionary<long, Trade> _trades = new();
     private readonly Dictionary<long, List<Trade>> _tradesByOrderId = new();
     private readonly Dictionary<string, Security> _assets = new();
@@ -25,17 +27,33 @@ public class TradeService : ITradeService, IDisposable
     public event Action<Trade[]>? NextTrades;
 
     public TradeService(IExternalExecutionManagement execution,
+                        Context context,
                         ISecurityService securityService,
                         IOrderService orderService,
                         Persistence persistence)
     {
         _execution = execution;
+        _context = context;
         _securityService = securityService;
         _orderService = orderService;
         _persistence = persistence;
+        _orderIdGenerator = IdGenerators.Get<Order>();
 
         _execution.TradeReceived += OnTradeReceived;
         _execution.TradesReceived += OnTradesReceived;
+    }
+
+    public void Initialize()
+    {
+        lock (_assets)
+        {
+            _assets.Clear();
+            var assets = _securityService.GetAssets(_context.Exchange);
+            foreach (var item in assets)
+            {
+                _assets[item.Code] = item;
+            }
+        }
     }
 
     private void OnTradeReceived(Trade trade)
@@ -85,18 +103,6 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
-        lock (_assets)
-        {
-            if (_assets.IsNullOrEmpty())
-            {
-                var assets = _securityService.GetAssets();
-                foreach (var a in assets)
-                {
-                    _assets[a.Code] = a;
-                }
-            }
-        }
-
         trade.SecurityId = order.SecurityId;
         trade.OrderId = order.Id;
         trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
@@ -130,6 +136,7 @@ public class TradeService : ITradeService, IDisposable
         }
         foreach (var trade in trades)
         {
+            trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
             trade.SecurityCode = security.Code;
         }
         return trades;
@@ -157,6 +164,34 @@ public class TradeService : ITradeService, IDisposable
             trade.SecurityCode = security.Code;
         }
         return trades;
+    }
+
+    public async Task CloseAllPositions(Security security)
+    {
+        var now = DateTime.UtcNow;
+        var previousDay = now.AddDays(-1);
+
+        var trades = await GetTrades(security, previousDay, now, true);
+        // combine trades of the same side, and send one single inverted-side order for each group
+        var bySides = trades.GroupBy(t => t.Side);
+        foreach (var tradeGroup in bySides)
+        {
+            var quantity = tradeGroup.Sum(t => t.Quantity);
+            var side = tradeGroup.Key == Side.Buy ? Side.Sell : Side.Buy;
+
+            var order = new Order
+            {
+                Id = _orderIdGenerator.NewTimeBasedId,
+                SecurityCode = security.Code,
+                CreateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow,
+                Quantity = quantity,
+                Side = side,
+                Type = OrderType.Market,
+                Status = OrderStatus.Submitting,
+            };
+            _orderService.SendOrder(order);
+        }
     }
 
     private void Persist(Trade trade) => _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });

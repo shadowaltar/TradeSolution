@@ -17,6 +17,8 @@ public interface ITradeService
     /// </summary>    
     event Action<Trade[]>? NextTrades;
 
+    void Initialize();
+
     /// <summary>
     /// Get the recent trades executed in the market (not only ours).
     /// </summary>
@@ -42,4 +44,6 @@ public interface ITradeService
     /// <param name="requestExternal"></param>
     /// <returns></returns>
     Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false);
+
+    Task CloseAllPositions(Security security);
 }

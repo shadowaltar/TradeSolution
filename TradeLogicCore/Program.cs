@@ -275,10 +275,11 @@ public class Program
         var resultCode = await adminService.Login(_testUserName, _testPassword, _testAccountName, _testEnvironment);
         if (resultCode != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("Login failed with code: " + resultCode);
 
-        orderService.CancelAllOpenOrders();
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
         if (security == null)
             return;
+
+        await orderService.CancelAllOpenOrders(security);
 
         var order = new Order
         {
@@ -293,7 +294,7 @@ public class Program
         await Task.Run(async () =>
         {
             await adminService.GetAccount(_testAccountName, _testEnvironment, false);
-            orderService.SendOrder(order, false);
+            orderService.SendOrder(order);
         });
 
         while (true)
@@ -312,8 +313,6 @@ public class Program
             }
 
             orderService.CancelOrder(order.Id);
-
-            orderService.CancelAllOpenOrders();
         }
 
         static void OnNewTradesReceived(Trade[] trades)

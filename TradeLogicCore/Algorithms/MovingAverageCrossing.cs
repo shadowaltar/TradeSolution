@@ -190,7 +190,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     }
 }
 
-public class MacVariables : IAlgorithmVariables
+public record MacVariables : IAlgorithmVariables
 {
     public decimal Fast { get; set; } = decimal.MinValue;
     public decimal Slow { get; set; } = decimal.MinValue;

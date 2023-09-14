@@ -54,13 +54,14 @@ public class Order : IComparable<Order>, ICloneable
     public Side Side { get; set; }
 
     /// <summary>
-    /// Price of a (limit) order. For a <see cref="OrderType.Market"/> order
+    /// Price of a limit order. For a <see cref="OrderType.Market"/> order
     /// this field is meaningless.
     /// </summary>
     public decimal Price { get; set; } = 0;
 
     /// <summary>
-    /// Price of a stop order.
+    /// The trigger price which when reached, a limit order (limit price specified by <see cref="Price"/>) is created.
+    /// Only used in <see cref="OrderType.StopLimit"/> and <see cref="OrderType.TakeProfitLimit"/>.
     /// </summary>
     public decimal StopPrice { get; set; } = 0;
 

@@ -64,8 +64,6 @@ public interface IPortfolioService
 
     List<Position> GetPositions();
 
-    void CloseAllPositions();
-
     /// <summary>
     /// TODO revise
     /// </summary>
