@@ -17,14 +17,12 @@ public interface ITradeService
     /// </summary>    
     event Action<Trade[]>? NextTrades;
 
-    IReadOnlyDictionary<long, long> TradeToOrderIds { get; }
-
     /// <summary>
     /// Get the recent trades executed in the market (not only ours).
     /// </summary>
     /// <param name="security"></param>
     /// <returns></returns>
-    Task<Trade[]?> GetMarketTrades(Security security);
+    Task<List<Trade>> GetMarketTrades(Security security);
 
     /// <summary>
     /// Get the executed trades for a given security.
@@ -34,7 +32,7 @@ public interface ITradeService
     /// <param name="end"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
+    Task<List<Trade>> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
 
     /// <summary>
     /// Get the trades related to an order.
@@ -43,5 +41,5 @@ public interface ITradeService
     /// <param name="orderId"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<Trade[]?> GetTrades(Security security, long orderId, bool requestExternal = false);
+    Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false);
 }

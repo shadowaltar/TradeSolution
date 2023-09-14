@@ -1,4 +1,5 @@
 ﻿using Microsoft.Identity.Client;
+using System;
 
 namespace TradeCommon.Runtime;
 
@@ -64,5 +65,20 @@ public static class Exceptions
     public static Exception InvalidTimeRange(DateTime? start, DateTime? end)
     {
         return new InvalidOperationException($"Time range is invalid; start {start}, end {end}");
+    }
+
+    public static Exception InvalidAlgorithmEngineState()
+    {
+        return new InvalidOperationException("Algorithm engine is not initialized.");
+    }
+
+    public static Exception EnumUnknown(string variableName)
+    {
+        return new ArgumentException("Must not be unknown.", variableName);
+    }
+
+    public static Exception MustLogin()
+    {
+        return new InvalidOperationException("Must login first.");
     }
 }

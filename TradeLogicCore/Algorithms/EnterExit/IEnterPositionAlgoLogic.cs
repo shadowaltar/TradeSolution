@@ -10,7 +10,7 @@ public interface IEnterPositionAlgoLogic
     ITransactionFeeLogic? FeeLogic { get; set; }
 
     List<Order> Open(AlgoEntry current,
-                     AlgoEntry last,
+                     AlgoEntry? last,
                      decimal enterPrice,
                      Side side,
                      DateTime enterTime,
@@ -18,7 +18,7 @@ public interface IEnterPositionAlgoLogic
                      decimal takeProfitPrice);
 
     void BackTestOpen(AlgoEntry current,
-                      AlgoEntry last,
+                      AlgoEntry? last,
                       decimal enterPrice,
                       Side side,
                       DateTime enterTime,

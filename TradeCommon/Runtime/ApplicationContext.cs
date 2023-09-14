@@ -5,7 +5,7 @@ using TradeCommon.Constants;
 namespace TradeCommon.Runtime;
 public class ApplicationContext
 {
-    protected IComponentContext _container;
+    protected IComponentContext? _container;
 
     private EnvironmentType _environment;
     private ExchangeType _exchange;
@@ -22,7 +22,7 @@ public class ApplicationContext
     /// </summary>
     public EnvironmentType Environment
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _environment;
+        get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _environment;
         private set => _environment = value;
     }
 
@@ -31,7 +31,7 @@ public class ApplicationContext
     /// </summary>
     public ExchangeType Exchange
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _exchange;
+        get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _exchange;
         private set => _exchange = value;
     }
 
@@ -40,7 +40,7 @@ public class ApplicationContext
     /// </summary>
     public int ExchangeId
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _exchangeId;
+        get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _exchangeId;
         private set => _exchangeId = value;
     }
 
@@ -49,7 +49,7 @@ public class ApplicationContext
     /// </summary>
     public BrokerType Broker
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _broker;
+        get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _broker;
         private set => _broker = value;
     }
 
@@ -58,15 +58,15 @@ public class ApplicationContext
     /// </summary>
     public int BrokerId
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _brokerId;
+        get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _brokerId;
         private set => _brokerId = value;
     }
 
     public void Initialize(IComponentContext container, EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        if (environment is EnvironmentType.Unknown) throw new ArgumentException("Must not be unknown.", nameof(environment));
-        if (exchange is ExchangeType.Unknown) throw new ArgumentException("Must not be unknown.", nameof(exchange));
-        if (broker is BrokerType.Unknown) throw new ArgumentException("Must not be unknown.", nameof(broker));
+        if (environment is EnvironmentType.Unknown) throw Exceptions.EnumUnknown(nameof(environment));
+        if (exchange is ExchangeType.Unknown) throw Exceptions.EnumUnknown(nameof(exchange));
+        if (broker is BrokerType.Unknown) throw Exceptions.EnumUnknown(nameof(broker));
 
         _container = container;
 

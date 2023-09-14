@@ -51,6 +51,7 @@ public interface IOrderService
 
     /// <summary>
     /// Get all orders given by a time range, and optional security name.
+    /// Either from external if <paramref name="requestExternal"/> == true, or from data storage.
     /// </summary>
     /// <param name="start"></param>
     /// <param name="end"></param>
@@ -61,6 +62,7 @@ public interface IOrderService
 
     /// <summary>
     /// Get all open orders with an optional security name.
+    /// Either from external if <paramref name="requestExternal"/> == true, or from current execution session.
     /// </summary>
     /// <param name="security"></param>
     /// <param name="requestExternal"></param>
@@ -68,11 +70,17 @@ public interface IOrderService
     Task<List<Order>> GetOpenOrders(Security? security = null, bool requestExternal = false);
 
     /// <summary>
+    /// Get all the orders in this execution session.
+    /// </summary>
+    /// <returns></returns>
+    List<Order> GetOrders();
+
+    /// <summary>
     /// Get an order from cache by its external id.
     /// </summary>
     /// <param name="externalOrderId"></param>
     /// <returns></returns>
-    Order? GetOrderByExternalId(long externalOrderId);
+    Order? GetOpenOrderByExternalId(long externalOrderId);
 
     /// <summary>
     /// Place an order without waiting for the result.

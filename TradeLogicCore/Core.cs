@@ -77,7 +77,7 @@ public class Core
         _ = Task.Factory.StartNew(async () =>
         {
             var engine = new AlgorithmEngine<T>(Context);
-            engine.SetAlgorithm(algorithm);
+            engine.Initialize(algorithm);
 
             _engines[guid] = engine;
             await engine.Run(parameters); // this is a blocking call

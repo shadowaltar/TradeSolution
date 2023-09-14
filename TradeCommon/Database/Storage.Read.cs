@@ -131,13 +131,22 @@ WHERE
 
     public static async Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end)
     {
-        // TODO supports only fx / equity types
         var dbName = DatabaseNames.ExecutionData;
         var sqlPart = SqlReader<Trade>.GetSelectClause();
         var secType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetTradeTableName(secType);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND Time >= $StartTime AND Time <= $EndTime";
-        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND Time >= $StartTime AND Time <= $EndTime";
+        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$StartTime", start), ("$EndTime", end));
+    }
+
+    public static async Task<List<Trade>> ReadTrades(Security security, long orderId)
+    {
+        var dbName = DatabaseNames.ExecutionData;
+        var sqlPart = SqlReader<Trade>.GetSelectClause();
+        var secType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetTradeTableName(secType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND OrderId = $OrderId";
+        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$OrderId", orderId));
     }
 
     public static async Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type)

@@ -93,6 +93,13 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         return await SendOrder(url, order);
     }
 
+    /// <summary>
+    /// Send an order. The server returns 'order is alive' response.
+    /// It is possible that the server will also attach the trade fills in the response.
+    /// </summary>
+    /// <param name="url"></param>
+    /// <param name="order"></param>
+    /// <returns></returns>
     private async Task<ExternalQueryState> SendOrder(string url, Order order)
     {
         var isOk = false;
@@ -116,7 +123,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             order.Status = OrderStatus.UnknownResponse;
             return ExternalQueryStates.Error(ActionType.SendOrder, ResultCode.SendOrderFailed, content, connId, errorMessage);
         }
-        // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""orderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
+        // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
         Parse(jsonNode, order, out var fills); // will change the order status accordingly
 
         var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
@@ -135,7 +142,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             var code = json.GetInt("code");
             if (code is < 0 and not int.MinValue)
                 return;
-            order.ExternalOrderId = json.GetLong("orderId");
+            order.ExternalOrderId = json.GetLong("externalOrderId");
             order.Status = OrderStatusConverter.ParseBinance(json.GetString("status"));
             order.ExternalCreateTime = json.GetUtcFromUnixMs("transactTime"); // TODO not sure if workingTime is useful or not
             order.FilledQuantity = json.GetDecimal("executedQty");
@@ -180,7 +187,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var parameters = new List<(string, string)>
         {
             ("symbol", order.SecurityCode),
-            //("orderId", order.ExternalOrderId.ToString()), // the Binance order Id takes precedence
+            //("externalOrderId", order.ExternalOrderId.ToString()), // the Binance order Id takes precedence
             ("origClientOrderId", order.Id.ToString()),
             ("newClientOrderId", _cancelIdGenerator.NewTimeBasedId.ToString())
         };
@@ -253,10 +260,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         return ExternalQueryStates.QueryTrades(content, connId, security.Code, trades).RecordTimes(rtt, swOuter);
 
 
-        static Trade[] Parse(JsonNode json, Security security)
+        static List<Trade> Parse(JsonNode json, Security security)
         {
             var rootArray = json.AsArray();
-            Trade[] trades = new Trade[rootArray.Count];
+            var trades = new List<Trade>(rootArray.Count);
 
             for (int i = 0; i < rootArray.Count; i++)
             {
@@ -282,7 +289,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
                         IsOwnerUnknown = true,
                     };
-                    trades[i] = trade;
+                    trades.Add(trade);
                 }
                 catch (Exception e)
                 {
@@ -315,13 +322,13 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var url = $"{_connectivity.RootUrl}/api/v3/order";
         var parameters = new List<(string, string)> { ("symbol", security.Code) };
         if (orderId > 0)
-            parameters.Add(("orderId", orderId.ToString()));
+            parameters.Add(("externalOrderId", orderId.ToString()));
         else
             parameters.Add(("origClientOrderId", externalOrderId.ToString()));
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url, parameters);
         var (response, rtt) = await _httpClient.TimedSendAsync(request);
         var connId = response.CheckHeaders();
-        // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""orderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
+        // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""externalOrderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
         if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
             return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, content, connId, errorMessage);
         var order = ParseOrder(json, security.Id);
@@ -352,7 +359,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         var (response, rtt) = await _httpClient.TimedSendAsync(request);
         var connId = response.CheckHeaders();
-        // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""orderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
+        // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""externalOrderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
         if (!response.ParseJsonArray(out var content, out var json, out var errorMessage, _log))
             return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, content, connId, errorMessage);
         var orders = ParseOrders(json, security);
@@ -464,24 +471,24 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// Get trades for a specific symbol [SIGNED].
     /// Valid combination with precedence:
     /// 1. symbol
-    /// 2. symbol + orderId
+    /// 2. symbol + externalOrderId
     /// 3. symbol + start (limit to 500 entries)
     /// 4. symbol + start + end (limit to 500 entries)
     /// </summary>
     /// <param name="security"></param>
-    /// <param name="orderId"></param>
+    /// <param name="externalOrderId"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
     /// <returns></returns>
     public async Task<ExternalQueryState> GetTrades(Security security,
-                                                    long orderId = long.MinValue,
+                                                    long externalOrderId = long.MinValue,
                                                     DateTime? start = null,
                                                     DateTime? end = null)
     {
         if (!ValidateSecurity(security, ActionType.GetTrade, out var errorState))
             return errorState!;
 
-        if (!orderId.IsValid() && start == null && end == null)
+        if (!externalOrderId.IsValid() && start == null && end == null)
             return ExternalQueryStates.InvalidArgument(ActionType.GetTrade, "Must provide at least an orderId, start or end time.");
 
         if (start == null && end != null)
@@ -493,9 +500,9 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         {
             ("symbol", security.Code),
         };
-        if (orderId.IsValid())
+        if (externalOrderId.IsValid())
         {
-            parameters.Add(("orderId", orderId.ToString()));
+            parameters.Add(("orderId", externalOrderId.ToString()));
             if (start != null)
             {
                 var startMs = start.Value.ToUnixMs();
@@ -626,7 +633,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             return new Trade
             {
                 Id = _tradeIdGenerator.NewTimeBasedId,
-                ExternalOrderId = rootObj.GetLong("orderId"),
+                ExternalOrderId = rootObj.GetLong("externalOrderId"),
                 SecurityId = securityId ?? 0,
                 SecurityCode = rootObj.GetString("symbol"),
                 Time = rootObj.GetUtcFromUnixMs("time"),
@@ -645,9 +652,9 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         }
     }
 
-    private Trade[] ParseTrades(JsonArray json, Security? security)
+    private List<Trade> ParseTrades(JsonArray json, Security? security)
     {
-        var trades = new Trade[json.Count];
+        var trades = new List<Trade>(json.Count);
         for (int i = 0; i < json.Count; i++)
         {
             JsonNode? node = json[i];
@@ -657,7 +664,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             var trade = ParseTrade(obj, security?.Id);
             if (trade == null) continue;
 
-            trades[i] = trade;
+            trades.Add(trade);
         }
         return trades;
     }

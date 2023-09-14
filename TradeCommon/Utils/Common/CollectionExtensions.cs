@@ -133,6 +133,14 @@ public static class CollectionExtensions
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
 
+    public static TV? ThreadSafeGet<T, TV>(this Dictionary<T, TV> dictionary, T key) where T : notnull
+    {
+        lock (dictionary)
+        {
+            return dictionary!.GetOrDefault(key);
+        }
+    }
+
     public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y) where T : notnull
     {
         lock (dictionary)
@@ -147,6 +155,14 @@ public static class CollectionExtensions
         lock (dictionary)
         {
             dictionary[key] = y;
+        }
+    }
+
+    public static List<TV> ThreadSafeValues<T, TV>(this Dictionary<T, TV> dictionary) where T : notnull
+    {
+        lock (dictionary)
+        {
+            return dictionary.Values.ToList();
         }
     }
 

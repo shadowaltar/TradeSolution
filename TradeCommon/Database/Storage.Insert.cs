@@ -111,11 +111,10 @@ DO UPDATE SET
 
         using var connection = await Connect(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
-
-        SqliteCommand? command = null;
+        
         try
         {
-            command = connection.CreateCommand();
+            using var command = connection.CreateCommand();
             command.CommandText = sql;
 
             foreach (var entry in entries)
@@ -145,10 +144,6 @@ DO UPDATE SET
         {
             _log.Error($"Failed to upsert into securities table.", e);
             transaction.Rollback();
-        }
-        finally
-        {
-            command?.Dispose();
         }
 
         await connection.CloseAsync();

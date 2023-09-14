@@ -17,10 +17,8 @@ public class TradeService : ITradeService, IDisposable
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Trade> _trades = new();
-    private readonly Dictionary<long, long> _tradeToOrderIds = new();
+    private readonly Dictionary<long, List<Trade>> _tradesByOrderId = new();
     private readonly Dictionary<string, Security> _assets = new();
-
-    public IReadOnlyDictionary<long, long> TradeToOrderIds => _tradeToOrderIds;
 
     public event Action<Trade>? NextTrade;
 
@@ -80,7 +78,7 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
-        var order = _orderService.GetOrderByExternalId(trade.ExternalOrderId);
+        var order = _orderService.GetOpenOrderByExternalId(trade.ExternalOrderId);
         if (order == null)
         {
             _log.Error("The associated order of a trade must exist.");
@@ -102,15 +100,7 @@ public class TradeService : ITradeService, IDisposable
         trade.SecurityId = order.SecurityId;
         trade.OrderId = order.Id;
         trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
-        lock (_trades)
-            _trades[trade.Id] = trade;
-        lock (_tradeToOrderIds)
-            _tradeToOrderIds[trade.Id] = trade.OrderId;
-    }
-
-    private void Persist(Trade trade)
-    {
-        _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });
+        _trades.ThreadSafeSet(trade.Id, trade);
     }
 
     public void Dispose()
@@ -118,23 +108,25 @@ public class TradeService : ITradeService, IDisposable
         _execution.TradeReceived -= OnTradeReceived;
     }
 
-    public async Task<Trade[]?> GetMarketTrades(Security security)
+    public async Task<List<Trade>> GetMarketTrades(Security security)
     {
         var state = await _execution.GetMarketTrades(security);
-        return state.ContentAs<Trade[]?>();
+        return state.ContentAs<List<Trade>>()!;
     }
 
-    public async Task<Trade[]?> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
+    public async Task<List<Trade>> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
     {
-        Trade[] trades;
+        List<Trade> trades;
         if (requestExternal)
         {
             var state = await _execution.GetTrades(security, start: start, end: end);
-            trades = state.ContentAs<Trade[]>() ?? Array.Empty<Trade>();
+            trades = state.ContentAs<List<Trade>>()!;
         }
         else
         {
-            trades = (await Storage.ReadTrades(security, start.Value, end.Value)).ToArray();
+            var s = start ?? DateTime.MinValue;
+            var e = end ?? DateTime.MaxValue;
+            trades = await Storage.ReadTrades(security, s, e);
         }
         foreach (var trade in trades)
         {
@@ -143,8 +135,29 @@ public class TradeService : ITradeService, IDisposable
         return trades;
     }
 
-    public Task<Trade[]?> GetTrades(Security security, long orderId, bool requestExternal = false)
+    public async Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false)
     {
-        throw new NotImplementedException();
+        List<Trade>? trades;
+        if (requestExternal)
+        {
+            var order = _orderService.GetOrder(orderId);
+            if (order == null) return new(); // TODO if an order is not cached in order service, this returns null
+
+            var state = await _execution.GetTrades(security, order.ExternalOrderId);
+            trades = state.ContentAs<List<Trade>>() ?? new();
+            _tradesByOrderId.ThreadSafeSet(orderId, trades); // replace anything cached directly
+        }
+        else
+        {
+            trades = await Storage.ReadTrades(security, orderId);
+            _tradesByOrderId.ThreadSafeSet(orderId, trades);
+        }
+        foreach (var trade in trades)
+        {
+            trade.SecurityCode = security.Code;
+        }
+        return trades;
     }
+
+    private void Persist(Trade trade) => _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });
 }

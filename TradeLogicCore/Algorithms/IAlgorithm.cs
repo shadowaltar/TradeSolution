@@ -6,7 +6,6 @@ using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
 
-
 public interface IAlgorithm
 {
     IEnterPositionAlgoLogic Entering { get; }
@@ -21,17 +20,17 @@ public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables
 
     T CalculateVariables(decimal price, AlgoEntry<T>? last);
 
-    bool IsOpenLongSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
+    bool IsOpenLongSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    bool IsCloseLongSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
+    bool IsCloseLongSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    bool IsShortSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
+    bool IsShortSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    bool IsCloseShortSignal(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
+    bool IsCloseShortSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
 
-    void BeforeSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
+    void BeforeSignalDetection(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
-    void AfterSignalDetection(AlgoEntry<T> current, AlgoEntry<T> last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
+    void AfterSignalDetection(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
     void BeforeAlgoExecution() { }
     void AfterAlgoExecution() { }

@@ -224,17 +224,34 @@ public static class ExternalQueryStates
     public static ExternalQueryState QueryTrades(string content,
                                                  string connId,
                                                  string securityCode,
-                                                 params Trade[] trades)
+                                                 List<Trade> trades)
     {
         return new ExternalQueryState
         {
-            Content = trades.Length == 0 ? null : trades.Length == 1 ? trades[0] : trades,
+            Content = trades.Count == 0 ? null : trades.Count == 1 ? trades[0] : trades,
             ResponsePayload = content,
             Action = ActionType.GetTrade,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetTradeOk,
             UniqueConnectionId = connId,
-            Description = $"Got {trades.Length} trade(s) for {securityCode}.",
+            Description = $"Got {trades.Count} trade(s) for {securityCode}.",
+        };
+    }
+
+    public static ExternalQueryState QueryTrade(string content,
+                                                string connId,
+                                                string securityCode,
+                                                Trade trade)
+    {
+        return new ExternalQueryState
+        {
+            Content = trade,
+            ResponsePayload = content,
+            Action = ActionType.GetTrade,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.GetTradeOk,
+            UniqueConnectionId = connId,
+            Description = $"Got a trade for {securityCode}.",
         };
     }
 

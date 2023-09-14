@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
@@ -11,13 +12,13 @@ public interface IAlgorithmEngine
 {
     event Action ReachedDesignatedEndTime;
 
-    IPositionSizingAlgoLogic Sizing { get; }
+    IPositionSizingAlgoLogic? Sizing { get; }
 
-    IEnterPositionAlgoLogic EnterLogic { get; }
+    IEnterPositionAlgoLogic? EnterLogic { get; }
 
-    IExitPositionAlgoLogic ExitLogic { get; }
+    IExitPositionAlgoLogic? ExitLogic { get; }
 
-    ISecurityScreeningAlgoLogic Screening { get; }
+    ISecurityScreeningAlgoLogic? Screening { get; }
 
     User? User { get; }
 
@@ -26,7 +27,7 @@ public interface IAlgorithmEngine
     /// <summary>
     /// Total signal count being processed. It is usually the count of prices / ticks.
     /// </summary>
-    int TotalSignalCount { get; }
+    int TotalPriceEventCount { get; }
 
     DateTime? DesignatedHaltTime { get; }
 
@@ -45,8 +46,8 @@ public interface IAlgorithmEngine
     bool ShouldCloseOpenPositionsWhenStopped { get; }
 
     AlgoStopTimeType WhenToStopOrHalt { get; }
-    
-    AlgoStartupParameters Parameters { get; }
+
+    AlgoStartupParameters? Parameters { get; }
 
     Task<int> Run(AlgoStartupParameters parameters);
 
@@ -60,7 +61,7 @@ public interface IAlgorithmEngine
 
 public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
 {
-    IAlgorithm<T> Algorithm { get; }
+    IAlgorithm<T>? Algorithm { get; }
 
     /// <summary>
     /// Gets all the algo entries created during engine execution.
@@ -71,4 +72,10 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
     /// Gets the algo entries only related to trading activities during engine execution.
     /// </summary>
     List<AlgoEntry<T>> GetExecutionEntries(int securityId);
+
+    /// <summary>
+    /// Runs the procedure to update the engine internal status.
+    /// Usually triggered by new price or new market events.
+    /// </summary>
+    void Update(int securityId, OhlcPrice ohlcPrice);
 }

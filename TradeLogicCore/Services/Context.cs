@@ -12,13 +12,20 @@ public class Context : ApplicationContext
     private IAlgorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
 
-    public bool IsBackTesting => _algorithmEngine?.Parameters.IsBackTesting ?? true;
+    public bool IsBackTesting
+    {
+        get
+        {
+            if (_algorithmEngine?.Parameters == null) throw Exceptions.InvalidAlgorithmEngineState();
+            return _algorithmEngine.Parameters.IsBackTesting;
+        }
+    }
 
     public IServices Services
     {
         get
         {
-            _services ??= _container.Resolve<IServices>();
+            _services ??= _container?.Resolve<IServices>() ?? throw Exceptions.ContextNotInitialized();
             return _services;
         }
     }
@@ -28,7 +35,7 @@ public class Context : ApplicationContext
     /// </summary>
     public User? User
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _user;
+        get => !IsInitialized ? throw Exceptions.MustLogin() : _user;
         internal set => _user = value;
     }
 
@@ -37,7 +44,7 @@ public class Context : ApplicationContext
     /// </summary>
     public Account? Account
     {
-        get => !IsInitialized ? throw new InvalidOperationException("Must initialize beforehand.") : _account;
+        get => !IsInitialized ? throw Exceptions.MustLogin() : _account;
         internal set => _account = value;
     }
 

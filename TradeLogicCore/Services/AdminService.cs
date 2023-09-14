@@ -5,7 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -188,7 +187,7 @@ public class AdminService : IAdminService
             if (account == null)
                 return null;
 
-            // when the storged & broker's external account names are the same
+            // when the stored & broker's external account names are the same
             // then must sync some info which are not on broker side
             if (account.ExternalAccount == CurrentAccount?.ExternalAccount)
             {

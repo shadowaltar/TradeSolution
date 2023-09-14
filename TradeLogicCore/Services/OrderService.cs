@@ -19,7 +19,8 @@ public class OrderService : IOrderService, IDisposable
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
-    private readonly Dictionary<long, Order> _externalOrderIdToOrders = new();
+    private readonly Dictionary<long, Order> _openOrders = new();
+    private readonly Dictionary<long, Order> _openOrdersByExternalId = new();
     private readonly Dictionary<long, Order> _cancelledOrders = new();
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
@@ -51,44 +52,11 @@ public class OrderService : IOrderService, IDisposable
         _orderIdGen = new IdGenerator("OrderIdGen");
     }
 
-    /// <summary>
-    /// Receive an order message from external.
-    /// </summary>
-    /// <param name="order"></param>
-    private void OnOrderReceived(Order order)
-    {
-        var eoid = order.ExternalOrderId;
-        var oid = order.Id;
-        if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
-        {
-            // TODO
-        }
-        else
-        {
-            order.Id = existingOrder.Id;
-            order.AccountId = existingOrder.AccountId;
-            order.CreateTime = existingOrder.CreateTime;
-            order.SecurityId = existingOrder.SecurityId;
-            if (order.Status != existingOrder.Status)
-            {
-                _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
-            }
-            _externalOrderIdToOrders.ThreadSafeSet(eoid, order);
-            _orders.ThreadSafeSet(oid, order);
-            _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
-        }
-        NextOrder?.Invoke(order);
-    }
+    public Order? GetOrder(long orderId) => _orders.ThreadSafeGet(orderId);
 
-    public Order? GetOrder(long orderId)
-    {
-        return _orders.ThreadSafeTryGet(orderId, out var order) ? order : null;
-    }
+    public Order? GetOpenOrderByExternalId(long externalOrderId) => _openOrdersByExternalId.ThreadSafeGet(externalOrderId);
 
-    public Order? GetOrderByExternalId(long externalOrderId)
-    {
-        return _externalOrderIdToOrders.ThreadSafeTryGet(externalOrderId, out var order) ? order : null;
-    }
+    public List<Order> GetOrders() => _orders.ThreadSafeValues();
 
     public async Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
     {
@@ -121,7 +89,9 @@ public class OrderService : IOrderService, IDisposable
         }
         else
         {
-            return await Storage.ReadOpenOrders(security);
+            if (_openOrders.IsNullOrEmpty())
+                return await Storage.ReadOpenOrders(security);
+            return _openOrders.ThreadSafeValues();
         }
     }
 
@@ -168,7 +138,8 @@ public class OrderService : IOrderService, IDisposable
 
     public void CancelAllOpenOrders()
     {
-        var securityIds = _orders.Values.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
+        var orders = _orders.ThreadSafeValues();
+        var securityIds = orders.Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled or OrderStatus.PartialCancelled)
             .Select(o => o.SecurityId).ToList();
         Task.Run(async () =>
         {
@@ -181,61 +152,6 @@ public class OrderService : IOrderService, IDisposable
             }
         });
         _log.Info("Canceling all open orders.");
-    }
-
-    private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState state)
-    {
-        if (!isSuccessful)
-        {
-            _log.Warn("Received a sent order action with issue.");
-        }
-
-        var order = state.ContentAs<Order>();
-        if (order == null)
-        {
-            _log.Warn("Received a state object without content!");
-            return;
-        }
-
-        lock (_lock)
-            _orders[order.Id] = order;
-
-        _log.Info("Sent order: " + order);
-
-        AfterOrderSent?.Invoke(order);
-        Persist(order);
-    }
-
-    private void OnOrderCancelled(bool isSuccessful, ExternalQueryState state)
-    {
-        if (!isSuccessful)
-        {
-            _log.Warn("Received a cancel order action with issue.");
-        }
-
-        var order = state.ContentAs<Order>();
-        if (order == null)
-        {
-            _log.Warn("Received a state object without content!");
-            return;
-        }
-
-        lock (_lock)
-        {
-            _orders.Remove(order.Id);
-            _cancelledOrders[order.Id] = order;
-        }
-
-        _log.Info("Cancelled order: " + order);
-
-        OrderCancelled?.Invoke(order);
-        Persist(order);
-    }
-
-    private void Persist(Order order)
-    {
-        var orderTask = new PersistenceTask<Order>(order);
-        _persistence.Enqueue(orderTask);
     }
 
     public void Dispose()
@@ -275,4 +191,91 @@ public class OrderService : IOrderService, IDisposable
             TimeInForce = timeInForce,
         };
     }
+
+
+    /// <summary>
+    /// Receive an order message from external.
+    /// </summary>
+    /// <param name="order"></param>
+    private void OnOrderReceived(Order order)
+    {
+        var eoid = order.ExternalOrderId;
+        var oid = order.Id;
+        if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
+        {
+            // TODO
+        }
+        else
+        {
+            order.Id = existingOrder.Id;
+            order.AccountId = existingOrder.AccountId;
+            order.CreateTime = existingOrder.CreateTime;
+            order.SecurityId = existingOrder.SecurityId;
+            if (order.Status != existingOrder.Status)
+            {
+                _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
+            }
+            _orders.ThreadSafeSet(oid, order);
+        }
+
+        if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
+        {
+            _openOrders.ThreadSafeSet(order.Id, order);
+            _openOrdersByExternalId.ThreadSafeSet(eoid, order);
+        }
+
+        Persist(order);
+        NextOrder?.Invoke(order);
+    }
+
+    private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState state)
+    {
+        if (!isSuccessful)
+        {
+            _log.Warn("Received a sent order action with issue.");
+        }
+
+        var order = state.ContentAs<Order>();
+        if (order == null)
+        {
+            _log.Warn("Received a state object without content!");
+            return;
+        }
+
+        lock (_lock)
+            _orders[order.Id] = order;
+
+        _log.Info("Sent order: " + order);
+
+        Persist(order);
+        AfterOrderSent?.Invoke(order);
+    }
+
+    private void OnOrderCancelled(bool isSuccessful, ExternalQueryState state)
+    {
+        if (!isSuccessful)
+        {
+            _log.Warn("Received a cancel order action with issue.");
+        }
+
+        var order = state.ContentAs<Order>();
+        if (order == null)
+        {
+            _log.Warn("Received a state object without content!");
+            return;
+        }
+
+        lock (_lock)
+        {
+            _orders.Remove(order.Id);
+            _cancelledOrders[order.Id] = order;
+        }
+
+        _log.Info("Cancelled order: " + order);
+
+        Persist(order);
+        OrderCancelled?.Invoke(order);
+    }
+
+    private void Persist(Order order) => _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
 }

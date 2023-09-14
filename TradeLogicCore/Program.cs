@@ -378,7 +378,7 @@ public class Program
                     algorithm.Screening = screening;
 
                     var engine = new AlgorithmEngine<RumiVariables>(context);
-                    engine.SetAlgorithm(algorithm);
+                    engine.Initialize(algorithm);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
@@ -543,7 +543,7 @@ public class Program
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
                         var engine = new AlgorithmEngine<MacVariables>(context);
-                        engine.SetAlgorithm(algorithm);
+                        engine.Initialize(algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                         var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
                             _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
