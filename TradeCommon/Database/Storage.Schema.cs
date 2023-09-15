@@ -12,15 +12,16 @@ public partial class Storage
 {
     public async Task CreateUserTable()
     {
-        const string dropSql =
+        var tableName = DatabaseNames.UserTable;
+        string dropSql =
 @$"
-DROP TABLE IF EXISTS {DatabaseNames.UserTable};
-DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_name_environment;
-DROP INDEX IF EXISTS idx_{DatabaseNames.UserTable}_email_environment;
+DROP TABLE IF EXISTS {tableName};
+DROP INDEX IF EXISTS idx_{tableName}_name_environment;
+DROP INDEX IF EXISTS idx_{tableName}_email_environment;
 ";
-        const string createSql =
+        string createSql =
 @$"
-CREATE TABLE IF NOT EXISTS {DatabaseNames.UserTable} (
+CREATE TABLE IF NOT EXISTS {tableName} (
     Id INTEGER PRIMARY KEY,
     Name VARCHAR(100) NOT NULL,
     Email VARCHAR(100) NOT NULL,
@@ -30,13 +31,13 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.UserTable} (
     UpdateTime DATE,
     UNIQUE(Name, Environment)
 );
-CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_name_environment
-    ON {DatabaseNames.UserTable} (Name, Environment);
-CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email_environment
-    ON {DatabaseNames.UserTable} (Email, Environment);
+CREATE UNIQUE INDEX idx_{tableName}_name_environment
+    ON {tableName} (Name, Environment);
+CREATE UNIQUE INDEX idx_{tableName}_email_environment
+    ON {tableName} (Email, Environment);
 ";
 
-        await DropThenCreate(dropSql, createSql, DatabaseNames.UserTable, DatabaseNames.StaticData);
+        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.StaticData);
     }
 
     public async Task CreateAccountTable()

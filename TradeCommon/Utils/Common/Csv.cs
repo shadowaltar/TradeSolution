@@ -9,6 +9,11 @@ using TradeCommon.Reporting;
 namespace Common;
 public static class Csv
 {
+    public static Dictionary<string, object?> ReadAsDictionary(string filePath)
+    {
+        return ReadAsDictionary<object>(filePath, null);
+    }
+
     public static Dictionary<string, TV?> ReadAsDictionary<TV>(string filePath, Func<string[], TV>? converter = null) where TV : class
     {
         using var reader = new StreamReader(filePath);

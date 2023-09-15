@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Reflection;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -15,8 +16,6 @@ using TradeDataCore.Essentials;
 namespace TradeCommon.Database;
 public interface IStorage
 {
-    void Initialize(ISecurityDefinitionProvider securityService);
-
     Task CreateAccountTable();
     Task CreateBalanceTable();
     Task CreateFinancialStatsTable();
@@ -28,8 +27,6 @@ public interface IStorage
     Task<List<string>> CreateTradeTable(SecurityType securityType);
     Task CreateUserTable();
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
-    Task<long> GetMax(string fieldName, string tableName, string databaseName);
-    Task<bool> CheckTableExists(string tableName, string database);
     Task Insert(IPersistenceTask task, bool isUpsert = true);
     Task<int> InsertAccount(Account account, bool isUpsert);
     Task<int> InsertBalance(Balance balance, bool isUpsert);
@@ -60,7 +57,16 @@ public interface IStorage
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);
+
+    void Initialize(ISecurityDefinitionProvider securityService);
+    Task<long> GetMax(string fieldName, string tableName, string databaseName);
+    Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
+    (string table, string? schema, string database) GetStorageNames<T>();
     void PurgeDatabase();
+
+    string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert);
+
+    string CreateDropTableAndIndexSql<T>();
 }

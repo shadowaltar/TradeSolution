@@ -1,13 +1,17 @@
 ﻿using Common.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Utils.Common.Attributes;
 
 namespace TradeLogicCore.Algorithms;
 
 /// <summary>
 /// Class which records prop algo execution.
 /// </summary>
+[Storage("algorithm_entries", null, "algorithm")]
 public record AlgoEntry([DatabaseIgnore] Security Security)
 {
+    public int BatchId { get; set; }
     public int VersionId { get; set; }
 
     public long PositionId { get; set; }

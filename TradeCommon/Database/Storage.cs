@@ -1,11 +1,19 @@
 ﻿using Autofac;
 using Common;
+using Common.Attributes;
 using log4net;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Primitives;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Text;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Providers;
+using TradeCommon.Runtime;
+using TradeCommon.Utils.Common.Attributes;
 
 namespace TradeCommon.Database;
 
@@ -13,8 +21,7 @@ public partial class Storage : IStorage
 {
     private readonly ILog _log = Logger.New();
     private readonly Dictionary<DataType, ISqlWriter> _writers = new();
-    private readonly IComponentContext _container;
-    private Func<int, Security> _getSecurityFunction;
+    private Func<int, Security>? _getSecurityFunction;
 
     public void Initialize(ISecurityDefinitionProvider securityService)
     {
@@ -176,5 +183,170 @@ public partial class Storage : IStorage
     private Security? GetSecurity(int securityId)
     {
         return _getSecurityFunction?.Invoke(securityId);
+    }
+
+    public (string table, string? schema, string database) GetStorageNames<T>()
+    {
+        var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
+        if (attr == null)
+            return default;
+        return (attr.TableName, attr.SchemaName, attr.DatabaseName);
+    }
+
+    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert)
+    {
+        var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
+        if (attr == null) throw new InvalidOperationException("Must provide table name.");
+
+        var tableName = attr.TableName;
+        var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
+        var uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()!.FieldNames ?? Array.Empty<string>();
+        var targetFieldNames = properties.Select(pair => pair.Key).ToList();
+        var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
+
+        var insertIgnoreFieldNames = properties.Where(pair =>
+        {
+            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
+            if (ignoreAttr != null && ignoreAttr.IgnoreInsert) return true;
+            return false;
+        }).Select(pair => pair.Key).ToList();
+
+        var upsertIgnoreFieldNames = properties.Where(pair =>
+        {
+            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
+            if (ignoreAttr != null && ignoreAttr.IgnoreUpsert) return true;
+            return false;
+        }).Select(pair => pair.Key).ToList();
+
+        // INSERT INTO (...)
+        var sb = new StringBuilder()
+            .Append("INSERT INTO ").AppendLine(tableName).Append('(');
+        foreach (var name in targetFieldNames)
+        {
+            if (insertIgnoreFieldNames.Contains(name))
+                continue;
+            sb.Append(name).Append(",");
+        }
+        sb.RemoveLast();
+        sb.Append(')').AppendLine();
+
+        // VALUES (...)
+        sb.AppendLine("VALUES").AppendLine().Append('(');
+        foreach (var name in targetFieldNames)
+        {
+            if (insertIgnoreFieldNames.Contains(name))
+                continue;
+            sb.Append(targetFieldNamePlaceHolders[name]).Append(",");
+        }
+        sb.RemoveLast();
+        sb.Append(')').AppendLine();
+
+        if (isUpsert && !uniqueKeyNames.IsNullOrEmpty())
+        {
+            // ON CONFLICT (...)
+            sb.Append("ON CONFLICT (");
+            foreach (var fn in uniqueKeyNames)
+            {
+                sb.Append(fn).Append(',');
+            }
+            sb.RemoveLast();
+            sb.Append(')').AppendLine();
+
+            // DO UPDATE SET ...
+            sb.Append("DO UPDATE SET ");
+            foreach (var fn in targetFieldNames)
+            {
+                if (upsertIgnoreFieldNames.Contains(fn))
+                    continue;
+                if (uniqueKeyNames.Contains(fn))
+                    continue;
+
+                sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
+            }
+            sb.RemoveLast();
+        }
+        return sb.ToString();
+    }
+
+    public string CreateDropTableAndIndexSql<T>()
+    {
+        var type = typeof(T);
+        var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
+        var table = storageAttr.TableName;
+        var schema = storageAttr.SchemaName ?? "";
+        var database = storageAttr.DatabaseName;
+        if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
+        if (!schema.IsBlank())
+            table = $"{table}.{schema}";
+
+        var sb = new StringBuilder();
+        sb.Append($"DROP TABLE IF EXISTS ").AppendLine(table);
+
+        var uniqueAttributes = type.GetCustomAttributes<UniqueAttribute>().ToList();
+        var indexAttributes = type.GetCustomAttributes<IndexAttribute>().ToList();
+
+        for (int i = 0; i < uniqueAttributes.Count; i++)
+        {
+            var attr = uniqueAttributes[i];
+            sb.Append($"DROP UNIQUE INDEX IF EXISTS ")
+                .Append("UX_").Append(table).Append('_')
+                .AppendJoin('_', attr.FieldNames)
+                .AppendLine();
+        }
+        for (int i = 0; i < indexAttributes.Count; i++)
+        {
+            var attr = indexAttributes[i];
+            sb.Append($"DROP INDEX IF EXISTS ")
+                .Append("IX_").Append(table).Append('_')
+                .AppendJoin('_', attr.FieldNames)
+                .AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    public string CreateCreateTableAndIndexSql<T>()
+    {
+        var type = typeof(T);
+        var properties = ReflectionUtils.GetPropertyToName(type);
+        var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
+        var table = storageAttr.TableName;
+        var schema = storageAttr.SchemaName ?? "";
+        var database = storageAttr.DatabaseName;
+        if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
+        if (!schema.IsBlank())
+            table = $"{table}.{schema}";
+
+        var sb = new StringBuilder();
+        sb.Append($"CREATE TABLE IF NOT EXISTS ")
+            .Append(table).AppendLine(" (");
+
+        foreach (var (name, property) in properties)
+        {
+            var typeString = TypeConverter.ToSqliteType(property.PropertyType);
+
+            var isNotNull = false;
+            var isPrimary = false;
+            var attributes = property.GetCustomAttributes();
+            foreach (var attr in attributes)
+            {
+                if (attr is AutoIncrementOnInsertAttribute)
+                {
+                    isPrimary = true;
+                }
+                if (attr is NotNullAttribute)
+                {
+                    isNotNull = true;
+                }
+            }
+
+            sb.Append(name).Append(' ').Append(typeString);
+
+            if (isPrimary)
+                sb.Append(" PRIMARY KEY");
+            else if (isNotNull)
+                sb.Append(" NOT NULL");
+        }
+
+        return sb.ToString();
     }
 }

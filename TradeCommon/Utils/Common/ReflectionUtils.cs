@@ -4,6 +4,7 @@ using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using TradeCommon.Utils.Common.Attributes;
 
 namespace Common;
 public static class ReflectionUtils
@@ -32,6 +33,10 @@ public static class ReflectionUtils
     /// Cache of meta info for a given type. See <see cref="ReflectionMetaInfo{T}"/> for details.
     /// </summary>
     private static readonly Dictionary<Type, object> _typeToMetaInfo = new();
+    /// <summary>
+    /// Cache of attribute meta info for a given type. See <see cref="AttributeMetaInfo"/> for details.
+    /// </summary>
+    private static readonly Dictionary<Type, AttributeMetaInfo> _typeToAttributeInfo = new();
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
     {
@@ -165,8 +170,13 @@ public static class ReflectionUtils
             {
                 i = (ReflectionMetaInfo<T>)info;
             }
+            if (!_typeToAttributeInfo.TryGetValue(t, out var a))
+            {
+                a = new AttributeMetaInfo();
+                _typeToAttributeInfo[t] = a;
+            }
 
-            vg = new ValueGetter<T>(properties.Values, i);
+            vg = new ValueGetter<T>(properties.Values, i, a);
             _typeToValueGetters[t] = vg;
         }
         return (ValueGetter<T>)vg;
@@ -273,13 +283,11 @@ public class ReflectionMetaInfo<T>
     public Dictionary<string, Func<T, object>> Getters { get; } = new();
     public Dictionary<string, Action<T, object?>> Setters { get; } = new();
     public Dictionary<string, Type> PropertyTypes { get; } = new();
-    public Dictionary<string, List<ValidationAttribute>> ValidationProperties { get; } = new();
-    public Dictionary<string, AutoCorrectAttribute> AutoCorrectProperties { get; } = new();
 }
 
 public class ValueGetter<T> : PropertyReflectionHelper<T>
 {
-    public ValueGetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info) : base(info)
+    public ValueGetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info, AttributeMetaInfo attrInfo) : base(info)
     {
         foreach (var property in properties)
         {
@@ -289,7 +297,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is ValidationAttribute va)
                 {
-                    var attrs = _info.ValidationProperties.GetOrCreate(property.Name);
+                    var attrs = attrInfo.ValidationProperties.GetOrCreate(property.Name);
                     attrs.Add(va);
                 }
             }
@@ -298,7 +306,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is AutoCorrectAttribute aa)
                 {
-                    _info.AutoCorrectProperties[property.Name] = aa;
+                    attrInfo.AutoCorrectProperties[property.Name] = aa;
                 }
             }
 
@@ -358,7 +366,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         violatedRule = "";
         invalidPropertyName = "";
-        foreach (var (propertyName, attributes) in _info.ValidationProperties)
+        foreach (var (propertyName, attributes) in _attributeInfo.ValidationProperties)
         {
             var value = Get(entry, propertyName);
             foreach (var attr in attributes)
@@ -388,7 +396,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         message = "";
         var value = Get(entry, propertyName);
-        if (_info.ValidationProperties.TryGetValue(propertyName, out var validationAttributes))
+        if (_attributeInfo.ValidationProperties.TryGetValue(propertyName, out var validationAttributes))
         {
             foreach (var attr in validationAttributes)
             {
@@ -414,7 +422,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     public bool IsWithAutoCorrect(T entry, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
     {
         originalValue = null;
-        if (_info.AutoCorrectProperties.TryGetValue(propertyName, out attribute))
+        if (_attributeInfo.AutoCorrectProperties.TryGetValue(propertyName, out attribute))
         {
             originalValue = Get(entry, propertyName);
             return true;
@@ -466,6 +474,7 @@ public class ValueSetter<T> : PropertyReflectionHelper<T>
 public abstract class PropertyReflectionHelper<T>
 {
     protected ReflectionMetaInfo<T> _info;
+    protected AttributeMetaInfo? _attributeInfo;
 
     protected PropertyReflectionHelper(ReflectionMetaInfo<T> info)
     {

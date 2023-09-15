@@ -10,14 +10,14 @@ public static class CollectionExtensions
     /// Get value by a key from the dictionary. If no matching key,
     /// create a new instance and save into the dictionary using the given key.
     /// </summary>
-    /// <typeparam name="TK"></typeparam>
-    /// <typeparam name="TV"></typeparam>
+    /// <typeparam name="Tk"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
     /// <param name="map"></param>
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Func<TV> createAction, Action<TK, TV>? afterCreated = null)
-        where TK : notnull
+    public static Tv GetOrCreate<Tk, Tv>(this Dictionary<Tk, Tv> map, Tk key, Func<Tv> createAction, Action<Tk, Tv>? afterCreated = null)
+        where Tk : notnull
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (map.TryGetValue(key, out var value))
@@ -32,15 +32,15 @@ public static class CollectionExtensions
     /// Get value by a key from the dictionary. If no matching key,
     /// create a new instance and save into the dictionary using the given key.
     /// </summary>
-    /// <typeparam name="TK"></typeparam>
-    /// <typeparam name="TV"></typeparam>
+    /// <typeparam name="Tk"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
     /// <param name="map"></param>
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static TV GetOrCreate<TK, TV>(this Dictionary<TK, TV> map, TK key, Action<TK, TV>? afterCreated = null)
-        where TV : new()
-        where TK : notnull
+    public static Tv GetOrCreate<Tk, Tv>(this Dictionary<Tk, Tv> map, Tk key, Action<Tk, Tv>? afterCreated = null)
+        where Tv : new()
+        where Tk : notnull
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         if (map.TryGetValue(key, out var value))
@@ -57,6 +57,29 @@ public static class CollectionExtensions
     /// <param name="collection"></param>
     /// <returns></returns>
     public static bool IsNullOrEmpty<T>([NotNullWhen(false)][AllowNull] this ICollection<T> collection) => collection == null || collection.Count == 0;
+
+    /// <summary>
+    /// Append values to an existing array.
+    /// It will always return a new array instance.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="collection"></param>
+    /// <param name="values"></param>
+    /// <returns></returns>
+    public static T[] AddRange<T>(this T[] collection, ICollection<T> values)
+    {
+        if (values.IsNullOrEmpty()) return collection.ToArray();
+        var count = collection.Length;
+        var results = new T[count + values.Count];
+        Array.Copy(collection, results, count);
+        var i = 0;
+        foreach (var item in values)
+        {
+            results[count + i] = item;
+            i++;
+        }
+        return results;
+    }
 
     public static void AddRange<T>(this Collection<T> collection, IEnumerable<T> values)
     {
@@ -104,19 +127,19 @@ public static class CollectionExtensions
         }
     }
 
-    public static TV GetOrCreate<T, TV>(this IDictionary<T, TV> dictionary, T key) where TV : new() where T : notnull
+    public static Tv GetOrCreate<T, Tv>(this IDictionary<T, Tv> dictionary, T key) where Tv : new() where T : notnull
     {
         if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
 
         if (!dictionary.TryGetValue(key, out var value))
         {
-            value = new TV();
+            value = new Tv();
             dictionary[key] = value;
         }
         return value;
     }
 
-    public static TV? GetOrDefault<T, TV>(this IDictionary<T, TV?> dictionary, T key, TV? defaultValue = default) where T : notnull
+    public static Tv? GetOrDefault<T, Tv>(this IDictionary<T, Tv?> dictionary, T key, Tv? defaultValue = default) where T : notnull
     {
         if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
 
@@ -128,12 +151,69 @@ public static class CollectionExtensions
         return value;
     }
 
-    public static Dictionary<T, TV> ShallowCopy<T, TV>(this IDictionary<T, TV> dictionary) where T : notnull
+    public static (Dictionary<Tk, Tv> primaryOnly, Dictionary<Tk, Tv> contentDiffs, Dictionary<Tk, Tv> secondaryOnly)
+        FindDifferences<Tk, Tv>(this IDictionary<Tk, Tv> primary, IDictionary<Tk, Tv> secondary)
+        where Tk : notnull
+        where Tv : IComparable<Tv>
+    {
+        var primaryOnly = new Dictionary<Tk, Tv>();
+        var contentDiffs = new Dictionary<Tk, Tv>();
+        var secondaryOnly = new Dictionary<Tk, Tv>();
+        foreach (var (id, first) in primary)
+        {
+            if (secondary.TryGetValue(id, out var second))
+            {
+                if (second.CompareTo(first) != 0)
+                    contentDiffs[id] = first;
+            }
+            else
+            {
+                primaryOnly[id] = first;
+            }
+        }
+        foreach (var (id, second) in secondary)
+        {
+            if (primary.TryGetValue(id, out var first))
+            {
+                if (second.CompareTo(first) != 0)
+                    contentDiffs[id] = first;
+            }
+            else
+            {
+                secondaryOnly[id] = second;
+            }
+        }
+        return (primaryOnly, contentDiffs, secondaryOnly);
+    }
+
+    public static (List<T>, List<T>) FindDifferences<T>(this IList<T> primary, IList<T> secondary)
+        where T : IComparable<T>
+    {
+        var primaryOnly = new List<T>();
+        var secondaryOnly = new List<T>();
+        foreach (var first in primary)
+        {
+            if (!secondary.Contains(first))
+            {
+                primaryOnly.Add(first);
+            }
+        }
+        foreach (var second in secondary)
+        {
+            if (!primary.Contains(second))
+            {
+                secondaryOnly.Add(second);
+            }
+        }
+        return (primaryOnly, secondaryOnly);
+    }
+
+    public static Dictionary<T, Tv> ShallowCopy<T, Tv>(this IDictionary<T, Tv> dictionary) where T : notnull
     {
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
 
-    public static TV? ThreadSafeGet<T, TV>(this Dictionary<T, TV> dictionary, T key) where T : notnull
+    public static Tv? ThreadSafeGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key) where T : notnull
     {
         lock (dictionary)
         {
@@ -141,7 +221,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static bool ThreadSafeTryGet<T, TV>(this Dictionary<T, TV> dictionary, T key, out TV y) where T : notnull
+    public static bool ThreadSafeTryGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, out Tv y) where T : notnull
     {
         lock (dictionary)
         {
@@ -150,7 +230,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static void ThreadSafeSet<T, TV>(this Dictionary<T, TV> dictionary, T key, TV y) where T : notnull
+    public static void ThreadSafeSet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, Tv y) where T : notnull
     {
         lock (dictionary)
         {
@@ -158,7 +238,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static List<TV> ThreadSafeValues<T, TV>(this Dictionary<T, TV> dictionary) where T : notnull
+    public static List<Tv> ThreadSafeValues<T, Tv>(this Dictionary<T, Tv> dictionary) where T : notnull
     {
         lock (dictionary)
         {

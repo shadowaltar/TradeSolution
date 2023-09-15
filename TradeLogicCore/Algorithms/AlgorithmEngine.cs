@@ -209,6 +209,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         }
         SetAlgoEffectiveTimeRange(parameters.TimeRange);
 
+        // prepare algo entry related info
+        var versionId = DateTime.UtcNow.Date.ToDateNumber();
+        var batchId = Context.Storage.GetMax(nameof(AlgoEntry.BatchId), Context.Storage.GetStorageNames<A> )
+
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
 

@@ -5,6 +5,16 @@ using TradeCommon.Essentials;
 namespace Common;
 public static class DateUtils
 {
+    public static int ToDateNumber(this DateTime value)
+    {
+        return value.Year * 10000 + value.Month * 100 + value.Day;
+    }
+
+    public static int ToSecondNumber(this DateTime value)
+    {
+        return (value.Year * 10000 + value.Month * 100 + value.Day) * 1000000 + value.Hour * 10000 + value.Minute * 100 + value.Second;
+    }
+
     public static int ToUnixSec(this DateTime value)
     {
         return (int)value.Subtract(DateTime.UnixEpoch).TotalSeconds;

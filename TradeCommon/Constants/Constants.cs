@@ -9,5 +9,7 @@ public static class Constants
 
     public const int ManualTradingStrategyId = 0;
 
+    public const char SqlCommandPlaceholderPrefix = '$';
+
     public static readonly string DatabaseFolder = @"C:\Temp\Data";
 }

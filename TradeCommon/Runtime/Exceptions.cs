@@ -81,4 +81,9 @@ public static class Exceptions
     {
         return new InvalidOperationException("Must login first.");
     }
+
+    public static Exception InvalidStorageDefinition()
+    {
+        return new InvalidOperationException("Must specify proper storage info");
+    }
 }

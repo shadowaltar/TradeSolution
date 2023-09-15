@@ -7,6 +7,9 @@ using System.Text;
 using TradeCommon.Database;
 using TradeCommon.Utils.Common;
 using Common.Attributes;
+using TradeCommon.Runtime;
+using Microsoft.Identity.Client.Extensions.Msal;
+using TradeCommon.Constants;
 
 namespace Common;
 
@@ -26,6 +29,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
     private readonly string _tableName;
     private readonly string _databasePath;
     private readonly string _databaseName;
+    private readonly char _placeholderPrefix;
 
     public string InsertSql { get; private set; } = "";
 
@@ -33,11 +37,15 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
     public string DeleteSql { get; private set; } = "";
 
+    public string DropTableAndIndexSql { get; private set; } = "";
+
+    public string CreateTableAndIndexSql { get; private set; } = "";
+
     public SqlWriter(IStorage storage,
                      string tableName,
                      string databasePath,
                      string databaseName,
-                     char placeholderPrefix = '$')
+                     char placeholderPrefix = Constants.SqlCommandPlaceholderPrefix)
     {
         tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
         databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
@@ -46,14 +54,17 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         if (!Directory.Exists(databasePath))
             Directory.CreateDirectory(databasePath);
 
+        _placeholderPrefix = placeholderPrefix;
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
         _uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()!.FieldNames ?? Array.Empty<string>();
         _targetFieldNames = _properties.Select(pair => pair.Key).ToList();
-        _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
-        _valueGetter = ReflectionUtils.GetValueGetter<T>();
+        _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => _placeholderPrefix + fn);
 
         AutoIncrementOnInsertFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<AutoIncrementOnInsertAttribute>() != null)
             .Select(pair => pair.Key).ToList();
+
+        _valueGetter = ReflectionUtils.GetValueGetter<T>();
+
         _storage = storage;
         _tableName = tableName;
         _databasePath = databasePath;
@@ -271,74 +282,26 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             return InsertSql;
         }
 
-        var insertIgnoreFieldNames = _properties.Where(pair =>
+        if (isUpsert)
         {
-            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
-            if (ignoreAttr != null && ignoreAttr.IgnoreInsert) return true;
-            return false;
-        }).Select(pair => pair.Key).ToList();
-
-        var upsertIgnoreFieldNames = _properties.Where(pair =>
-        {
-            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
-            if (ignoreAttr != null && ignoreAttr.IgnoreUpsert) return true;
-            return false;
-        }).Select(pair => pair.Key).ToList();
-
-        // INSERT INTO (...)
-        var sb = new StringBuilder()
-            .Append("INSERT INTO ").AppendLine(_tableName).Append('(');
-        foreach (var name in _targetFieldNames)
-        {
-            if (insertIgnoreFieldNames.Contains(name))
-                continue;
-            sb.Append(name).Append(",");
-        }
-        sb.RemoveLast();
-        sb.Append(')').AppendLine();
-
-        // VALUES (...)
-        sb.AppendLine("VALUES").AppendLine().Append('(');
-        foreach (var name in _targetFieldNames)
-        {
-            if (insertIgnoreFieldNames.Contains(name))
-                continue;
-            sb.Append(_targetFieldNamePlaceHolders[name]).Append(",");
-        }
-        sb.RemoveLast();
-        sb.Append(')').AppendLine();
-
-        if (isUpsert && !_uniqueKeyNames.IsNullOrEmpty())
-        {
-            // ON CONFLICT (...)
-            sb.Append("ON CONFLICT (");
-            foreach (var fn in _uniqueKeyNames)
-            {
-                sb.Append(fn).Append(',');
-            }
-            sb.RemoveLast();
-            sb.Append(')').AppendLine();
-
-            // DO UPDATE SET ...
-            sb.Append("DO UPDATE SET ");
-            foreach (var fn in _targetFieldNames)
-            {
-                if (upsertIgnoreFieldNames.Contains(fn))
-                    continue;
-                if (_uniqueKeyNames.Contains(fn))
-                    continue;
-
-                sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
-            }
-            sb.RemoveLast();
-            UpsertSql = sb.ToString();
+            UpsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert);
             return UpsertSql;
         }
         else
         {
-            InsertSql = sb.ToString();
+            InsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert);
             return InsertSql;
         }
+    }
+
+    public string GetDropTableAndIndexSql()
+    {
+        if (!DropTableAndIndexSql.IsNullOrEmpty())
+        {
+            return DropTableAndIndexSql;
+        }
+        DropTableAndIndexSql = _storage.CreateDropTableAndIndexSql<T>();
+        return DropTableAndIndexSql;
     }
 
     protected virtual async Task<SqliteConnection> Connect()
