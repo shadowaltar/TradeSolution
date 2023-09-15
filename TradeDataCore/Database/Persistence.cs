@@ -47,7 +47,7 @@ namespace TradeDataCore.Database;
 
 //                while (_tasks.TryDequeue(out var task))
 //                {
-//                    await Storage.Insert(task);
+//                    await _storage.Insert(task);
 //                    Persisted?.Invoke(task);
 //                }
 

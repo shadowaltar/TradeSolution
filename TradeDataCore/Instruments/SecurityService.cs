@@ -1,8 +1,13 @@
 ﻿using Common;
+using Microsoft.Identity.Client.Extensions.Msal;
+using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
+using TradeDataCore.Essentials;
 
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
@@ -10,12 +15,13 @@ public class SecurityService : ISecurityService
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
     private readonly ApplicationContext _context;
-
+    private readonly IStorage _storage;
     private bool _isInitialized;
 
-    public SecurityService(ApplicationContext context)
+    public SecurityService(ApplicationContext context, IStorage storage)
     {
         _context = context;
+        _storage = storage;
     }
 
     public async Task<List<Security>> Initialize()
@@ -27,9 +33,11 @@ public class SecurityService : ISecurityService
         List<Security> securities = new();
         foreach (var secType in secTypes)
         {
-            securities.AddRange(await Storage.ReadSecurities(secType));
+            securities.AddRange(await _storage.ReadSecurities(secType));
         }
         RefreshCache(securities);
+
+        _storage.Initialize(this);
 
         _isInitialized = true;
         return securities;
@@ -57,7 +65,7 @@ public class SecurityService : ISecurityService
         var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
         if (requestDatabase)
         {
-            var securities = await Storage.ReadSecurities(secType, exchStr);
+            var securities = await _storage.ReadSecurities(secType, exchStr);
             RefreshCache(securities);
             return securities;
         }
@@ -87,7 +95,7 @@ public class SecurityService : ISecurityService
     {
         if (requestExternal)
         {
-            var securities = await Storage.ReadSecurities(securityIds);
+            var securities = await _storage.ReadSecurities(securityIds);
             RefreshCache(securities);
             return securities;
         }
@@ -113,7 +121,7 @@ public class SecurityService : ISecurityService
     {
         if (requestExternal)
         {
-            var security = await Storage.ReadSecurity(exchange, code, securityType);
+            var security = await _storage.ReadSecurity(exchange, code, securityType);
             if (security != null)
             {
                 await GetAllSecurities();
@@ -134,7 +142,7 @@ public class SecurityService : ISecurityService
     {
         if (requestExternal)
         {
-            var securities = await Storage.ReadSecurities(new List<int> { securityId });
+            var securities = await _storage.ReadSecurities(new List<int> { securityId });
             if (!securities.IsNullOrEmpty())
             {
                 RefreshCache(securities[0]);
@@ -215,5 +223,57 @@ public class SecurityService : ISecurityService
             _securities[s.Id] = s;
             _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), SecurityTypeConverter.Parse(s.Type))] = s.Id;
         }
+    }
+
+    public async Task<(int securityId, int count)> UpsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
+    {
+        return await _storage.UpsertPrices(id, interval, secType, prices);
+    }
+
+    public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
+    {
+        return await _storage.ReadPrices(securityId, interval, securityType, start, end, priceDecimalPoints);
+    }
+
+    public async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
+    {
+        return await _storage.ReadAllPrices(securities, interval, securityType, range);
+    }
+
+    public async Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime end, int lookBackPeriod)
+    {
+        var securityType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        // find out the exact start time
+        // roughly -x biz days:
+        DateTime roughStart;
+        if (interval == IntervalType.OneDay)
+            roughStart = end.AddBusinessDays(-lookBackPeriod);
+
+        return await _storage.ReadPrices(security.Id, interval, securityType, end, lookBackPeriod);
+    }
+
+    public async Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime start, DateTime end)
+    {
+        var securityType = SecurityTypeConverter.Parse(security.Type);
+        return await _storage.ReadPrices(security.Id, interval, securityType, start, end);
+    }
+
+    public async Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval)
+    {
+        var securityType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dt = await _storage.Query($"SELECT SecurityId, StartTime FROM {tableName} WHERE SecurityId = {security.Id}",
+            DatabaseNames.MarketData,
+            TypeCode.Int32, TypeCode.DateTime);
+
+        var results = new Dictionary<int, List<DateTime>>();
+        foreach (DataRow row in dt.Rows)
+        {
+            var id = (int)row["SecurityId"];
+            var dateTimes = results.GetOrCreate(security.Id);
+            dateTimes.Add((DateTime)row["StartTime"]);
+        }
+        return results;
     }
 }

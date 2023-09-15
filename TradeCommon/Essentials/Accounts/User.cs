@@ -7,7 +7,7 @@ namespace TradeCommon.Essentials.Accounts;
 [Unique(nameof(Name), nameof(Environment))]
 public class User
 {
-    [UpsertIgnore, AutoIncrementOnInsert]
+    [AutoIncrementOnInsert]
     public int Id { get; set; } = -1;
 
     [Length(MinLength = 3)]
@@ -25,7 +25,7 @@ public class User
 
     public DateTime UpdateTime { get; set; }
 
-    [InsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public List<Account> Accounts { get; } = new();
 
     public override string ToString()

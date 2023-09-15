@@ -34,7 +34,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Security code (will not be saved to database).
     /// </summary>
-    [UpsertIgnore, SelectIgnore, InsertIgnore]
+    [DatabaseIgnore]
     public string SecurityCode { get; set; } = "";
 
     /// <summary>
@@ -132,13 +132,13 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Any additional order parameters.
     /// </summary>
-    [UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public AdvancedOrderSettings? AdvancedOrderSettings { get; set; }
 
     /// <summary>
     /// Gets if the order is successfully placed (either it is still alive or filled).
     /// </summary>
-    [UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
 
     public object Clone()

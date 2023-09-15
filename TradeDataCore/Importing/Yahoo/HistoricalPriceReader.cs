@@ -16,6 +16,12 @@ namespace TradeDataCore.Importing.Yahoo;
 public class HistoricalPriceReader : IHistoricalPriceReader
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IStorage _storage;
+
+    public HistoricalPriceReader(IStorage storage)
+    {
+        _storage = storage;
+    }
 
     public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
@@ -47,7 +53,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
         return await ReadYahooPrices(securities, interval, null, null, range, filters);
     }
 
-    private static async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+    private async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
         DateTime? start, DateTime? end, TimeRangeType range, params (FinancialStatType type, decimal value)[] filters)
     {
         var results = new Dictionary<int, PricesAndCorporateActions>();
@@ -110,9 +116,9 @@ public class HistoricalPriceReader : IHistoricalPriceReader
         return results;
     }
 
-    private static async Task<List<Security>> FilterSecuritiesAsync(List<Security> securities, (FinancialStatType type, decimal value)[] filters)
+    private async Task<List<Security>> FilterSecuritiesAsync(List<Security> securities, (FinancialStatType type, decimal value)[] filters)
     {
-        var allStats = await Storage.ReadFinancialStats();
+        var allStats = await _storage.ReadFinancialStats();
         var filteredSecurities = new List<Security>();
         foreach (var (type, value) in filters)
         {

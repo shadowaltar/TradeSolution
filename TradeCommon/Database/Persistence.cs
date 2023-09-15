@@ -4,20 +4,22 @@ using TradeCommon.Runtime;
 namespace TradeCommon.Database;
 public class Persistence : IDisposable
 {
+    private readonly IStorage _storage;
     private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    
+
     private bool _isRunning;
 
     public event Action<IPersistenceTask>? Persisted;
 
-    public Persistence()
+    public Persistence(IStorage storage)
     {
         Task.Factory.StartNew(async (t) =>
         {
             _isRunning = true;
             await Run();
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
+        _storage = storage;
     }
 
     public void Enqueue(IPersistenceTask task)
@@ -32,9 +34,9 @@ public class Persistence : IDisposable
             if (_tasks.TryDequeue(out var task))
             {
                 if (task.ActionType == DatabaseActionType.Create)
-                    await Storage.Insert(task, false);
+                    await _storage.Insert(task, false);
                 else if (task.ActionType == DatabaseActionType.Update)
-                    await Storage.Insert(task, true);
+                    await _storage.Insert(task, true);
                 else
                     return;
                 Persisted?.Invoke(task);

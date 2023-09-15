@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using System.Net;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 
 namespace TradeCommon.Runtime;
 public class ApplicationContext
@@ -16,6 +17,14 @@ public class ApplicationContext
     public bool IsExternalProhibited { get; private set; }
 
     public bool IsInitialized { get; private set; }
+
+    public IStorage Storage { get; }
+
+    public ApplicationContext(IStorage storage)
+    {
+        Storage = storage;
+    }
+
 
     /// <summary>
     /// Get current environment.

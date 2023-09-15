@@ -15,11 +15,3 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 //Console.WriteLine(hash);
 //var summary = BenchmarkRunner.Run<BinaryFunctionsBenchmark>();
 //var summary = BenchmarkRunner.Run<ExternalExecutionStateBenchmark>();
-
-RunTableCreation1();
-
-async void RunTableCreation1()
-{
-    await Storage.CreateAccountTable();
-    await Storage.CreateBalanceTable();
-}

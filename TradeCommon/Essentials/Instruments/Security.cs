@@ -4,7 +4,6 @@ using TradeCommon.Runtime;
 namespace TradeCommon.Essentials.Instruments;
 public class Security
 {
-    [UpsertIgnore]
     [AutoIncrementOnInsert]
     public int Id { get; set; }
     public string Code { get; set; }
@@ -14,7 +13,8 @@ public class Security
     public string? SubType { get; set; }
     public decimal LotSize { get; set; }
     public string? Currency { get; set; }
-    [UpsertIgnore, InsertIgnore, SelectIgnore]
+
+    [DatabaseIgnore]
     public Security? CurrencyAsset { get; set; }
     public string? Cusip { get; set; }
     public string? Isin { get; set; }

@@ -18,10 +18,10 @@ public class FxSecurityInfo
     public decimal? MaxLotSize { get; set; }
     public decimal? MinNotional { get; set; }
 
-    [UpsertIgnore,SelectIgnore,InsertIgnore]
+    [DatabaseIgnore]
     public Security? BaseAsset { get; set; }
 
-    [UpsertIgnore, SelectIgnore, InsertIgnore]
+    [DatabaseIgnore]
     public Security? QuoteAsset { get; set; }
 
     public override bool Equals(object? obj)

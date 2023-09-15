@@ -16,7 +16,6 @@ public class Account
     /// <summary>
     /// Unique account id.
     /// </summary>
-    [UpsertIgnore]
     [AutoIncrementOnInsert]
     public int Id { get; set; }
 
@@ -71,10 +70,10 @@ public class Account
 
     public DateTime UpdateTime { get; set; }
 
-    [InsertIgnore, UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public Balance? MainBalance { get; private set; }
 
-    [InsertIgnore, UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public List<Balance> Balances { get; } = new();
 
     public override string ToString()

@@ -28,7 +28,7 @@ public class BackTestingController : Controller
     ///// <param name="exchangeStr">Exchange of the security.</param>
     ///// <param name="secTypeStr">Security type like Equity/Fx.</param>
     ///// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
-    ///// <param name="stopLossRatio">Checks the SLPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the SLPrice.</param>
+    ///// <param name="stopLossRatio">Checks the StopLossPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the StopLossPrice.</param>
     ///// <param name="fastParam">Fast SMA param.</param>
     ///// <param name="slowParam">Slow EMA param.</param>
     ///// <param name="rumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>
@@ -86,7 +86,7 @@ public class BackTestingController : Controller
     ///// <param name="exchangeStr">Exchange of the security.</param>
     ///// <param name="secTypeStr">Security type like Equity/Fx.</param>
     ///// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
-    ///// <param name="stopLossRatio">Checks the SLPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the SLPrice.</param>
+    ///// <param name="stopLossRatio">Checks the StopLossPrice=EnterPrice*(1-SLRatio) against OHLC's low price. If hits below, close immediately at the StopLossPrice.</param>
     ///// <param name="concatenatedFastParam">Fast SMA param.</param>
     ///// <param name="concatenatedSlowParam">Slow EMA param.</param>
     ///// <param name="concatenatedRumiParam">RUMI SMA param (as of diff of Slow-Fast)</param>

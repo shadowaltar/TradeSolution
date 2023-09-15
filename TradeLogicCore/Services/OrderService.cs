@@ -16,6 +16,7 @@ public class OrderService : IOrderService, IDisposable
 
     private readonly IExternalExecutionManagement _execution;
     private readonly Context _context;
+    private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
@@ -42,6 +43,7 @@ public class OrderService : IOrderService, IDisposable
     {
         _execution = execution;
         _context = context;
+        _storage = context.Storage;
         _securityService = securityService;
         _persistence = persistence;
 
@@ -68,7 +70,7 @@ public class OrderService : IOrderService, IDisposable
         }
         else
         {
-            orders = (await Storage.ReadOrders(security, start, end)).ToArray();
+            orders = (await _storage.ReadOrders(security, start, end)).ToArray();
         }
         foreach (var order in orders)
         {
@@ -90,7 +92,7 @@ public class OrderService : IOrderService, IDisposable
         else
         {
             if (_openOrders.IsNullOrEmpty())
-                return await Storage.ReadOpenOrders(security);
+                return await _storage.ReadOpenOrders(security);
             return _openOrders.ThreadSafeValues();
         }
     }

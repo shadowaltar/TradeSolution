@@ -174,8 +174,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         current.RealizedPnl = 0;
         current.UnrealizedPnl = 0;
         current.RealizedReturn = 0;
-        current.SLPrice = stopLossPrice;
-        current.TPPrice = takeProfitPrice;
+        current.StopLossPrice = stopLossPrice;
+        current.TakeProfitPrice = takeProfitPrice;
         current.Notional = size * enterPrice;
     }
 }

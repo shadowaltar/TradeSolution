@@ -25,12 +25,10 @@ public class StockScreener : IStockScreener
 {
     private static readonly ILog _log = Common.Logger.New();
 
-    private readonly IDataServices _dataServices;
     private readonly ISecurityService _securityService;
 
-    public StockScreener(IDataServices dataServices, ISecurityService securityService)
+    public StockScreener(ISecurityService securityService)
     {
-        _dataServices = dataServices;
         _securityService = securityService;
     }
 
@@ -54,7 +52,7 @@ public class StockScreener : IStockScreener
         {
             foreach (var security in securityCandidates)
             {
-                var value = criteria.CalculateValue(_dataServices, security);
+                var value = criteria.CalculateValue(_securityService, security);
 
                 if (criteria.Compare(value))
                 {
@@ -67,7 +65,7 @@ public class StockScreener : IStockScreener
             var toBeRanked = new List<(Security sec, double val)>();
             foreach (var security in securityCandidates)
             {
-                var val = criteria.CalculateValue(_dataServices, security);
+                var val = criteria.CalculateValue(_securityService, security);
                 if (double.IsNaN(val))
                     continue;
                 toBeRanked.Add((security, val));
@@ -190,7 +188,7 @@ public abstract class ScreeningCriteria
         return base.ToString();
     }
 
-    public abstract double CalculateValue(IDataServices dataServices, Security security);
+    public abstract double CalculateValue(ISecurityService dataServices, Security security);
 
     public bool Compare(double val)
     {

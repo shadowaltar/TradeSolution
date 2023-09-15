@@ -123,7 +123,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     public void BackTestStopLoss(AlgoEntry current, AlgoEntry last, DateTime exitTime)
     {
         var enterPrice = current.EnterPrice!.Value;
-        var exitPrice = current.SLPrice!.Value;
+        var exitPrice = current.StopLossPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
 
         if (current.IsLong)

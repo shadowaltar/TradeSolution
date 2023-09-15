@@ -10,6 +10,12 @@ namespace TradeDataCore.Importing.Binance;
 public class DefinitionReader
 {
     private static readonly ILog _log = Logger.New();
+    private readonly IStorage _storage;
+
+    public DefinitionReader(IStorage storage)
+    {
+        _storage = storage;
+    }
 
     public async Task<List<Security>?> ReadAndSave(SecurityType type)
     {
@@ -87,7 +93,7 @@ public class DefinitionReader
             securities.Add(security);
         }
 
-        await Storage.UpsertFxDefinitions(securities);
+        await _storage.UpsertFxDefinitions(securities);
         return securities;
     }
 }

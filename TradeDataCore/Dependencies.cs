@@ -36,7 +36,7 @@ public class Dependencies
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterSingleton<IDataServices, DataServices>();
+            builder.RegisterSingleton<IStorage, Storage>();
             builder.RegisterSingleton<IHistoricalMarketDataService, HistoricalMarketDataService>();
             builder.RegisterSingleton<IMarketDataService, RealTimeMarketDataService>();
             builder.RegisterSingleton<IFinancialStatsDataService, FinancialStatsDataService>();

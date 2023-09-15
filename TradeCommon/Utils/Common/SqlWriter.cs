@@ -22,6 +22,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
     public List<string> AutoIncrementOnInsertFieldNames { get; }
 
+    private readonly IStorage _storage;
     private readonly string _tableName;
     private readonly string _databasePath;
     private readonly string _databaseName;
@@ -32,7 +33,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
     public string DeleteSql { get; private set; } = "";
 
-    public SqlWriter(string tableName,
+    public SqlWriter(IStorage storage,
+                     string tableName,
                      string databasePath,
                      string databaseName,
                      char placeholderPrefix = '$')
@@ -52,7 +54,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         AutoIncrementOnInsertFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<AutoIncrementOnInsertAttribute>() != null)
             .Select(pair => pair.Key).ToList();
-
+        _storage = storage;
         _tableName = tableName;
         _databasePath = databasePath;
         _databaseName = databaseName;
@@ -169,7 +171,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         newValue = long.MinValue;
         if (AutoIncrementOnInsertFieldNames.Contains(name))
         {
-            var maxId = AsyncHelper.RunSync(() => Storage.GetMax(name, _tableName, _databaseName));
+            var maxId = AsyncHelper.RunSync(() => _storage.GetMax(name, _tableName, _databaseName));
             newValue = maxId.IsValid() ? maxId + 1 : 1;
             return true;
         }
@@ -269,10 +271,19 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             return InsertSql;
         }
 
-        var insertIgnoreFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<InsertIgnoreAttribute>() != null)
-            .Select(pair => pair.Key).ToList();
-        var upsertIgnoreFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<UpsertIgnoreAttribute>() != null)
-            .Select(pair => pair.Key).ToList();
+        var insertIgnoreFieldNames = _properties.Where(pair =>
+        {
+            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
+            if (ignoreAttr != null && ignoreAttr.IgnoreInsert) return true;
+            return false;
+        }).Select(pair => pair.Key).ToList();
+
+        var upsertIgnoreFieldNames = _properties.Where(pair =>
+        {
+            var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
+            if (ignoreAttr != null && ignoreAttr.IgnoreUpsert) return true;
+            return false;
+        }).Select(pair => pair.Key).ToList();
 
         // INSERT INTO (...)
         var sb = new StringBuilder()
@@ -303,7 +314,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             sb.Append("ON CONFLICT (");
             foreach (var fn in _uniqueKeyNames)
             {
-                sb.Append(fn).Append(",");
+                sb.Append(fn).Append(',');
             }
             sb.RemoveLast();
             sb.Append(')').AppendLine();

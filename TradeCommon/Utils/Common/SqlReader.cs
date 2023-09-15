@@ -103,8 +103,12 @@ public class SqlReader<T> : IDisposable where T : new()
         if (!_selectClauses.TryGetValue(typeof(T), out var clause))
         {
             var properties = ReflectionUtils.GetPropertyToName(typeof(T));
-            var selectIgnoreFieldNames = properties.Where(pair => pair.Value.GetCustomAttribute<SelectIgnoreAttribute>() != null)
-                .Select(pair => pair.Key).ToList();
+            var selectIgnoreFieldNames = properties.Where(pair =>
+            {
+                var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
+                if (ignoreAttr != null && ignoreAttr.IgnoreSelect) return true;
+                return false;
+            }).Select(pair => pair.Key).ToList();
 
             var sb = new StringBuilder("SELECT ");
             foreach (var propertyName in properties.Keys)

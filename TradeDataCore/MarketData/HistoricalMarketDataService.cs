@@ -7,24 +7,32 @@ namespace TradeDataCore.MarketData;
 
 public class HistoricalMarketDataService : IHistoricalMarketDataService, IPriceProvider
 {
+    private readonly IStorage _storage;
+
+    public HistoricalMarketDataService(IStorage storage)
+    {
+        _storage = storage;
+    }
+
     public bool HasSubscription => NextPrice != null;
 
     public event Action<int, IntervalType, OhlcPrice>? NextPrice;
 
+
     public async Task<List<OhlcPrice>> Get(Security security, IntervalType intervalType, DateTime start, DateTime end)
     {
-        return await Storage.ReadPrices(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+        return await _storage.ReadPrices(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
     }
 
     public IAsyncEnumerable<OhlcPrice> GetAsync(Security security, IntervalType intervalType, DateTime start, DateTime end)
     {
-        return Storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+        return _storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
     }
 
     public Task StartGet(Security security, IntervalType intervalType, DateTime start, DateTime end)
     {
         var id = security.Id;
-        var asyncEnumerable = Storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
+        var asyncEnumerable = _storage.ReadPricesAsync(security.Id, intervalType, SecurityTypeConverter.Parse(security.Type), start, end, security.PricePrecision);
         return Task.Run(async () =>
         {
             await foreach (var p in asyncEnumerable)

@@ -91,6 +91,12 @@ public static class DatabaseNames
             };
     }
 
+    public static string GetOrderTableName(string securityType, bool isErrorTable = false)
+    {
+        var type = SecurityTypeConverter.Parse(securityType);
+        return GetOrderTableName(type, isErrorTable);
+    }
+
     public static string GetTradeTableName(SecurityType type, bool isErrorTable = false)
     {
         if (!isErrorTable)
@@ -109,6 +115,12 @@ public static class DatabaseNames
             };
     }
 
+    public static string GetTradeTableName(string securityType, bool isErrorTable = false)
+    {
+        var type = SecurityTypeConverter.Parse(securityType);
+        return GetTradeTableName(type, isErrorTable);
+    }
+
     public static string GetPositionTableName(SecurityType type, bool isErrorTable = false)
     {
         if (!isErrorTable)
@@ -125,6 +137,12 @@ public static class DatabaseNames
                 SecurityType.Fx => ErrorFxPositionTable,
                 _ => throw new NotImplementedException()
             };
+    }
+
+    public static string GetPositionTableName(string securityType, bool isErrorTable = false)
+    {
+        var type = SecurityTypeConverter.Parse(securityType);
+        return GetPositionTableName(type, isErrorTable);
     }
 
     public static string GetPriceTableName(IntervalType intervalType, SecurityType securityType)

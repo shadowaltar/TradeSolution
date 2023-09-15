@@ -225,13 +225,13 @@ public class AdminController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpPost("rebuild-security-definition-tables")]
-    public async Task<ActionResult> RebuildSecurityDefinitionTables([FromForm(Name = "admin-password")] string password)
+    public async Task<ActionResult> RebuildSecurityDefinitionTables([FromServices] IStorage storage, [FromForm(Name = "admin-password")] string password)
     {
         if (password.IsBlank()) return BadRequest();
         if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
 
-        await Storage.CreateSecurityTable(SecurityType.Equity);
-        await Storage.CreateSecurityTable(SecurityType.Fx);
+        await storage.CreateSecurityTable(SecurityType.Equity);
+        await storage.CreateSecurityTable(SecurityType.Fx);
 
         var tuples = new (string table, string db)[]
         {
@@ -241,7 +241,7 @@ public class AdminController : Controller
         var results = await Task.WhenAll(tuples.Select(async t =>
         {
             var (table, db) = t;
-            var r = await Storage.CheckTableExists(table, db);
+            var r = await storage.CheckTableExists(table, db);
             return (table, r);
         }));
         return Ok(results.ToDictionary(p => p.table, p => p.r));
@@ -250,12 +250,14 @@ public class AdminController : Controller
     /// <summary>
     /// WARNING, this will erase all the data. Rebuild all the price tables.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="password">Mandatory</param>
     /// <param name="intervalStr">Must be used along with <paramref name="secTypeStr"/>. Only supports 1m, 1h or 1d. If not set, all will be rebuilt.</param>
     /// <param name="secTypeStr">Must be used along with <paramref name="intervalStr"/>.</param>
     /// <returns></returns>
     [HttpPost("rebuild-price-tables")]
-    public async Task<ActionResult> RebuildPriceTables([FromForm(Name = "admin-password")] string password,
+    public async Task<ActionResult> RebuildPriceTables([FromServices] IStorage storage,
+                                                       [FromForm(Name = "admin-password")] string password,
                                                        [FromQuery(Name = "interval")] string? intervalStr,
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
@@ -283,8 +285,8 @@ public class AdminController : Controller
             var results = await Task.WhenAll(tuples.Select(async t =>
             {
                 var (table, db, interval, secType) = t;
-                await Storage.CreatePriceTable(interval, secType);
-                var r = await Storage.CheckTableExists(table, db);
+                await storage.CreatePriceTable(interval, secType);
+                var r = await storage.CheckTableExists(table, db);
                 return (table, r);
             }));
             return Ok(results.ToDictionary(p => p.table, p => p.r));
@@ -292,8 +294,8 @@ public class AdminController : Controller
         else if (interval is IntervalType.OneMinute or IntervalType.OneHour or IntervalType.OneDay)
         {
             var table = DatabaseNames.GetPriceTableName(interval, secType);
-            await Storage.CreatePriceTable(interval, secType);
-            var r = await Storage.CheckTableExists(table, DatabaseNames.MarketData);
+            await storage.CreatePriceTable(interval, secType);
+            var r = await storage.CheckTableExists(table, DatabaseNames.MarketData);
             return Ok(new Dictionary<string, bool> { { table, r } });
         }
 
@@ -303,12 +305,14 @@ public class AdminController : Controller
     /// <summary>
     /// WARNING, this will erase all the data. Rebuild tables with specific type.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="password"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="tableTypeStr">Empty to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables-except-prices")]
-    public async Task<ActionResult> RebuildOtherTables([FromForm(Name = "admin-password")] string password,
+    public async Task<ActionResult> RebuildOtherTables([FromServices] IStorage storage,
+                                                       [FromForm(Name = "admin-password")] string password,
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr = null,
                                                        [FromQuery(Name = "table-type")] string? tableTypeStr = null)
     {
@@ -322,49 +326,49 @@ public class AdminController : Controller
         if (tableTypeStr != null)
         {
             var dataType = DataTypeConverter.Parse(tableTypeStr);
-            results = await CreateTables(dataType, secType);
+            results = await CreateTables(storage, dataType, secType);
         }
         else if (tableTypeStr.IsBlank() && secTypeStr.IsBlank())
         {
             results = new();
-            results.AddRange(await CreateTables(DataType.User));
-            results.AddRange(await CreateTables(DataType.Account));
-            results.AddRange(await CreateTables(DataType.Balance));
-            results.AddRange(await CreateTables(DataType.FinancialStat));
-            results.AddRange(await CreateTables(DataType.Order, SecurityType.Fx));
-            results.AddRange(await CreateTables(DataType.Order, SecurityType.Equity));
-            results.AddRange(await CreateTables(DataType.Trade, SecurityType.Fx));
-            results.AddRange(await CreateTables(DataType.Trade, SecurityType.Equity));
-            results.AddRange(await CreateTables(DataType.Position, SecurityType.Fx));
-            results.AddRange(await CreateTables(DataType.Position, SecurityType.Equity));
-            results.AddRange(await CreateTables(DataType.OpenOrderId));
+            results.AddRange(await CreateTables(storage, DataType.User));
+            results.AddRange(await CreateTables(storage, DataType.Account));
+            results.AddRange(await CreateTables(storage, DataType.Balance));
+            results.AddRange(await CreateTables(storage, DataType.FinancialStat));
+            results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Fx));
+            results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Equity));
+            results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Fx));
+            results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Equity));
+            results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Fx));
+            results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
+            results.AddRange(await CreateTables(storage, DataType.OpenOrderId));
         }
         return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableTypeStr} or {secTypeStr} is wrong.") : Ok(results);
     }
 
-    private async Task<Dictionary<string, bool>?> CreateTables(DataType dataType, SecurityType secType = SecurityType.Unknown)
+    private async Task<Dictionary<string, bool>?> CreateTables(IStorage storage, DataType dataType, SecurityType secType = SecurityType.Unknown)
     {
         List<string> resultTableNames = new();
         switch (dataType)
         {
             case DataType.FinancialStat:
-                await Storage.CreateFinancialStatsTable();
+                await storage.CreateFinancialStatsTable();
                 resultTableNames.Add(DatabaseNames.FinancialStatsTable);
                 break;
             case DataType.Account:
-                await Storage.CreateAccountTable();
+                await storage.CreateAccountTable();
                 resultTableNames.Add(DatabaseNames.AccountTable);
                 break;
             case DataType.Balance:
-                await Storage.CreateBalanceTable();
+                await storage.CreateBalanceTable();
                 resultTableNames.Add(DatabaseNames.BalanceTable);
                 break;
             case DataType.User:
-                await Storage.CreateUserTable();
+                await storage.CreateUserTable();
                 resultTableNames.Add(DatabaseNames.UserTable);
                 break;
             case DataType.OpenOrderId:
-                await Storage.CreateOpenOrderIdTable();
+                await storage.CreateOpenOrderIdTable();
                 resultTableNames.Add(DatabaseNames.OpenOrderIdTable);
                 break;
         }
@@ -374,16 +378,16 @@ public class AdminController : Controller
             switch (dataType)
             {
                 case DataType.Order:
-                    resultTableNames.AddRange(await Storage.CreateOrderTable(secType));
+                    resultTableNames.AddRange(await storage.CreateOrderTable(secType));
                     break;
                 case DataType.Trade:
-                    resultTableNames.AddRange(await Storage.CreateTradeTable(secType));
+                    resultTableNames.AddRange(await storage.CreateTradeTable(secType));
                     break;
                 case DataType.Position:
-                    resultTableNames.AddRange(await Storage.CreatePositionTable(secType));
+                    resultTableNames.AddRange(await storage.CreatePositionTable(secType));
                     break;
                     //case DataType.TradeOrderPositionRelationship:
-                    //    results = new List<string> { await Storage.CreateTradeOrderPositionIdTable(secType) };
+                    //    results = new List<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
                     //    break;
             }
         }
@@ -391,11 +395,11 @@ public class AdminController : Controller
         var results = new Dictionary<string, bool>();
         foreach (var tn in resultTableNames)
         {
-            var r = await Storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
+            var r = await storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
             if (!r)
-                r = await Storage.CheckTableExists(tn, DatabaseNames.StaticData);
+                r = await storage.CheckTableExists(tn, DatabaseNames.StaticData);
             if (!r)
-                r = await Storage.CheckTableExists(tn, DatabaseNames.MarketData);
+                r = await storage.CheckTableExists(tn, DatabaseNames.MarketData);
             results[tn] = r;
         }
         return results;

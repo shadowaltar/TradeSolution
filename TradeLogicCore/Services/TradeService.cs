@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -14,6 +15,7 @@ public class TradeService : ITradeService, IDisposable
 
     private readonly IExternalExecutionManagement _execution;
     private readonly Context _context;
+    private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
@@ -34,6 +36,7 @@ public class TradeService : ITradeService, IDisposable
     {
         _execution = execution;
         _context = context;
+        _storage = context.Storage;
         _securityService = securityService;
         _orderService = orderService;
         _persistence = persistence;
@@ -132,7 +135,7 @@ public class TradeService : ITradeService, IDisposable
         {
             var s = start ?? DateTime.MinValue;
             var e = end ?? DateTime.MaxValue;
-            trades = await Storage.ReadTrades(security, s, e);
+            trades = await _storage.ReadTrades(security, s, e);
         }
         foreach (var trade in trades)
         {
@@ -156,7 +159,7 @@ public class TradeService : ITradeService, IDisposable
         }
         else
         {
-            trades = await Storage.ReadTrades(security, orderId);
+            trades = await _storage.ReadTrades(security, orderId);
             _tradesByOrderId.ThreadSafeSet(orderId, trades);
         }
         foreach (var trade in trades)

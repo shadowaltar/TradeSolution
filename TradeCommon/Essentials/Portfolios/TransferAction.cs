@@ -7,7 +7,7 @@ public class TransferAction
     public ActionType Action { get; set; }
     public int AssetId { get; set; }
     
-    [UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public string? AssetCode { get; set; }
     public decimal Quantity { get; set; }
     public DateTime RequestTime { get; set; }

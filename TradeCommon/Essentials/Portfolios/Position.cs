@@ -55,6 +55,9 @@ public record Position
     /// </summary>
     public decimal Price { get; set; }
 
+    /// <summary>
+    /// The notional amount of this position, which is price * quantity.
+    /// </summary>
     public decimal Notional { get; set; }
 
     /// <summary>
@@ -94,13 +97,13 @@ public record Position
     /// <summary>
     /// All orders related to this position.
     /// </summary>
-    [UpsertIgnore]
+    [DatabaseIgnore]
     public List<Order> Orders { get; set; } = new();
 
     /// <summary>
     /// All trades related to this position.
     /// </summary>
-    [UpsertIgnore]
+    [DatabaseIgnore]
     public List<Trade> Trades { get; set; } = new();
 
     /// <summary>

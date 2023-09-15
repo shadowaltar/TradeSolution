@@ -31,18 +31,20 @@ internal class Program
         await CheckMissingPrices();
 
         //await PeriodicDataImporting(args);
-        //var ss = Dependencies.Container.Resolve<ISecurityService>();
-        //var reader = new JsonPriceReader(ss);
+        //var securityService = Dependencies.Container.Resolve<ISecurityService>();
+        //var reader = new JsonPriceReader(securityService);
         //var results = await reader.Import(@"C:\Temp\AllPrices_1h_20210808_binance\AllPrices_1h_20210808_binance.json");
     }
 
     private static async Task CheckMissingPrices()
     {
-        var ss = Dependencies.Container.Resolve<ISecurityService>();
-        var security = await ss.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
+        var securityService = Dependencies.Container.Resolve<ISecurityService>();
+        var storage = Dependencies.Container.Resolve<IStorage>();
+        var security = await securityService.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
         // 2020-11-30 06:00:00~06:59:00 missing
-        var missingOnes = await PriceIntegrityChecker.CheckMissingPrices(security, new DateTime(2020, 1, 1), new DateTime(2023, 7, 1), IntervalType.OneMinute);
-        await Console.Out.WriteLineAsync(   $"Missings:" + missingOnes.Count);
+        var checker = new PriceIntegrityChecker(securityService);
+        var missingOnes = await checker.CheckMissingPrices(security, new DateTime(2020, 1, 1), new DateTime(2023, 7, 1), IntervalType.OneMinute);
+        await Console.Out.WriteLineAsync($"Missings:" + missingOnes.Count);
         var missingDays = missingOnes.Select(datum => datum.Date).Distinct().ToList();
     }
 
@@ -79,6 +81,7 @@ internal class Program
             return;
         }
 
+        var storage = Dependencies.Container.Resolve<IStorage>();
         IHistoricalPriceReader priceReader;
         if (external.EqualsIgnoreCase(ExternalNames.Binance))
         {
@@ -87,7 +90,7 @@ internal class Program
         }
         else if (external.EqualsIgnoreCase(ExternalNames.Yahoo))
         {
-            priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
+            priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage);
         }
         else
         {
@@ -114,7 +117,7 @@ internal class Program
             {
                 if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
                 {
-                    var (securityId, count) = await Storage.UpsertPrices(security.Id, i, SecurityType.Fx, list);
+                    var (securityId, count) = await securityService.UpsertPrices(security.Id, i, SecurityType.Fx, list);
                     results.Add((i, securityId, count));
                 }
             }

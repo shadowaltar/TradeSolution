@@ -15,6 +15,7 @@ public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
     private readonly IComponentContext _container;
+    private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly ITradeService _tradeService;
     private readonly IPortfolioService _portfolioService;
@@ -37,6 +38,7 @@ public class AdminService : IAdminService
     {
         Context = context;
         _container = container;
+        _storage = context.Storage;
         _securityService = securityService;
         _tradeService = tradeService;
         _portfolioService = portfolioService;
@@ -131,17 +133,17 @@ public class AdminService : IAdminService
 
         user.ValidateOrThrow();
         user.AutoCorrect();
-        return await Storage.InsertUser(user);
+        return await _storage.InsertUser(user);
     }
 
     public async Task<User?> GetUser(string? userName, EnvironmentType environment)
     {
-        return userName.IsBlank() ? null : await Storage.ReadUser(userName, "", environment);
+        return userName.IsBlank() ? null : await _storage.ReadUser(userName, "", environment);
     }
 
     public async Task<User?> GetUserByEmail(string? email, EnvironmentType environment)
     {
-        return email.IsBlank() ? null : await Storage.ReadUser("", email, environment);
+        return email.IsBlank() ? null : await _storage.ReadUser("", email, environment);
     }
 
     public async Task<int> CreateAccount(Account account)
@@ -151,7 +153,7 @@ public class AdminService : IAdminService
 
         account.ValidateOrThrow();
         account.AutoCorrect();
-        return await Storage.InsertAccount(account, false);
+        return await _storage.InsertAccount(account, false);
     }
 
     public async Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false)
@@ -164,13 +166,13 @@ public class AdminService : IAdminService
 
         if (!requestExternal)
         {
-            var account = await Storage.ReadAccount(accountName, environment);
+            var account = await _storage.ReadAccount(accountName, environment);
             if (account == null)
             {
                 _log.Error($"Failed to read account by name {accountName} from database in {environment}.");
                 return null;
             }
-            var balances = await Storage.ReadBalances(account.Id);
+            var balances = await _storage.ReadBalances(account.Id);
             if (balances.IsNullOrEmpty())
             {
                 _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database in {environment}.");

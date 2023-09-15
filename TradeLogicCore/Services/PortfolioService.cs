@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
+using TradeCommon.Providers;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 
@@ -17,9 +18,10 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly IdGenerator _positionIdGenerator;
     private readonly IExternalExecutionManagement _execution;
     private readonly Context _context;
+    private readonly IStorage _storage;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
-    private readonly ISecurityService _securityService;
+    private readonly ISecurityDefinitionProvider _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, long> _orderToPositionIds = new();
     private readonly Dictionary<long, Position> _openPositions = new();
@@ -43,6 +45,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     {
         _execution = externalExecution;
         _context = context;
+        _storage = context.Storage;
         _orderService = orderService;
         _tradeService = tradeService;
         _securityService = securityService;
@@ -286,7 +289,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             asset.Quantity += quantity;
             // TODO external logic
 
-            var balances = await Storage.ReadBalances(Portfolio.AccountId);
+            var balances = await _storage.ReadBalances(Portfolio.AccountId);
             var balance = balances.FirstOrDefault(b => b.AssetId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
             return balance;
         }
@@ -296,7 +299,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     public async Task<Balance?> Deposit(int accountId, int assetId, decimal quantity)
     {
         // TODO external logic!
-        var balances = await Storage.ReadBalances(accountId);
+        var balances = await _storage.ReadBalances(accountId);
         var balance = balances.FirstOrDefault(b => b.AssetId == assetId);
         if (balance == null)
         {
@@ -310,7 +313,7 @@ public class PortfolioService : IPortfolioService, IDisposable
                 SettlingAmount = 0,
                 UpdateTime = DateTime.UtcNow,
             };
-            if (await Storage.InsertBalance(balance, false) > 0)
+            if (await _storage.InsertBalance(balance, false) > 0)
                 return balance;
             else
             {
@@ -323,7 +326,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         else
         {
             balance.FreeAmount += quantity;
-            if (await Storage.InsertBalance(balance, true) > 0)
+            if (await _storage.InsertBalance(balance, true) > 0)
                 return balance;
             else
             {
@@ -348,7 +351,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             }
             asset.Quantity -= quantity;
             _log.Info($"Withdrew {quantity} quantity from current account. Remaining free amount: {asset.Quantity}.");
-            var balances = await Storage.ReadBalances(Portfolio.AccountId);
+            var balances = await _storage.ReadBalances(Portfolio.AccountId);
             var balance = balances.FirstOrDefault(b => b.AssetId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
             balance.FreeAmount -= quantity;
             return balance;

@@ -27,7 +27,7 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// Security code (will not be saved to database).
     /// </summary>
-    [UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public string? SecurityCode { get; set; }
 
     /// <summary>
@@ -78,7 +78,7 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// The asset/currency of the fee.
     /// </summary>
-    [UpsertIgnore, SelectIgnore]
+    [DatabaseIgnore]
     public string? FeeAssetCode { get; set; }
 
     /// <summary>
@@ -97,13 +97,13 @@ public class Trade : IComparable<Trade>
     /// Usually it is a trade observed in the market which is
     /// not related to current user.
     /// </summary>
-    [UpsertIgnore, SelectIgnore, InsertIgnore]
+    [DatabaseIgnore]
     public bool IsOwnerUnknown { get; set; } = false;
 
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
     /// </summary>
-    [UpsertIgnore, SelectIgnore, InsertIgnore]
+    [DatabaseIgnore]
     public int BestMatch { get; set; } = 0;
 
     public int CompareTo(Trade? trade)

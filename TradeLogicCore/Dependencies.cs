@@ -2,6 +2,7 @@
 using Common;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Runtime;
 using TradeLogicCore.Instruments;
 using TradeLogicCore.Services;
@@ -55,9 +56,10 @@ public static class Dependencies
             builder.RegisterSingleton<IAlgorithmService, AlgorithmService>();
             builder.RegisterSingleton<IAdminService, AdminService>();
 
-            var context = new Context();
-            builder.RegisterSingletonInstance<Context>(context);
-            builder.RegisterSingletonInstance<ApplicationContext>(context);
+            builder.RegisterType<Context>().As<Context>().As<ApplicationContext>().SingleInstance();
+            //var context = new Context();
+            //builder.RegisterSingletonInstance<Context>(context);
+            //builder.RegisterSingletonInstance<ApplicationContext>(context);
             builder.RegisterSingleton<Core>();
             builder.RegisterSingleton<IServices, Services.Services>();
         }

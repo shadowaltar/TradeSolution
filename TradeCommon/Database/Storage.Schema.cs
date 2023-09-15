@@ -1,16 +1,16 @@
 ﻿using Common;
+using Common.Attributes;
 using System.Reflection;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
-using Common.Attributes;
 
 namespace TradeCommon.Database;
 
 public partial class Storage
 {
-    public static async Task CreateUserTable()
+    public async Task CreateUserTable()
     {
         const string dropSql =
 @$"
@@ -39,7 +39,7 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.UserTable}_email_environment
         await DropThenCreate(dropSql, createSql, DatabaseNames.UserTable, DatabaseNames.StaticData);
     }
 
-    public static async Task CreateAccountTable()
+    public async Task CreateAccountTable()
     {
         const string dropSql =
 @$"
@@ -72,7 +72,7 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_ownerId
         await DropThenCreate(dropSql, createSql, DatabaseNames.AccountTable, DatabaseNames.StaticData);
     }
 
-    public static async Task CreateBalanceTable()
+    public async Task CreateBalanceTable()
     {
         string dropSql =
 @$"
@@ -103,7 +103,7 @@ CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
         await DropThenCreate(dropSql, createSql, DatabaseNames.BalanceTable, DatabaseNames.StaticData);
     }
 
-    public static async Task CreateSecurityTable(SecurityType type)
+    public async Task CreateSecurityTable(SecurityType type)
     {
         if (type == SecurityType.Equity)
         {
@@ -119,7 +119,7 @@ CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
         }
     }
 
-    private static async Task CreateStockDefinitionTable()
+    private async Task CreateStockDefinitionTable()
     {
         const string dropSql =
 @$"
@@ -152,7 +152,7 @@ CREATE UNIQUE INDEX idx_code_exchange
         await DropThenCreate(dropSql, createSql, DatabaseNames.StockDefinitionTable, DatabaseNames.StaticData);
     }
 
-    private static async Task CreateFxDefinitionTable()
+    private async Task CreateFxDefinitionTable()
     {
         const string dropSql =
 @$"
@@ -188,7 +188,7 @@ CREATE UNIQUE INDEX idx_code_exchange
         await DropThenCreate(dropSql, createSql, DatabaseNames.FxDefinitionTable, DatabaseNames.StaticData);
     }
 
-    public static async Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType)
+    public async Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         string dropSql =
@@ -221,7 +221,7 @@ ON {tableName} (SecurityId);
         return tableName;
     }
 
-    public static async Task<List<string>> CreateOrderTable(SecurityType securityType)
+    public async Task<List<string>> CreateOrderTable(SecurityType securityType)
     {
         var tableNames = new List<string>
         {
@@ -280,7 +280,7 @@ CREATE INDEX idx_{tableName}_externalOrderId
         return tableNames;
     }
 
-    public static async Task<List<string>> CreateTradeTable(SecurityType securityType)
+    public async Task<List<string>> CreateTradeTable(SecurityType securityType)
     {
         var tableNames = new List<string>
         {
@@ -329,7 +329,7 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId_time
         return tableNames;
     }
 
-    public static async Task<string> CreateOpenOrderIdTable()
+    public async Task<string> CreateOpenOrderIdTable()
     {
         const string tableName = DatabaseNames.OpenOrderIdTable;
         var dropSql =
@@ -356,7 +356,7 @@ CREATE UNIQUE INDEX idx_{tableName}_securityType
         return tableName;
     }
 
-    public static async Task<List<string>> CreatePositionTable(SecurityType securityType)
+    public async Task<List<string>> CreatePositionTable(SecurityType securityType)
     {
         var tableNames = new List<string>
         {
@@ -397,7 +397,7 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId_startTime
         return tableNames;
     }
 
-    public static async Task<long> GetMax(string fieldName, string tableName, string databaseName)
+    public async Task<long> GetMax(string fieldName, string tableName, string databaseName)
     {
         using var connection = await Connect(databaseName);
         using var command = connection.CreateCommand();
@@ -410,51 +410,7 @@ CREATE UNIQUE INDEX idx_{tableName}_securityId_startTime
         return long.MinValue;
     }
 
-    //    public static async Task<string> CreateTradeOrderPositionIdTable(SecurityType securityType)
-    //    {
-    //        var tableName = DatabaseNames.GetTradeOrderPositionIdTable(securityType);
-    //        var dropSql =
-    //@$"
-    //DROP TABLE IF EXISTS {tableName};
-    //DROP INDEX IF EXISTS idx_{tableName}_securityId;
-    //DROP INDEX IF EXISTS idx_{tableName}_tradeId;
-    //DROP INDEX IF EXISTS idx_{tableName}_orderId;
-    //DROP INDEX IF EXISTS idx_{tableName}_positionId;
-    //DROP INDEX IF EXISTS idx_{tableName}_externalTradeId;
-    //DROP INDEX IF EXISTS idx_{tableName}_externalOrderId;
-    //";
-    //        var createSql =
-    //@$"
-    //CREATE TABLE IF NOT EXISTS {tableName} (
-    //    Id INTEGER PRIMARY KEY,
-    //    SecurityId INTEGER NOT NULL,
-    //    TradeId INTEGER NOT NULL,
-    //    OrderId INTEGER NOT NULL,
-    //    PositionId INTEGER NOT NULL,
-    //    ExternalTradeId INTEGER,
-    //    ExternalOrderId INTEGER,
-    //    UNIQUE(Id)
-    //);
-    //CREATE UNIQUE INDEX idx_{tableName}_securityId
-    //    ON {tableName} (SecurityId);
-    //CREATE UNIQUE INDEX idx_{tableName}_tradeId
-    //    ON {tableName} (TradeId);
-    //CREATE UNIQUE INDEX idx_{tableName}_orderId
-    //    ON {tableName} (OrderId);
-    //CREATE UNIQUE INDEX idx_{tableName}_positionId
-    //    ON {tableName} (PositionId);
-    //CREATE UNIQUE INDEX idx_{tableName}_externalTradeId
-    //    ON {tableName} (ExternalTradeId);
-    //CREATE UNIQUE INDEX idx_{tableName}_externalOrderId
-    //    ON {tableName} (ExternalOrderId);
-    //";
-
-    //        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
-
-    //        return tableName;
-    //    }
-
-    public static async Task CreateFinancialStatsTable()
+    public async Task CreateFinancialStatsTable()
     {
         const string dropSql =
 @$"
@@ -473,7 +429,7 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         await DropThenCreate(dropSql, createSql, DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData);
     }
 
-    private static async Task DropThenCreate(string dropSql, string createSql, string tableName, string databaseName)
+    private async Task DropThenCreate(string dropSql, string createSql, string tableName, string databaseName)
     {
         using var connection = await Connect(databaseName);
         using var dropCommand = connection.CreateCommand();
@@ -487,14 +443,14 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         _log.Info($"Created {tableName} table in {databaseName}.");
     }
 
-    private static string GetCreateTableUniqueClause<T>()
+    private string GetCreateTableUniqueClause<T>()
     {
         var type = typeof(T);
         var uniqueKeys = type.GetCustomAttribute<UniqueAttribute>()?.FieldNames;
         return uniqueKeys.IsNullOrEmpty() ? "" : $", UNIQUE({string.Join(", ", uniqueKeys)})";
     }
 
-    private static string GetCreateTableUniqueIndexStatement<T>(string tableName)
+    private string GetCreateTableUniqueIndexStatement<T>(string tableName)
     {
         var type = typeof(T);
         var uniqueKeys = type.GetCustomAttribute<UniqueAttribute>()?.FieldNames;
@@ -507,7 +463,7 @@ ON {tableName}
     ({string.Join(", ", uniqueKeys)});";
     }
 
-    private static string GetDropTableUniqueIndexStatement<T>(string tableName)
+    private string GetDropTableUniqueIndexStatement<T>(string tableName)
     {
         var type = typeof(T);
         var uniqueKeys = type.GetCustomAttribute<UniqueAttribute>()?.FieldNames;

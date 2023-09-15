@@ -1,15 +1,25 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Providers;
 
 namespace TradeCommon.Database;
 
-public partial class Storage
+public partial class Storage : IStorage
 {
-    private static readonly ILog _log = Logger.New();
-    private static readonly Dictionary<DataType, ISqlWriter> _writers = new();
+    private readonly ILog _log = Logger.New();
+    private readonly Dictionary<DataType, ISqlWriter> _writers = new();
+    private readonly IComponentContext _container;
+    private Func<int, Security> _getSecurityFunction;
+
+    public void Initialize(ISecurityDefinitionProvider securityService)
+    {
+        _getSecurityFunction = securityService.GetSecurity;
+    }
 
     /// <summary>
     /// Execute a query and return a <see cref="DataTable"/>.
@@ -20,7 +30,7 @@ public partial class Storage
     /// <param name="typeCodes"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public static async Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes)
+    public async Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes)
     {
         var entries = new DataTable();
 
@@ -75,7 +85,7 @@ public partial class Storage
     /// <param name="sql"></param>
     /// <param name="database"></param>
     /// <returns></returns>
-    public static async Task<DataTable> Query(string sql, string database)
+    public async Task<DataTable> Query(string sql, string database)
     {
         var entries = new DataTable();
 
@@ -117,7 +127,7 @@ public partial class Storage
     /// <param name="tableName"></param>
     /// <param name="database"></param>
     /// <returns></returns>
-    public static async Task<bool> CheckTableExists(string tableName, string database)
+    public async Task<bool> CheckTableExists(string tableName, string database)
     {
         if (tableName.IsBlank()) return false;
         if (database.IsBlank()) return false;
@@ -133,7 +143,7 @@ public partial class Storage
     /// <summary>
     /// Purge the databases.
     /// </summary>
-    public static void PurgeDatabase()
+    public void PurgeDatabase()
     {
         var databaseNames = new[] { DatabaseNames.MarketData, DatabaseNames.StaticData, DatabaseNames.ExecutionData };
         try
@@ -151,15 +161,20 @@ public partial class Storage
         }
     }
 
-    private static string? GetConnectionString(string databaseName)
+    private string? GetConnectionString(string databaseName)
     {
         return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
     }
 
-    private static async Task<SqliteConnection> Connect(string database)
+    private async Task<SqliteConnection> Connect(string database)
     {
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
+    }
+
+    private Security? GetSecurity(int securityId)
+    {
+        return _getSecurityFunction?.Invoke(securityId);
     }
 }

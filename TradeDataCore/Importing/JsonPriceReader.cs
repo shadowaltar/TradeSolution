@@ -9,10 +9,12 @@ using TradeDataCore.Instruments;
 namespace TradeDataCore.Importing;
 public class JsonPriceReader
 {
+    private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
 
-    public JsonPriceReader(ISecurityService securityService)
+    public JsonPriceReader(IStorage storage, ISecurityService securityService)
     {
+        _storage = storage;
         _securityService = securityService;
     }
 
@@ -32,7 +34,7 @@ public class JsonPriceReader
                 continue;
 
             var interval = IntervalTypeConverter.Parse(intervalStr);
-            var i = await Storage.UpsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
+            var i = await _storage.UpsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
             results[group.Key] = i;
         }
         return results;

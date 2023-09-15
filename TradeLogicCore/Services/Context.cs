@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
@@ -11,6 +12,10 @@ public class Context : ApplicationContext
     private IServices? _services;
     private IAlgorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
+
+    public Context(IStorage storage) : base(storage)
+    {
+    }
 
     public bool IsBackTesting
     {

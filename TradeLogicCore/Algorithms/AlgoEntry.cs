@@ -6,8 +6,10 @@ namespace TradeLogicCore.Algorithms;
 /// <summary>
 /// Class which records prop algo execution.
 /// </summary>
-public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, SelectIgnore] Security Security)
+public record AlgoEntry([DatabaseIgnore] Security Security)
 {
+    public int VersionId { get; set; }
+
     public long PositionId { get; set; }
 
     public int SecurityId { get; set; } = -1;
@@ -43,8 +45,8 @@ public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, Sel
 
     public decimal? EnterPrice { get; set; }
     public decimal? ExitPrice { get; set; }
-    public decimal? SLPrice { get; set; }
-    public decimal? TPPrice { get; set; }
+    public decimal? StopLossPrice { get; set; }
+    public decimal? TakeProfitPrice { get; set; }
     public DateTime? EnterTime { get; set; }
     public TimeSpan? Elapsed { get; set; }
 
@@ -68,11 +70,12 @@ public record AlgoEntry([UpsertIgnore] long Id, [UpsertIgnore, InsertIgnore, Sel
     /// Fee incurred when enter and/or exit a position.
     /// </summary>
     public decimal Fee { get; set; }
+    public decimal FeeAssetId { get; set; }
 }
 
 public record AlgoEntry<T> : AlgoEntry
 {
-    public AlgoEntry([UpsertIgnore] long Id, [InsertIgnore, SelectIgnore, UpsertIgnore] Security Security) : base(Id, Security)
+    public AlgoEntry([DatabaseIgnore] Security Security) : base(Security)
     {
     }
 

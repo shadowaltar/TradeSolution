@@ -24,7 +24,7 @@ public class Balance
     /// <summary>
     /// Name of the asset, usually it is a kind of currency.
     /// </summary>
-    [SelectIgnore, InsertIgnore, UpsertIgnore]
+    [DatabaseIgnore]
     public string AssetCode { get; set; } = "";
 
     /// <summary>

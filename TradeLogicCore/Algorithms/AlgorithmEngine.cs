@@ -25,7 +25,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     private readonly IntervalType _intervalType;
     private readonly TimeSpan _interval;
-    private readonly IdGenerator _algoEntryIdGen;
     private readonly IdGenerator _positionIdGen;
 
     private IReadOnlyDictionary<int, Security>? _pickedSecurities;
@@ -114,7 +113,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
         _engineThreadId = Environment.CurrentManagedThreadId;
 
-        _algoEntryIdGen = IdGenerators.Get<AlgoEntry>();
         _positionIdGen = IdGenerators.Get<Position>();
     }
 
@@ -321,7 +319,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var price = ohlcPrice.C;
 
         var entryPositionId = lastEntry?.PositionId ?? _positionIdGen.NewTimeBasedId;
-        var entry = new AlgoEntry<T>(_algoEntryIdGen.NewTimeBasedId, security)
+        var entry = new AlgoEntry<T>(security)
         {
             SecurityId = securityId,
             PositionId = entryPositionId,
@@ -357,7 +355,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         }
 
         // if opened, SL must be set
-        Assertion.ShallNever((entry.IsLong || entry.IsShort) && entry.SLPrice == 0);
+        Assertion.ShallNever((entry.IsLong || entry.IsShort) && entry.StopLossPrice == 0);
 
         var lastOhlcPrice = _lastOhlcPricesBySecurityId[securityId];
         TryLong(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
@@ -610,7 +608,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     //            BackTestCheckLongStopLoss(entry, lastEntry, ohlcPrice, intervalType);
     //            BackTestCheckShortStopLoss(entry, lastEntry, ohlcPrice, intervalType);
 
-    //            Assertion.ShallNever(entry.SLPrice == 0 && (entry.IsLong || entry.IsShort));
+    //            Assertion.ShallNever(entry.StopLossPrice == 0 && (entry.IsLong || entry.IsShort));
 
     //            var toLong = Algorithm.IsOpenLongSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
     //            var toCloseLong = Algorithm.IsCloseLongSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
@@ -813,7 +811,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     {
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
-        if (IsBackTesting && entry.IsLong && ohlcPrice.L <= entry.SLPrice)
+        if (IsBackTesting && entry.IsLong && ohlcPrice.L <= entry.StopLossPrice)
         {
             Algorithm.BeforeStopLossLong(entry);
 
@@ -835,7 +833,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     {
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
-        if (IsBackTesting && entry.IsShort && ohlcPrice.H >= entry.SLPrice)
+        if (IsBackTesting && entry.IsShort && ohlcPrice.H >= entry.StopLossPrice)
         {
             Algorithm.BeforeStopLossLong(entry);
 
@@ -894,13 +892,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             current.EnterTime = last.EnterTime;
             current.ExitPrice = last.ExitPrice;
             current.Elapsed = last.Elapsed + _interval;
-            current.SLPrice = last.SLPrice;
-            current.TPPrice = last.TPPrice;
+            current.StopLossPrice = last.StopLossPrice;
+            current.TakeProfitPrice = last.TakeProfitPrice;
             current.UnrealizedPnl = (currentPrice - current.EnterPrice!.Value) * current.Quantity;
             current.Fee = last.Fee;
 
             Assertion.Shall(current.EnterPrice.HasValue);
-            Assertion.Shall(current.SLPrice.HasValue);
+            Assertion.Shall(current.StopLossPrice.HasValue);
             Assertion.Shall(last.Quantity != 0);
             Assertion.Shall(current.Fee >= 0);
 
@@ -915,8 +913,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             current.EnterTime = null;
             current.ExitPrice = null;
             current.Elapsed = null;
-            current.SLPrice = null;
-            current.TPPrice = null;
+            current.StopLossPrice = null;
+            current.TakeProfitPrice = null;
             current.UnrealizedPnl = 0;
             current.Fee = 0;
         }

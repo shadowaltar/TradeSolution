@@ -26,6 +26,7 @@ public class PriceController : Controller
     /// <summary>
     /// Get prices given exchangeStr, code, interval and start time.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="exchangeStr"></param>
     /// <param name="code"></param>
     /// <param name="secTypeStr"></param>
@@ -34,7 +35,8 @@ public class PriceController : Controller
     /// <param name="endStr">In yyyyMMdd</param>
     /// <returns></returns>
     [HttpGet("{exchangeStr}/{code}")]
-    public async Task<ActionResult> GetPrices(string exchangeStr = ExternalNames.Hkex,
+    public async Task<ActionResult> GetPrices([FromServices] IStorage storage,
+                                              string exchangeStr = ExternalNames.Hkex,
                                               string code = "00001",
                                               [FromQuery(Name = "sec-type")] string secTypeStr = nameof(SecurityType.Equity),
                                               [FromQuery(Name = "interval")] string intervalStr = "1d",
@@ -48,16 +50,17 @@ public class PriceController : Controller
         DateTime end = DateTime.UtcNow;
         if (endStr != null && ControllerValidator.IsBadOrParse(endStr, out end, out br)) return br;
 
-        var security = await Storage.ReadSecurity(exchange, code, secType);
+        var security = await storage.ReadSecurity(exchange, code, secType);
         if (security == null) return BadRequest("Missing security.");
 
-        var prices = await Storage.ReadPrices(security.Id, interval, secType, start, end);
+        var prices = await storage.ReadPrices(security.Id, interval, secType, start, end);
         return Ok(prices);
     }
 
     /// <summary>
     /// Get prices from Yahoo given exchangeStr, code, interval and start time.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="securityService"></param>
     /// <param name="exchangeStr"></param>
     /// <param name="code"></param>
@@ -66,7 +69,8 @@ public class PriceController : Controller
     /// <param name="rangeStr"></param>
     /// <returns></returns>
     [HttpGet("yahoo/{exchangeStr}/{code}")]
-    public async Task<ActionResult> GetPriceFromYahoo([FromServices] ISecurityService securityService,
+    public async Task<ActionResult> GetPriceFromYahoo([FromServices] IStorage storage,
+                                                      [FromServices] ISecurityService securityService,
                                                       string exchangeStr = ExternalNames.Hkex,
                                                       string code = "00001",
                                                       [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
@@ -81,7 +85,7 @@ public class PriceController : Controller
         var security = await securityService.GetSecurity(code, exchange, secType);
         if (security == null) return BadRequest("Missing security.");
 
-        var prices = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader()
+        var prices = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage)
             .ReadYahooPrices(new List<Security> { security }, interval, range);
         return Ok(prices);
     }
@@ -90,6 +94,7 @@ public class PriceController : Controller
     /// HEAVY CALL!
     /// Gets all security price data in HKEX from Yahoo and save to database.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="securityService"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="intervalStr"></param>
@@ -97,7 +102,8 @@ public class PriceController : Controller
     /// <param name="minMarketCapStr"></param>
     /// <returns></returns>
     [HttpGet($"{ExternalNames.Hkex}/get-and-save-all")]
-    public async Task<ActionResult> GetAndSaveHkexPrices([FromServices] ISecurityService securityService,
+    public async Task<ActionResult> GetAndSaveHkexPrices([FromServices] IStorage storage,
+                                                         [FromServices] ISecurityService securityService,
                                                          [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
                                                          [FromQuery(Name = "interval")] string intervalStr = "1d",
                                                          [FromQuery(Name = "range")] string rangeStr = "10y",
@@ -114,14 +120,14 @@ public class PriceController : Controller
         var securities = await securityService.GetSecurities(secType, ExchangeType.Hkex);
         if (securities.IsNullOrEmpty()) return BadRequest("Missing security.");
 
-        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
+        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage);
         var allPrices = await priceReader.ReadYahooPrices(securities, interval, range, (FinancialStatType.MarketCap, minMarketCap));
 
         foreach (var security in securities)
         {
             if (allPrices.TryGetValue(security.Id, out var tuple))
             {
-                await Storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
+                await storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
             }
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
@@ -171,7 +177,7 @@ public class PriceController : Controller
             {
                 if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
                 {
-                    await Storage.UpsertPrices(security.Id, interval, secType, list);
+                    await securityService.UpsertPrices(security.Id, interval, secType, list);
                 }
             }
             return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
@@ -190,7 +196,7 @@ public class PriceController : Controller
                 {
                     if (prices?.TryGetValue(security.Id, out var list) ?? false)
                     {
-                        var (securityId, count) = await Storage.UpsertPrices(security.Id, interval, secType, list);
+                        var (securityId, count) = await securityService.UpsertPrices(security.Id, interval, secType, list);
                         var oldCount = summary.GetOrCreate(security.Code);
                         summary[security.Code] = oldCount + count;
                     }
@@ -238,6 +244,7 @@ public class PriceController : Controller
     /// Gets one security price data from Yahoo in this exchangeStr and save to database.
     /// </summary>
     /// <param name="securityService"></param>
+    /// <param name="storage"></param>
     /// <param name="exchangeStr"></param>
     /// <param name="code"></param>
     /// <param name="secTypeStr"></param>
@@ -246,6 +253,7 @@ public class PriceController : Controller
     /// <returns></returns>
     [HttpGet("{exchangeStr}/get-and-save-one")]
     public async Task<ActionResult> GetAndSaveHongKongOne([FromServices] ISecurityService securityService,
+                                                          [FromServices] IStorage storage,
                                                           [FromQuery(Name = "exchangeStr")] string exchangeStr = ExternalNames.Hkex,
                                                           string code = "00001",
                                                           [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
@@ -260,13 +268,13 @@ public class PriceController : Controller
         var security = await securityService.GetSecurity(code, exchange, secType);
         if (security == null) return BadRequest("Missing security.");
 
-        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader();
+        var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage);
         var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {
-            await Storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
-            var count = await Storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
+            await securityService.UpsertPrices(security.Id, interval, secType, tuple.Prices);
+            var count = await storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
             Console.WriteLine($"Code {security.Code} exchangeStr {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
@@ -306,7 +314,7 @@ public class PriceController : Controller
             securities = securities.Where(s => symbols!.ContainsIgnoreCase(s.Code)).ToList();
         }
         var start = TimeRangeTypeConverter.ConvertTimeSpan(range, OperatorType.Minus)(DateTime.Today);
-        var allPrices = await Storage.ReadAllPrices(securities, interval, secType, range);
+        var allPrices = await securityService.ReadAllPrices(securities, interval, secType, range);
 
         var extendedResults = allPrices.Values.SelectMany(l => l)
             .OrderBy(i => i.Ex).ThenBy(i => i.Code).ThenBy(i => i.I).ThenBy(i => i.T)
@@ -334,17 +342,19 @@ public class PriceController : Controller
     /// <summary>
     /// Get the count of price entries in database.
     /// </summary>
+    /// <param name="storage"></param>
     /// <param name="intervalStr"></param>
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
     [HttpGet("metrics/all-row-count")]
-    public async Task<ActionResult> Count([FromQuery(Name = "interval")] string intervalStr = "1h",
+    public async Task<ActionResult> Count([FromServices] IStorage storage,
+                                          [FromQuery(Name = "interval")] string intervalStr = "1h",
                                           [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
 
-        var resultSet = await Storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
+        var resultSet = await storage.Query("SELECT COUNT(Close) FROM " + DatabaseNames.GetPriceTableName(interval, secType), DatabaseNames.MarketData);
         return resultSet != null ? Ok(resultSet.Rows[0][0]) : BadRequest();
     }
 
@@ -353,7 +363,8 @@ public class PriceController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpGet("metrics/per-security-row-count")]
-    public async Task<ActionResult> ReportPriceCount([FromQuery(Name = "interval")] string intervalStr = "1h",
+    public async Task<ActionResult> ReportPriceCount([FromServices] IStorage storage,
+                                                     [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                      [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out var br)) return br;
@@ -363,8 +374,8 @@ public class PriceController : Controller
         var definitionTableName = DatabaseNames.GetDefinitionTableName(secType);
         if (definitionTableName.IsBlank())
             return BadRequest();
-        var dt1 = await Storage.Query($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
-        var dt2 = await Storage.Query($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
+        var dt1 = await storage.Query($"select count(Close) as Count, SecurityId from {priceTableName} group by SecurityId", DatabaseNames.MarketData);
+        var dt2 = await storage.Query($"select Id, Code, Exchange, Name from {definitionTableName}", DatabaseNames.StaticData);
         if (dt1 != null && dt2 != null)
         {
             var result = from table1 in dt1.AsEnumerable()
@@ -390,13 +401,14 @@ public class PriceController : Controller
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
     [HttpGet("metrics/daily-price-count")]
-    public async Task<ActionResult> ReportDailyPriceEntryCount([FromQuery(Name = "interval")] string intervalStr = "1h",
+    public async Task<ActionResult> ReportDailyPriceEntryCount([FromServices] IStorage storage,
+                                                               [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                                [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
     {
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
 
-        var results = await Storage.ReadDailyMissingPriceSituations(interval, secType);
+        var results = await storage.ReadDailyMissingPriceSituations(interval, secType);
         return Ok(results);
     }
 }

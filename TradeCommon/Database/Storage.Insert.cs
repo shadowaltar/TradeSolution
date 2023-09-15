@@ -13,9 +13,9 @@ namespace TradeCommon.Database;
 
 public partial class Storage
 {
-    private static readonly string DatabaseFolder = Constants.Constants.DatabaseFolder;
+    private readonly string DatabaseFolder = Constants.Constants.DatabaseFolder;
 
-    public static async Task Insert(IPersistenceTask task, bool isUpsert = true)
+    public async Task Insert(IPersistenceTask task, bool isUpsert = true)
     {
         _log.Info("Persisting into database: " + task.GetType().Name);
 
@@ -28,17 +28,17 @@ public partial class Storage
         {
             if (!orderTask.Entries.IsNullOrEmpty())
                 foreach (var entry in orderTask.Entries)
-                    await InsertOrder(entry, orderTask.SecurityType, isUpsert);
+                    await InsertOrder(entry, isUpsert);
             else if (orderTask.Entry != null)
-                await InsertOrder(orderTask.Entry, orderTask.SecurityType, isUpsert);
+                await InsertOrder(orderTask.Entry, isUpsert);
         }
         else if (task is PersistenceTask<Trade> tradeTask)
         {
             if (!tradeTask.Entries.IsNullOrEmpty())
                 foreach (var entry in tradeTask.Entries)
-                    await InsertTrade(entry, tradeTask.SecurityType, isUpsert);
+                    await InsertTrade(entry, isUpsert);
             else if (tradeTask.Entry != null)
-                await InsertTrade(tradeTask.Entry, tradeTask.SecurityType, isUpsert);
+                await InsertTrade(tradeTask.Entry, isUpsert);
         }
         else if (task is PersistenceTask<OpenOrderId> openOrderIdTask)
         {
@@ -52,9 +52,9 @@ public partial class Storage
         {
             if (!positionTask.Entries.IsNullOrEmpty())
                 foreach (var entry in positionTask.Entries)
-                    await InsertPosition(entry, positionTask.SecurityType, isUpsert);
+                    await InsertPosition(entry, isUpsert);
             else if (positionTask.Entry != null)
-                await InsertPosition(positionTask.Entry, positionTask.SecurityType, isUpsert);
+                await InsertPosition(positionTask.Entry, isUpsert);
         }
         else if (task is PersistenceTask<Security> securityTask && !securityTask.Entries.IsNullOrEmpty())
         {
@@ -85,7 +85,7 @@ public partial class Storage
         }
     }
 
-    public static async Task UpsertStockDefinitions(List<Security> entries)
+    public async Task UpsertStockDefinitions(List<Security> entries)
     {
         const string sql =
 @$"
@@ -111,7 +111,7 @@ DO UPDATE SET
 
         using var connection = await Connect(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
-        
+
         try
         {
             using var command = connection.CreateCommand();
@@ -149,7 +149,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public static async Task UpsertFxDefinitions(List<Security> entries)
+    public async Task UpsertFxDefinitions(List<Security> entries)
     {
         const string sql =
 @$"
@@ -216,7 +216,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public static async Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
+    public async Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -281,7 +281,7 @@ DO UPDATE SET
         return (securityId, count);
     }
 
-    public static async Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats)
+    public async Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats)
     {
         var count = 0;
         var tableName = DatabaseNames.FinancialStatsTable;
@@ -327,78 +327,84 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return count;
     }
 
-    public static async Task<int> InsertUser(User user)
+    public async Task<int> InsertUser(User user)
     {
         var tableName = DatabaseNames.UserTable;
         if (!_writers.TryGetValue(DataType.User, out var writer))
         {
-            writer = new SqlWriter<User>(tableName, DatabaseFolder, DatabaseNames.StaticData);
+            writer = new SqlWriter<User>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
             _writers[DataType.User] = writer;
         }
         return await writer.InsertOne(user, false);
     }
 
-    public static async Task<int> InsertAccount(Account account, bool isUpsert)
+    public async Task<int> InsertAccount(Account account, bool isUpsert)
     {
         var tableName = DatabaseNames.AccountTable;
         if (!_writers.TryGetValue(DataType.Account, out var writer))
         {
-            writer = new SqlWriter<Account>(tableName, DatabaseFolder, DatabaseNames.StaticData);
+            writer = new SqlWriter<Account>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
             _writers[DataType.Account] = writer;
         }
         return await writer.InsertOne(account, isUpsert);
     }
 
-    public static async Task<int> InsertBalance(Balance balance, bool isUpsert)
+    public async Task<int> InsertBalance(Balance balance, bool isUpsert)
     {
         var tableName = DatabaseNames.BalanceTable;
         if (!_writers.TryGetValue(DataType.Balance, out var writer))
         {
-            writer = new SqlWriter<Balance>(tableName, DatabaseFolder, DatabaseNames.StaticData);
+            writer = new SqlWriter<Balance>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
             _writers[DataType.Balance] = writer;
         }
         return await writer.InsertOne(balance, isUpsert);
     }
 
-    public static async Task InsertOrder(Order order, SecurityType securityType, bool isUpsert = true)
+    public async Task<int> InsertOrder(Order order, bool isUpsert = true)
     {
-        var tableName = DatabaseNames.GetOrderTableName(securityType);
+        var security = GetSecurity(order.SecurityId);
+        if (security == null) return 0;
+        var tableName = DatabaseNames.GetOrderTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Order, out var writer))
         {
-            writer = new SqlWriter<Order>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            writer = new SqlWriter<Order>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Order] = writer;
         }
-        await writer.InsertOne(order, isUpsert);
+        return await writer.InsertOne(order, isUpsert);
     }
 
-    public static async Task InsertTrade(Trade trade, SecurityType securityType, bool isUpsert = true)
+    public async Task<int> InsertTrade(Trade trade, bool isUpsert = true)
     {
-        var tableName = DatabaseNames.GetTradeTableName(securityType);
+        var security = GetSecurity(trade.SecurityId);
+        if (security == null) return 0;
+        var tableName = DatabaseNames.GetTradeTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Trade, out var writer))
         {
-            writer = new SqlWriter<Trade>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            writer = new SqlWriter<Trade>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Trade] = writer;
         }
-        await writer.InsertOne(trade, isUpsert);
+        return await writer.InsertOne(trade, isUpsert);
     }
 
-    public static async Task InsertPosition(Position position, SecurityType securityType, bool isUpsert = true)
+    public async Task<int> InsertPosition(Position position, bool isUpsert = true)
     {
-        var tableName = DatabaseNames.GetPositionTableName(securityType);
+        var security = GetSecurity(position.SecurityId);
+        if (security == null) return 0;
+        var tableName = DatabaseNames.GetPositionTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Position, out var writer))
         {
-            writer = new SqlWriter<Position>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            writer = new SqlWriter<Position>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.Position] = writer;
         }
-        await writer.InsertOne(position, isUpsert);
+        return await writer.InsertOne(position, isUpsert);
     }
 
-    public static async Task InsertOpenOrderId(OpenOrderId openOrderId)
+    public async Task InsertOpenOrderId(OpenOrderId openOrderId)
     {
         var tableName = DatabaseNames.OpenOrderIdTable;
         if (!_writers.TryGetValue(DataType.OpenOrderId, out var writer))
         {
-            writer = new SqlWriter<OpenOrderId>(tableName, DatabaseFolder, DatabaseNames.ExecutionData);
+            writer = new SqlWriter<OpenOrderId>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
             _writers[DataType.OpenOrderId] = writer;
         }
         await writer.InsertOne(openOrderId, false);
