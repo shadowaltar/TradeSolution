@@ -7,9 +7,9 @@ namespace TradeCommon.Essentials.Portfolios;
 /// </summary>
 public record Portfolio
 {
-    public Dictionary<int, Position> Positions { get; } = new();
+    public Dictionary<long, Position> Positions { get; } = new();
 
-    public Dictionary<int, Position> AssetPositions { get; } = new();
+    public Dictionary<long, Position> AssetPositions { get; } = new();
 
     public int AccountId { get; }
 

@@ -5,7 +5,7 @@
 /// If there are multiple, the 1st one is the primary one.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = true)]
-public class UniqueAttribute : Attribute
+public class UniqueAttribute : Attribute, IStorageRelatedAttribute
 {
     /// <summary>
     /// The table field names for a unique clause

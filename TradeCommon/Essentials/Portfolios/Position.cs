@@ -110,6 +110,6 @@ public record Position
     /// Whether it is a closed position.
     /// Usually it means (remaining) quantity equals to zero.
     /// </summary>
-    [UpsertIgnore]
+    [DatabaseIgnore]
     public bool IsClosed => Quantity == 0;
 }

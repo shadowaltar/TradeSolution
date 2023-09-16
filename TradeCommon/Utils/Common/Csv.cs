@@ -214,10 +214,10 @@ public static class CsvSettings<T>
 
         public BooleanCsvConversion(bool treatEmptyStringAsFalse = false)
         {
-            var noStrings = Constants.NoStrings;
+            var noStrings = Consts.NoStrings;
             if (treatEmptyStringAsFalse)
             {
-                var temp = new List<string>(Constants.NoStrings);
+                var temp = new List<string>(Consts.NoStrings);
                 temp.Add(string.Empty);
                 noStrings = temp.ToArray();
             }
@@ -225,7 +225,7 @@ public static class CsvSettings<T>
             AutoMap(CultureInfo.InvariantCulture);
             foreach (var selector in BooleanConversionPropertySelectors)
             {
-                Map(selector).TypeConverterOption.BooleanValues(true, true, Constants.YesStrings);
+                Map(selector).TypeConverterOption.BooleanValues(true, true, Consts.YesStrings);
                 Map(selector).TypeConverterOption.BooleanValues(false, true, noStrings);
             }
         }

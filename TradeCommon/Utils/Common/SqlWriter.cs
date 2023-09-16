@@ -45,7 +45,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                      string tableName,
                      string databasePath,
                      string databaseName,
-                     char placeholderPrefix = Constants.SqlCommandPlaceholderPrefix)
+                     char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
     {
         tableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
         databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
@@ -56,7 +56,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         _placeholderPrefix = placeholderPrefix;
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        _uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()!.FieldNames ?? Array.Empty<string>();
+        _uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()?.FieldNames ?? Array.Empty<string>();
         _targetFieldNames = _properties.Select(pair => pair.Key).ToList();
         _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => _placeholderPrefix + fn);
 
@@ -147,14 +147,21 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
                     continue;
 
                 var placeholder = _targetFieldNamePlaceHolders[name];
-                var value = _valueGetter.Get((T)(object)entry, name);
+                var (value, valueType) = _valueGetter.GetTypeAndValue((T)(object)entry, name);
                 value = TryAutoIncrement(name, out var a) ? a : value;
                 value ??= DBNull.Value;
                 // by default treat enum value as upper string
-                if (value.GetType().IsEnum)
+                if (valueType.IsEnum)
                     command.Parameters.AddWithValue(placeholder, value.ToString()!.ToUpperInvariant());
+                else if (!valueType.IsSqlNativeType() && !ReflectionUtils.GetDatabaseIgnoredPropertyNames<T1>().Contains(name))
+                {
+                    var text = Json.Serialize(value);
+                    command.Parameters.AddWithValue(placeholder, text);
+                }
                 else
+                {
                     command.Parameters.AddWithValue(placeholder, value);
+                }
             }
             count++;
             result = await command.ExecuteNonQueryAsync();

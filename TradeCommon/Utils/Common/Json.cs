@@ -8,7 +8,12 @@ public static class Json
         return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(obj));
     }
 
-    public static async Task<T?> Deserialize<T>(string content)
+    public static string Serialize<T>(T obj)
+    {
+        return JsonSerializer.Serialize<T>(obj);
+    }
+
+    public static T? Deserialize<T>(string content)
     {
         return JsonSerializer.Deserialize<T>(content);
     }

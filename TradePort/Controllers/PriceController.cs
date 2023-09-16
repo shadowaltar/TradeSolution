@@ -320,7 +320,7 @@ public class PriceController : Controller
             .OrderBy(i => i.Ex).ThenBy(i => i.Code).ThenBy(i => i.I).ThenBy(i => i.T)
             .ToList();
 
-        var dataFilePath = Path.Join(Path.GetTempPath(), $"AllPrices_{intervalStr}_{start.ToString(Constants.DefaultDateFormat)}_{exchange}.json");
+        var dataFilePath = Path.Join(Path.GetTempPath(), $"AllPrices_{intervalStr}_{start.ToString(Consts.DefaultDateFormat)}_{exchange}.json");
 
         try
         {

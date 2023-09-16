@@ -22,7 +22,7 @@ public class JsonPriceReader
     {
         var results = new Dictionary<(string, string, string), (int, int)>();
         var content = await File.ReadAllTextAsync(json);
-        var p = await Json.Deserialize<List<ExtendedOhlcPrice>>(content);
+        var p = Json.Deserialize<List<ExtendedOhlcPrice>>(content);
         var priceGroups = p.GroupBy(p => (p.Code, p.Ex, p.I));
         foreach (var group in priceGroups)
         {

@@ -25,6 +25,9 @@ public enum DataType
     Balance,
     User,
     AccountLedgerRecord,
+    
+    AlgoEntry,
+    ServiceTelemetry,
 }
 
 public class DataTypeConverter

@@ -23,7 +23,7 @@ namespace TradeLogicCore.Instruments;
 /// </summary>
 public class StockScreener : IStockScreener
 {
-    private static readonly ILog _log = Common.Logger.New();
+    private static readonly ILog _log = Logger.New();
 
     private readonly ISecurityService _securityService;
 

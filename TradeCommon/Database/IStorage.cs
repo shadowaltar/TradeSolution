@@ -1,5 +1,4 @@
 ﻿using System.Data;
-using System.Reflection;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -28,6 +27,7 @@ public interface IStorage
     Task CreateUserTable();
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
     Task Insert(IPersistenceTask task, bool isUpsert = true);
+    Task<int> Insert<T>(IPersistenceTask task, bool isUpsert = true) where T : new();
     Task<int> InsertAccount(Account account, bool isUpsert);
     Task<int> InsertBalance(Balance balance, bool isUpsert);
     Task<int> InsertOrder(Order order, bool isUpsert = true);
@@ -63,10 +63,11 @@ public interface IStorage
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
-    (string table, string? schema, string database) GetStorageNames<T>();
     void PurgeDatabase();
 
     string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert);
 
     string CreateDropTableAndIndexSql<T>();
+
+    Task<(string table, string database)> CreateTable<T>();
 }

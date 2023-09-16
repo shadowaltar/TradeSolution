@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Parameters;

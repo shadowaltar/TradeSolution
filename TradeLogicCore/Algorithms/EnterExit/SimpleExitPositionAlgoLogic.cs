@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;

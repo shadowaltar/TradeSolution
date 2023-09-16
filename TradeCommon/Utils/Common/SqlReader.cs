@@ -1,14 +1,13 @@
 ﻿using Common;
+using Common.Attributes;
 using log4net;
-using log4net.Util;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
-using Common.Attributes;
-using static TradeCommon.Constants.Constants;
+using TradeCommon.Constants;
 
 namespace Common;
 
@@ -305,7 +304,7 @@ public static class SqlReader
 
     private static string? GetConnectionString(string databaseName)
     {
-        return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
+        return $"Data Source={Path.Combine(Consts.DatabaseFolder, databaseName)}.db";
     }
 
     private static async Task<SqliteConnection> Connect(string database)

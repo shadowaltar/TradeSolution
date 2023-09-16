@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms.Sizing;

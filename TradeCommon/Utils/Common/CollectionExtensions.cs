@@ -213,34 +213,47 @@ public static class CollectionExtensions
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
 
-    public static Tv? ThreadSafeGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key) where T : notnull
+    public static Tv? ThreadSafeGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        lock (dictionary)
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
         {
             return dictionary!.GetOrDefault(key);
         }
     }
 
-    public static bool ThreadSafeTryGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, out Tv y) where T : notnull
+    public static bool ThreadSafeRemove<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        lock (dictionary)
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
+        {
+            return dictionary!.Remove(key);
+        }
+    }
+
+    public static bool ThreadSafeTryGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
         {
             var r = dictionary.TryGetValue(key, out y);
             return r;
         }
     }
 
-    public static void ThreadSafeSet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, Tv y) where T : notnull
+    public static void ThreadSafeSet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, Tv y, object? @lock = null) where T : notnull
     {
-        lock (dictionary)
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
         {
             dictionary[key] = y;
         }
     }
 
-    public static List<Tv> ThreadSafeValues<T, Tv>(this Dictionary<T, Tv> dictionary) where T : notnull
+    public static List<Tv> ThreadSafeValues<T, Tv>(this Dictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
-        lock (dictionary)
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
         {
             return dictionary.Values.ToList();
         }

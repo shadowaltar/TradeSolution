@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
@@ -16,15 +17,14 @@ public class PortfolioService : IPortfolioService, IDisposable
     private static readonly ILog _log = Logger.New();
     private readonly IdGenerator _orderIdGenerator;
     private readonly IdGenerator _positionIdGenerator;
-    private readonly IExternalExecutionManagement _execution;
     private readonly Context _context;
+    private readonly IExternalExecutionManagement _execution;
     private readonly IStorage _storage;
     private readonly IOrderService _orderService;
     private readonly ITradeService _tradeService;
     private readonly ISecurityDefinitionProvider _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, long> _orderToPositionIds = new();
-    private readonly Dictionary<long, Position> _openPositions = new();
     private readonly Dictionary<long, Position> _closedPositions = new();
     private readonly object _lock = new();
 
@@ -67,25 +67,16 @@ public class PortfolioService : IPortfolioService, IDisposable
                 return;
         }
 
-        bool positionExists = false;
-        Position? position;
-        lock (_lock)
-        {
-            positionExists = _openPositions.TryGetValue(positionId, out position);
-        }
-
+        var position = Portfolio.Positions.ThreadSafeGet(positionId, _lock);
         // either create a new position, or merge the trade into it
-        if (positionExists && position != null)
+        if (position != null)
         {
             Merge(position, trade);
 
             if (position.IsClosed)
             {
-                lock (_lock)
-                {
-                    _openPositions.Remove(positionId);
-                    _closedPositions[positionId] = position;
-                }
+                Portfolio.Positions.ThreadSafeRemove(positionId, _lock);
+                _closedPositions.ThreadSafeSet(positionId, position, _lock);
                 PositionClosed?.Invoke(position);
             }
             else
@@ -114,22 +105,14 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public List<Position> GetOpenPositions()
     {
-        List<Position> results;
-        lock (_lock)
-        {
-            results = _openPositions.Values.OrderBy(p => p.StartTime).ToList();
-        }
+        var results = Portfolio.Positions.ThreadSafeValues(_lock);
+        results.Sort((r1, r2) => r1.StartTime.CompareTo(r2.StartTime));
         return results;
     }
 
     public List<Position> GetClosedPositions()
     {
-        List<Position> results;
-        lock (_lock)
-        {
-            results = _closedPositions.Values.ToList();
-        }
-        return results;
+        return _closedPositions.ThreadSafeValues(_lock);
     }
 
     public List<Balance> GetCurrentBalances()
@@ -176,9 +159,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public async Task Initialize()
     {
-        var account = _context.Account
-            ?? throw new InvalidOperationException("Must login an account before initializing portfolio");
-
+        var account = _context.Account ?? throw Exceptions.MustLogin();
         await _execution.Subscribe();
 
         // must be two different instances
@@ -207,6 +188,42 @@ public class PortfolioService : IPortfolioService, IDisposable
         };
         position.Trades.Add(trade);
         return position;
+    }
+
+    public Order CreateCloseOrder(Position position)
+    {
+        if (position.SecurityCode.IsBlank()) throw Exceptions.InvalidPosition(position.Id, "missing security code");
+        return new Order
+        {
+            Id = _orderIdGenerator.NewTimeBasedId,
+            SecurityCode = position.SecurityCode,
+            CreateTime = DateTime.UtcNow,
+            UpdateTime = DateTime.UtcNow,
+            Quantity = position.Quantity,
+            Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
+            Type = OrderType.Market,
+            Status = OrderStatus.Submitting,
+        };
+    }
+
+    public void CloseAllPositions()
+    {
+        // if it is non-fx, create orders to expunge the long/short positions
+        var positions = Portfolio.Positions.ThreadSafeValues(_lock);
+        foreach (var position in positions)
+        {
+            var order = CreateCloseOrder(position);
+            _orderService.SendOrder(order);
+        }
+        // if it is fx (non-crypto), sell all non-basic assets
+        positions = Portfolio.AssetPositions.ThreadSafeValues(_lock);
+        foreach (var position in positions)
+        {
+            if (Consts.BasicAssetCodes.Contains(position.SecurityCode))
+                continue;
+            var order = CreateCloseOrder(position);
+            _orderService.SendOrder(order);
+        }
     }
 
     /// <summary>

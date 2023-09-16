@@ -1,14 +1,20 @@
-﻿using TradeCommon.Essentials;
+﻿using Common;
+using Common.Attributes;
+using System.Reflection;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 
 public static class DatabaseNames
 {
+    public const string DatabaseSuffix = "_data";
+
     public const string StaticData = "static_data";
     public const string MarketData = "market_data";
     public const string ExecutionData = "execution_data";
@@ -45,6 +51,8 @@ public static class DatabaseNames
 
     public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
     public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
+
+    private static Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
 
     public static string GetDatabaseName<T>()
     {
@@ -184,5 +192,23 @@ public static class DatabaseNames
             SecurityType.Fx => FxTradeToOrderToPositionIdTable,
             _ => throw new NotImplementedException()
         };
+    }
+
+    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>()
+    {
+        var type = typeof(T);
+        if (_tableDatabaseNamesByType.TryGetValue(type, out var tuple))
+        {
+            return tuple;
+        }
+        var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
+        var table = storageAttr.TableName;
+        var schema = storageAttr.SchemaName ?? "";
+        var database = storageAttr.DatabaseName;
+        if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
+        if (!schema.IsBlank())
+            table = $"{table}.{schema}";
+        _tableDatabaseNamesByType[type] = tuple = (table, database + DatabaseNames.DatabaseSuffix);
+        return tuple;
     }
 }

@@ -14,16 +14,16 @@ public class User
     [AutoIncrementOnInsert]
     public int Id { get; set; } = -1;
 
-    [Length(MinLength = 3, MaxLength = 100)]
+    [NotNull, Length(MinLength = 3, MaxLength = 100)]
     public string Name { get; set; } = "";
 
-    [Length(MinLength = 5, MaxLength = 100), AlwaysLowerCase]
+    [NotNull, Length(MinLength = 5, MaxLength = 100), AlwaysLowerCase]
     public string Email { get; set; } = "";
 
-    [NotUnknown, NotNull]
+    [NotNull, NotUnknown]
     public string Environment { get; set; } = Environments.Unknown;
 
-    [Length(MaxLength = 512), NotNull]
+    [NotNull, Length(MaxLength = 512)]
     public string EncryptedPassword { get; set; } = "";
 
     [NotNull]

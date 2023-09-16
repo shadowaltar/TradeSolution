@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
@@ -8,6 +9,8 @@ namespace TradeLogicCore.Algorithms;
 
 public interface IAlgorithm
 {
+    int Id { get; }
+    int VersionId { get; }
     IEnterPositionAlgoLogic Entering { get; }
     IExitPositionAlgoLogic Exiting { get; }
     ISecurityScreeningAlgoLogic Screening { get; }
@@ -16,8 +19,6 @@ public interface IAlgorithm
 
 public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables
 {
-    IAlgorithmEngine<T> Engine { get; }
-
     T CalculateVariables(decimal price, AlgoEntry<T>? last);
 
     bool IsOpenLongSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }

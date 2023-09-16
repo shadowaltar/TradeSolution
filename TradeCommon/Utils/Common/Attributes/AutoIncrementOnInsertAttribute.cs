@@ -6,7 +6,7 @@
 /// this value will not be auto-incremented.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
-public class AutoIncrementOnInsertAttribute : DatabaseIgnoreAttribute
+public class AutoIncrementOnInsertAttribute : DatabaseIgnoreAttribute, IStorageRelatedAttribute
 {
     public AutoIncrementOnInsertAttribute() : base(true, true, false)
     {

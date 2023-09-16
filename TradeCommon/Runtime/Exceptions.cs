@@ -86,4 +86,9 @@ public static class Exceptions
     {
         return new InvalidOperationException("Must specify proper storage info");
     }
+
+    public static Exception InvalidPosition(long positionId, string message)
+    {
+        return new InvalidOperationException($"The position (id: {positionId}) is invalid: {message}.");
+    }
 }

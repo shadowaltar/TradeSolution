@@ -97,4 +97,17 @@ public interface IPortfolioService
     Task<Balance?> Deposit(int accountId, int assetId, decimal quantity);
 
     Task<Balance?> Withdraw(int assetId, decimal quantity);
+
+    /// <summary>
+    /// Create an opposite side order from a known position.
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    Order CreateCloseOrder(Position position);
+    
+    /// <summary>
+    /// Traverse through current position and non-basic assets,
+    /// create corresponding opposite side orders and send.
+    /// </summary>
+    void CloseAllPositions();
 }

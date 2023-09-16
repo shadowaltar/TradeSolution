@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Common.Attributes;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class LengthAttribute : ValidationAttribute
+public class LengthAttribute : ValidationAttribute, IStorageRelatedAttribute
 {
     public int MinLength { get; set; }
     public int MaxLength { get; set; }

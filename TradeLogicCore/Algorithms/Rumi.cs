@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Calculations;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
@@ -16,9 +17,10 @@ public class Rumi : IAlgorithm<RumiVariables>
     private readonly SimpleMovingAverage _fastMa;
     private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
-    private readonly Context _context;
 
-    public IAlgorithmEngine<RumiVariables> Engine { get; set; }
+    public int Id => 2;
+
+    public int VersionId => 20230801;
 
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
@@ -32,8 +34,6 @@ public class Rumi : IAlgorithm<RumiVariables>
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
     {
-        _context = context;
-
         Sizing = new SimplePositionSizing();
         Screening = new SimpleSecurityScreeningAlgoLogic();
         Entering = new SimpleEnterPositionAlgoLogic(context);
@@ -105,5 +105,4 @@ public record RumiVariables : IAlgorithmVariables
     public decimal Slow { get; set; } = decimal.MinValue;
     public decimal Rumi { get; set; } = decimal.MinValue;
     public decimal LastRumi { get; set; } = decimal.MinValue;
-    public string Type => "RUMI";
 }

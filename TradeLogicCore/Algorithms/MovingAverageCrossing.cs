@@ -1,7 +1,9 @@
 ﻿using Common;
+using Common.Attributes;
 using log4net;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
@@ -20,8 +22,8 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     private readonly SimpleMovingAverage _slowMa;
     private readonly Context _context;
 
-    public IAlgorithmEngine<MacVariables> Engine { get; }
-
+    public int Id => 1;
+    public int VersionId => 20230916;
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
     public decimal StopLossRatio { get; } = 0.02m;
@@ -214,6 +216,4 @@ public record MacVariables : IAlgorithmVariables
     /// -1 the other way round. 0 means no crossing after the flag is reset.
     /// </summary>
     public int FastXSlow { get; set; } = 0;
-
-    public string Type => "MovingAverageCrossing";
 }

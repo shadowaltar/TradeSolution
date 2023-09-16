@@ -178,7 +178,7 @@ public class OrderService : IOrderService, IDisposable
             Side = side,
             Status = OrderStatus.Placing,
             StopPrice = 0,
-            StrategyId = Constants.ManualTradingStrategyId,
+            StrategyId = Consts.ManualTradingStrategyId,
             TimeInForce = timeInForce,
         };
     }

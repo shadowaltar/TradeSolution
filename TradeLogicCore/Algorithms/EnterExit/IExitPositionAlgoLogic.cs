@@ -1,4 +1,5 @@
-﻿using TradeLogicCore.Algorithms.FeeCalculation;
+﻿using TradeCommon.Essentials.Algorithms;
+using TradeLogicCore.Algorithms.FeeCalculation;
 
 namespace TradeLogicCore.Algorithms.EnterExit;
 public interface IExitPositionAlgoLogic

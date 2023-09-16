@@ -22,7 +22,12 @@ public static class ReflectionUtils
     /// <summary>
     /// Cache of types which the key is its type name (not fully qualified name).
     /// </summary>
-    private static readonly Dictionary<string, Type?> _nameOnlyTypeToTypes = new();
+    private static readonly Dictionary<string, Type?> _typesByTypeName = new();
+
+    /// <summary>
+    /// Cache of types which the key is its super type.
+    /// </summary>
+    private static readonly Dictionary<Type, List<Type>> _typesBySuperType = new();
 
     /// <summary>
     /// Cache of property info for a given type. Property info are keyed by its name.
@@ -33,10 +38,26 @@ public static class ReflectionUtils
     /// Cache of meta info for a given type. See <see cref="ReflectionMetaInfo{T}"/> for details.
     /// </summary>
     private static readonly Dictionary<Type, object> _typeToMetaInfo = new();
+
     /// <summary>
     /// Cache of attribute meta info for a given type. See <see cref="AttributeMetaInfo"/> for details.
     /// </summary>
     private static readonly Dictionary<Type, AttributeMetaInfo> _typeToAttributeInfo = new();
+
+    public static bool IsRecord(this Type type)
+    {
+        return type.GetMethods().Any(m => m.Name == "<Clone>$");
+    }
+
+    public static bool IsSuperOf<TSub>(this Type type)
+    {
+        return type.IsAssignableFrom(typeof(TSub));
+    }
+
+    public static bool IsSuperOf(this Type type, Type subType)
+    {
+        return type.IsAssignableFrom(subType);
+    }
 
     public static void SetPropertyValue(this object target, Type type, string propertyName, object? value)
     {
@@ -172,7 +193,7 @@ public static class ReflectionUtils
             }
             if (!_typeToAttributeInfo.TryGetValue(t, out var a))
             {
-                a = new AttributeMetaInfo();
+                a = InitializeAttributeMetaInfo(t);
                 _typeToAttributeInfo[t] = a;
             }
 
@@ -208,16 +229,18 @@ public static class ReflectionUtils
     }
 
     /// <summary>
-    /// Super-simplified type name to type mapping. It will only generate the first appearance of type
-    /// if multiple ones have the same name but different namespaces.
+    /// Search a type by its name from all loaded assemblies.
+    /// It will only get the first appearance if same name types exists under different namespaces.
+    /// Optionally you can specify a <paramref name="namespaceHint"/> to find the type from there only;
+    /// or specify a super type of the desired types to limit the search results.
     /// </summary>
     /// <param name="typeName"></param>
     /// <returns></returns>
-    public static Type? SearchType(string? typeName, string namespaceHint = "")
+    public static Type? SearchType(string typeName, string namespaceHint = "", Type? superTypeHint = null)
     {
         if (typeName.IsBlank()) throw new ArgumentNullException(nameof(typeName));
 
-        if (_nameOnlyTypeToTypes.TryGetValue(typeName, out var result))
+        if (_typesByTypeName.TryGetValue(typeName, out var result))
             return result;
 
         foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
@@ -225,18 +248,43 @@ public static class ReflectionUtils
             foreach (Type t in a.GetTypes())
             {
                 if (!namespaceHint.IsBlank() && t.Namespace != namespaceHint)
-                {
                     continue;
-                }
+                if (superTypeHint != null && !superTypeHint.IsAssignableFrom(t))
+                    continue;
+
                 if (t.Name == typeName)
                 {
-                    _nameOnlyTypeToTypes[typeName] = t;
+                    _typesByTypeName[typeName] = t;
                     return t;
                 }
             }
         }
-        _nameOnlyTypeToTypes[typeName] = null;
+        _typesByTypeName[typeName] = null;
         return null;
+    }
+
+    public static List<Type> SearchType(Type superType, string namespaceHint = "")
+    {
+        if (superType == null) throw new ArgumentNullException(nameof(superType));
+
+        if (_typesBySuperType.TryGetValue(superType, out var results))
+            return results;
+
+        foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            foreach (Type t in a.GetTypes())
+            {
+                if (!namespaceHint.IsBlank() && t.Namespace != namespaceHint)
+                    continue;
+
+                if (superType.IsAssignableFrom(t))
+                {
+                    var subTypes = _typesBySuperType.GetOrCreate(superType);
+                    subTypes.Add(t);
+                }
+            }
+        }
+        return _typesBySuperType.GetOrCreate(superType);
     }
 
     /// <summary>
@@ -251,11 +299,38 @@ public static class ReflectionUtils
         {
             return results;
         }
-        // exclude the static and non-public getter
-        results = type.GetProperties(flags).Where(p => !(p.GetGetMethod()?.IsStatic ?? false))
-            .ToDictionary(p => p.Name, p => p);
+
+        // get a list of inherited classes, from base to sub
+        var typeChain = type.GetBaseTypeChain().ToList();
+        typeChain.Reverse();
+        typeChain.Add(type);
+
+        results = new Dictionary<string, PropertyInfo>();
+        foreach (var t in typeChain)
+        {
+            // only in current class (no super), exclude the static and non-public getter
+            var properties = t.GetProperties(flags | BindingFlags.DeclaredOnly)
+                .Where(p => !(p.GetGetMethod()?.IsStatic ?? false));
+            foreach (var p in properties)
+            {
+                results[p.Name] = p;
+            }
+        }
         _typeToPropertyInfoMap[type] = results;
         return results;
+    }
+
+    public static IEnumerable<Type> GetBaseTypeChain(this Type type)
+    {
+        var t = type;
+        while (true)
+        {
+            var baseClass = t.BaseType;
+            if (baseClass?.Name is "Object" or null)
+                yield break;
+            yield return baseClass;
+            t = baseClass;
+        }
     }
 
     public static List<(string name, PropertyInfo property, int index)> GetOrderedPropertyAndName(Type type, BindingFlags flags = BindingFlags.Instance | BindingFlags.Public)
@@ -263,6 +338,29 @@ public static class ReflectionUtils
         return type.GetProperties(flags)
             .Where(p => !(p.GetGetMethod()?.IsStatic ?? false))
             .Select((p, i) => (p.Name, p, i)).ToList();
+    }
+
+    public static IReadOnlySet<string> GetDatabaseIgnoredPropertyNames<T>()
+    {
+        var t = typeof(T);
+        if (!_typeToAttributeInfo.TryGetValue(t, out var attrInfo))
+        {
+            attrInfo = InitializeAttributeMetaInfo(t);
+            _typeToAttributeInfo[t] = attrInfo;
+        }
+        return attrInfo.DatabaseIgnoredPropertyNames;
+    }
+
+    private static AttributeMetaInfo InitializeAttributeMetaInfo(Type t)
+    {
+        var attrInfo = new AttributeMetaInfo();
+        foreach (var (name, property) in GetPropertyToName(t))
+        {
+            var ignoreAttr = property.GetCustomAttribute<DatabaseIgnoreAttribute>();
+            if (ignoreAttr != null)
+                attrInfo.DatabaseIgnoredPropertyNames.Add(name);
+        }
+        return attrInfo;
     }
 }
 
@@ -297,7 +395,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is ValidationAttribute va)
                 {
-                    var attrs = attrInfo.ValidationProperties.GetOrCreate(property.Name);
+                    var attrs = attrInfo.Validations.GetOrCreate(property.Name);
                     attrs.Add(va);
                 }
             }
@@ -306,7 +404,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
                 var attr = property.GetCustomAttribute(attribute);
                 if (attr is AutoCorrectAttribute aa)
                 {
-                    attrInfo.AutoCorrectProperties[property.Name] = aa;
+                    attrInfo.AutoCorrections[property.Name] = aa;
                 }
             }
 
@@ -366,7 +464,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         violatedRule = "";
         invalidPropertyName = "";
-        foreach (var (propertyName, attributes) in _attributeInfo.ValidationProperties)
+        foreach (var (propertyName, attributes) in _attributeInfo.Validations)
         {
             var value = Get(entry, propertyName);
             foreach (var attr in attributes)
@@ -396,7 +494,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         message = "";
         var value = Get(entry, propertyName);
-        if (_attributeInfo.ValidationProperties.TryGetValue(propertyName, out var validationAttributes))
+        if (_attributeInfo.Validations.TryGetValue(propertyName, out var validationAttributes))
         {
             foreach (var attr in validationAttributes)
             {
@@ -422,7 +520,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     public bool IsWithAutoCorrect(T entry, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
     {
         originalValue = null;
-        if (_attributeInfo.AutoCorrectProperties.TryGetValue(propertyName, out attribute))
+        if (_attributeInfo.AutoCorrections.TryGetValue(propertyName, out attribute))
         {
             originalValue = Get(entry, propertyName);
             return true;

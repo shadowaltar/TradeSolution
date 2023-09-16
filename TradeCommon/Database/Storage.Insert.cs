@@ -13,7 +13,7 @@ namespace TradeCommon.Database;
 
 public partial class Storage
 {
-    private readonly string DatabaseFolder = Constants.Constants.DatabaseFolder;
+    private readonly string DatabaseFolder = Consts.DatabaseFolder;
 
     public async Task Insert(IPersistenceTask task, bool isUpsert = true)
     {
@@ -83,6 +83,42 @@ public partial class Storage
         {
             throw new InvalidOperationException($"Persistence task type {task.GetType().Name} is not supported.");
         }
+    }
+
+    public async Task<int> Insert<T>(IPersistenceTask task, bool isUpsert = true) where T : new()
+    {
+        if (task is PersistenceTask<T> pt)
+        {
+            if (pt.Entry != null)
+            {
+                var count = await InsertOne<T>(pt.Entry, isUpsert);
+                _log.Info($"Persisted {count} entry into database: {typeof(T).Name}");
+                return count;
+            }
+            else if (!pt.Entries.IsNullOrEmpty())
+            {
+                var count = 0;
+                foreach (var entry in pt.Entries)
+                {
+                    count += await InsertOne<T>(entry, isUpsert);
+                }
+                _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
+                return count;
+            }
+        }
+        throw new InvalidOperationException("Impossible case.");
+    }
+
+    public async Task<int> InsertOne<T>(T entry, bool isUpsert) where T : new()
+    {
+        var type = typeof(T);
+        var (tableName, database) = DatabaseNames.GetTableAndDatabaseName<T>();
+        if (!_writers.TryGetValue(type.Name, out var writer))
+        {
+            writer = new SqlWriter<T>(this, tableName, DatabaseFolder, database);
+            _writers[type.Name] = writer;
+        }
+        return await writer.InsertOne(entry, isUpsert);
     }
 
     public async Task UpsertStockDefinitions(List<Security> entries)
@@ -330,10 +366,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public async Task<int> InsertUser(User user)
     {
         var tableName = DatabaseNames.UserTable;
-        if (!_writers.TryGetValue(DataType.User, out var writer))
+        if (!_writers.TryGetValue(DataType.User.ToString(), out var writer))
         {
             writer = new SqlWriter<User>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
-            _writers[DataType.User] = writer;
+            _writers[DataType.User.ToString()] = writer;
         }
         return await writer.InsertOne(user, false);
     }
@@ -341,10 +377,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public async Task<int> InsertAccount(Account account, bool isUpsert)
     {
         var tableName = DatabaseNames.AccountTable;
-        if (!_writers.TryGetValue(DataType.Account, out var writer))
+        if (!_writers.TryGetValue(DataType.Account.ToString(), out var writer))
         {
             writer = new SqlWriter<Account>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
-            _writers[DataType.Account] = writer;
+            _writers[DataType.Account.ToString()] = writer;
         }
         return await writer.InsertOne(account, isUpsert);
     }
@@ -352,10 +388,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public async Task<int> InsertBalance(Balance balance, bool isUpsert)
     {
         var tableName = DatabaseNames.BalanceTable;
-        if (!_writers.TryGetValue(DataType.Balance, out var writer))
+        if (!_writers.TryGetValue(DataType.Balance.ToString(), out var writer))
         {
             writer = new SqlWriter<Balance>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
-            _writers[DataType.Balance] = writer;
+            _writers[DataType.Balance.ToString()] = writer;
         }
         return await writer.InsertOne(balance, isUpsert);
     }
@@ -365,10 +401,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         var security = GetSecurity(order.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetOrderTableName(security.Type);
-        if (!_writers.TryGetValue(DataType.Order, out var writer))
+        if (!_writers.TryGetValue(DataType.Order.ToString(), out var writer))
         {
             writer = new SqlWriter<Order>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-            _writers[DataType.Order] = writer;
+            _writers[DataType.Order.ToString()] = writer;
         }
         return await writer.InsertOne(order, isUpsert);
     }
@@ -378,10 +414,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         var security = GetSecurity(trade.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetTradeTableName(security.Type);
-        if (!_writers.TryGetValue(DataType.Trade, out var writer))
+        if (!_writers.TryGetValue(DataType.Trade.ToString(), out var writer))
         {
             writer = new SqlWriter<Trade>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-            _writers[DataType.Trade] = writer;
+            _writers[DataType.Trade.ToString()] = writer;
         }
         return await writer.InsertOne(trade, isUpsert);
     }
@@ -391,10 +427,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         var security = GetSecurity(position.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetPositionTableName(security.Type);
-        if (!_writers.TryGetValue(DataType.Position, out var writer))
+        if (!_writers.TryGetValue(DataType.Position.ToString(), out var writer))
         {
             writer = new SqlWriter<Position>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-            _writers[DataType.Position] = writer;
+            _writers[DataType.Position.ToString()] = writer;
         }
         return await writer.InsertOne(position, isUpsert);
     }
@@ -402,10 +438,10 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
     public async Task InsertOpenOrderId(OpenOrderId openOrderId)
     {
         var tableName = DatabaseNames.OpenOrderIdTable;
-        if (!_writers.TryGetValue(DataType.OpenOrderId, out var writer))
+        if (!_writers.TryGetValue(DataType.OpenOrderId.ToString(), out var writer))
         {
             writer = new SqlWriter<OpenOrderId>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-            _writers[DataType.OpenOrderId] = writer;
+            _writers[DataType.OpenOrderId.ToString()] = writer;
         }
         await writer.InsertOne(openOrderId, false);
     }

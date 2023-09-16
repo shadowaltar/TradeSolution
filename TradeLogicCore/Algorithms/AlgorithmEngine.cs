@@ -3,6 +3,7 @@ using log4net;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
@@ -104,6 +105,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     public bool ShouldCloseOpenPositionsWhenStopped { get; protected set; }
 
     public AlgoStopTimeType WhenToStopOrHalt { get; protected set; }
+
+    public int AlgoVersionId { get; private set; }
+
+    public int AlgoBatchId { get; private set; }
 
     public AlgorithmEngine(Context context)
     {
@@ -210,22 +215,15 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         SetAlgoEffectiveTimeRange(parameters.TimeRange);
 
         // prepare algo entry related info
-        var versionId = DateTime.UtcNow.Date.ToDateNumber();
-        var batchId = Context.Storage.GetMax(nameof(AlgoEntry.BatchId), Context.Storage.GetStorageNames<A> )
+        AlgoVersionId = DateTime.UtcNow.Date.ToDateNumber();
+        var (table, database) = DatabaseNames.GetTableAndDatabaseName<AlgoEntry>();
+        AlgoBatchId = Convert.ToInt32(await Context.Storage.GetMax(nameof(AlgoEntry.BatchId), table, database));
 
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
 
         _log.Info("Algorithm Engine execution ends, processed " + TotalPriceEventCount);
         return TotalPriceEventCount;
-    }
-
-    public void ScheduleMaintenance(DateTime haltTime, DateTime resumeTime)
-    {
-        if (haltTime.IsValid())
-            DesignatedHaltTime = haltTime;
-        if (resumeTime.IsValid())
-            DesignatedResumeTime = resumeTime;
     }
 
     public async Task Stop()
@@ -323,9 +321,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var price = ohlcPrice.C;
 
         var entryPositionId = lastEntry?.PositionId ?? _positionIdGen.NewTimeBasedId;
-        var entry = new AlgoEntry<T>(security)
+        var entry = new AlgoEntry<T>
         {
+            AlgoId = Algorithm.Id,
+            VersionId = Algorithm.VersionId,
+            BatchId = AlgoBatchId,
             SecurityId = securityId,
+            Security = security,
             PositionId = entryPositionId,
             Time = ohlcPrice.T,
             Variables = Algorithm.CalculateVariables(price, lastEntry),
@@ -469,27 +471,27 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
                     }
                     return false;
                 case AlgoStartTimeType.NextStartOfLocalDay:
-                {
-                    _runningState = AlgoRunningState.Stopped;
-                    var localNow = DateTime.Now;
-                    if (start > localNow)
                     {
-                        var stopTime = DesignatedStopTime;
-                        if (stopTime != null)
-                            stopTime = stopTime.Value.ToLocalTime();
-                        var r = CanStart(start, stopTime, localNow);
-                        if (r)
+                        _runningState = AlgoRunningState.Stopped;
+                        var localNow = DateTime.Now;
+                        if (start > localNow)
                         {
-                            _runningState = AlgoRunningState.Running;
-                            return true;
+                            var stopTime = DesignatedStopTime;
+                            if (stopTime != null)
+                                stopTime = stopTime.Value.ToLocalTime();
+                            var r = CanStart(start, stopTime, localNow);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                return true;
+                            }
                         }
+                        else
+                        {
+                            _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
+                        }
+                        return false;
                     }
-                    else
-                    {
-                        _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
-                    }
-                    return false;
-                }
                 case AlgoStartTimeType.NextMarketOpens:
                     // TODO, need market meta data
                     return false;
@@ -946,7 +948,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         foreach (var security in securities)
         {
             Services.Order.CancelAllOpenOrders(security);
-            Services.Trade.CloseAllPositions(security);
         }
+        Services.Portfolio.CloseAllPositions();
     }
 }

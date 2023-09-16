@@ -1,16 +1,17 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
+using System;
 using System.Diagnostics;
-using System.Net.Http;
 using System.Text;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -60,6 +61,23 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+        var ae = new AlgoEntry<MacVariables>()
+        {
+            AlgoId = 100,
+            VersionId = 9,
+            BatchId = 100,
+            Price = 10000m,
+            Time = DateTime.UtcNow,
+            Variables = new MacVariables { Fast = 10001, Slow = 9999, FastXSlow = -1, PriceXFast = -1, PriceXSlow = 1 },
+            Elapsed = TimeSpans.OneHour,
+            SecurityId = 101,
+            Security = new Security { Id = 101, Code = "Dummy" },
+            LongSignal = SignalType.Open,
+            ShortCloseType = CloseType.None,
+        };
+        var s = new Storage();
+        await s.Insert<AlgoEntry<MacVariables>>(new PersistenceTask<AlgoEntry<MacVariables>>(ae));
+
         await RunMacMimicWebService();
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
@@ -89,7 +107,7 @@ public class Program
         var stopLoss = 0.0005m;
         var takeProfit = 0.0005m;
         _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";
-        _fakeSecretFilePath = Path.Combine(Constants.DatabaseFolder, $"{Environments.ToString(environment)}_{userName}_{accountName}");
+        _fakeSecretFilePath = Path.Combine(Consts.DatabaseFolder, $"{Environments.ToString(environment)}_{userName}_{accountName}");
 
         Dependencies.Register(ExternalNames.Convert(exchange), exchange, environment);
 
@@ -141,23 +159,23 @@ public class Program
             {
                 case ResultCode.GetSecretFailed:
                 case ResultCode.SecretMalformed:
-                {
-                    File.Delete(_fakeSecretFilePath);
-                    File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                    break;
-                }
+                    {
+                        File.Delete(_fakeSecretFilePath);
+                        File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
+                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                        break;
+                    }
                 case ResultCode.GetAccountFailed:
-                {
-                    var account = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                    break;
-                }
+                    {
+                        var account = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                        break;
+                    }
                 case ResultCode.AccountHasNoAsset:
-                {
-                    var balance = await services.Portfolio.Deposit(security.CurrencyAsset.Id, 1000m);
-                    break;
-                }
+                    {
+                        var balance = await services.Portfolio.Deposit(security.CurrencyAsset.Id, 1000m);
+                        break;
+                    }
             }
         }
         return result;

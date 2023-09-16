@@ -85,7 +85,9 @@ public static class TypeConverter
             || type == typeof(decimal?)
             || type == typeof(double?))
             return "REAL";
-        if (type == typeof(string))
+        if (type == typeof(string)
+            || type == typeof(char)
+            || type == typeof(char?))
             return "VARCHAR";
 
         if (type == typeof(DateTime)

@@ -154,4 +154,37 @@ public static class SqlExtensions
         }
         return false;
     }
+
+    public static bool IsSqlNativeType(this Type type)
+    {
+        if (type == typeof(int)
+            || type == typeof(long)
+            || type == typeof(int?)
+            || type == typeof(long?))
+            return true;
+
+        if (type == typeof(decimal)
+            || type == typeof(double)
+            || type == typeof(decimal?)
+            || type == typeof(double?))
+            return true;
+        if (type == typeof(string)
+            || type == typeof(char)
+            || type == typeof(char?))
+            return true;
+
+        if (type == typeof(DateTime)
+            || type == typeof(TimeSpan)
+            || type == typeof(DateTime?)
+            || type == typeof(TimeSpan?))
+            return true;
+
+        if (type == typeof(bool) || type == typeof(bool?))
+            return true;
+
+        if (type.IsEnum)
+            return true;
+
+        return false;
+    }
 }

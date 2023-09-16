@@ -183,7 +183,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
                             var exDate = contentObj.GetLocalFromUnixMs("date");
                             if (payableDate == default || numerator == default || denominator == default || exDate == default)
                             {
-                                _log.Warn($"Invalid stock split entry. Payable:{payableDate.ToString(Constants.DefaultDateFormat)},Ex:{exDate.ToString(Constants.DefaultDateFormat)},N/D:{numerator}/{denominator}");
+                                _log.Warn($"Invalid stock split entry. Payable:{payableDate.ToString(Consts.DefaultDateFormat)},Ex:{exDate.ToString(Consts.DefaultDateFormat)},N/D:{numerator}/{denominator}");
                                 continue;
                             }
 
@@ -298,7 +298,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
             if (missingDataTimes.Count > 0)
             {
                 _log.Warn("Data entries with below start times are ignored as they don't have valid price elements: "
-                    + string.Join(',', missingDataTimes.Select(t => t.ToString(Constants.DefaultDateTimeFormat))));
+                    + string.Join(',', missingDataTimes.Select(t => t.ToString(Consts.DefaultDateTimeFormat))));
             }
 
             return new PricesAndCorporateActions(prices, corporateActions);

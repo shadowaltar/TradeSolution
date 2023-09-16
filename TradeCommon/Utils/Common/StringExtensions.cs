@@ -59,7 +59,7 @@ public static class StringExtensions
         return false;
     }
 
-    public static DateTime ParseDate(this string? value, string? format = Constants.DefaultDateFormat, DateTime defaultValue = default)
+    public static DateTime ParseDate(this string? value, string? format = Consts.DefaultDateFormat, DateTime defaultValue = default)
     {
         return value.IsBlank()
             ? defaultValue
@@ -67,8 +67,8 @@ public static class StringExtensions
     }
 
     public static DateTime ParseDateOrTime(this string? value,
-                                           string? dateFormat = Constants.DefaultDateFormat,
-                                           string? timeFormat = Constants.DefaultDateTimeFormat,
+                                           string? dateFormat = Consts.DefaultDateFormat,
+                                           string? timeFormat = Consts.DefaultDateTimeFormat,
                                            DateTime defaultValue = default)
     {
         if (value.IsBlank())

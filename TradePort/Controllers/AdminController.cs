@@ -4,6 +4,7 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 using TradeDataCore.StaticData;
@@ -307,14 +308,14 @@ public class AdminController : Controller
     /// </summary>
     /// <param name="storage"></param>
     /// <param name="password"></param>
-    /// <param name="secTypeStr"></param>
-    /// <param name="tableTypeStr">Empty to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
+    /// <param name="secTypeStr">Only Order, Trade, Position and Price tables support security type.</param>
+    /// <param name="tableType">Unknown to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables-except-prices")]
     public async Task<ActionResult> RebuildOtherTables([FromServices] IStorage storage,
                                                        [FromForm(Name = "admin-password")] string password,
-                                                       [FromQuery(Name = "sec-type")] string? secTypeStr = null,
-                                                       [FromQuery(Name = "table-type")] string? tableTypeStr = null)
+                                                       [FromQuery(Name = "table-type")] DataType tableType,
+                                                       [FromQuery(Name = "sec-type")] string? secTypeStr = null)
     {
         if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
 
@@ -323,18 +324,18 @@ public class AdminController : Controller
             secType = SecurityTypeConverter.Parse(secTypeStr);
 
         Dictionary<string, bool>? results = null;
-        if (tableTypeStr != null)
+        if (tableType != DataType.Unknown)
         {
-            var dataType = DataTypeConverter.Parse(tableTypeStr);
-            results = await CreateTables(storage, dataType, secType);
+            results = await CreateTables(storage, tableType, secType);
         }
-        else if (tableTypeStr.IsBlank() && secTypeStr.IsBlank())
+        else if (tableType == DataType.Unknown && secTypeStr.IsBlank())
         {
             results = new();
             results.AddRange(await CreateTables(storage, DataType.User));
             results.AddRange(await CreateTables(storage, DataType.Account));
             results.AddRange(await CreateTables(storage, DataType.Balance));
             results.AddRange(await CreateTables(storage, DataType.FinancialStat));
+            results.AddRange(await CreateTables(storage, DataType.AlgoEntry));
             results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Fx));
             results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Equity));
             results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Fx));
@@ -343,7 +344,7 @@ public class AdminController : Controller
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
             results.AddRange(await CreateTables(storage, DataType.OpenOrderId));
         }
-        return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableTypeStr} or {secTypeStr} is wrong.") : Ok(results);
+        return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.") : Ok(results);
     }
 
     private async Task<Dictionary<string, bool>?> CreateTables(IStorage storage, DataType dataType, SecurityType secType = SecurityType.Unknown)
@@ -370,6 +371,10 @@ public class AdminController : Controller
             case DataType.OpenOrderId:
                 await storage.CreateOpenOrderIdTable();
                 resultTableNames.Add(DatabaseNames.OpenOrderIdTable);
+                break;
+            case DataType.AlgoEntry:
+                var (table, database) = await storage.CreateTable<AlgoEntry>();
+                resultTableNames.Add(table);
                 break;
         }
 
