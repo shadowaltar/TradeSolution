@@ -13,6 +13,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Reporting;
@@ -23,6 +24,7 @@ using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
@@ -61,22 +63,8 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var ae = new AlgoEntry<MacVariables>()
-        {
-            AlgoId = 100,
-            VersionId = 9,
-            BatchId = 100,
-            Price = 10000m,
-            Time = DateTime.UtcNow,
-            Variables = new MacVariables { Fast = 10001, Slow = 9999, FastXSlow = -1, PriceXFast = -1, PriceXSlow = 1 },
-            Elapsed = TimeSpans.OneHour,
-            SecurityId = 101,
-            Security = new Security { Id = 101, Code = "Dummy" },
-            LongSignal = SignalType.Open,
-            ShortCloseType = CloseType.None,
-        };
-        var s = new Storage();
-        await s.Insert<AlgoEntry<MacVariables>>(new PersistenceTask<AlgoEntry<MacVariables>>(ae));
+        //var storage = new Storage();
+        //var x = await storage.CreateTable<AlgoEntry>();
 
         await RunMacMimicWebService();
         //await NewOrderDemo();
@@ -111,22 +99,45 @@ public class Program
 
         Dependencies.Register(ExternalNames.Convert(exchange), exchange, environment);
 
-        var adminService = Dependencies.ComponentContext.Resolve<IAdminService>();
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var context = Dependencies.ComponentContext.Resolve<Context>();
+        var core = Dependencies.ComponentContext.Resolve<Core>();
 
         var broker = ExternalNames.Convert(exchange);
         services.Admin.Initialize(environment, exchange, broker);
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
-        //if (security == null) return BadRequest("Invalid or missing security.");
-
         var result = await Login(services, userName, password, email, accountName, accountType, context.Environment, security);
+        if (result != ResultCode.LoginUserAndAccountOk)
+            return;
 
-        var core = Dependencies.ComponentContext.Resolve<Core>();
 
-        AlgoEffectiveTimeRange algoTimeRange = null;
+        //var order = new Order
+        //{
+        //    AccountId = context.Account.Id,
+        //    SecurityCode = security.Code,
+        //    SecurityId = security.Id,
+        //    BrokerId = context.BrokerId,
+        //    CreateTime = DateTime.UtcNow,
+        //    ExchangeId = context.ExchangeId,
+        //    Quantity = 1m,
+        //    Side = Side.Sell,
+        //    Status = OrderStatus.Sending,
+        //    TimeInForce = TimeInForceType.GoodTillCancel,
+        //    Price = 0,
+        //    Type = OrderType.Market,
+        //};
+        //for (int i = 0; i < 10; i++)
+        //{
+        //    order.Id = IdGenerators.Get<Order>().NewTimeBasedId;
+        //    await services.Order.SendOrder(order);
+        //}
+        //Thread.Sleep(100000);
+        //return;
+
+
+        AlgoEffectiveTimeRange? algoTimeRange = null;
         switch (core.Environment)
         {
             case EnvironmentType.Test:
@@ -135,14 +146,21 @@ public class Program
             case EnvironmentType.Uat:
                 algoTimeRange = AlgoEffectiveTimeRange.ForPaperTrading(interval);
                 break;
+            default:
+                return;
         }
-        var parameters = new AlgoStartupParameters(false, adminService.CurrentUser.Name,
-            adminService.CurrentAccount.Name, core.Environment, core.Exchange, core.Broker, interval,
+        var parameters = new AlgoStartupParameters(false, context.User!.Name,
+            context.Account!.Name, core.Environment, core.Exchange, core.Broker, interval,
             new List<Security> { security }, algoTimeRange);
         _log.Info("Execute algorithm with parameters: " + parameters);
+
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
+        var sizing = new SimplePositionSizingLogic(PositionSizingMethod.Constant, fixedAmount: 1000);
         algorithm.Screening = screening;
+        algorithm.Sizing = sizing;
+
+        context.SetPreferredAssets("BUSD", "TUSD", "USDT");
         var guid = await core.StartAlgorithm(parameters, algorithm);
 
         Thread.Sleep(TimeSpan.FromMinutes(10));
@@ -312,7 +330,7 @@ public class Program
         await Task.Run(async () =>
         {
             await adminService.GetAccount(_testAccountName, _testEnvironment, false);
-            orderService.SendOrder(order);
+            await orderService.SendOrder(order);
         });
 
         while (true)
@@ -333,7 +351,7 @@ public class Program
             orderService.CancelOrder(order.Id);
         }
 
-        static void OnNewTradesReceived(Trade[] trades)
+        static void OnNewTradesReceived(List<Trade> trades)
         {
             foreach (var trade in trades)
             {

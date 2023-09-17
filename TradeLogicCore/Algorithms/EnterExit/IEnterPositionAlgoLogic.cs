@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Sizing;
 
@@ -10,13 +11,13 @@ public interface IEnterPositionAlgoLogic
 
     ITransactionFeeLogic? FeeLogic { get; set; }
 
-    List<Order> Open(AlgoEntry current,
-                     AlgoEntry? last,
-                     decimal enterPrice,
-                     Side side,
-                     DateTime enterTime,
-                     decimal stopLossPrice,
-                     decimal takeProfitPrice);
+    Task<List<ExternalQueryState>> Open(AlgoEntry current,
+                                        AlgoEntry? last,
+                                        decimal enterPrice,
+                                        Side side,
+                                        DateTime enterTime,
+                                        decimal stopLossPrice,
+                                        decimal takeProfitPrice);
 
     void BackTestOpen(AlgoEntry current,
                       AlgoEntry? last,

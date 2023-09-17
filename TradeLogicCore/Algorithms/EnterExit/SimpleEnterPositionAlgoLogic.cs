@@ -38,13 +38,13 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         _context = context;
     }
 
-    public List<Order> Open(AlgoEntry current,
-                            AlgoEntry last,
-                            decimal enterPrice,
-                            Side side,
-                            DateTime enterTime,
-                            decimal stopLossPrice,
-                            decimal takeProfitPrice)
+    public async Task<List<ExternalQueryState>> Open(AlgoEntry current,
+                                                     AlgoEntry? last,
+                                                     decimal enterPrice,
+                                                     Side side,
+                                                     DateTime enterTime,
+                                                     decimal stopLossPrice,
+                                                     decimal takeProfitPrice)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
@@ -53,7 +53,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
         var now = DateTime.UtcNow;
 
-        var orders = new List<Order>();
+        var states = new List<ExternalQueryState>();
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
@@ -71,8 +71,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             Status = OrderStatus.New,
             TimeInForce = TimeInForceType.GoodTillCancel,
         };
-        _orderService.SendOrder(order);
-        orders.Add(order);
+        var state = await _orderService.SendOrder(order);
+        states.Add(state);
 
         if (stopLossPrice.IsValid())
         {
@@ -99,8 +99,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     Quantity = size,
                     SecurityCode = current.Security.Code,
                 };
-                _orderService.SendOrder(slOrder);
-                orders.Add(slOrder);
+                state = await _orderService.SendOrder(slOrder);
+                states.Add(state);
             }
         }
 
@@ -129,15 +129,15 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     Quantity = size,
                     SecurityCode = current.Security.Code,
                 };
-                _orderService.SendOrder(tpOrder);
-                orders.Add(tpOrder);
+                state = await _orderService.SendOrder(tpOrder);
+                states.Add(state);
             }
         }
-        return orders;
+        return states;
     }
 
     public void BackTestOpen(AlgoEntry current,
-                             AlgoEntry last,
+                             AlgoEntry? last,
                              decimal enterPrice,
                              Side side,
                              DateTime enterTime,

@@ -26,7 +26,7 @@ public class TradeService : ITradeService, IDisposable
 
     public event Action<Trade>? NextTrade;
 
-    public event Action<Trade[]>? NextTrades;
+    public event Action<List<Trade>>? NextTrades;
 
     public TradeService(IExternalExecutionManagement execution,
                         Context context,
@@ -42,6 +42,8 @@ public class TradeService : ITradeService, IDisposable
         _persistence = persistence;
         _orderIdGenerator = IdGenerators.Get<Order>();
 
+        _execution.TradeReceived -= OnTradeReceived;
+        _execution.TradesReceived -= OnTradesReceived;
         _execution.TradeReceived += OnTradeReceived;
         _execution.TradesReceived += OnTradesReceived;
     }
@@ -68,7 +70,7 @@ public class TradeService : ITradeService, IDisposable
         Persist(trade);
     }
 
-    private void OnTradesReceived(Trade[] trades)
+    private void OnTradesReceived(List<Trade> trades)
     {
         foreach (var trade in trades)
         {
@@ -99,16 +101,22 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
-        var order = _orderService.GetOpenOrderByExternalId(trade.ExternalOrderId);
+        // order is always handled before trade
+        var order = _orderService.GetOrderByExternalId(trade.ExternalOrderId);
         if (order == null)
         {
             _log.Error("The associated order of a trade must exist.");
             return;
         }
 
+        // resolve fee asset id here
+        if (!trade.FeeAssetCode.IsBlank())
+        {
+            trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
+            trade.IsTemp = false;
+        }
         trade.SecurityId = order.SecurityId;
         trade.OrderId = order.Id;
-        trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
         _trades.ThreadSafeSet(trade.Id, trade);
     }
 
@@ -191,9 +199,9 @@ public class TradeService : ITradeService, IDisposable
                 Quantity = quantity,
                 Side = side,
                 Type = OrderType.Market,
-                Status = OrderStatus.Submitting,
+                Status = OrderStatus.Sending,
             };
-            _orderService.SendOrder(order);
+            await _orderService.SendOrder(order);
         }
     }
 

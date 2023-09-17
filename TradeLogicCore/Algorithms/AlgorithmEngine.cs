@@ -301,7 +301,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     /// </summary>
     /// <param name="securityId"></param>
     /// <param name="ohlcPrice"></param>
-    public void Update(int securityId, OhlcPrice ohlcPrice)
+    public async Task Update(int securityId, OhlcPrice ohlcPrice)
     {
         if (Algorithm == null || Parameters == null || Screening == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -364,8 +364,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         Assertion.ShallNever((entry.IsLong || entry.IsShort) && entry.StopLossPrice == 0);
 
         var lastOhlcPrice = _lastOhlcPricesBySecurityId[securityId];
-        TryLong(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
-        TryShort(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
+        await TryLong(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
+        await TryShort(ohlcPrice, security, entry, lastEntry, lastOhlcPrice);
 
         _log.Info(entry);
         lastEntry = entry;
@@ -376,10 +376,10 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         if (lastEntry != null && lastEntry.IsLong)
         {
             _log.Info("Close any opened entry at the end of back-testing.");
-            TryCloseLong(entry, security, ohlcPrice, _intervalType);
+            await TryCloseLong(entry, security, ohlcPrice, _intervalType);
             TryCloseShort(entry, security, ohlcPrice, _intervalType);
 
-            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
+            //Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
         }
 
         if (lastEntry != null && lastEntry.IsShort)
@@ -671,7 +671,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     /// <param name="entry"></param>
     /// <param name="lastEntry"></param>
     /// <param name="lastOhlcPrice"></param>
-    private void TryLong(OhlcPrice ohlcPrice, Security security, AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, OhlcPrice lastOhlcPrice)
+    private async Task TryLong(OhlcPrice ohlcPrice, Security security, AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, OhlcPrice lastOhlcPrice)
     {
         if (Algorithm == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -679,8 +679,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var toCloseLong = Algorithm.IsCloseLongSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
         entry.LongSignal = toLong ? SignalType.Open : toCloseLong ? SignalType.Close : SignalType.Hold;
 
-        TryOpenLong(entry, lastEntry, security, ohlcPrice, _intervalType);
-        TryCloseLong(entry, security, ohlcPrice, _intervalType);
+        await TryOpenLong(entry, lastEntry, security, ohlcPrice, _intervalType);
+        await TryCloseLong(entry, security, ohlcPrice, _intervalType);
     }
 
     /// <summary>
@@ -691,7 +691,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     /// <param name="entry"></param>
     /// <param name="lastEntry"></param>
     /// <param name="lastOhlcPrice"></param>
-    private void TryShort(OhlcPrice ohlcPrice, Security security, AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, OhlcPrice lastOhlcPrice)
+    private async Task TryShort(OhlcPrice ohlcPrice, Security security, AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, OhlcPrice lastOhlcPrice)
     {
         if (Algorithm == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -699,11 +699,11 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var toCloseShort = Algorithm.IsCloseShortSignal(entry, lastEntry, ohlcPrice, lastOhlcPrice);
         entry.ShortSignal = toShort ? SignalType.Open : toCloseShort ? SignalType.Close : SignalType.Hold;
 
-        TryOpenShort(entry, lastEntry, security, ohlcPrice, _intervalType);
-        TryCloseShort(entry, security, ohlcPrice, _intervalType);
+        await TryOpenShort(entry, lastEntry, security, ohlcPrice, _intervalType);
+        await TryCloseShort(entry, security, ohlcPrice, _intervalType);
     }
 
-    private bool TryOpenLong(AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
+    private async Task<bool> TryOpenLong(AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (Algorithm == null || EnterLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -719,7 +719,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             if (IsBackTesting)
             {
                 EnterLogic.BackTestOpen(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
-                Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
+                //Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
                 entry.PositionId = _positionIdGen.NewInt;
 
                 _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
@@ -728,7 +728,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             }
             else
             {
-                EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
+                await EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Buy, endTimeOfBar, sl, tp);
             }
 
             Algorithm.AfterLongOpened(entry);
@@ -737,7 +737,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         return false;
     }
 
-    private bool TryCloseLong(AlgoEntry<T> entry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
+    private async Task<bool> TryCloseLong(AlgoEntry<T> entry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -747,13 +747,17 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
             if (IsBackTesting)
             {
-                ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
-                Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
-
-                _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
-                _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-                _totalCurrentOpenPositions--;
+                ExitLogic.BackTestClose(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+                //Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
             }
+            else
+            {
+                await ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            }
+            _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
+            _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
+            _totalCurrentOpenPositions--;
+
 
             Algorithm.AfterLongClosed(entry);
             return true;
@@ -761,7 +765,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         return false;
     }
 
-    private bool TryOpenShort(AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
+    private async Task<bool> TryOpenShort(AlgoEntry<T> entry, AlgoEntry<T>? lastEntry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (Algorithm == null || EnterLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -775,7 +779,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             if (IsBackTesting)
             {
                 EnterLogic.BackTestOpen(entry, lastEntry, ohlcPrice.C, Side.Sell, endTimeOfBar, sl, tp);
-                Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
+                //Services.Portfolio.SpendAsset(entry.SecurityId, entry.Notional);
                 entry.PositionId = _positionIdGen.NewInt;
 
                 _openedEntriesBySecurityIds.GetOrCreate(security.Id)[entry.PositionId] = entry;
@@ -784,7 +788,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             }
             else
             {
-                EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Sell, endTimeOfBar, sl, tp);
+                await EnterLogic.Open(entry, lastEntry, ohlcPrice.C, Side.Sell, endTimeOfBar, sl, tp);
             }
             Algorithm.AfterShortOpened(entry);
             return true;
@@ -792,7 +796,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         return false;
     }
 
-    private bool TryCloseShort(AlgoEntry<T> entry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
+    private async Task<bool> TryCloseShort(AlgoEntry<T> entry, Security security, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -800,8 +804,11 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         {
             Algorithm.BeforeClosingShort(entry);
 
-            ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
-            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
+            if (IsBackTesting)
+                ExitLogic.BackTestClose(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            else
+                await ExitLogic.Close(entry, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+            //Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
@@ -823,7 +830,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
             // assuming always stopped loss at the stopLossPrice
             ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
-            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
+            //Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
@@ -845,7 +852,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
             // assuming always stopped loss at the stopLossPrice
             ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
-            Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
+            //Services.Portfolio.Realize(entry.SecurityId, entry.RealizedPnl);
 
             _openedEntriesBySecurityIds.GetValueOrDefault(security.Id)?.Remove(entry.PositionId);
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);

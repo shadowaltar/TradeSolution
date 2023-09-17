@@ -25,6 +25,12 @@ public interface IStorage
     Task CreateSecurityTable(SecurityType type);
     Task<List<string>> CreateTradeTable(SecurityType securityType);
     Task CreateUserTable();
+
+    string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null);
+
+    string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null);
+
+    Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null);
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
     Task Insert(IPersistenceTask task, bool isUpsert = true);
     Task<int> Insert<T>(IPersistenceTask task, bool isUpsert = true) where T : new();
@@ -64,10 +70,4 @@ public interface IStorage
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
     void PurgeDatabase();
-
-    string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert);
-
-    string CreateDropTableAndIndexSql<T>();
-
-    Task<(string table, string database)> CreateTable<T>();
 }

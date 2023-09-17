@@ -49,9 +49,11 @@ public static class NumericExtensions
 
     public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
-    public static bool IsValid(this decimal value) => value != decimal.MaxValue && value != decimal.MinValue;
+    public static bool IsValid(this decimal value) => value != decimal.MinValue && value != decimal.MaxValue;
 
-    public static bool IsValid(this long value) => value != long.MaxValue && value != long.MinValue;
+    public static bool IsValid(this decimal? value) => value != null && value != decimal.MinValue && value != decimal.MaxValue;
+
+    public static bool IsValid(this long value) => value != long.MinValue && value != long.MaxValue;
 
     public static bool ApproxEquals(this decimal value1, decimal value2)
     {

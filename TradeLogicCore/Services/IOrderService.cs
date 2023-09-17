@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Services;
 
@@ -73,21 +74,21 @@ public interface IOrderService
     /// Get all the orders in this execution session.
     /// </summary>
     /// <returns></returns>
-    List<Order> GetOrders();
+    List<Order> GetOrders(Security? security = null, bool requestExternal = false);
 
     /// <summary>
     /// Get an order from cache by its external id.
     /// </summary>
     /// <param name="externalOrderId"></param>
     /// <returns></returns>
-    Order? GetOpenOrderByExternalId(long externalOrderId);
+    Order? GetOrderByExternalId(long externalOrderId);
 
     /// <summary>
     /// Place an order without waiting for the result.
     /// </summary>
     /// <param name="order"></param>
     /// <param name="isFakeOrder"></param>
-    void SendOrder(Order order, bool isFakeOrder = false);
+    Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false);
 
     /// <summary>
     /// Cancel an order without waiting for the result.

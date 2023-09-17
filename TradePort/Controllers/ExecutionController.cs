@@ -1,5 +1,7 @@
 ﻿using Autofac;
+using Common;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -23,6 +25,14 @@ namespace TradePort.Controllers;
 [Route("execution")]
 public class ExecutionController : Controller
 {
+    private readonly ISecurityService _securityService;
+
+    public ExecutionController(ISecurityService securityService)
+    {
+        _securityService = securityService;
+    }
+
+
     /// <summary>
     /// Manually send an order.
     /// </summary>
@@ -30,11 +40,10 @@ public class ExecutionController : Controller
     /// <param name="orderService"></param>
     /// <param name="adminService"></param>
     /// <param name="portfolioService"></param>
+    /// <param name="context"></param>
     /// <param name="password">Required.</param>
     /// <param name="exchange"></param>
     /// <param name="environment"></param>
-    /// <param name="exchangeStr">Exchange name.</param>
-    /// <param name="envStr"></param>
     /// <param name="accountName">Account name.</param>
     /// <param name="secTypeStr">Security type.</param>
     /// <param name="symbol">Symbol of security.</param>
@@ -45,15 +54,16 @@ public class ExecutionController : Controller
     /// <param name="stopLoss">Stop loss price of order. Must be > 0.</param>
     /// <param name="isFakeOrder">Send a fake order if true.</param>
     /// <returns></returns>
-    [HttpPost("{exchange}/accounts/{account}/order")]
+    [HttpPost("{exchange}/accounts/{account}/orders/send")]
     public async Task<ActionResult> SendOrder([FromServices] ISecurityService securityService,
                                               [FromServices] IOrderService orderService,
                                               [FromServices] IAdminService adminService,
                                               [FromServices] IPortfolioService portfolioService,
+                                              [FromServices] Context context,
                                               [FromForm] string password,
                                               [FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-                                              [FromRoute(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
-                                              [FromRoute(Name = "account")] string accountName = "0",
+                                              [FromRoute(Name = "account")] string accountName = "",
+                                              [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
                                               [FromQuery(Name = "side")] Side side = Side.None,
@@ -74,11 +84,19 @@ public class ExecutionController : Controller
 
         var security = await securityService.GetSecurity(symbol, exchange, secType);
         if (security == null) return BadRequest("Cannot find security.");
-        if (orderType is not OrderType.Limit or OrderType.Market or OrderType.StopLimit or OrderType.Stop)
-            return BadRequest("Currently only supports limit, market, stop limit or stop market orders.");
+
+        var supportedOrderType = new List<OrderType> { OrderType.Limit, OrderType.Market, OrderType.StopLimit, OrderType.Stop, OrderType.TakeProfit, OrderType.TakeProfitLimit };
+        if (!supportedOrderType.Contains(orderType))
+            return BadRequest("Currently only supports normal/stop/take-profit limit/market market orders.");
+
         if (price == 0 && orderType != OrderType.Market)
             return BadRequest("Only market order can have zero price.");
 
+        if (accountName.IsBlank() && context.Account == null)
+        {
+            return BadRequest("Either provide an account name, or login first.");
+        }
+        accountName = accountName.IsBlank() ? context.Account!.Name : accountName;
         var account = await adminService.GetAccount(accountName, environment);
         if (account == null) return BadRequest("Invalid or missing account.");
 
@@ -88,8 +106,48 @@ public class ExecutionController : Controller
             return BadRequest("Invalid order price or quantity.");
 
         // as a manual order, no need to go through algorithm position sizing rules
-        orderService.SendOrder(order, isFakeOrder);
+        await orderService.SendOrder(order, isFakeOrder);
         return Ok(order);
+    }
+
+    /// <summary>
+    /// Query all orders of a symbol.
+    /// </summary>
+    /// <param name="securityService"></param>
+    /// <param name="orderService"></param>
+    /// <param name="context"></param>
+    /// <param name="password"></param>
+    /// <param name="accountName"></param>
+    /// <param name="exchange"></param>
+    /// <param name="environment"></param>
+    /// <param name="secTypeStr"></param>
+    /// <param name="symbol"></param>
+    /// <returns></returns>
+    [HttpPost("{exchange}/accounts/{account}/orders/query")]
+    public async Task<ActionResult> GetAllOrders([FromServices] ISecurityService securityService,
+                                                 [FromServices] IOrderService orderService,
+                                                 [FromServices] Context context,
+                                                 [FromForm(Name = "admin-password")] string password,
+                                                 [FromRoute(Name = "account")] string accountName = "",
+                                                 [FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+                                                 [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+                                                 [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
+                                                 [FromQuery(Name = "symbol")] string symbol = "BTCTUSD")
+    {
+        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
+        if (ControllerValidator.IsUnknown(environment, out br)) return br;
+        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
+
+        var security = await securityService.GetSecurity(symbol, exchange, secType);
+        if (security == null) return BadRequest("Cannot find security.");
+        if (context.Account == null)
+        {
+            return BadRequest("Must login first.");
+        }
+
+        var orders = await orderService.GetOrderHistory(DateTime.MinValue, DateTime.UtcNow, security, true);
+        return Ok(orders);
     }
 
     /// <summary>

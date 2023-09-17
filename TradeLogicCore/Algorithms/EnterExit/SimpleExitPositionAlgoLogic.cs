@@ -52,15 +52,16 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public void Close(AlgoEntry current, decimal exitPrice, DateTime exitTime)
+    public async Task<ExternalQueryState> Close(AlgoEntry current, decimal exitPrice, DateTime exitTime)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         var position = _portfolioService.GetPosition(current.SecurityId);
         if (position == null)
         {
-            _log.Error($"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.");
-            return;
+            var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.";
+            _log.Error(message);
+            return ExternalQueryStates.InvalidPosition(message);
         }
         var order = new Order
         {
@@ -73,12 +74,12 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             ExchangeId = _context.ExchangeId,
             Quantity = position.Quantity,
             Side = Side.Sell,
-            Status = OrderStatus.Submitting,
+            Status = OrderStatus.Sending,
             TimeInForce = TimeInForceType.GoodTillCancel,
             Price = exitPrice,
             Type = OrderType.Limit,
         };
-        _orderService.SendOrder(order);
+        return await _orderService.SendOrder(order);
     }
 
     public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)

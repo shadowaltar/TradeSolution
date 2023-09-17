@@ -10,6 +10,7 @@ namespace TradeCommon.Essentials.Accounts;
 /// Account represents a record of entries under a user
 /// on either client or broker/exchange side.
 /// </summary>
+[Storage("accounts", "static")]
 [Unique(nameof(Name), nameof(Environment))]
 public class Account
 {

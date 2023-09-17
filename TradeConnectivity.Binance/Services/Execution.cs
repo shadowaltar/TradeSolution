@@ -134,52 +134,69 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             return ExternalQueryStates.Error(ActionType.SendOrder, ResultCode.SendOrderFailed, content, connId, errorMessage);
         }
         // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
-        Parse(jsonNode, order, out var fills); // will change the order status accordingly
+        var trades = new List<Trade>();
+        Parse(jsonNode, order, trades); // will change the order status accordingly
 
         var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
 
         // raise events
         OrderPlaced?.Invoke(order.IsSuccessful, state);
-        if (!fills.IsNullOrEmpty())
-            TradesReceived?.Invoke(fills);
+        if (!trades.IsNullOrEmpty())
+            TradesReceived?.Invoke(trades);
 
         return state;
 
-        static void Parse(JsonNode json, Order order, out Trade[]? fills)
+        void Parse(JsonObject json, Order order, List<Trade> trades)
         {
-            fills = null;
+            if (json.Count == 0)
+                return;
 
             var code = json.GetInt("code");
             if (code is < 0 and not int.MinValue)
                 return;
-            order.ExternalOrderId = json.GetLong("externalOrderId");
+            order.ExternalOrderId = json.GetLong("orderId");
             order.Status = OrderStatusConverter.ParseBinance(json.GetString("status"));
             order.ExternalCreateTime = json.GetUtcFromUnixMs("transactTime"); // TODO not sure if workingTime is useful or not
             order.FilledQuantity = json.GetDecimal("executedQty");
-
+            order.ExternalUpdateTime = json.GetUtcFromUnixMs("workingTime");
+            order.Price = json.GetDecimal("price"); // need trades to get the price if type = MARKET
+            order.UpdateTime = DateUtils.Max(order.ExternalCreateTime, order.ExternalUpdateTime);
             var fillsObj = json["fills"]?.AsArray();
             if (fillsObj != null && fillsObj.Count != 0)
             {
-                fills = new Trade[fillsObj.Count];
+                var averagePrice = 0m;
+                var tradedQuantity = 0m;
                 for (int i = 0; i < fillsObj.Count; i++)
                 {
                     JsonNode? item = fillsObj[i];
-                    fills[i] = new Trade
+                    if (item == null)
+                        continue;
+
+                    var trade = new Trade
                     {
+                        Id = _tradeIdGenerator.NewTimeBasedId,
+                        ExternalTradeId = item.GetLong("tradeId"),
+                        OrderId = order.Id,
+                        ExternalOrderId = order.ExternalOrderId,
                         SecurityId = order.SecurityId,
+                        SecurityCode = order.SecurityCode,
                         Price = item.GetDecimal("price"),
                         Quantity = item.GetDecimal("qty"),
                         Side = order.Side,
                         Fee = item.GetDecimal("commission"),
                         FeeAssetCode = item.GetString("commissionAsset"),
-                        // TODO externalTradeId should we do it in TradeService or here?
-                        ExternalTradeId = item.GetLong("externalTradeId"),
-                        OrderId = order.Id,
-                        ExternalOrderId = order.ExternalOrderId,
-
-                        IsOwnerUnknown = true,
+                        // FeeAssetId cannot be determined, until executing in service layer logic
+                        IsTemp = true,
+                        BrokerId = _context.BrokerId,
+                        Time = order.ExternalUpdateTime,
+                        ExchangeId = _context.ExchangeId,
                     };
+                    trades.Add(trade);
+                    averagePrice = (averagePrice * tradedQuantity + trade.Price * trade.Quantity) / (tradedQuantity + trade.Quantity);
+                    tradedQuantity += trade.Quantity;
                 }
+                order.Price = averagePrice;
+                order.FilledQuantity = tradedQuantity;
             }
         }
     }
@@ -297,7 +314,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         Time = time,
                         Side = side,
 
-                        IsOwnerUnknown = true,
+                        IsTemp = true,
                     };
                     trades.Add(trade);
                 }
@@ -513,15 +530,15 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         if (externalOrderId.IsValid())
         {
             parameters.Add(("orderId", externalOrderId.ToString()));
-            if (start != null)
+        }
+        if (start != null)
+        {
+            var startMs = start.Value.ToUnixMs();
+            parameters.Add(("startTime", startMs.ToString()));
+            if (end != null)
             {
-                var startMs = start.Value.ToUnixMs();
-                parameters.Add(("startTime", startMs.ToString()));
-                if (end != null)
-                {
-                    var endMs = end.Value.ToUnixMs();
-                    parameters.Add(("endTime", endMs.ToString()));
-                }
+                var endMs = end.Value.ToUnixMs();
+                parameters.Add(("endTime", endMs.ToString()));
             }
         }
         parameters.Add(("limit", "500"));
@@ -560,7 +577,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         // subscribe to the listen key in order to listen to order/trade/account changes
         Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={_listenKey}");
 
-        var webSocket = uri.Listen(ParseUserStreamingData);
+        var webSocket = uri.Listen(OnStreamingDataReceived);
         _webSockets[_listenKey] = webSocket;
 
         var message = $"Subscribed to user streaming data, listen-key: {_listenKey}";
@@ -687,7 +704,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// Parse user's streaming data.
     /// </summary>
     /// <param name="bytes"></param>
-    private void ParseUserStreamingData(byte[] bytes)
+    private void OnStreamingDataReceived(byte[] bytes)
     {
         string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
         try
@@ -704,51 +721,51 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             switch (messageType)
             {
                 case "outboundAccountPosition": // balance changes due to trading activities
-                {
-                    var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
-                    var balanceArray = jsonNode["B"]?.AsArray();
-                    if (balanceArray == null)
                     {
-                        _log.Warn($"Unknown user-streaming account balance data."); break;
+                        var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
+                        var balanceArray = jsonNode["B"]?.AsArray();
+                        if (balanceArray == null)
+                        {
+                            _log.Warn($"Unknown user-streaming account balance data."); break;
+                        }
+                        var balances = new List<Balance>();
+                        foreach (var balanceObject in balanceArray.OfType<JsonObject>())
+                        {
+                            var balance = new Balance
+                            {
+                                AssetCode = balanceObject.GetString("a"),
+                                FreeAmount = balanceObject.GetDecimal("f"),
+                                LockedAmount = balanceObject.GetDecimal("l"),
+                                IsTemp = true,
+                            };
+                            balances.Add(balance);
+                        }
+                        BalancesChanged?.Invoke(balances);
                     }
-                    var balances = new List<Balance>();
-                    foreach (var balanceObject in balanceArray.OfType<JsonObject>())
-                    {
-                        var balance = new Balance();
-                        var code = balanceObject.GetString("a");
-                        var free = balanceObject.GetDecimal("f");
-                        var locked = balanceObject.GetBoolean("l");
-                        balances.Add(balance);
-                    }
-                    BalancesChanged?.Invoke(balances);
-                }
-                break;
+                    break;
                 case "balanceUpdate": // balance changes due to deposit or withdrawal or fund transfer
-                {
-                    var code = jsonNode.GetString("a");
-                    var delta = jsonNode.GetDecimal("d");
-                    var clearanceTime = jsonNode.GetUtcFromUnixMs("T");
-                    var action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw;
-                    var transaction = new TransferAction
                     {
-                        Action = action,
-                        Quantity = Math.Abs(delta),
-                        AssetCode = code,
-                        RequestTime = eventTime,
-                        EffectiveTime = clearanceTime,
-                    };
-                    Transferred?.Invoke(transaction);
-                }
-                break;
+                        var delta = jsonNode.GetDecimal("d");
+                        var transaction = new TransferAction
+                        {
+                            Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
+                            Quantity = Math.Abs(delta),
+                            AssetCode = jsonNode.GetString("a"),
+                            RequestTime = eventTime,
+                            EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                        };
+                        Transferred?.Invoke(transaction);
+                    }
+                    break;
                 case "executionReport": // order
-                {
+
                     var sideString = jsonNode.GetString("S");
                     var orderTypeString = jsonNode.GetString("o");
 
                     var code = jsonNode.GetString("s");
                     var orderId = jsonNode.GetLong("c");
                     var side = sideString == "BUY" ? Side.Buy : sideString == "SELL" ? Side.Sell : Side.None;
-                    var orderType = Enum.TryParse<OrderType>(orderTypeString, out var ot) ? ot : OrderType.Unknown;
+                    var orderType = Enum.TryParse<OrderType>(orderTypeString, true, out var ot) ? ot : OrderType.Unknown;
                     var timeInForce = jsonNode.GetString("f").ConvertDescriptionToEnum<TimeInForceType>(TimeInForceType.Unknown);
                     var orderQuantity = jsonNode.GetDecimal("q");
                     var orderPrice = jsonNode.GetDecimal("p");
@@ -765,11 +782,11 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     var lastExecutedPrice = jsonNode.GetDecimal("L");
                     var fee = jsonNode.GetDecimal("n");
                     var feeAssetCode = jsonNode.GetString("N");
-                    var time = jsonNode.GetUtcFromUnixMs("T"); // transaction time
+                    var transactionTime = jsonNode.GetUtcFromUnixMs("T"); // transaction time
                     var externalTradeId = jsonNode.GetLong("t");
                     var isOnOrderBook = jsonNode.GetBoolean("w");
                     var isMakerOrder = jsonNode.GetBoolean("m");
-                    var createTime = jsonNode.GetLong("O");
+                    var createTime = jsonNode.GetUtcFromUnixMs("O"); // order creation time
                     var cumulativeQuoteAssetTransactedNotional = jsonNode.GetDecimal("Z"); // SUM(prx*qty)
                     var lastQuoteAssetTransactedNotional = jsonNode.GetDecimal("Y"); // SUM(lastPrx*lastQty)
                     var quoteOrderQuantity = jsonNode.GetDecimal("Q");
@@ -781,6 +798,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     var workingTime = jsonNode.GetUtcFromUnixMs("W"); // appears if the order is on order book
                     var isUsingSor = jsonNode.GetBoolean("uS");
 
+                    var updateTime = DateUtils.Max(transactionTime, workingTime);
+
                     var order = new Order
                     {
                         Id = orderId, // need to be filled later
@@ -788,10 +807,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         BrokerId = _brokerId,
                         ExchangeId = _exchangeId,
                         CreateTime = DateTime.MinValue, // need to be filled later
-                        ExternalCreateTime = DateTime.MinValue,
+                        ExternalCreateTime = createTime,
+                        ExternalUpdateTime = updateTime, // the transaction time which should also be order's update time
                         ExternalOrderId = externalOrderId,
-                        UpdateTime = time, // if no user changes, the update time should be the same as external update time
-                        ExternalUpdateTime = time, // the transaction time which should also be order's update time
+                        UpdateTime = DateTime.UtcNow, // if no user changes, the update time should be the same as external update time
                         FilledQuantity = cumulativeFilledQuantity,
                         Status = OrderStatusConverter.ParseBinance(status),
                         Type = orderType,
@@ -816,20 +835,21 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             ExternalOrderId = externalOrderId,
                             SecurityId = -1, // need to be filled later
                             SecurityCode = code,
+                            Side = side,
                             BrokerId = _brokerId,
                             ExchangeId = _exchangeId,
                             ExternalTradeId = externalTradeId,
                             Fee = fee,
                             FeeAssetCode = feeAssetCode,
                             FeeAssetId = -1, // need to be filled later
-                            IsOwnerUnknown = false,
+                            IsTemp = false,
                             BestMatch = 0,
                             OrderId = -1, // need to be filled later
                         };
                         TradeReceived?.Invoke(trade);
                     }
-                }
-                break;
+
+                    break;
                 default:
                     _log.Warn($"Unknown user-streaming data, type: {messageType}.");
                     break;

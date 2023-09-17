@@ -10,6 +10,10 @@ using Common.Attributes;
 using TradeCommon.Runtime;
 using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Constants;
+using System;
+using Utilities;
+using System.Windows.Input;
+using System.Data.Common;
 
 namespace Common;
 
@@ -56,7 +60,11 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         _placeholderPrefix = placeholderPrefix;
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        _uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()?.FieldNames ?? Array.Empty<string>();
+        // only the 'primary' (the 1st) unique attribute will be used as the members
+        // for UNIQUE() clause
+        // the other unique attributes are only for indexes
+        _uniqueKeyNames = typeof(T).GetCustomAttributes<UniqueAttribute>()
+            .FirstOrDefault()?.FieldNames ?? Array.Empty<string>();
         _targetFieldNames = _properties.Select(pair => pair.Key).ToList();
         _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => _placeholderPrefix + fn);
 
@@ -84,23 +92,16 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         try
         {
             command = connection.CreateCommand();
-            sql ??= GetInsertSql(isUpsert);
+            sql ??= GetInsertSql(isUpsert, _tableName);
             command.CommandText = sql;
-            foreach (var entry in entries)
+            foreach (object? entry in entries)
             {
                 if (entry == null)
                     continue;
 
                 command.Parameters.Clear();
-                foreach (var name in _targetFieldNames)
-                {
-                    var placeholder = _targetFieldNamePlaceHolders[name];
+                SetCommandParameters(command, (T)entry);
 
-                    var value = _valueGetter.Get((T)(object)entry, name);
-                    value = TryAutoIncrement(name, out var a) ? a : value;
-                    value ??= DBNull.Value;
-                    command.Parameters.AddWithValue(placeholder, value);
-                }
                 count++;
                 result += await command.ExecuteNonQueryAsync();
             }
@@ -121,6 +122,30 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         return result;
     }
 
+    private void SetCommandParameters(DbCommand command, T entry)
+    {
+        foreach (var name in _targetFieldNames)
+        {
+            var placeholder = _targetFieldNamePlaceHolders[name];
+
+            var (value, valueType) = _valueGetter.GetTypeAndValue(entry, name);
+            value = TryAutoIncrement(name, out var a) ? a : value;
+            value ??= DBNull.Value;
+            // always convert enum value as upper string
+            if (valueType.IsEnum)
+                command.Parameters.Add(new SqliteParameter(placeholder, value.ToString()!.ToUpperInvariant()));
+            else if (!valueType.IsSqlNativeType() && !ReflectionUtils.GetDatabaseIgnoredPropertyNames<T>().Contains(name))
+            {
+                var text = Json.Serialize(value);
+                command.Parameters.Add(new SqliteParameter(placeholder, text));
+            }
+            else
+            {
+                command.Parameters.Add(new SqliteParameter(placeholder, value));
+            }
+        }
+    }
+
     public async Task<int> UpsertOne<T1>(T1 entry, string? sql = null)
     {
         return await InsertOne<T1>(entry, true, sql);
@@ -130,54 +155,30 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
     {
         var result = 0;
         if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
+        if (entry == null)
+            return 0;
 
         using var connection = await Connect();
-        using var transaction = connection.BeginTransaction();
-        var count = 0;
         SqliteCommand? command = null;
         try
         {
             command = connection.CreateCommand();
-            sql ??= GetInsertSql(isUpsert);
+            sql ??= GetInsertSql(isUpsert, _tableName);
             command.CommandText = sql;
+            var e = (T)(object)entry;
 
-            foreach (var name in _targetFieldNames)
-            {
-                if (entry == null)
-                    continue;
-
-                var placeholder = _targetFieldNamePlaceHolders[name];
-                var (value, valueType) = _valueGetter.GetTypeAndValue((T)(object)entry, name);
-                value = TryAutoIncrement(name, out var a) ? a : value;
-                value ??= DBNull.Value;
-                // by default treat enum value as upper string
-                if (valueType.IsEnum)
-                    command.Parameters.AddWithValue(placeholder, value.ToString()!.ToUpperInvariant());
-                else if (!valueType.IsSqlNativeType() && !ReflectionUtils.GetDatabaseIgnoredPropertyNames<T1>().Contains(name))
-                {
-                    var text = Json.Serialize(value);
-                    command.Parameters.AddWithValue(placeholder, text);
-                }
-                else
-                {
-                    command.Parameters.AddWithValue(placeholder, value);
-                }
-            }
-            count++;
+            SetCommandParameters(command, e);
             result = await command.ExecuteNonQueryAsync();
 
             _log.Info($"Upserted 1 entry into {_tableName} table.");
-            transaction.Commit();
         }
         catch (Exception e)
         {
             _log.Error($"Failed to upsert into {_tableName} table.", e);
-            transaction.Rollback();
         }
         finally
         {
             command?.Dispose();
-            transaction.Dispose();
         }
 
         await connection.CloseAsync();
@@ -274,7 +275,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         return DeleteSql;
     }
 
-    private string GetInsertSql(bool isUpsert)
+    private string GetInsertSql(bool isUpsert, string? tableNameOverride = null)
     {
         if (_properties.IsNullOrEmpty())
             return "";
@@ -291,12 +292,12 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         if (isUpsert)
         {
-            UpsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert);
+            UpsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
             return UpsertSql;
         }
         else
         {
-            InsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert);
+            InsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
             return InsertSql;
         }
     }

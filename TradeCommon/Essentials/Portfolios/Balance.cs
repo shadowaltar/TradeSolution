@@ -10,7 +10,8 @@ namespace TradeCommon.Essentials.Portfolios;
 /// <summary>
 /// A balance entry in an account (one account may hold multiple balance entries).
 /// </summary>
-/// 
+
+[Storage("balances", "static")]
 [Unique(nameof(AssetId), nameof(AccountId))]
 public class Balance
 {
@@ -43,6 +44,12 @@ public class Balance
     public decimal SettlingAmount { get; set; }
 
     public DateTime UpdateTime { get; set; }
+
+    /// <summary>
+    /// Indicates this object is not complete and temporary.
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsTemp { get; set; }
 
     public override string ToString()
     {

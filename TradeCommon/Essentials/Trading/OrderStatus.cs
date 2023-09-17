@@ -19,7 +19,7 @@ public enum OrderStatus
     /// <summary>
     /// The order is to be placed and not acknowledged by broker yet.
     /// </summary>
-    Placing = 1,
+    Sending = 1,
     /// <summary>
     /// The order is to be modified and not acknowledged by broker yet.
     /// </summary>

@@ -1,6 +1,7 @@
 ﻿using Common;
 using TradeCommon.Constants;
 using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
 
 namespace TradeCommon.Essentials.Trading;
 
@@ -10,6 +11,9 @@ namespace TradeCommon.Essentials.Trading;
 /// One order object may result in zero or more trades immediately or in a period of time.
 /// </summary>
 [Unique(nameof(Id))]
+[Unique(nameof(ExternalTradeId))]
+[Index(nameof(SecurityId))]
+[Storage("trades", "execution")]
 public class Trade : IComparable<Trade>
 {
     public const long DefaultId = 0;
@@ -17,11 +21,13 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// Unique trade id.
     /// </summary>
+    [NotNull]
     public long Id { get; set; }
 
     /// <summary>
     /// Security id.
     /// </summary>
+    [NotNull]
     public int SecurityId { get; set; }
 
     /// <summary>
@@ -33,46 +39,55 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// The order id associated with this trade.
     /// </summary>
+    [NotNull]
     public long OrderId { get; set; }
 
     /// <summary>
     /// The trade id associated with this trade provided by the broker.
     /// </summary>
+    [NotNull]
     public long ExternalTradeId { get; set; } = DefaultId;
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// </summary>
+    [NotNull]
     public long ExternalOrderId { get; set; } = DefaultId;
 
     /// <summary>
     /// Trade execution time.
     /// </summary>
+    [NotNull]
     public DateTime Time { get; set; }
 
     /// <summary>
     /// Side of this trade.
     /// </summary>
+    [NotNull]
     public Side Side { get; set; }
 
     /// <summary>
     /// The execution price of this trade.
     /// </summary>
+    [NotNull]
     public decimal Price { get; set; }
 
     /// <summary>
     /// The executed quantity in this trade.
     /// </summary>
+    [NotNull]
     public decimal Quantity { get; set; }
 
     /// <summary>
     /// The fee incurred in this trade.
     /// </summary>
+    [NotNull]
     public decimal Fee { get; set; }
 
     /// <summary>
     /// The asset Id of the fee.
     /// </summary>
+    [NotNull]
     public int FeeAssetId { get; set; }
 
     /// <summary>
@@ -84,11 +99,13 @@ public class Trade : IComparable<Trade>
     /// <summary>
     /// The broker's ID.
     /// </summary>
+    [NotNull]
     public int BrokerId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
     /// The exchange's ID.
     /// </summary>
+    [NotNull]
     public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
@@ -98,7 +115,7 @@ public class Trade : IComparable<Trade>
     /// not related to current user.
     /// </summary>
     [DatabaseIgnore]
-    public bool IsOwnerUnknown { get; set; } = false;
+    public bool IsTemp { get; set; } = false;
 
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;

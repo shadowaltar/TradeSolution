@@ -1,13 +1,17 @@
-﻿using Common;
+﻿using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
-using Common.Attributes;
 
 namespace TradeCommon.Essentials.Trading;
 
 /// <summary>
 /// Action to buy or sell a security.
 /// </summary>
+[Storage("orders", "execution")]
 [Unique(nameof(Id))]
+[Index(nameof(SecurityId))]
+[Index(nameof(SecurityId), nameof(CreateTime))]
+[Index(nameof(ExternalOrderId))]
 public class Order : IComparable<Order>, ICloneable
 {
     public const long DefaultId = 0;
@@ -15,20 +19,20 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Unique order id.
     /// </summary>
-    [Positive]
+    [NotNull, Positive]
     public long Id { get; set; }
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// If this is a new order it should be null.
     /// </summary>
-    [Positive]
+    [NotNull, Positive]
     public long ExternalOrderId { get; set; } = DefaultId;
 
     /// <summary>
     /// The id of security to be or already being bought / sold.
     /// </summary>
-    [Positive]
+    [NotNull, Positive]
     public int SecurityId { get; set; }
 
     /// <summary>
@@ -40,17 +44,19 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// The target account. This embeds the broker info.
     /// </summary>
-    [Positive]
+    [NotNull, Positive]
     public int AccountId { get; set; }
 
     /// <summary>
     /// The type of order.
     /// </summary>
+    [NotNull]
     public OrderType Type { get; set; } = OrderType.Market;
 
     /// <summary>
     /// To buy / sell.
     /// </summary>
+    [NotNull]
     public Side Side { get; set; }
 
     /// <summary>
@@ -68,16 +74,19 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Quantity to be traded.
     /// </summary>
+    [NotNull]
     public decimal Quantity { get; set; } = 0;
 
     /// <summary>
     /// Currently filled quantity.
     /// </summary>
+    [NotNull]
     public decimal FilledQuantity { get; set; } = 0;
 
     /// <summary>
     /// Status of this order
     /// </summary>
+    [NotNull]
     public OrderStatus Status { get; set; } = OrderStatus.Unknown;
 
     /// <summary>
@@ -90,11 +99,13 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Order creation time (client-side).
     /// </summary>
+    [NotNull]
     public DateTime CreateTime { get; set; }
 
     /// <summary>
     /// Order update / cancel time (client-side).
     /// </summary>
+    [NotNull]
     public DateTime UpdateTime { get; set; }
 
     /// <summary>
@@ -112,6 +123,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// Indicates how the order will be cancelled or stay alive, like GTC / FOK etc.
     /// </summary>
+    [NotNull]
     public TimeInForceType TimeInForce { get; set; } = TimeInForceType.GoodTillCancel;
 
     /// <summary>
@@ -122,18 +134,20 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// The broker's ID.
     /// </summary>
+    [NotNull]
     public int BrokerId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
     /// The exchange's ID.
     /// </summary>
+    [NotNull]
     public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
 
     /// <summary>
     /// Any additional order parameters.
     /// </summary>
-    [DatabaseIgnore]
-    public AdvancedOrderSettings? AdvancedOrderSettings { get; set; }
+    [AsJson]
+    public AdvancedOrderSettings? AdvancedSettings { get; set; }
 
     /// <summary>
     /// Gets if the order is successfully placed (either it is still alive or filled).
@@ -143,9 +157,9 @@ public class Order : IComparable<Order>, ICloneable
 
     public object Clone()
     {
-        var advanced = AdvancedOrderSettings?.Clone();
+        var advanced = AdvancedSettings?.Clone();
         var order = (Order)MemberwiseClone();
-        order.AdvancedOrderSettings = (AdvancedOrderSettings?)advanced;
+        order.AdvancedSettings = (AdvancedOrderSettings?)advanced;
         return order;
     }
 
@@ -154,6 +168,7 @@ public class Order : IComparable<Order>, ICloneable
         var r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
         if (r != 0) r = SecurityId.CompareTo(other?.SecurityId);
         if (r != 0) r = AccountId.CompareTo(other?.AccountId);
+        if (r != 0) r = ParentOrderId.CompareTo(other?.ParentOrderId);
         if (r != 0) r = Type.CompareTo(other?.Type);
         if (r != 0) r = Side.CompareTo(other?.Side);
         if (r != 0) r = Price.CompareTo(other?.Price);
@@ -168,12 +183,12 @@ public class Order : IComparable<Order>, ICloneable
         if (r != 0) r = TimeInForce.CompareTo(other?.TimeInForce);
         if (r != 0) r = BrokerId.CompareTo(other?.BrokerId);
         if (r != 0) r = ExchangeId.CompareTo(other?.ExchangeId);
-        if (AdvancedOrderSettings != null)
+        if (AdvancedSettings != null)
         {
-            if (r != 0) r = AdvancedOrderSettings.TimeInForceTime.CompareTo(other?.AdvancedOrderSettings?.TimeInForceTime);
-            if (r != 0) r = AdvancedOrderSettings.TrailingSpread.CompareTo(other?.AdvancedOrderSettings?.TrailingSpread);
-            if (r != 0) r = AdvancedOrderSettings.TrailingType.CompareTo(other?.AdvancedOrderSettings?.TrailingType);
-            if (r != 0) r = AdvancedOrderSettings.TrailingValue.CompareTo(other?.AdvancedOrderSettings?.TrailingValue);
+            if (r != 0) r = AdvancedSettings.TimeInForceTime.CompareTo(other?.AdvancedSettings?.TimeInForceTime);
+            if (r != 0) r = AdvancedSettings.TrailingSpread.CompareTo(other?.AdvancedSettings?.TrailingSpread);
+            if (r != 0) r = AdvancedSettings.TrailingType.CompareTo(other?.AdvancedSettings?.TrailingType);
+            if (r != 0) r = AdvancedSettings.TrailingValue.CompareTo(other?.AdvancedSettings?.TrailingValue);
         }
         return r;
     }

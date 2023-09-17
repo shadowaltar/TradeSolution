@@ -100,14 +100,17 @@ public interface IPortfolioService
 
     /// <summary>
     /// Create an opposite side order from a known position.
+    /// Since the quote/currency asset may not be the same as before,
+    /// an overriding security can be provided.
     /// </summary>
     /// <param name="position"></param>
+    /// <param name="security"></param>
     /// <returns></returns>
-    Order CreateCloseOrder(Position position);
+    Order CreateCloseOrder(Position position, Security? security = null);
     
     /// <summary>
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    void CloseAllPositions();
+    Task CloseAllPositions();
 }

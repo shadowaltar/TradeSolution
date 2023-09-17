@@ -117,6 +117,7 @@ public enum ActionType
     GetAccount,
     GetTrade,
     GetOrder,
+    GetPosition,
 
     GetMisc,
     GetFrequencyRestriction,
@@ -185,6 +186,20 @@ public static class ExternalQueryStates
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetOrderFailed,
             UniqueConnectionId = responseConnectionId,
+            Description = errorMessage,
+        };
+    }
+
+    public static ExternalQueryState InvalidPosition(string errorMessage)
+    {
+        return new ExternalQueryState
+        {
+            Content = null,
+            ResponsePayload = null,
+            Action = ActionType.GetPosition,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.GetPositionFailed,
+            UniqueConnectionId = "",
             Description = errorMessage,
         };
     }

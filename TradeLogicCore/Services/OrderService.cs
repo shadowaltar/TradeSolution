@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.CodeAnalysis;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -21,7 +22,7 @@ public class OrderService : IOrderService, IDisposable
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Order> _orders = new();
     private readonly Dictionary<long, Order> _openOrders = new();
-    private readonly Dictionary<long, Order> _openOrdersByExternalId = new();
+    private readonly Dictionary<long, Order> _ordersByExternalId = new();
     private readonly Dictionary<long, Order> _cancelledOrders = new();
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
@@ -56,9 +57,13 @@ public class OrderService : IOrderService, IDisposable
 
     public Order? GetOrder(long orderId) => _orders.ThreadSafeGet(orderId);
 
-    public Order? GetOpenOrderByExternalId(long externalOrderId) => _openOrdersByExternalId.ThreadSafeGet(externalOrderId);
+    public Order? GetOrderByExternalId(long externalOrderId) => _ordersByExternalId.ThreadSafeGet(externalOrderId);
 
-    public List<Order> GetOrders() => _orders.ThreadSafeValues();
+    public List<Order> GetOrders(Security? security = null, bool requestExternal = false)
+    {
+        // TODO
+        return _orders.ThreadSafeValues();
+    }
 
     public async Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
     {
@@ -97,7 +102,7 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void SendOrder(Order order, bool isFakeOrder = false)
+    public async Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false)
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
@@ -108,20 +113,26 @@ public class OrderService : IOrderService, IDisposable
 
         if (isFakeOrder && _execution is ISupportFakeOrder fakeOrderEndPoint)
         {
-            fakeOrderEndPoint.SendFakeOrder(order);
+            return await fakeOrderEndPoint.SendFakeOrder(order);
         }
         else if (isFakeOrder)
         {
-            _log.Warn("The external end point does not support fake order. Order will not be sent: " + order);
-            return;
+            var message = "The external end point does not support fake order.";
+            _log.Warn(message + " Order will not be sent: " + order);
+            return ExternalQueryStates.InvalidOrder("", "", message);
         }
         else
         {
-            _execution.SendOrder(order);
-        }
+            // persistence probably happens twice: one is before send (status = Sending)
+            // the other is if order is accepted by external execution logic
+            // and its new status (like Live / Filled) piggy-backed in the response
+            Persist(order);
+            var state = await _execution.SendOrder(order);
+            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+            _log.Info("Sent a new order: " + order);
 
-        _log.Info("Sent a new order: " + order);
-        Persist(order);
+            return state;
+        }
     }
 
     public void CancelOrder(long orderId)
@@ -176,7 +187,7 @@ public class OrderService : IOrderService, IDisposable
             SecurityCode = security.Code,
             SecurityId = security.Id,
             Side = side,
-            Status = OrderStatus.Placing,
+            Status = OrderStatus.Sending,
             StopPrice = 0,
             StrategyId = Consts.ManualTradingStrategyId,
             TimeInForce = timeInForce,
@@ -212,7 +223,7 @@ public class OrderService : IOrderService, IDisposable
         if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
         {
             _openOrders.ThreadSafeSet(order.Id, order);
-            _openOrdersByExternalId.ThreadSafeSet(eoid, order);
+            _ordersByExternalId.ThreadSafeSet(eoid, order);
         }
 
         Persist(order);
@@ -233,8 +244,8 @@ public class OrderService : IOrderService, IDisposable
             return;
         }
 
-        lock (_lock)
-            _orders[order.Id] = order;
+        _orders.ThreadSafeSet(order.Id, order, _lock);
+        _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order, _lock);
 
         _log.Info("Sent order: " + order);
 

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Identity.Client;
 using System;
+using TradeCommon.Essentials.Portfolios;
 
 namespace TradeCommon.Runtime;
 
@@ -7,7 +8,12 @@ public static class Exceptions
 {
     public static InvalidOperationException InvalidSecurityId(int securityId)
     {
-        return new InvalidOperationException($"The security id {securityId} has no related security defined. Check your security definition.");
+        return new InvalidOperationException($"The security id {securityId} has no security defined. Check your security definition.");
+    }
+
+    public static InvalidOperationException InvalidSecurityCode(string code)
+    {
+        return new InvalidOperationException($"The security code {code} has no security defined. Check your security definition.");
     }
     
     public static InvalidOperationException MissingQuoteAsset(int securityId)
@@ -90,5 +96,10 @@ public static class Exceptions
     public static Exception InvalidPosition(long positionId, string message)
     {
         return new InvalidOperationException($"The position (id: {positionId}) is invalid: {message}.");
+    }
+
+    public static Exception MissingSecurity()
+    {
+        return new InvalidOperationException($"The security is missing.");
     }
 }

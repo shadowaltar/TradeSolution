@@ -190,39 +190,73 @@ public class PortfolioService : IPortfolioService, IDisposable
         return position;
     }
 
-    public Order CreateCloseOrder(Position position)
+    public Order CreateCloseOrder(Position position, Security? securityOverride = null)
     {
         if (position.SecurityCode.IsBlank()) throw Exceptions.InvalidPosition(position.Id, "missing security code");
+        if (_context.Account == null) throw Exceptions.MustLogin();
+
         return new Order
         {
             Id = _orderIdGenerator.NewTimeBasedId,
-            SecurityCode = position.SecurityCode,
+            SecurityId = securityOverride?.Id ?? position.SecurityId,
+            SecurityCode = securityOverride?.Code ?? position.SecurityCode,
             CreateTime = DateTime.UtcNow,
             UpdateTime = DateTime.UtcNow,
             Quantity = position.Quantity,
             Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
             Type = OrderType.Market,
-            Status = OrderStatus.Submitting,
+            TimeInForce = TimeInForceType.GoodTillCancel,
+            Status = OrderStatus.Sending,
+
+            AccountId = _context.Account.Id,
+            BrokerId = _context.BrokerId,
+            ExchangeId = _context.ExchangeId,
+            ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId, // this is a temp one, should be updated later
+            FilledQuantity = 0,
+            ExternalCreateTime = DateTime.MinValue,
+            ExternalUpdateTime = DateTime.MinValue,
+            ParentOrderId = 0,
+            Price = 0,
+            StopPrice = 0,
         };
     }
 
-    public void CloseAllPositions()
+    public async Task CloseAllPositions()
     {
         // if it is non-fx, create orders to expunge the long/short positions
         var positions = Portfolio.Positions.ThreadSafeValues(_lock);
         foreach (var position in positions)
         {
             var order = CreateCloseOrder(position);
-            _orderService.SendOrder(order);
+            await _orderService.SendOrder(order);
         }
+
         // if it is fx (non-crypto), sell all non-basic assets
         positions = Portfolio.AssetPositions.ThreadSafeValues(_lock);
         foreach (var position in positions)
         {
-            if (Consts.BasicAssetCodes.Contains(position.SecurityCode))
+            if (_context.PreferredAssetCodes.Contains(position.SecurityCode))
                 continue;
-            var order = CreateCloseOrder(position);
-            _orderService.SendOrder(order);
+
+            // cannot close an asset directly, need to pair it up with a quote asset
+            // eg. to close BTC position, with known preferred assets USDT and TUSD,
+            // will try to use BTCUSDT to close position, then BTCTUSD if BTCUSDT is not available
+            Security? security = null;
+            var codes = _context.PreferredAssetCodes.Select(c => position.SecurityCode + c).ToList();
+            foreach (var code in codes)
+            {
+                security = _securityService.GetSecurity(code);
+                if (security != null) break;
+            }
+
+            if (security != null)
+            {
+                var order = CreateCloseOrder(position, security);
+                await _orderService.SendOrder(order);
+            }
+
+            // TEMP TODO
+            break;
         }
     }
 

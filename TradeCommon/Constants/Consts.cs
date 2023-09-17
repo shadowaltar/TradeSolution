@@ -14,10 +14,4 @@ public static class Consts
     public static readonly string DatabaseFolder = @"C:\Temp\Data";
 
     public const int EnumDatabaseTypeSize = 20;
-
-    public static readonly IReadOnlyList<string> BasicAssetCodes = new List<string>
-    {
-        "USD",
-        "USDT", "TUSD", "BUSD", "USDC"
-    };
 }

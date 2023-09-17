@@ -126,6 +126,18 @@ public class AdminController : Controller
         var account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
         return account == null ? BadRequest("Invalid account name.") : Ok(account);
     }
+
+    /// <summary>
+    /// Get current login account's information.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <returns></returns>
+    [HttpGet("accounts/current")]
+    public ActionResult GetLoggedInAccount([FromServices] IAdminService adminService)
+    {
+        return Ok(adminService.CurrentAccount);
+    }
+
     /// <summary>
     /// Get account's information.
     /// </summary>

@@ -117,6 +117,11 @@ public static class DateUtils
         return date1 < date2 ? date1 : date2;
     }
 
+    public static DateTime Max(DateTime date1, DateTime date2)
+    {
+        return date1 > date2 ? date1 : date2;
+    }
+
     /// <summary>
     /// Create series of DateTime with equal gap in between.
     /// The last output can be either equal to or smaller than the

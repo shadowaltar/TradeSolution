@@ -42,7 +42,7 @@ public record AlgoEntry
     public int SecurityId { get; set; } = -1;
 
     [DatabaseIgnore]
-    public Security? Security { get; set; }
+    public Security Security { get; set; }
 
     [NotNull]
     public DateTime Time { get; set; }
@@ -83,8 +83,7 @@ public record AlgoEntry
     /// <summary>
     /// Return vs previous OHLC price using two close prices.
     /// </summary>
-    public decimal Return { get; set; } = 0;
-
+    public decimal Return { get; set; }
     public decimal? EnterPrice { get; set; }
     public decimal? ExitPrice { get; set; }
     public decimal? StopLossPrice { get; set; }
@@ -95,17 +94,18 @@ public record AlgoEntry
     /// <summary>
     /// Notional value of this entry. Current Price * Quantity being hold.
     /// </summary>
-    public decimal Notional { get; set; }
+    public decimal? Notional { get; set; }
 
     /// <summary>
     /// Realized return of this entry which is just closed. 1 - Exit Price / Enter Price.
     /// </summary>
-    public decimal RealizedReturn { get; set; }
+    public decimal? RealizedReturn { get; set; }
 
     /// <summary>
     /// Realized PNL of this entry which is just closed. (Exit Price - Enter Price) * Quantity held.
     /// </summary>
-    public decimal RealizedPnl { get; set; }
+    public decimal? RealizedPnl { get; set; }
+
 
     /// <summary>
     /// Unrealized PNL of this entry which is still opened. (Current Price - Enter Price) * Quantity held.
@@ -119,6 +119,12 @@ public record AlgoEntry
 
     [Positive]
     public decimal FeeAssetId { get; set; }
+
+    public decimal? ActualQuantity { get; set; }
+    public decimal? ActualEnterPrice { get; set; }
+    public decimal? ActualExitPrice { get; set; }
+    public decimal? ActualRealizedReturn { get; set; }
+    public decimal? ActualRealizedPnl { get; set; }
 }
 
 public record AlgoEntry<T> : AlgoEntry

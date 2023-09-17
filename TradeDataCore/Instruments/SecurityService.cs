@@ -1,4 +1,5 @@
 ﻿using Common;
+using Iced.Intel;
 using Microsoft.Identity.Client.Extensions.Msal;
 using System.Data;
 using TradeCommon.Constants;
@@ -13,6 +14,7 @@ namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
 {
     private readonly Dictionary<int, Security> _securities = new();
+    private readonly Dictionary<string, Security> _securitiesByCode = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
     private readonly ApplicationContext _context;
     private readonly IStorage _storage;
@@ -156,12 +158,14 @@ public class SecurityService : ISecurityService
         }
     }
 
+    public Security? GetSecurity(string code)
+    {
+        return _securitiesByCode.ThreadSafeGet(code);
+    }
+
     public Security GetSecurity(int securityId)
     {
-        lock (_securities)
-        {
-            return _securities.GetValueOrDefault(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);
-        }
+        return _securities.ThreadSafeGet(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);
     }
 
     /// <summary>
@@ -178,6 +182,13 @@ public class SecurityService : ISecurityService
                 var s = securities[i];
                 var secType = SecurityTypeConverter.Parse(s.Type);
                 _securities[s.Id] = s;
+
+                // only the first appearance of a code will be cached!
+                if (!_securitiesByCode.ContainsKey(s.Code))
+                {
+                    _securitiesByCode[s.Code] = s;
+                }
+
                 _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), secType)] = s.Id;
 
                 // mark the fx for next loop; it includes both fx and assets

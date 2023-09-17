@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -19,6 +20,7 @@ public class AdminService : IAdminService
     private readonly ISecurityService _securityService;
     private readonly ITradeService _tradeService;
     private readonly IPortfolioService _portfolioService;
+    private readonly Persistence _persistence;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
 
@@ -28,12 +30,14 @@ public class AdminService : IAdminService
 
     public Context Context { get; }
 
-    public AdminService(Context context,
-                        IComponentContext container,
+    public AdminService(IComponentContext container,
+                        Context context,
+                        Persistence persistence,
                         ISecurityService securityService,
-                        ITradeService tradeService,
                         IPortfolioService portfolioService,
+                        ITradeService tradeService,
                         IExternalAccountManagement accountManagement,
+                        IExternalExecutionManagement execution,
                         IExternalConnectivityManagement connectivity)
     {
         Context = context;
@@ -42,8 +46,12 @@ public class AdminService : IAdminService
         _securityService = securityService;
         _tradeService = tradeService;
         _portfolioService = portfolioService;
+        _persistence = persistence;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
+
+        execution.BalancesChanged -= OnBalancesChanged;
+        execution.BalancesChanged += OnBalancesChanged;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
@@ -219,5 +227,22 @@ public class AdminService : IAdminService
             }
             return account;
         }
+    }
+
+    private void OnBalancesChanged(List<Balance> balances)
+    {
+        var account = Context.Account ?? throw Exceptions.MustLogin();
+        foreach (var balance in balances)
+        {
+            var asset = _securityService.GetSecurity(balance.AssetCode);
+            if (asset == null)
+                _log.Error("Received a balance update with unknown asset id, asset code is: " + balance.AssetCode);
+
+            balance.AccountId = account.Id;
+            balance.AssetId = asset?.Id ?? -1;
+            balance.IsTemp = false;
+            balance.UpdateTime = DateTime.UtcNow;
+        }
+        _persistence.Enqueue(new PersistenceTask<Balance>(balances) { ActionType = DatabaseActionType.Update });
     }
 }

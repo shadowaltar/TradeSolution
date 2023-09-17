@@ -78,5 +78,5 @@ public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVari
     /// Runs the procedure to update the engine internal status.
     /// Usually triggered by new price or new market events.
     /// </summary>
-    void Update(int securityId, OhlcPrice ohlcPrice);
+    Task Update(int securityId, OhlcPrice ohlcPrice);
 }

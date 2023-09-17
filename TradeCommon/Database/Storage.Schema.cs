@@ -48,10 +48,10 @@ CREATE UNIQUE INDEX idx_{tableName}_email_environment
         await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.StaticData);
     }
 
-    public async Task<(string table, string database)> CreateTable<T>()
+    public async Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null)
     {
-        string dropSql = CreateDropTableAndIndexSql<T>();
-        string createSql = CreateCreateTableAndIndexSql<T>();
+        string dropSql = CreateDropTableAndIndexSql<T>(tableNameOverride);
+        string createSql = CreateCreateTableAndIndexSql<T>(tableNameOverride);
         var tuple = DatabaseNames.GetTableAndDatabaseName<T>();
         await DropThenCreate(dropSql, createSql, tuple.tableName, tuple.databaseName);
         return tuple;
@@ -249,50 +249,51 @@ ON {tableName} (SecurityId);
 
         foreach (var tableName in tableNames)
         {
-            var dropSql =
-@$"
-DROP TABLE IF EXISTS {tableName};
-DROP INDEX IF EXISTS idx_{tableName}_id;
-DROP INDEX IF EXISTS idx_{tableName}_securityId;
-DROP INDEX IF EXISTS idx_{tableName}_securityId_createTime;
-DROP INDEX IF EXISTS idx_{tableName}_externalOrderId;
-";
-            var createSql =
-    @$"
-CREATE TABLE IF NOT EXISTS {tableName} (
-    Id INTEGER PRIMARY KEY,
-    ExternalOrderId INTEGER NOT NULL,
-    SecurityId INTEGER NOT NULL,
-    AccountId INTEGER NOT NULL,
-    Type VARCHAR(40) NOT NULL,
-    Price REAL NOT NULL,
-    Quantity REAL NOT NULL,
-    FilledQuantity REAL NOT NULL,
-    Status VARCHAR(10) NOT NULL,
-    Side CHAR(1) NOT NULL,
-    ParentOrderId INTEGER NOT NULL,
-    StopPrice REAL DEFAULT 0 NOT NULL,
-    CreateTime DATE NOT NULL,
-    UpdateTime DATE NOT NULL,
-    ExternalCreateTime DATE DEFAULT 0,
-    ExternalUpdateTime DATE DEFAULT 0,
-    TimeInForce VARCHAR(10),
-    StrategyId INTEGER DEFAULT 0,
-    BrokerId INTEGER DEFAULT 0,
-    ExchangeId INTEGER DEFAULT 0,
-    UNIQUE(Id)
-);
-CREATE INDEX idx_{tableName}_id
-    ON {tableName} (Id);
-CREATE INDEX idx_{tableName}_securityId
-    ON {tableName} (SecurityId);
-CREATE UNIQUE INDEX idx_{tableName}_securityId_createTime
-    ON {tableName} (SecurityId, CreateTime);
-CREATE INDEX idx_{tableName}_externalOrderId
-    ON {tableName} (ExternalOrderId);
-";
+            await CreateTable<Order>(tableName);
+            //            var dropSql =
+            //@$"
+            //DROP TABLE IF EXISTS {tableName};
+            //DROP INDEX IF EXISTS idx_{tableName}_id;
+            //DROP INDEX IF EXISTS idx_{tableName}_securityId;
+            //DROP INDEX IF EXISTS idx_{tableName}_securityId_createTime;
+            //DROP INDEX IF EXISTS idx_{tableName}_externalOrderId;
+            //";
+            //            var createSql =
+            //    @$"
+            //CREATE TABLE IF NOT EXISTS {tableName} (
+            //    Id INTEGER PRIMARY KEY,
+            //    ExternalOrderId INTEGER NOT NULL,
+            //    SecurityId INTEGER NOT NULL,
+            //    AccountId INTEGER NOT NULL,
+            //    Type VARCHAR(40) NOT NULL,
+            //    Price REAL NOT NULL,
+            //    Quantity REAL NOT NULL,
+            //    FilledQuantity REAL NOT NULL,
+            //    Status VARCHAR(10) NOT NULL,
+            //    Side CHAR(1) NOT NULL,
+            //    ParentOrderId INTEGER NOT NULL,
+            //    StopPrice REAL DEFAULT 0 NOT NULL,
+            //    CreateTime DATE NOT NULL,
+            //    UpdateTime DATE NOT NULL,
+            //    ExternalCreateTime DATE DEFAULT 0,
+            //    ExternalUpdateTime DATE DEFAULT 0,
+            //    TimeInForce VARCHAR(10),
+            //    StrategyId INTEGER DEFAULT 0,
+            //    BrokerId INTEGER DEFAULT 0,
+            //    ExchangeId INTEGER DEFAULT 0,
+            //    UNIQUE(Id)
+            //);
+            //CREATE INDEX idx_{tableName}_id
+            //    ON {tableName} (Id);
+            //CREATE INDEX idx_{tableName}_securityId
+            //    ON {tableName} (SecurityId);
+            //CREATE UNIQUE INDEX idx_{tableName}_securityId_createTime
+            //    ON {tableName} (SecurityId, CreateTime);
+            //CREATE INDEX idx_{tableName}_externalOrderId
+            //    ON {tableName} (ExternalOrderId);
+            //";
 
-            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
+            //            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
         }
 
         return tableNames;
@@ -308,40 +309,41 @@ CREATE INDEX idx_{tableName}_externalOrderId
 
         foreach (var tableName in tableNames)
         {
-            var dropSql =
-@$"
-DROP TABLE IF EXISTS {tableName};
-DROP INDEX IF EXISTS idx_{tableName}_securityId;
-DROP INDEX IF EXISTS idx_{tableName}_securityId_time;
-";
-            var createSql =
-    @$"
-CREATE TABLE IF NOT EXISTS {tableName} (
-    Id INTEGER PRIMARY KEY,
-    SecurityId INTEGER NOT NULL,
-    OrderId INTEGER NOT NULL,
-    ExternalTradeId INTEGER NOT NULL,
-    ExternalOrderId INTEGER NOT NULL,
-    Time INT NOT NULL,
-    Type VARCHAR(40) NOT NULL,
-    Price DOUBLE NOT NULL,
-    Quantity DOUBLE NOT NULL,
-    Side CHAR(1) NOT NULL,
-    Fee DOUBLE NOT NULL,
-    FeeAssetId INTEGER NOT NULL,
-    BrokerId INTEGER DEFAULT 0,
-    ExchangeId INTEGER DEFAULT 0,
-    UNIQUE(Id)
-);
-CREATE UNIQUE INDEX idx_{tableName}_id
-    ON {tableName} (Id);
-CREATE UNIQUE INDEX idx_{tableName}_securityId
-    ON {tableName} (SecurityId);
-CREATE UNIQUE INDEX idx_{tableName}_securityId_time
-    ON {tableName} (SecurityId, Time);
-";
+            await CreateTable<Trade>(tableName);
+            //            var dropSql =
+            //@$"
+            //DROP TABLE IF EXISTS {tableName};
+            //DROP INDEX IF EXISTS idx_{tableName}_securityId;
+            //DROP INDEX IF EXISTS idx_{tableName}_securityId_time;
+            //";
+            //            var createSql =
+            //    @$"
+            //CREATE TABLE IF NOT EXISTS {tableName} (
+            //    Id INTEGER PRIMARY KEY,
+            //    SecurityId INTEGER NOT NULL,
+            //    OrderId INTEGER NOT NULL,
+            //    ExternalTradeId INTEGER NOT NULL,
+            //    ExternalOrderId INTEGER NOT NULL,
+            //    Time INT NOT NULL,
+            //    Type VARCHAR(40) NOT NULL,
+            //    Price DOUBLE NOT NULL,
+            //    Quantity DOUBLE NOT NULL,
+            //    Side CHAR(1) NOT NULL,
+            //    Fee DOUBLE NOT NULL,
+            //    FeeAssetId INTEGER NOT NULL,
+            //    BrokerId INTEGER DEFAULT 0,
+            //    ExchangeId INTEGER DEFAULT 0,
+            //    UNIQUE(Id)
+            //);
+            //CREATE UNIQUE INDEX idx_{tableName}_id
+            //    ON {tableName} (Id);
+            //CREATE UNIQUE INDEX idx_{tableName}_securityId
+            //    ON {tableName} (SecurityId);
+            //CREATE UNIQUE INDEX idx_{tableName}_securityId_time
+            //    ON {tableName} (SecurityId, Time);
+            //";
 
-            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
+            //            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
         }
 
         return tableNames;
@@ -461,14 +463,15 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         _log.Info($"Created {tableName} table in {databaseName}.");
     }
 
-    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert)
+    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null)
     {
         var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
         if (attr == null) throw new InvalidOperationException("Must provide table name.");
 
-        var tableName = attr.TableName;
+        var tableName = tableNameOverride ?? attr.TableName;
         var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        var uniqueKeyNames = typeof(T).GetCustomAttribute<UniqueAttribute>()!.FieldNames ?? Array.Empty<string>();
+        var uniqueKeyNames = typeof(T).GetCustomAttributes<UniqueAttribute>()
+            .FirstOrDefault()?.FieldNames ?? Array.Empty<string>();
         var targetFieldNames = properties.Select(pair => pair.Key).ToList();
         var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
 
@@ -524,10 +527,12 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         return sb.ToString();
     }
 
-    public string CreateDropTableAndIndexSql<T>()
+    public string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null)
     {
         var type = typeof(T);
         var (table, _) = DatabaseNames.GetTableAndDatabaseName<T>();
+        table = tableNameOverride ?? table;
+
         var sb = new StringBuilder();
         sb.Append($"DROP TABLE IF EXISTS ").Append(table).AppendLine(";");
 
@@ -553,12 +558,13 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         return sb.ToString();
     }
 
-    public string CreateCreateTableAndIndexSql<T>()
+    public string CreateCreateTableAndIndexSql<T>(string? tableNameOverride = null)
     {
         var type = typeof(T);
         var (table, _) = DatabaseNames.GetTableAndDatabaseName<T>();
-        var properties = ReflectionUtils.GetPropertyToName(type);
+        table = tableNameOverride ?? table;
 
+        var properties = ReflectionUtils.GetPropertyToName(type);
         var uniqueAttributes = type.GetCustomAttributes<UniqueAttribute>().ToList();
         var indexAttributes = type.GetCustomAttributes<IndexAttribute>().ToList();
         var primaryUniqueKeys = uniqueAttributes.FirstOrDefault()?.FieldNames;

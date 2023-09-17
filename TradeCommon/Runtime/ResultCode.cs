@@ -23,6 +23,8 @@ public enum ResultCode
     UpdateOrderOk,
 
     GetTradeOk,
+    
+    GetPositionOk,
 
     GetSecretOk,
 
@@ -59,6 +61,8 @@ public enum ResultCode
     UpdateOrderSendFailed,
 
     GetTradeFailed,
+    
+    GetPositionFailed,
 
     GetSecretFailed,
     SecretMalformed,

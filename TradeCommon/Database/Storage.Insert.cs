@@ -97,11 +97,7 @@ public partial class Storage
             }
             else if (!pt.Entries.IsNullOrEmpty())
             {
-                var count = 0;
-                foreach (var entry in pt.Entries)
-                {
-                    count += await InsertOne<T>(entry, isUpsert);
-                }
+                var count = await InsertMany<T>(pt.Entries, isUpsert);
                 _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
                 return count;
             }
@@ -119,6 +115,18 @@ public partial class Storage
             _writers[type.Name] = writer;
         }
         return await writer.InsertOne(entry, isUpsert);
+    }
+
+    public async Task<int> InsertMany<T>(List<T> entry, bool isUpsert) where T : new()
+    {
+        var type = typeof(T);
+        var (tableName, database) = DatabaseNames.GetTableAndDatabaseName<T>();
+        if (!_writers.TryGetValue(type.Name, out var writer))
+        {
+            writer = new SqlWriter<T>(this, tableName, DatabaseFolder, database);
+            _writers[type.Name] = writer;
+        }
+        return await writer.InsertMany(entry, isUpsert);
     }
 
     public async Task UpsertStockDefinitions(List<Security> entries)

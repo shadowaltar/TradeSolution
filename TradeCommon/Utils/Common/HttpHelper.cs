@@ -100,6 +100,7 @@ public static class HttpHelper
         var swInner = Stopwatch.StartNew();
         var response = await client.SendAsync(request);
         swInner.Stop();
+        _log.Info($"[{swInner.Elapsed.Seconds:F4}s] Called REST API ({request.Method}): {request.RequestUri}");
         return (response, swInner.ElapsedMilliseconds);
     }
 }

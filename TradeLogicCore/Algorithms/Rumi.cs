@@ -34,7 +34,7 @@ public class Rumi : IAlgorithm<RumiVariables>
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
     {
-        Sizing = new SimplePositionSizing();
+        Sizing = new SimplePositionSizingLogic();
         Screening = new SimpleSecurityScreeningAlgoLogic();
         Entering = new SimpleEnterPositionAlgoLogic(context);
         Exiting = new SimpleExitPositionAlgoLogic(context, stopLossRatio, decimal.MinValue);

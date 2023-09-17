@@ -4,6 +4,7 @@ public class IdGenerator
     private long _longId;
     private int _intId;
     private volatile int _sequentialSuffix;
+    private volatile int _negativeSequentialSuffix;
 
     private readonly object _lock = new();
 
@@ -29,6 +30,20 @@ public class IdGenerator
                 _sequentialSuffix++;
                 if (_sequentialSuffix == 10)
                     _sequentialSuffix = 0;
+                return DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
+            }
+        }
+    }
+
+    public long NewNegativeTimeBasedId
+    {
+        get
+        {
+            lock (_lock)
+            {
+                _negativeSequentialSuffix--;
+                if (_negativeSequentialSuffix == 0)
+                    _negativeSequentialSuffix = 10;
                 return DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
             }
         }

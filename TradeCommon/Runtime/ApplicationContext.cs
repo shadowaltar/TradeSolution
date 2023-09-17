@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using System.Net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -8,6 +9,7 @@ public class ApplicationContext
 {
     protected IComponentContext? _container;
 
+    private readonly List<string> _preferredAssetCodes = new();
     private EnvironmentType _environment;
     private ExchangeType _exchange;
     private int _exchangeId;
@@ -19,6 +21,8 @@ public class ApplicationContext
     public bool IsInitialized { get; private set; }
 
     public IStorage Storage { get; }
+
+    public IReadOnlyList<string> PreferredAssetCodes => _preferredAssetCodes;
 
     public ApplicationContext(IStorage storage)
     {
@@ -98,5 +102,18 @@ public class ApplicationContext
         ExternalConnectionStates.EnvironmentId = ExchangeId;
         ExternalConnectionStates.Broker = broker;
         ExternalConnectionStates.BrokerId = BrokerId;
+    }
+
+    public void SetPreferredAssets(params string[] assetCodes)
+    {
+        _preferredAssetCodes.Clear();
+        _preferredAssetCodes.AddRange(assetCodes);
+        if (_preferredAssetCodes.IsNullOrEmpty())
+        {
+            _preferredAssetCodes.Add("TUSD");
+            _preferredAssetCodes.Add("USDT");
+            _preferredAssetCodes.Add("BUSD");
+            _preferredAssetCodes.Add("USD");
+        }
     }
 }

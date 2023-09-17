@@ -15,7 +15,7 @@ public interface ITradeService
     /// For example, an order matches multiple depths in an order book
     /// will result in multiple trades.
     /// </summary>    
-    event Action<Trade[]>? NextTrades;
+    event Action<List<Trade>>? NextTrades;
 
     void Initialize();
 

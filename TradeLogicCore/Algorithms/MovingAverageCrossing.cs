@@ -28,9 +28,9 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public int SlowParam { get; } = 5;
     public decimal StopLossRatio { get; } = 0.02m;
 
-    public IPositionSizingAlgoLogic Sizing { get; }
-    public IEnterPositionAlgoLogic Entering { get; }
-    public IExitPositionAlgoLogic Exiting { get; }
+    public IPositionSizingAlgoLogic Sizing { get; set; }
+    public IEnterPositionAlgoLogic Entering { get; set; }
+    public IExitPositionAlgoLogic Exiting { get; set; }
     public ISecurityScreeningAlgoLogic Screening { get; set; }
 
     private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
@@ -48,7 +48,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         _context = context;
 
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
-        Sizing = sizing ?? new SimplePositionSizing();
+        Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
         Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
         Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, stopLossRatio, takeProfitRatio);
