@@ -50,10 +50,26 @@ public class SqlReader<T> : IDisposable where T : new()
             if (_properties.TryGetValue(name, out var pi))
             {
                 var type = pi.PropertyType;
-                _valueSetter.Set(entry, name, Get(type, name));
+                var isAsJson = _valueSetter.AttributeInfo.IsAsJson(name);
+                var value = isAsJson ? GetFromJson(type, name) : Get(type, name);
+                _valueSetter.Set(entry, name, value);
             }
         }
         return entry;
+    }
+
+    private object? GetFromJson(Type type, string name)
+    {
+        try
+        {
+            var stringVal = Reader.SafeGetString(name);
+            return Json.Deserialize(type, stringVal!);
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to deserialize a field value for {name} into json.", e);
+            return null;
+        }
     }
 
     /// <summary>
@@ -68,6 +84,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.SafeGetString(name);
         else if (type == typeof(decimal))
             return Reader.GetDecimal(name);
+        else if (type == typeof(long))
+            return Reader.GetInt64(name);
         else if (type == typeof(double))
             return Reader.GetDouble(name);
         else if (type == typeof(DateTime))
@@ -78,6 +96,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.GetBoolean(name);
         else if (type == typeof(decimal?))
             return Reader.SafeGetDecimal(name);
+        else if (type == typeof(long?))
+            return Reader.SafeGetLong(name);
         else if (type == typeof(double?))
             return Reader.SafeGetDouble(name);
         else if (type == typeof(DateTime?))
@@ -88,7 +108,8 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.SafeGetBool(name);
         else if (type.IsEnum)
             return Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : default;
-        throw new NotImplementedException("Unsupported type: " + type.Name);
+        else
+            throw new NotImplementedException("Unsupported type: " + type.Name);
     }
 
     public TV? GetOrDefault<TV>(string columnName, TV? defaultValue = default)

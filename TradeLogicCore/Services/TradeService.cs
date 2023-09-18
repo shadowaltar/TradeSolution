@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -145,12 +144,19 @@ public class TradeService : ITradeService, IDisposable
             var e = end ?? DateTime.MaxValue;
             trades = await _storage.ReadTrades(security, s, e);
         }
+        FixTempTrades(trades, security);
+        return trades;
+    }
+
+    private void FixTempTrades(List<Trade> trades, Security security)
+    {
         foreach (var trade in trades)
         {
             trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
+            trade.SecurityId = security.Id;
             trade.SecurityCode = security.Code;
+            trade.IsTemp = false;
         }
-        return trades;
     }
 
     public async Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false)

@@ -475,7 +475,7 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
         var targetFieldNames = properties.Select(pair => pair.Key).ToList();
         var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
 
-        var ignoreFieldNames = ReflectionUtils.GetDatabaseIgnoredPropertyNames<T>();
+        var ignoreFieldNames = ReflectionUtils.GetAttributeInfo<T>().DatabaseIgnoredPropertyNames;
 
         // INSERT INTO (...)
         var sb = new StringBuilder()

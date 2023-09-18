@@ -105,6 +105,16 @@ public static class SqlExtensions
         return reader.GetDouble(i);
     }
 
+    public static long SafeGetLong(this DbDataReader reader, string fieldName, long defaultValue = default)
+    {
+        if (!reader.HasColumn(fieldName))
+            return defaultValue;
+        var i = reader.GetOrdinal(fieldName);
+        if (reader.IsDBNull(i))
+            return defaultValue;
+        return reader.GetInt64(i);
+    }
+
     public static decimal SafeGetDecimal(this DbDataReader reader, string fieldName, decimal defaultValue = default)
     {
         if (!reader.HasColumn(fieldName))

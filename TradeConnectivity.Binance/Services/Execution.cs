@@ -521,6 +521,25 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         if (start == null && end != null)
             return ExternalQueryStates.InvalidArgument(ActionType.GetTrade, "If end time is provided, start time must also be provided.");
 
+        if (end != null && start != null && end - start > TimeSpans.OneDay)
+        {
+            // Binance allows 24h retrieval only
+            var results = new List<Trade>();
+            var states = new List<ExternalQueryState>();
+            var totalRtt = 0L;
+            var totalTime = 0L;
+            foreach (var (s, e) in (start.Value, end.Value).Split(TimeSpans.OneDay))
+            {
+                var state = await GetTrades(security, externalOrderId, s, e);
+                results.AddRange(state.ContentAs<List<Trade>>()!);
+                totalRtt += state.NetworkRoundtripTime;
+                totalTime += state.TotalTime;
+            }
+            var totalState = ExternalQueryStates.QueryTrades("", "", security.Code, results).RecordTimes(totalRtt, totalTime);
+            totalState.SubStates = states;
+            return totalState;
+        }
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/myTrades";
         var parameters = new List<(string, string)>
@@ -663,7 +682,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                 Id = _tradeIdGenerator.NewTimeBasedId,
                 ExternalOrderId = rootObj.GetLong("orderId"), // binance's order id is our external order id
                 ExternalTradeId = rootObj.GetLong("id"),
-                SecurityId = securityId ?? 0,
                 SecurityCode = rootObj.GetString("symbol"),
                 Time = rootObj.GetUtcFromUnixMs("time"),
                 Price = rootObj.GetDecimal("price"),
@@ -674,6 +692,13 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                 BestMatch = rootObj.GetBoolean("isBestMatch") ? 1 : -1,
                 BrokerId = _context.BrokerId,
                 ExchangeId = _context.ExchangeId,
+                
+                // the trades got from external are lacking some ids
+                // set it to temp to allow later logic to fix them
+                SecurityId = securityId ?? -1,
+                OrderId = -1,
+                FeeAssetId = -1,
+                IsTemp = true,
             };
         }
         catch (Exception ex)

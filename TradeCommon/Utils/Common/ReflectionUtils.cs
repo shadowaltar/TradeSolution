@@ -161,10 +161,8 @@ public static class ReflectionUtils
 
     public static DataTable AddDataRow<T>(DataTable table, T entry) where T : notnull
     {
-        var t = typeof(T);
         var vg = GetValueGetter<T>();
         var tableRow = table.NewRow();
-
         foreach (var (name, value) in vg.GetNamesAndValues(entry))
         {
             tableRow[name] = value;
@@ -180,22 +178,7 @@ public static class ReflectionUtils
         {
             var properties = GetPropertyToName(t, flags);
 
-            ReflectionMetaInfo<T> i;
-            if (!_typeToMetaInfo.TryGetValue(t, out var info))
-            {
-                i = new ReflectionMetaInfo<T>();
-                _typeToMetaInfo[t] = i;
-                i.Ordering.AddRange(GetOrderedPropertyAndName(t).ToDictionary(t => t.name, t => t.index));
-            }
-            else
-            {
-                i = (ReflectionMetaInfo<T>)info;
-            }
-            if (!_typeToAttributeInfo.TryGetValue(t, out var a))
-            {
-                a = InitializeAttributeMetaInfo(t);
-                _typeToAttributeInfo[t] = a;
-            }
+            InitializeMetaInfo(t, out ReflectionMetaInfo<T> i, out AttributeMetaInfo a);
 
             vg = new ValueGetter<T>(properties.Values, i, a);
             _typeToValueGetters[t] = vg;
@@ -210,19 +193,9 @@ public static class ReflectionUtils
         {
             var properties = GetPropertyToName(t, flags).Values;
 
-            ReflectionMetaInfo<T> i;
-            if (!_typeToMetaInfo.TryGetValue(t, out var info))
-            {
-                i = new ReflectionMetaInfo<T>();
-                _typeToMetaInfo[t] = i;
-                i.Ordering.AddRange(GetOrderedPropertyAndName(t).ToDictionary(t => t.name, t => t.index));
-            }
-            else
-            {
-                i = (ReflectionMetaInfo<T>)info;
-            }
+            InitializeMetaInfo(t, out ReflectionMetaInfo<T> i, out AttributeMetaInfo a);
 
-            vg = new ValueSetter<T>(properties, i);
+            vg = new ValueSetter<T>(properties, i, a);
             _typeToValueSetters[t] = vg;
         }
         return (ValueSetter<T>)vg;
@@ -340,27 +313,71 @@ public static class ReflectionUtils
             .Select((p, i) => (p.Name, p, i)).ToList();
     }
 
-    public static IReadOnlySet<string> GetDatabaseIgnoredPropertyNames<T>()
+    public static AttributeMetaInfo GetAttributeInfo<T>()
     {
         var t = typeof(T);
-        if (!_typeToAttributeInfo.TryGetValue(t, out var attrInfo))
+        if (!_typeToAttributeInfo.TryGetValue(t, out var ami))
         {
-            attrInfo = InitializeAttributeMetaInfo(t);
-            _typeToAttributeInfo[t] = attrInfo;
+            InitializeMetaInfo<T>(t, out _, out var result);
+            ami = result;
         }
-        return attrInfo.DatabaseIgnoredPropertyNames;
+        return ami;
     }
 
-    private static AttributeMetaInfo InitializeAttributeMetaInfo(Type t)
+    private static void InitializeMetaInfo<T>(Type t, out ReflectionMetaInfo<T> rmi, out AttributeMetaInfo ami)
     {
-        var attrInfo = new AttributeMetaInfo();
-        foreach (var (name, property) in GetPropertyToName(t))
+        // get cached or initialize reflection related meta info
+        if (!_typeToMetaInfo.TryGetValue(t, out var info))
         {
-            var ignoreAttr = property.GetCustomAttribute<DatabaseIgnoreAttribute>();
-            if (ignoreAttr != null)
-                attrInfo.DatabaseIgnoredPropertyNames.Add(name);
+            rmi = new ReflectionMetaInfo<T>();
+            _typeToMetaInfo[t] = rmi;
+
+            rmi.Ordering.AddRange(GetOrderedPropertyAndName(t).ToDictionary(t => t.name, t => t.index));
         }
-        return attrInfo;
+        else
+        {
+            rmi = (ReflectionMetaInfo<T>)info;
+        }
+
+        // get cached or initialize attribute related meta info
+        if (!_typeToAttributeInfo.TryGetValue(t, out ami))
+        {
+            ami = new AttributeMetaInfo();
+            _typeToAttributeInfo[t] = ami;
+
+            foreach (var (name, property) in GetPropertyToName(t))
+            {
+                var ignoreAttr = property.GetCustomAttribute<DatabaseIgnoreAttribute>();
+                if (ignoreAttr != null)
+                {
+                    ami.DatabaseIgnoredPropertyNames.Add(name);
+                }
+                var asJsonAttr = property.GetCustomAttribute<AsJsonAttribute>();
+                if (asJsonAttr != null)
+                {
+                    ami.AsJsonPropertyNames.Add(name);
+                }
+
+                // mark the attributes
+                foreach (var attribute in Validator.ValidationAttributes)
+                {
+                    var attr = property.GetCustomAttribute(attribute);
+                    if (attr is ValidationAttribute va)
+                    {
+                        var attrs = ami.Validations.GetOrCreate(property.Name);
+                        attrs.Add(va);
+                    }
+                }
+                foreach (var attribute in Validator.AutoCorrectAttributes)
+                {
+                    var attr = property.GetCustomAttribute(attribute);
+                    if (attr is AutoCorrectAttribute aa)
+                    {
+                        ami.AutoCorrections[property.Name] = aa;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -385,31 +402,12 @@ public class ReflectionMetaInfo<T>
 
 public class ValueGetter<T> : PropertyReflectionHelper<T>
 {
-    public ValueGetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info, AttributeMetaInfo attrInfo) : base(info)
+    public ValueGetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> rmi, AttributeMetaInfo ami) : base(rmi, ami)
     {
         foreach (var property in properties)
         {
-            // mark the attributes
-            foreach (var attribute in Validator.ValidationAttributes)
-            {
-                var attr = property.GetCustomAttribute(attribute);
-                if (attr is ValidationAttribute va)
-                {
-                    var attrs = attrInfo.Validations.GetOrCreate(property.Name);
-                    attrs.Add(va);
-                }
-            }
-            foreach (var attribute in Validator.AutoCorrectAttributes)
-            {
-                var attr = property.GetCustomAttribute(attribute);
-                if (attr is AutoCorrectAttribute aa)
-                {
-                    attrInfo.AutoCorrections[property.Name] = aa;
-                }
-            }
-
-            _info.Getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
-            _info.PropertyTypes[property.Name] = property.PropertyType;
+            ReflectionInfo.Getters[property.Name] = ReflectionUtils.BuildUntypedGetter<T>(property);
+            ReflectionInfo.PropertyTypes[property.Name] = property.PropertyType;
         }
     }
 
@@ -423,7 +421,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     /// <returns></returns>
     public object? Get(T targetObject, string propertyName)
     {
-        return _info.Getters[propertyName].Invoke(targetObject);
+        return ReflectionInfo.Getters[propertyName].Invoke(targetObject);
     }
 
     /// <summary>
@@ -435,7 +433,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     /// <returns></returns>
     public (object?, Type) GetTypeAndValue(T targetObject, string propertyName)
     {
-        return (_info.Getters[propertyName].Invoke(targetObject), _info.PropertyTypes[propertyName]);
+        return (ReflectionInfo.Getters[propertyName].Invoke(targetObject), ReflectionInfo.PropertyTypes[propertyName]);
     }
 
     /// <summary>
@@ -464,7 +462,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         violatedRule = "";
         invalidPropertyName = "";
-        foreach (var (propertyName, attributes) in _attributeInfo.Validations)
+        foreach (var (propertyName, attributes) in AttributeInfo.Validations)
         {
             var value = Get(entry, propertyName);
             foreach (var attr in attributes)
@@ -494,7 +492,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     {
         message = "";
         var value = Get(entry, propertyName);
-        if (_attributeInfo.Validations.TryGetValue(propertyName, out var validationAttributes))
+        if (AttributeInfo.Validations.TryGetValue(propertyName, out var validationAttributes))
         {
             foreach (var attr in validationAttributes)
             {
@@ -520,7 +518,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     public bool IsWithAutoCorrect(T entry, string propertyName, out object? originalValue, [NotNullWhen(true)] out AutoCorrectAttribute? attribute)
     {
         originalValue = null;
-        if (_attributeInfo.AutoCorrections.TryGetValue(propertyName, out attribute))
+        if (AttributeInfo.AutoCorrections.TryGetValue(propertyName, out attribute))
         {
             originalValue = Get(entry, propertyName);
             return true;
@@ -535,7 +533,7 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
     /// <returns></returns>
     public IEnumerable<(string, object)> GetNamesAndValues(T entry)
     {
-        foreach (var (name, getter) in _info.Getters)
+        foreach (var (name, getter) in ReflectionInfo.Getters)
         {
             yield return (name, getter(entry));
         }
@@ -544,14 +542,14 @@ public class ValueGetter<T> : PropertyReflectionHelper<T>
 
 public class ValueSetter<T> : PropertyReflectionHelper<T>
 {
-    public ValueSetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> info) : base(info)
+    public ValueSetter(IEnumerable<PropertyInfo> properties, ReflectionMetaInfo<T> rmi, AttributeMetaInfo ami) : base(rmi, ami)
     {
         foreach (var property in properties)
         {
             var setter = ReflectionUtils.BuildUntypedSetter<T>(property);
             if (setter != null)
-                _info.Setters[property.Name] = setter;
-            _info.PropertyTypes[property.Name] = property.PropertyType;
+                ReflectionInfo.Setters[property.Name] = setter;
+            ReflectionInfo.PropertyTypes[property.Name] = property.PropertyType;
         }
     }
 
@@ -565,27 +563,28 @@ public class ValueSetter<T> : PropertyReflectionHelper<T>
     /// <param name="value"></param>
     public void Set(T targetObject, string propertyName, object? value)
     {
-        _info.Setters[propertyName].Invoke(targetObject, value);
+        ReflectionInfo.Setters[propertyName].Invoke(targetObject, value);
     }
 }
 
 public abstract class PropertyReflectionHelper<T>
 {
-    protected ReflectionMetaInfo<T> _info;
-    protected AttributeMetaInfo? _attributeInfo;
+    public ReflectionMetaInfo<T> ReflectionInfo { get; private set; }
+    public AttributeMetaInfo AttributeInfo { get; private set; }
 
-    protected PropertyReflectionHelper(ReflectionMetaInfo<T> info)
+    protected PropertyReflectionHelper(ReflectionMetaInfo<T> rmi, AttributeMetaInfo ami)
     {
-        _info = info;
+        ReflectionInfo = rmi;
+        AttributeInfo = ami;
     }
 
     public IEnumerable<string> GetNames()
     {
-        return _info.Ordering.Keys;
+        return ReflectionInfo.Ordering.Keys;
     }
 
     public int GetIndex(string propertyName)
     {
-        return _info.Ordering.TryGetValue(propertyName, out var index) ? index : -1;
+        return ReflectionInfo.Ordering.TryGetValue(propertyName, out var index) ? index : -1;
     }
 }

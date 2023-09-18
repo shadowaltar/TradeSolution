@@ -165,4 +165,35 @@ public static class DateUtils
         }
         return results;
     }
+
+    /// <summary>
+    /// Given a start and end time, split it into multiple intervals.
+    /// Returns a list of start + end tuples which those earlier ones come first.
+    /// For each split segments, the end of last tuple is the start of next tuple.
+    /// </summary>
+    /// <param name="original"></param>
+    /// <param name="interval"></param>
+    /// <returns></returns>
+    public static IEnumerable<(DateTime segmentStart, DateTime segmentEnd)> Split(this (DateTime start, DateTime end) original, TimeSpan interval)
+    {
+        if (original.end - original.start < interval)
+        {
+            yield return original;
+            yield break;
+        }
+
+        var end = original.end;
+        do
+        {
+            var start = end - interval;
+
+            start = Max(start, original.start);
+            yield return (start, end);
+
+            if (original.start >= start)
+                break;
+
+            end = start;
+        } while (true);
+    }
 }

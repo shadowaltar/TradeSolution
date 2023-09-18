@@ -133,8 +133,10 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
             value ??= DBNull.Value;
             // always convert enum value as upper string
             if (valueType.IsEnum)
+            {
                 command.Parameters.Add(new SqliteParameter(placeholder, value.ToString()!.ToUpperInvariant()));
-            else if (!valueType.IsSqlNativeType() && !ReflectionUtils.GetDatabaseIgnoredPropertyNames<T>().Contains(name))
+            }
+            else if (!valueType.IsSqlNativeType() && !ReflectionUtils.GetAttributeInfo<T>().IsDatabaseIgnored(name))
             {
                 var text = Json.Serialize(value);
                 command.Parameters.Add(new SqliteParameter(placeholder, text));

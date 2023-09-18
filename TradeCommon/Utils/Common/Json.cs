@@ -18,6 +18,11 @@ public static class Json
         return JsonSerializer.Deserialize<T>(content);
     }
 
+    public static object? Deserialize(Type type, string content)
+    {
+        return JsonSerializer.Deserialize(content, type);
+    }
+
     public static string ToJson(object obj)
     {
         return JsonSerializer.Serialize(obj);

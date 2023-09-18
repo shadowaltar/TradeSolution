@@ -66,9 +66,9 @@ public class Core
 
         await Task.Run(async () =>
         {
-            // check one day's historical order / trade only
+            // check one week's historical order / trade only
             // they should not impact trading
-            var previousDay = startTime.AddDays(-1);
+            var previousDay = startTime.AddDays(-7);
             await ReconcileRecentOrderHistory(previousDay, startTime, parameters.SecurityPool);
             await ReconcileRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
         });
@@ -179,9 +179,15 @@ public class Core
         }
         var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
         if (!toCreate.IsNullOrEmpty())
+        {
+            _log.Info($"{toCreate.Count} recent trades are in external but not internal system and need to be inserted into database.");
             _services.Persistence.Enqueue(new PersistenceTask<Trade>(toCreate) { ActionType = DatabaseActionType.Create });
+        }
         if (!toUpdate.IsNullOrEmpty())
+        {
+            _log.Info($"{toUpdate.Count} recent trades in external are different from internal system and need to be updated into database.");
             _services.Persistence.Enqueue(new PersistenceTask<Trade>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
+        }
     }
 
     private async Task ReconcileAccountAndBalance(User user)

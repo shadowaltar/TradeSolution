@@ -74,6 +74,13 @@ public record ExternalQueryState : INetworkTimeState
         return this;
     }
 
+    public ExternalQueryState RecordTimes(long rtt, long total)
+    {
+        NetworkRoundtripTime = rtt;
+        TotalTime = total;
+        return this;
+    }
+
     public override string ToString()
     {
         return $"QueryState Time[{NetworkRoundtripTime}ms/{TotalTime}ms] Action[{Action}] [{ResultCode}] [{UniqueConnectionId}]";
