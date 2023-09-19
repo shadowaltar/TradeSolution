@@ -17,7 +17,7 @@ public record ExternalConnectionState
     public SubscriptionType Type { get; set; }
     public ActionType Action { get; set; }
     public ResultCode ResultCode { get; set; }
-    public int ExternalId { get; set; }
+    public int ExternalId { get; set; } = 0;
     public string? UniqueConnectionId { get; set; }
     public string? Description { get; set; }
     public List<ExternalConnectionState>? SubStates { get; set; }
@@ -37,7 +37,7 @@ public record ExternalQueryState : INetworkTimeState
 
     public ResultCode ResultCode { get; set; }
 
-    public int ExternalId { get; set; }
+    public int ExternalId { get; set; } = 0;
 
     public string? UniqueConnectionId { get; set; }
 
@@ -47,7 +47,20 @@ public record ExternalQueryState : INetworkTimeState
 
     public long TotalTime { get; set; }
 
-    public T? ContentAs<T>() => Content is T typed ? typed : default;
+    public T? Get<T>() => Content is T typed ? typed : default;
+    
+    public List<T>? GetAll<T>()
+    {
+        if (Content is T typed)
+        {
+            return new List<T> { typed };
+        }
+        if (Content is List<T> list)
+        {
+            return list;
+        }
+        return null;
+    }
 
     public List<ExternalQueryState>? SubStates { get; set; }
 

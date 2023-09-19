@@ -134,8 +134,8 @@ public class SecurityService : ISecurityService
         {
             lock (_securities)
             {
-                var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? temp : -1;
-                return id == -1 ? null : _securities.GetValueOrDefault(id);
+                var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? temp : 0;
+                return id <= 0 ? null : _securities.GetValueOrDefault(id);
             }
         }
     }

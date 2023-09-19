@@ -208,7 +208,7 @@ public static class DatabaseNames
         if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
         if (!schema.IsBlank())
             table = $"{table}.{schema}";
-        _tableDatabaseNamesByType[type] = tuple = (table, database + DatabaseNames.DatabaseSuffix);
+        _tableDatabaseNamesByType[type] = tuple = (table, database + DatabaseSuffix);
         return tuple;
     }
 }

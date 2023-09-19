@@ -3,7 +3,7 @@
 namespace TradeLogicCore.Algorithms;
 public class Decision
 {
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
 
     public OrderType OrderType { get; set; } = OrderType.Limit;
 

@@ -102,4 +102,14 @@ public static class Exceptions
     {
         return new InvalidOperationException($"The security is missing.");
     }
+
+    public static Exception InvalidTradeServiceState(string message)
+    {
+        return new InvalidOperationException("Invalid TradeService State: "+ message);
+    }
+
+    public static Exception InvalidOrderServiceState(string message)
+    {
+        return new InvalidOperationException("Invalid OrderService State: " + message);
+    }
 }

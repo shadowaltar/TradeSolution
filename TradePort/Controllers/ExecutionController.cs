@@ -146,7 +146,7 @@ public class ExecutionController : Controller
             return BadRequest("Must login first.");
         }
 
-        var orders = await orderService.GetOrderHistory(DateTime.MinValue, DateTime.UtcNow, security, true);
+        var orders = await orderService.GetOrders(security, DateTime.MinValue, DateTime.UtcNow, true);
         return Ok(orders);
     }
 

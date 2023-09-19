@@ -2,6 +2,6 @@
 
 public class FinancialStat
 {
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
     public decimal MarketCap { get; set; }
 }

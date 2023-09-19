@@ -15,12 +15,12 @@ namespace TradeCommon.Essentials.Portfolios;
 [Unique(nameof(AssetId), nameof(AccountId))]
 public class Balance
 {
-    public int AssetId { get; set; }
+    public int AssetId { get; set; } = 0;
 
     /// <summary>
     /// The associated account's Id.
     /// </summary>
-    public int AccountId { get; set; }
+    public int AccountId { get; set; } = 0;
 
     /// <summary>
     /// Name of the asset, usually it is a kind of currency.
@@ -44,12 +44,6 @@ public class Balance
     public decimal SettlingAmount { get; set; }
 
     public DateTime UpdateTime { get; set; }
-
-    /// <summary>
-    /// Indicates this object is not complete and temporary.
-    /// </summary>
-    [DatabaseIgnore]
-    public bool IsTemp { get; set; }
 
     public override string ToString()
     {

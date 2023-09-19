@@ -44,6 +44,18 @@ public interface ITradeService
     /// <param name="requestExternal"></param>
     /// <returns></returns>
     Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false);
-
+    
+    /// <summary>
+    /// Get the cached trades related to an order.
+    /// </summary>
+    /// <param name="orderId"></param>
+    /// <returns></returns>
+    List<Trade> GetTrades(long orderId);
     Task CloseAllPositions(Security security);
+
+    /// <summary>
+    /// Update the internal state.
+    /// </summary>
+    /// <param name="trades"></param>
+    void Update(ICollection<Trade> trades);
 }

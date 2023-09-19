@@ -40,7 +40,7 @@ public class StandardDeviation : Calculator
         {
             double first = _cachedValues.First!.ValueRef;
             _cachedValues.RemoveFirst();
-            _previousAverage = (_previousAverage * Period + value - first) / Period;
+            _previousAverage = ((_previousAverage * Period) + value - first) / Period;
 
             return FindStdev(_cachedValues, _previousAverage);
         }
@@ -71,7 +71,7 @@ public class StandardDeviation : Calculator
         {
             decimal first = _cachedDecimalValues.First!.ValueRef;
             _cachedDecimalValues.RemoveFirst();
-            _previousDecimalAverage = (_previousDecimalAverage * Period + value - first) / Period;
+            _previousDecimalAverage = ((_previousDecimalAverage * Period) + value - first) / Period;
 
             return FindStdev(_cachedDecimalValues, _previousDecimalAverage);
         }

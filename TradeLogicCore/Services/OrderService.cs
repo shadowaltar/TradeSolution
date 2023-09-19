@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using TradeCommon.CodeAnalysis;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -24,6 +23,7 @@ public class OrderService : IOrderService, IDisposable
     private readonly Dictionary<long, Order> _openOrders = new();
     private readonly Dictionary<long, Order> _ordersByExternalId = new();
     private readonly Dictionary<long, Order> _cancelledOrders = new();
+    private readonly Dictionary<long, Order> _errorOrders = new();
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
 
@@ -55,9 +55,15 @@ public class OrderService : IOrderService, IDisposable
         _orderIdGen = new IdGenerator("OrderIdGen");
     }
 
-    public Order? GetOrder(long orderId) => _orders.ThreadSafeGet(orderId);
+    public Order? GetOrder(long orderId)
+    {
+        return _orders.ThreadSafeGet(orderId);
+    }
 
-    public Order? GetOrderByExternalId(long externalOrderId) => _ordersByExternalId.ThreadSafeGet(externalOrderId);
+    public Order? GetOrderByExternalId(long externalOrderId)
+    {
+        return _ordersByExternalId.ThreadSafeGet(externalOrderId);
+    }
 
     public List<Order> GetOrders(Security? security = null, bool requestExternal = false)
     {
@@ -65,17 +71,24 @@ public class OrderService : IOrderService, IDisposable
         return _orders.ThreadSafeValues();
     }
 
-    public async Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false)
+    public async Task<List<Order>> GetOrders(Security security, DateTime start, DateTime end, bool requestExternal = false)
     {
-        Order[] orders;
+        var orders = new List<Order>();
         if (requestExternal)
         {
             var state = await _execution.GetOrderHistory(security, start, end);
-            orders = state?.ContentAs<Order[]>() ?? new Order[0];
+            orders.AddOrAddRange(state.Get<List<Order>>(), state.Get<Order>());
+            foreach (var order in orders)
+            {
+                order.AccountId = _context.Account!.Id;
+                order.BrokerId = _context.BrokerId;
+                order.ExchangeId = _context.ExchangeId;
+                order.SecurityCode = security.Code;
+            }
         }
         else
         {
-            orders = (await _storage.ReadOrders(security, start, end)).ToArray();
+            orders = await _storage.ReadOrders(security, start, end);
         }
         foreach (var order in orders)
         {
@@ -92,13 +105,17 @@ public class OrderService : IOrderService, IDisposable
         if (requestExternal)
         {
             var state = await _execution.GetOpenOrders(security);
-            return state.ContentAs<List<Order>?>() ?? new List<Order>();
+            var orders = state.Get<List<Order>>();
+            if (orders == null)
+            {
+                var order = state.Get<Order>();
+                return order == null ? new List<Order>() : new List<Order> { order };
+            }
+            return orders;
         }
         else
         {
-            if (_openOrders.IsNullOrEmpty())
-                return await _storage.ReadOpenOrders(security);
-            return _openOrders.ThreadSafeValues();
+            return _openOrders.IsNullOrEmpty() ? await _storage.ReadOpenOrders(security) : _openOrders.ThreadSafeValues();
         }
     }
 
@@ -106,7 +123,7 @@ public class OrderService : IOrderService, IDisposable
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
-        if (order.Id == 0)
+        if (order.Id <= 0)
             order.Id = _orderIdGen.NewTimeBasedId;
         if (order.CreateTime == DateTime.MinValue)
             order.CreateTime = DateTime.UtcNow;
@@ -237,7 +254,7 @@ public class OrderService : IOrderService, IDisposable
             _log.Warn("Received a sent order action with issue.");
         }
 
-        var order = state.ContentAs<Order>();
+        var order = state.Get<Order>();
         if (order == null)
         {
             _log.Warn("Received a state object without content!");
@@ -260,7 +277,7 @@ public class OrderService : IOrderService, IDisposable
             _log.Warn("Received a cancel order action with issue.");
         }
 
-        var order = state.ContentAs<Order>();
+        var order = state.Get<Order>();
         if (order == null)
         {
             _log.Warn("Received a state object without content!");
@@ -279,14 +296,45 @@ public class OrderService : IOrderService, IDisposable
         OrderCancelled?.Invoke(order);
     }
 
-    private void Persist(Order order) => _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+    public void Update(ICollection<Order> orders)
+    {
+        foreach (var order in orders)
+        {
+            if (order.Id <= 0)
+            {
+                order.Id = _orderIdGen.NewTimeBasedId;
+            }
+            order.AccountId = _context.Account.Id;
+            order.BrokerId = _context.BrokerId;
+            order.ExchangeId = _context.ExchangeId;
+            if (order.Status == OrderStatus.Live)
+            {
+                _openOrders.ThreadSafeSet(order.Id, order);
+            }
+            else if (order.Status == OrderStatus.Failed)
+            {
+                _errorOrders.ThreadSafeSet(order.Id, order);
+            }
+            else if (order.Status is OrderStatus.Cancelled or OrderStatus.PartialCancelled)
+            {
+                _cancelledOrders.ThreadSafeSet(order.Id, order);
+            }
+            _orders.ThreadSafeSet(order.Id, order);
+            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+        }
+    }
+
+    public void Persist(Order order)
+    {
+        _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+    }
 
     private void Persist(ExternalQueryState state)
     {
         if (state.ResultCode == ResultCode.CancelOrderOk)
         {
-            var orders = state.ContentAs<List<Order>>();
-            var order = state.ContentAs<Order>();
+            var orders = state.Get<List<Order>>();
+            var order = state.Get<Order>();
             // expect to have at least one
             if (!orders.IsNullOrEmpty())
                 _persistence.Enqueue(new PersistenceTask<Order>(orders) { ActionType = DatabaseActionType.Update });

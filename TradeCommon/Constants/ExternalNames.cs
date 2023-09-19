@@ -1,6 +1,4 @@
-﻿using OfficeOpenXml.Style;
-
-namespace TradeCommon.Constants;
+﻿namespace TradeCommon.Constants;
 public static class ExternalNames
 {
     public const string Futu = "FUTU";
@@ -19,7 +17,7 @@ public static class ExternalNames
         { BrokerType.Futu, 200 },
 
         { BrokerType.Unknown, 0 },
-        { BrokerType.Simulator, -1 },
+        { BrokerType.Simulator, -100 },
     };
 
     public static readonly IReadOnlyDictionary<ExchangeType, int> ExchangeTypeToIds = new Dictionary<ExchangeType, int>()

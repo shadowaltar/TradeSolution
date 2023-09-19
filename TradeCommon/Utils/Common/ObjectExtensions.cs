@@ -1,4 +1,6 @@
-﻿namespace Common;
+﻿using System.Runtime.CompilerServices;
+
+namespace Common;
 public static class ObjectExtensions
 {
     /// <summary>
@@ -15,5 +17,10 @@ public static class ObjectExtensions
         if (o1 == null && o2 != null) return -1;
 
         return o1!.CompareTo(o2);
+    }
+
+    public static T FastCast<T>(this object o)
+    {
+        return Unsafe.As<object, T>(ref o);
     }
 }

@@ -156,7 +156,7 @@ public class AdminService : IAdminService
 
     public async Task<int> CreateAccount(Account account)
     {
-        if (account.Id < 0) throw new ArgumentException("Invalid account type.");
+        if (account.Id <= 0) throw new ArgumentException("Invalid account type.");
         if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
 
         account.ValidateOrThrow();
@@ -198,7 +198,7 @@ public class AdminService : IAdminService
         else
         {
             var state = await _accountManagement.GetAccount(assets);
-            var account = state.ContentAs<Account>();
+            var account = state.Get<Account>();
             if (account == null)
                 return null;
 
@@ -239,8 +239,7 @@ public class AdminService : IAdminService
                 _log.Error("Received a balance update with unknown asset id, asset code is: " + balance.AssetCode);
 
             balance.AccountId = account.Id;
-            balance.AssetId = asset?.Id ?? -1;
-            balance.IsTemp = false;
+            balance.AssetId = asset?.Id ?? 0;
             balance.UpdateTime = DateTime.UtcNow;
         }
         _persistence.Enqueue(new PersistenceTask<Balance>(balances) { ActionType = DatabaseActionType.Update });

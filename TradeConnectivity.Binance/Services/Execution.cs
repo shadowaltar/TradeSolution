@@ -185,8 +185,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         Side = order.Side,
                         Fee = item.GetDecimal("commission"),
                         FeeAssetCode = item.GetString("commissionAsset"),
-                        // FeeAssetId cannot be determined, until executing in service layer logic
-                        IsTemp = true,
+                        FeeAssetId = 0, // cannot be determined until executing in service layer logic
                         BrokerId = _context.BrokerId,
                         Time = order.ExternalUpdateTime,
                         ExchangeId = _context.ExchangeId,
@@ -307,14 +306,22 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     var side = tradeObj.GetBoolean("isBuyerMaker") ? Side.Sell : Side.Buy;
                     var trade = new Trade
                     {
+                        Id = 0,
+                        BrokerId = 0,
+                        ExchangeId = 0,
+                        ExternalOrderId = 0,
+                        Fee = 0,
+                        FeeAssetId = 0,
+                        FeeAssetCode = "",
+                        OrderId = 0,
+                        BestMatch = 0,
                         SecurityId = security.Id,
+                        SecurityCode = "",
                         ExternalTradeId = tradeId,
                         Price = price,
                         Quantity = quantity,
                         Time = time,
                         Side = side,
-
-                        IsTemp = true,
                     };
                     trades.Add(trade);
                 }
@@ -531,9 +538,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             foreach (var (s, e) in (start.Value, end.Value).Split(TimeSpans.OneDay))
             {
                 var state = await GetTrades(security, externalOrderId, s, e);
-                results.AddRange(state.ContentAs<List<Trade>>()!);
+                results.AddOrAddRange(state.Get<List<Trade>>(), state.Get<Trade>());
                 totalRtt += state.NetworkRoundtripTime;
                 totalTime += state.TotalTime;
+                states.Add(state);
             }
             var totalState = ExternalQueryStates.QueryTrades("", "", security.Code, results).RecordTimes(totalRtt, totalTime);
             totalState.SubStates = states;
@@ -652,14 +660,19 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
     private static Order ParseOrder(JsonObject rootObj, int? securityId)
     {
+        // 'workingTime' is similar to 'time', usually smaller than 'updateTime'
+        var createTime = rootObj.GetUtcFromUnixMs("time");
+        var updateTime = rootObj.GetUtcFromUnixMs("updateTime");
         return new Order
         {
             Id = rootObj.GetLong("clientOrderId"),
-            ExternalOrderId = rootObj.GetLong("id"),
+            ExternalOrderId = rootObj.GetLong("id", rootObj.GetLong("orderId")),
             SecurityId = securityId ?? 0,
             SecurityCode = rootObj.GetString("symbol"),
-            ExternalCreateTime = rootObj.GetUtcFromUnixMs("time"),
-            ExternalUpdateTime = rootObj.GetUtcFromUnixMs("updateTime"), // TODO what about 'workingTime'?
+            CreateTime = createTime,
+            ExternalCreateTime = createTime,
+            UpdateTime = updateTime,
+            ExternalUpdateTime = updateTime,
             Price = rootObj.GetDecimal("price"),
             Quantity = rootObj.GetDecimal("origQty"),
             FilledQuantity = rootObj.GetDecimal("executedQty"),
@@ -692,13 +705,12 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                 BestMatch = rootObj.GetBoolean("isBestMatch") ? 1 : -1,
                 BrokerId = _context.BrokerId,
                 ExchangeId = _context.ExchangeId,
-                
+
                 // the trades got from external are lacking some ids
                 // set it to temp to allow later logic to fix them
-                SecurityId = securityId ?? -1,
-                OrderId = -1,
-                FeeAssetId = -1,
-                IsTemp = true,
+                SecurityId = securityId ?? 0,
+                OrderId = 0,
+                FeeAssetId = 0
             };
         }
         catch (Exception ex)
@@ -746,44 +758,42 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             switch (messageType)
             {
                 case "outboundAccountPosition": // balance changes due to trading activities
+                {
+                    var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
+                    var balanceArray = jsonNode["B"]?.AsArray();
+                    if (balanceArray == null)
                     {
-                        var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
-                        var balanceArray = jsonNode["B"]?.AsArray();
-                        if (balanceArray == null)
-                        {
-                            _log.Warn($"Unknown user-streaming account balance data."); break;
-                        }
-                        var balances = new List<Balance>();
-                        foreach (var balanceObject in balanceArray.OfType<JsonObject>())
-                        {
-                            var balance = new Balance
-                            {
-                                AssetCode = balanceObject.GetString("a"),
-                                FreeAmount = balanceObject.GetDecimal("f"),
-                                LockedAmount = balanceObject.GetDecimal("l"),
-                                IsTemp = true,
-                            };
-                            balances.Add(balance);
-                        }
-                        BalancesChanged?.Invoke(balances);
+                        _log.Warn($"Unknown user-streaming account balance data."); break;
                     }
-                    break;
-                case "balanceUpdate": // balance changes due to deposit or withdrawal or fund transfer
+                    var balances = new List<Balance>();
+                    foreach (var balanceObject in balanceArray.OfType<JsonObject>())
                     {
-                        var delta = jsonNode.GetDecimal("d");
-                        var transaction = new TransferAction
+                        var balance = new Balance
                         {
-                            Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
-                            Quantity = Math.Abs(delta),
-                            AssetCode = jsonNode.GetString("a"),
-                            RequestTime = eventTime,
-                            EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                            AssetCode = balanceObject.GetString("a"),
+                            FreeAmount = balanceObject.GetDecimal("f"),
+                            LockedAmount = balanceObject.GetDecimal("l"),
                         };
-                        Transferred?.Invoke(transaction);
+                        balances.Add(balance);
                     }
-                    break;
+                    BalancesChanged?.Invoke(balances);
+                }
+                break;
+                case "balanceUpdate": // balance changes due to deposit or withdrawal or fund transfer
+                {
+                    var delta = jsonNode.GetDecimal("d");
+                    var transaction = new TransferAction
+                    {
+                        Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
+                        Quantity = Math.Abs(delta),
+                        AssetCode = jsonNode.GetString("a"),
+                        RequestTime = eventTime,
+                        EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                    };
+                    Transferred?.Invoke(transaction);
+                }
+                break;
                 case "executionReport": // order
-
                     var sideString = jsonNode.GetString("S");
                     var orderTypeString = jsonNode.GetString("o");
 
@@ -828,7 +838,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     var order = new Order
                     {
                         Id = orderId, // need to be filled later
-                        AccountId = -1, // need to be filled later
+                        AccountId = 0, // need to be filled later
                         BrokerId = _brokerId,
                         ExchangeId = _exchangeId,
                         CreateTime = DateTime.MinValue, // need to be filled later
@@ -843,7 +853,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         Price = orderType == OrderType.Market ? orderPrice : 0,
                         Quantity = orderQuantity,
                         SecurityCode = code,
-                        SecurityId = -1, // need to be filled later
+                        SecurityId = 0, // need to be filled later
                         Side = side,
                         StopPrice = stopPrice,
                         StrategyId = strategyId,
@@ -858,7 +868,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         {
                             Id = _tradeIdGenerator.NewTimeBasedId,
                             ExternalOrderId = externalOrderId,
-                            SecurityId = -1, // need to be filled later
+                            SecurityId = 0, // need to be filled later
                             SecurityCode = code,
                             Side = side,
                             BrokerId = _brokerId,
@@ -866,10 +876,12 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             ExternalTradeId = externalTradeId,
                             Fee = fee,
                             FeeAssetCode = feeAssetCode,
-                            FeeAssetId = -1, // need to be filled later
-                            IsTemp = false,
+                            FeeAssetId = 0, // need to be filled later
                             BestMatch = 0,
-                            OrderId = -1, // need to be filled later
+                            OrderId = 0, // need to be filled later
+                            Price = 0, // TODO
+                            Quantity = 0, // TODO
+                            Time = updateTime, // TODO
                         };
                         TradeReceived?.Invoke(trade);
                     }

@@ -65,6 +65,7 @@ public class Program
 
         //var storage = new Storage();
         //var x = await storage.CreateTable<AlgoEntry>();
+        //var y = await storage.CreateTradeTable(SecurityType.Fx);
 
         await RunMacMimicWebService();
         //await NewOrderDemo();
@@ -431,7 +432,7 @@ public class Program
                     }
                     assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
                     var endQuantity = assetPosition.Quantity.ToDouble();
-                    var annualizedReturn = Metrics.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
+                    var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                     if (annualizedReturn == 0)
                     {
                         _log.Info($"No trades at all: {security.Code}");
@@ -447,7 +448,7 @@ public class Program
                         security.Name,
                         intervalStr,
                         endQuantity,
-                        Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
+                        Maths.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
                         annualizedReturn.ToString("P4"),
                         tradeCount,
                         entries.Count(e => e.LongCloseType == CloseType.StopLoss),
@@ -597,7 +598,7 @@ public class Program
 
                         assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
                         var endQuantity = assetPosition.Quantity.ToDouble();
-                        var annualizedReturn = Metrics.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
+                        var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                         if (annualizedReturn == 0)
                         {
                             _log.Info($"No trades at all: {security.Code}");
@@ -618,7 +619,7 @@ public class Program
                             security.Code,
                             security.Name,
                             endQuantity,
-                            Metrics.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
+                            Maths.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
                             annualizedReturn.ToString("P4"),
                             tradeCount,
                             entries.Count(e => e.LongCloseType == CloseType.StopLoss),

@@ -1,5 +1,7 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
+using System.Diagnostics;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -18,10 +20,13 @@ public class TradeService : ITradeService, IDisposable
     private readonly ISecurityService _securityService;
     private readonly IOrderService _orderService;
     private readonly Persistence _persistence;
-    private readonly IdGenerator _orderIdGenerator;
+    private readonly IdGenerator _orderIdGen;
+    private readonly IdGenerator _tradeIdGen;
     private readonly Dictionary<long, Trade> _trades = new();
+    private readonly Dictionary<long, Trade> _tradesByExternalId = new();
     private readonly Dictionary<long, List<Trade>> _tradesByOrderId = new();
-    private readonly Dictionary<string, Security> _assets = new();
+    private readonly Dictionary<string, Security> _assetsByCode = new();
+    private readonly Dictionary<int, Security> _assetsById = new();
 
     public event Action<Trade>? NextTrade;
 
@@ -39,7 +44,8 @@ public class TradeService : ITradeService, IDisposable
         _securityService = securityService;
         _orderService = orderService;
         _persistence = persistence;
-        _orderIdGenerator = IdGenerators.Get<Order>();
+        _orderIdGen = IdGenerators.Get<Order>();
+        _tradeIdGen = IdGenerators.Get<Trade>();
 
         _execution.TradeReceived -= OnTradeReceived;
         _execution.TradesReceived -= OnTradesReceived;
@@ -49,13 +55,13 @@ public class TradeService : ITradeService, IDisposable
 
     public void Initialize()
     {
-        lock (_assets)
+        lock (_assetsByCode)
         {
-            _assets.Clear();
+            _assetsByCode.Clear();
             var assets = _securityService.GetAssets(_context.Exchange);
             foreach (var item in assets)
             {
-                _assets[item.Code] = item;
+                _assetsByCode[item.Code] = item;
             }
         }
     }
@@ -63,9 +69,10 @@ public class TradeService : ITradeService, IDisposable
     private void OnTradeReceived(Trade trade)
     {
         InternalOnNextTrade(trade);
+        UpdateTradeByOrderId(trade);
+        //UpdateOrderFilledPrice(trade.OrderId);
 
         NextTrade?.Invoke(trade);
-
         Persist(trade);
     }
 
@@ -75,9 +82,13 @@ public class TradeService : ITradeService, IDisposable
         {
             InternalOnNextTrade(trade);
         }
+        UpdateTradesByOrderId(trades);
+        //foreach (var orderId in trades.Select(t => t.OrderId))
+        //{
+        //    UpdateOrderFilledPrice(orderId);
+        //}
 
         NextTrades?.Invoke(trades);
-
         foreach (var trade in trades)
         {
             Persist(trade);
@@ -89,12 +100,12 @@ public class TradeService : ITradeService, IDisposable
         // When a trade is received from external system execution engine
         // parser logic, it might only have external order id info.
         // Need to associate the order and the trade here.
-        if (trade.ExternalTradeId == Trade.DefaultId)
+        if (trade.ExternalTradeId <= 0)
         {
             _log.Error("The external system's trade id of a trade must exist.");
             return;
         }
-        if (trade.ExternalOrderId == Trade.DefaultId)
+        if (trade.ExternalOrderId <= 0)
         {
             _log.Error("The external system's order id of a trade must exist.");
             return;
@@ -109,14 +120,18 @@ public class TradeService : ITradeService, IDisposable
         }
 
         // resolve fee asset id here
-        if (!trade.FeeAssetCode.IsBlank())
+        if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
         {
-            trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
-            trade.IsTemp = false;
+            trade.FeeAssetId = _assetsByCode.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : 0;
+        }
+        if (trade.FeeAssetCode.IsBlank() && trade.FeeAssetId != 0)
+        {
+            trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
         }
         trade.SecurityId = order.SecurityId;
         trade.OrderId = order.Id;
         _trades.ThreadSafeSet(trade.Id, trade);
+        _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
     }
 
     public void Dispose()
@@ -127,16 +142,16 @@ public class TradeService : ITradeService, IDisposable
     public async Task<List<Trade>> GetMarketTrades(Security security)
     {
         var state = await _execution.GetMarketTrades(security);
-        return state.ContentAs<List<Trade>>()!;
+        return state.Get<List<Trade>>();
     }
 
     public async Task<List<Trade>> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false)
     {
-        List<Trade> trades;
+        List<Trade>? trades;
         if (requestExternal)
         {
             var state = await _execution.GetTrades(security, start: start, end: end);
-            trades = state.ContentAs<List<Trade>>()!;
+            trades = state.GetAll<Trade>();
         }
         else
         {
@@ -145,17 +160,32 @@ public class TradeService : ITradeService, IDisposable
             trades = await _storage.ReadTrades(security, s, e);
         }
         FixTempTrades(trades, security);
-        return trades;
+        return trades ?? new List<Trade>();
     }
 
-    private void FixTempTrades(List<Trade> trades, Security security)
+    private void FixTempTrades(List<Trade>? trades, Security security)
     {
+        if (trades.IsNullOrEmpty()) return;
         foreach (var trade in trades)
         {
-            trade.FeeAssetId = _assets.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : -1;
+            if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
+            {
+                trade.FeeAssetId = _assetsByCode.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : 0;
+            }
+            if (trade.FeeAssetCode.IsBlank() && trade.FeeAssetId != 0)
+            {
+                trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
+            }
             trade.SecurityId = security.Id;
             trade.SecurityCode = security.Code;
-            trade.IsTemp = false;
+        }
+    }
+
+    public List<Trade> GetTrades(long orderId)
+    {
+        lock (_tradesByOrderId)
+        {
+            return _tradesByOrderId.GetOrCreate(orderId).ToList();
         }
     }
 
@@ -168,14 +198,13 @@ public class TradeService : ITradeService, IDisposable
             if (order == null) return new(); // TODO if an order is not cached in order service, this returns null
 
             var state = await _execution.GetTrades(security, order.ExternalOrderId);
-            trades = state.ContentAs<List<Trade>>() ?? new();
-            _tradesByOrderId.ThreadSafeSet(orderId, trades); // replace anything cached directly
+            trades = state.GetAll<Trade>();
         }
         else
         {
             trades = await _storage.ReadTrades(security, orderId);
-            _tradesByOrderId.ThreadSafeSet(orderId, trades);
         }
+        trades ??= new List<Trade>();
         foreach (var trade in trades)
         {
             trade.SecurityCode = security.Code;
@@ -198,7 +227,7 @@ public class TradeService : ITradeService, IDisposable
 
             var order = new Order
             {
-                Id = _orderIdGenerator.NewTimeBasedId,
+                Id = _orderIdGen.NewTimeBasedId,
                 SecurityCode = security.Code,
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
@@ -209,6 +238,78 @@ public class TradeService : ITradeService, IDisposable
             };
             await _orderService.SendOrder(order);
         }
+    }
+
+    public void Update(ICollection<Trade> trades)
+    {
+        foreach (var trade in trades)
+        {
+            if (trade.Id <= 0)
+            {
+                trade.Id = _tradeIdGen.NewTimeBasedId;
+            }
+            if (trade.OrderId <= 0)
+            {
+                var order = _orderService.GetOrderByExternalId(trade.ExternalOrderId);
+                if (order == null || trade.ExternalOrderId <= 0)
+                {
+                    _log.Error("Failed to find corresponding order by trade external-order-id, or the id is invalid.");
+                }
+                else
+                {
+                    trade.OrderId = order.Id;
+                }
+            }
+            _trades.ThreadSafeSet(trade.Id, trade);
+            _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
+        }
+        UpdateTradesByOrderId(trades);
+    }
+
+    private void UpdateTradesByOrderId(ICollection<Trade> trades)
+    {
+        lock (_tradesByOrderId)
+        {
+            foreach (var trade in trades)
+            {
+                var ts = _tradesByOrderId.GetOrCreate(trade.OrderId);
+                var existingIndex = ts.FindIndex(t => t.Id == trade.Id);
+                if (existingIndex != -1)
+                    ts[existingIndex] = trade;
+                else
+                    ts.Add(trade);
+            }
+        }
+    }
+
+    private void UpdateTradeByOrderId(Trade trade)
+    {
+        lock (_tradesByOrderId)
+        {
+            var ts = _tradesByOrderId.GetOrCreate(trade.OrderId);
+            var existingIndex = ts.FindIndex(t => t.Id == trade.Id);
+            if (existingIndex != -1)
+                ts[existingIndex] = trade;
+            else
+                ts.Add(trade);
+        }
+    }
+
+    private void UpdateOrderFilledPrice(long orderId)
+    {
+        var order = _orderService.GetOrder(orderId);
+        if (order == null) throw Exceptions.InvalidTradeServiceState("Expect an order already cached when requesting it from TradeService, orderId " + orderId);
+
+        var trades = _tradesByOrderId.ThreadSafeGet(orderId);
+        if (trades == null) throw Exceptions.InvalidTradeServiceState("Must cache before update order filled price, orderId " + orderId);
+
+        var sumProduct = trades.Sum(t => t.Price * t.Quantity);
+        var sumQuantity = trades.Sum(t => t.Quantity);
+        var weightedPrice = sumProduct / sumQuantity;
+        if (order.Price == weightedPrice)
+            return;
+
+        _orderService.Persist(order);
     }
 
     private void Persist(Trade trade) => _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });

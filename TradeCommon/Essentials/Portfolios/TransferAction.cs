@@ -5,8 +5,8 @@ namespace TradeCommon.Essentials.Portfolios;
 public class TransferAction
 {
     public ActionType Action { get; set; }
-    public int AssetId { get; set; }
-    
+    public int AssetId { get; set; } = 0;
+
     [DatabaseIgnore]
     public string? AssetCode { get; set; }
     public decimal Quantity { get; set; }

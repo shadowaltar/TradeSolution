@@ -73,8 +73,8 @@ public class AccountManager : IExternalAccountManagement
                 var asset = balanceObj.GetString("asset");
                 var free = balanceObj.GetDecimal("free");
                 var locked = balanceObj.GetDecimal("locked");
-                var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? -1;
-                if (assetId == -1)
+                var assetId = assets?.FirstOrDefault(a => a.Name == asset)?.Id ?? 0;
+                if (assetId <= 0)
                 {
                     // those assets/symbols which are not actively trading
                     // this happens in TEST site very often

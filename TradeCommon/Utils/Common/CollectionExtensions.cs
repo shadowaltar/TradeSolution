@@ -87,6 +87,19 @@ public static class CollectionExtensions
             collection.Add(v);
     }
 
+    public static void AddOrAddRange<T>(this ICollection<T> collection, IEnumerable<T>? values, T? value)
+    {
+        if (values != null)
+        {
+            foreach (var v in values)
+            {
+                collection.Add(v);
+            }
+        }
+        if (value != null)
+            collection.Add(value);
+    }
+
     public static void AddRange<Tk, Tv>(this IDictionary<Tk, Tv>? collection, IEnumerable<KeyValuePair<Tk, Tv>>? values)
     {
         if (collection == null || values == null) return;

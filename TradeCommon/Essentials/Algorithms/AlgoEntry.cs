@@ -18,28 +18,28 @@ public record AlgoEntry
     /// The id of batch of algorithm execution.
     /// </summary>
     [NotNull]
-    public int BatchId { get; set; }
+    public int BatchId { get; set; } = 0;
 
     /// <summary>
     /// The algorithm's Id.
     /// </summary>
     [NotNull]
-    public int AlgoId { get; set; }
+    public int AlgoId { get; set; } = 0;
 
     /// <summary>
     /// The version id of this algorithm.
     /// </summary>
     [NotNull]
-    public int VersionId { get; set; }
+    public int VersionId { get; set; } = 0;
 
     /// <summary>
     /// The id which indicates a position's existence over multiple algo-entries
     /// </summary>
-    [NotNull, DefaultValue(0)]
-    public long PositionId { get; set; }
+    [NotNull]
+    public long PositionId { get; set; } = 0;
 
     [NotNull]
-    public int SecurityId { get; set; } = -1;
+    public int SecurityId { get; set; } = 0;
 
     [DatabaseIgnore]
     public Security Security { get; set; }

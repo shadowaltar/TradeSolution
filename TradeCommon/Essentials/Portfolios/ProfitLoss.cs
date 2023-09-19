@@ -1,7 +1,7 @@
 ﻿namespace TradeCommon.Essentials.Portfolios;
 public class ProfitLoss
 {
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
     public decimal Value { get; set; }
     public decimal StartPrice { get; set; }
     public decimal EndPrice { get; set; }

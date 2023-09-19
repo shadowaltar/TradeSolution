@@ -1,12 +1,12 @@
 ﻿using Common;
 
 namespace TradeCommon.Calculations;
-public class Metrics
+public class Maths
 {
     public static double GetAnnualizedReturn(double start, double end, DateTime startTime, DateTime endTime)
     {
         var years = 365 / (endTime - startTime).TotalDays;
-        return Math.Pow(((end - start) / start + 1), years) - 1;
+        return Math.Pow(end / start, years) - 1;
     }
 
     public static double GetStandardDeviation(IList<double> values, bool isSample = true, bool ignoreInvalid = true)

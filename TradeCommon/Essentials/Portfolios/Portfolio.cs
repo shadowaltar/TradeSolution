@@ -11,7 +11,7 @@ public record Portfolio
 
     public Dictionary<long, Position> AssetPositions { get; } = new();
 
-    public int AccountId { get; }
+    public int AccountId { get; } = 0;
 
     public Portfolio(Account account)
     {
@@ -20,7 +20,7 @@ public record Portfolio
         {
             var position = new Position
             {
-                Id = -1,
+                Id = 0,
                 AccountId = balance.AccountId,
                 SecurityId = balance.AssetId,
                 SecurityCode = balance.AssetCode,

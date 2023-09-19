@@ -54,12 +54,12 @@ public interface IOrderService
     /// Get all orders given by a time range, and optional security name.
     /// Either from external if <paramref name="requestExternal"/> == true, or from data storage.
     /// </summary>
+    /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
-    /// <param name="security"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<Order[]> GetOrderHistory(DateTime start, DateTime end, Security security, bool requestExternal = false);
+    Task<List<Order>> GetOrders(Security security, DateTime start, DateTime end, bool requestExternal = false);
 
     /// <summary>
     /// Get all open orders with an optional security name.
@@ -120,4 +120,16 @@ public interface IOrderService
                             Side side,
                             OrderType orderType = OrderType.Limit,
                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+
+    /// <summary>
+    /// Update the internal state.
+    /// </summary>
+    /// <param name="orders"></param>
+    void Update(ICollection<Order> orders);
+
+    /// <summary>
+    /// Persist an order to data storage.
+    /// </summary>
+    /// <param name="order"></param>
+    void Persist(Order order);
 }

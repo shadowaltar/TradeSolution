@@ -14,26 +14,24 @@ namespace TradeCommon.Essentials.Trading;
 [Index(nameof(ExternalOrderId))]
 public class Order : IComparable<Order>, ICloneable
 {
-    public const long DefaultId = 0;
-
     /// <summary>
     /// Unique order id.
     /// </summary>
     [NotNull, Positive]
-    public long Id { get; set; }
+    public long Id { get; set; } = 0;
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// If this is a new order it should be null.
     /// </summary>
     [NotNull, Positive]
-    public long ExternalOrderId { get; set; } = DefaultId;
+    public long ExternalOrderId { get; set; } = 0;
 
     /// <summary>
     /// The id of security to be or already being bought / sold.
     /// </summary>
     [NotNull, Positive]
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
 
     /// <summary>
     /// Security code (will not be saved to database).
@@ -45,7 +43,7 @@ public class Order : IComparable<Order>, ICloneable
     /// The target account. This embeds the broker info.
     /// </summary>
     [NotNull, Positive]
-    public int AccountId { get; set; }
+    public int AccountId { get; set; } = 0;
 
     /// <summary>
     /// The type of order.
@@ -94,7 +92,7 @@ public class Order : IComparable<Order>, ICloneable
     /// If a system does not support stop loss / take profit order in one go,
     /// The individual stop loss / take profit order should indicate its original order here.
     /// </summary>
-    public long ParentOrderId { get; set; }
+    public long ParentOrderId { get; set; } = 0;
 
     /// <summary>
     /// Order creation time (client-side).
@@ -129,7 +127,7 @@ public class Order : IComparable<Order>, ICloneable
     /// <summary>
     /// The strategy used to generate this order.
     /// </summary>
-    public int StrategyId { get; set; }
+    public int StrategyId { get; set; } = 0;
 
     /// <summary>
     /// The broker's ID.

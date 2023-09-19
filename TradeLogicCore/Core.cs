@@ -1,6 +1,6 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -64,14 +64,10 @@ public class Core
         await ReconcileAccountAndBalance(user);
         await ReconcileOpenOrders();
 
-        await Task.Run(async () =>
-        {
-            // check one week's historical order / trade only
-            // they should not impact trading
-            var previousDay = startTime.AddDays(-7);
-            await ReconcileRecentOrderHistory(previousDay, startTime, parameters.SecurityPool);
-            await ReconcileRecentTradeHistory(previousDay, startTime, parameters.SecurityPool);
-        });
+        // check one week's historical order / trade only
+        var previousDay = startTime.AddDays(-7);
+        await CacheAndReconcileRecentOrders(previousDay, startTime, parameters.SecurityPool);
+        await CacheAndReconcileRecentTrades(previousDay, startTime, parameters.SecurityPool);
 
         var guid = Guid.NewGuid();
         _ = Task.Factory.StartNew(async () =>
@@ -119,74 +115,101 @@ public class Core
         return _algorithms.Values.ToList();
     }
 
-    private async Task ReconcileRecentOrderHistory(DateTime start, DateTime end, List<Security> securities)
+    private async Task CacheAndReconcileRecentOrders(DateTime start, DateTime end, List<Security> securities)
     {
+        if (securities.IsNullOrEmpty() || start > end) return;
         var externalOrders = new Dictionary<long, Order>();
         var internalOrders = new Dictionary<long, Order>();
+
+        // sync external to internal
         foreach (var security in securities)
         {
-            var externalResults = await _services.Order.GetOrderHistory(start, end, security, true);
-            if (externalResults != null)
-            {
-                foreach (var r in externalResults)
-                {
-                    externalOrders[r.ExternalOrderId] = r;
-                }
-            }
-
-            var internalResults = await _services.Order.GetOrderHistory(start, end, security);
-            if (internalResults != null)
-            {
-                foreach (var r in internalResults)
-                {
-                    internalOrders[r.ExternalOrderId] = r;
-                }
-            }
+            var externalResults = await _services.Order.GetOrders(security, start, end, true);
+            var internalResults = await _services.Order.GetOrders(security, start, end);
+            externalOrders.AddRange(externalResults.ToDictionary(o => o.ExternalOrderId, o => o));
+            internalOrders.AddRange(internalResults.ToDictionary(o => o.ExternalOrderId, o => o));
         }
         var (toCreate, toUpdate, toDelete) = FindDifferences(externalOrders, internalOrders);
-
         if (!toCreate.IsNullOrEmpty())
-            _services.Persistence.Enqueue(new PersistenceTask<Order>(toCreate) { ActionType = DatabaseActionType.Create });
+        {
+            _services.Order.Update(toCreate);
+            _log.Info($"{toCreate.Count} recent orders are in external but not internal system and need to be inserted into database.");
+            foreach (var order in toCreate)
+            {
+                await Context.Storage.InsertOrder(order);
+            }
+        }
         if (!toUpdate.IsNullOrEmpty())
-            _services.Persistence.Enqueue(new PersistenceTask<Order>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
+        {
+            _services.Order.Update(toUpdate.Values);
+            _log.Info($"{toUpdate.Count} recent orders in external are different from internal system and need to be updated into database.");
+            foreach (var order in toUpdate.Values)
+            {
+                await Context.Storage.InsertOrder(order);
+            }
+        }
+
+        // read again if necessary and cache them
+        if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
+        {
+            _services.Order.Update(internalOrders.Values);
+        }
+        else
+        {
+            foreach (var security in securities)
+            {
+                var orders = await _services.Order.GetOrders(security, start, end);
+                _services.Order.Update(orders);
+            }
+        }
     }
 
-    private async Task ReconcileRecentTradeHistory(DateTime start, DateTime end, List<Security> securities)
+    private async Task CacheAndReconcileRecentTrades(DateTime start, DateTime end, List<Security> securities)
     {
+        if (securities.IsNullOrEmpty() || start > end) return;
         var externalTrades = new Dictionary<long, Trade>();
         var internalTrades = new Dictionary<long, Trade>();
         foreach (var security in securities)
         {
             var externalResults = await _services.Trade.GetTrades(security, start, end, true);
-            if (!externalResults.IsNullOrEmpty())
-            {
-                foreach (var r in externalResults)
-                {
-                    if (r == null) continue;
-                    externalTrades[r.ExternalTradeId] = r;
-                }
-            }
-
             var internalResults = await _services.Trade.GetTrades(security, start, end);
-            if (!internalResults.IsNullOrEmpty())
-            {
-                foreach (var r in internalResults)
-                {
-                    if (r == null) continue;
-                    internalTrades[r.ExternalTradeId] = r;
-                }
-            }
+            externalTrades.AddRange(externalResults.ToDictionary(o => o.ExternalTradeId, o => o));
+            internalTrades.AddRange(internalResults.ToDictionary(o => o.ExternalTradeId, o => o));
         }
+
+        // sync external to internal
         var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
         if (!toCreate.IsNullOrEmpty())
         {
+            _services.Trade.Update(toCreate);
             _log.Info($"{toCreate.Count} recent trades are in external but not internal system and need to be inserted into database.");
-            _services.Persistence.Enqueue(new PersistenceTask<Trade>(toCreate) { ActionType = DatabaseActionType.Create });
+            foreach (var trade in toCreate)
+            {
+                await Context.Storage.InsertTrade(trade);
+            }
         }
         if (!toUpdate.IsNullOrEmpty())
         {
+            _services.Trade.Update(toUpdate.Values);
             _log.Info($"{toUpdate.Count} recent trades in external are different from internal system and need to be updated into database.");
-            _services.Persistence.Enqueue(new PersistenceTask<Trade>(toUpdate.Values.ToList()) { ActionType = DatabaseActionType.Update });
+            foreach (var trade in toUpdate.Values)
+            {
+                await Context.Storage.InsertTrade(trade);
+            }
+        }
+
+        // read again if necessary and cache them
+        if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
+        {
+            _services.Trade.Update(internalTrades.Values);
+        }
+        else
+        {
+            foreach (var security in securities)
+            {
+                var trades = await _services.Trade.GetTrades(security, start, end);
+                _services.Trade.Update(trades);
+            }
         }
     }
 

@@ -5,7 +5,7 @@ namespace TradeCommon.Essentials.Instruments;
 public class Security
 {
     [AutoIncrementOnInsert]
-    public int Id { get; set; }
+    public int Id { get; set; } = 0;
     public string Code { get; set; }
     public string Name { get; set; }
     public string Exchange { get; set; }

@@ -18,12 +18,12 @@ public record Position
     /// <summary>
     /// Unique id of this position.
     /// </summary>
-    public long Id { get; set; }
+    public long Id { get; set; } = 0;
 
     /// <summary>
     /// The account id associated to this position.
     /// </summary>
-    public int AccountId { get; set; }
+    public int AccountId { get; set; } = 0;
 
     /// <summary>
     /// The time which the position is established.
@@ -71,7 +71,7 @@ public record Position
     /// If it is an fx position, it is the base-quote pair definition Id.
     /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc. 
     /// </summary>
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
 
     /// <summary>
     /// Position base asset's Id.
@@ -79,7 +79,7 @@ public record Position
     /// If it is an fx position, it is the base asset Id.
     /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
     /// </summary>
-    public int BaseAssetId { get; set; } = -1;
+    public int BaseAssetId { get; set; } = 0;
 
     /// <summary>
     /// Position quote asset's Id.
@@ -87,7 +87,7 @@ public record Position
     /// If it is an fx position, it is the quote asset Id.
     /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
     /// </summary>
-    public int QuoteAssetId { get; set; } = -1;
+    public int QuoteAssetId { get; set; } = 0;
 
     /// <summary>
     /// Realized pnl, which is the sum of all realized pnl from each closed trades.

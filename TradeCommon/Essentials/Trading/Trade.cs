@@ -16,19 +16,17 @@ namespace TradeCommon.Essentials.Trading;
 [Storage("trades", "execution")]
 public class Trade : IComparable<Trade>
 {
-    public const long DefaultId = 0;
-
     /// <summary>
     /// Unique trade id.
     /// </summary>
     [NotNull]
-    public long Id { get; set; }
+    public long Id { get; set; } = 0;
 
     /// <summary>
     /// Security id.
     /// </summary>
     [NotNull]
-    public int SecurityId { get; set; }
+    public int SecurityId { get; set; } = 0;
 
     /// <summary>
     /// Security code (will not be saved to database).
@@ -40,19 +38,19 @@ public class Trade : IComparable<Trade>
     /// The order id associated with this trade.
     /// </summary>
     [NotNull]
-    public long OrderId { get; set; }
+    public long OrderId { get; set; } = 0;
 
     /// <summary>
     /// The trade id associated with this trade provided by the broker.
     /// </summary>
     [NotNull]
-    public long ExternalTradeId { get; set; } = DefaultId;
+    public long ExternalTradeId { get; set; } = 0;
 
     /// <summary>
     /// The order id associated with this trade provided by the broker.
     /// </summary>
     [NotNull]
-    public long ExternalOrderId { get; set; } = DefaultId;
+    public long ExternalOrderId { get; set; } = 0;
 
     /// <summary>
     /// Trade execution time.
@@ -88,7 +86,7 @@ public class Trade : IComparable<Trade>
     /// The asset Id of the fee.
     /// </summary>
     [NotNull]
-    public int FeeAssetId { get; set; }
+    public int FeeAssetId { get; set; } = 0;
 
     /// <summary>
     /// The asset/currency of the fee.
@@ -107,15 +105,6 @@ public class Trade : IComparable<Trade>
     /// </summary>
     [NotNull]
     public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
-
-    /// <summary>
-    /// The trade object is coarse such that we don't have
-    /// info to determine who owns it or which order is this trade being related to.
-    /// Usually it is a trade observed in the market which is
-    /// not related to current user.
-    /// </summary>
-    [DatabaseIgnore]
-    public bool IsTemp { get; set; } = false;
 
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
@@ -143,6 +132,6 @@ public class Trade : IComparable<Trade>
 
     public override string ToString()
     {
-        return $"[{Id}][{ExternalTradeId}][{Time:yyMMdd-HHmmss}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
+        return $"[{Id}][{ExternalTradeId}][{Time:yyMMdd-HHmmss}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}, oid:{OrderId}, eoid:{ExternalOrderId}";
     }
 }

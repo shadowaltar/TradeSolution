@@ -12,7 +12,7 @@ namespace TradeCommon.Essentials.Accounts;
 public class User
 {
     [AutoIncrementOnInsert]
-    public int Id { get; set; } = -1;
+    public int Id { get; set; } = 0;
 
     [NotNull, Length(MinLength = 3, MaxLength = 100)]
     public string Name { get; set; } = "";

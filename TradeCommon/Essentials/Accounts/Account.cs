@@ -1,8 +1,7 @@
-﻿using TradeCommon.Essentials.Portfolios;
+﻿using Common.Attributes;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
-using Common.Attributes;
 using TradeCommon.Utils.Common;
-using TradeCommon.Essentials.Instruments;
 
 namespace TradeCommon.Essentials.Accounts;
 
@@ -18,7 +17,7 @@ public class Account
     /// Unique account id.
     /// </summary>
     [AutoIncrementOnInsert]
-    public int Id { get; set; }
+    public int Id { get; set; } = 0;
 
     /// <summary>
     /// Name of account;
@@ -30,7 +29,7 @@ public class Account
     /// Account owner.
     /// </summary>
     [NotNegative]
-    public int OwnerId { get; set; } = int.MinValue;
+    public int OwnerId { get; set; } = 0;
 
     /// <summary>
     /// External account id from broker.
@@ -42,7 +41,7 @@ public class Account
     /// Name of the broker.
     /// </summary>
     [Positive]
-    public int BrokerId { get; set; } = int.MinValue;
+    public int BrokerId { get; set; } = 0;
 
     /// <summary>
     /// Type of the account, for example it indicates if it is a sport or margin trading one.
