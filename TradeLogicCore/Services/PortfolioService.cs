@@ -99,7 +99,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
             PositionCreated?.Invoke(position);
 
-            _persistence.Enqueue(new PersistenceTask<Position>(position));
+            _persistence.Enqueue(position);
         }
     }
 

@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using System.Data.Common;
 
-namespace Common;
+namespace Common.Database;
 public static class SqlExtensions
 {
     public static T ReadFromSql<T>(this SqlDataReader reader, List<(string name, Type type, Action<T, object> setter)> setters) where T : new()

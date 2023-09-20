@@ -1,7 +1,7 @@
 ﻿using Common.Attributes;
 using System.ComponentModel.DataAnnotations;
 
-namespace TradeCommon.Utils.Common.Attributes;
+namespace Common.Attributes;
 public class AttributeMetaInfo
 {
     public Dictionary<string, List<ValidationAttribute>> Validations { get; } = new();

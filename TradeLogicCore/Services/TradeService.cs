@@ -1,7 +1,5 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
-using System.Diagnostics;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -312,5 +310,9 @@ public class TradeService : ITradeService, IDisposable
         _orderService.Persist(order);
     }
 
-    private void Persist(Trade trade) => _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });
+    private void Persist(Trade trade)
+    {
+        var security = _securityService.GetSecurity(trade.SecurityCode);
+        _persistence.Enqueue(trade, security);
+    }
 }

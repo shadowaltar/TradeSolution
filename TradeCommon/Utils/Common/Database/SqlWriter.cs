@@ -1,21 +1,15 @@
-﻿using log4net;
+﻿using Common.Attributes;
+using log4net;
 using Microsoft.Data.Sqlite;
 using Microsoft.IdentityModel.Tokens;
 using System.Data;
+using System.Data.Common;
 using System.Reflection;
 using System.Text;
-using TradeCommon.Database;
-using TradeCommon.Utils.Common;
-using Common.Attributes;
-using TradeCommon.Runtime;
-using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Constants;
-using System;
-using Utilities;
-using System.Windows.Input;
-using System.Data.Common;
+using TradeCommon.Database;
 
-namespace Common;
+namespace Common.Database;
 
 public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 {
@@ -294,12 +288,12 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
 
         if (isUpsert)
         {
-            UpsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
+            UpsertSql = _storage.SchemaHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
             return UpsertSql;
         }
         else
         {
-            InsertSql = _storage.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
+            InsertSql = _storage.SchemaHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableNameOverride);
             return InsertSql;
         }
     }
@@ -310,7 +304,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : new()
         {
             return DropTableAndIndexSql;
         }
-        DropTableAndIndexSql = _storage.CreateDropTableAndIndexSql<T>();
+        DropTableAndIndexSql = _storage.SchemaHelper.CreateDropTableAndIndexSql<T>();
         return DropTableAndIndexSql;
     }
 

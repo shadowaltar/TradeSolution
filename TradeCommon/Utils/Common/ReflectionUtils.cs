@@ -4,7 +4,7 @@ using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using TradeCommon.Utils.Common.Attributes;
+using Common.Attributes;
 
 namespace Common;
 public static class ReflectionUtils

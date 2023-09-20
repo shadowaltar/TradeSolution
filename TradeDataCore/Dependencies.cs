@@ -44,7 +44,6 @@ public class Dependencies
             builder.RegisterSingleton<MessageBroker<Order>>(nameof(Order));
             builder.RegisterSingleton<MessageBroker<Trade>>(nameof(Trade));
             builder.RegisterSingleton<MessageBroker<Position>>(nameof(Position));
-            builder.RegisterSingleton<MessageBroker<IPersistenceTask>>();
 
             builder.RegisterSingleton<Persistence>();
 

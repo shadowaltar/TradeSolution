@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -543,12 +544,14 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         {
             var lastEntry = _lastEntriesBySecurityId.GetValueOrDefault(order.SecurityId);
         }
-        _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+        var security = Context.Services.Security.GetSecurity(order.SecurityId);
+        _persistence.Enqueue(order, security);
     }
 
     private void OnNextTrade(Trade trade)
     {
-        _persistence.Enqueue(new PersistenceTask<Trade>(trade) { ActionType = DatabaseActionType.Create });
+        var security = Context.Services.Security.GetSecurity(trade.SecurityId);
+        _persistence.Enqueue(trade, security);
     }
 
     private void OnHistoricalPriceEnd(int priceCount)

@@ -1,34 +1,72 @@
-﻿using TradeCommon.Essentials;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Runtime;
+﻿using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace TradeCommon.Database;
 
-public class PersistenceTask<T> : IPersistenceTask
+public class PersistenceTask /*: IPersistenceTask*/
 {
-    public PersistenceTask(T entry)
+    private object? _entry;
+    private IList? _entries;
+    private object? _parameter;
+
+    public Type? Type { get; set; }
+
+    public bool IsUpsert { get; set; }
+
+    public PersistenceTask()
     {
-        Entry = entry;
     }
 
-    public PersistenceTask(List<T> entries)
+    public PersistenceTask(object entry, object? parameter = null, bool isUpsert = true)
     {
-        Entries = entries;
+        _entry = entry;
+        _parameter = parameter;
+        IsUpsert = isUpsert;
     }
 
-    public DatabaseActionType ActionType { get; set; } = DatabaseActionType.Create;
+    public PersistenceTask(IList entries, object? parameter = null, bool isUpsert = true)
+    {
+        _entries = entries;
+        _parameter = parameter;
+        IsUpsert = isUpsert;
+    }
 
-    public int SecurityId { get; set; }
-    public IntervalType IntervalType { get; set; }
-    public SecurityType SecurityType { get; set; }
+    //public Security? Security { get; set; }
+    //public int SecurityId { get; set; }
+    //public IntervalType IntervalType { get; set; }
+    //public SecurityType SecurityType { get; set; }
 
-    /// <summary>
-    /// For single item usage.
-    /// </summary>
-    public T? Entry { get; private set; }
+    public T? GetEntry<T>() where T : class
+    {
+        if (_entry != null)
+            return Unsafe.As<T>(_entry);
+        return default;
+    }
 
-    /// <summary>
-    /// For batch / transaction item processing.
-    /// </summary>
-    public List<T>? Entries { get; private set; }
+    public IList<T> GetEntries<T>() where T : class
+    {
+        if (_entries != null)
+            return Unsafe.As<IList<T>>(_entries);
+        return new List<T>(0);
+    }
+
+    public void SetEntry(object o, object? parameter = null)
+    {
+        _entry = o;
+        _parameter = parameter;
+    }
+
+    public void SetEntries(IList o, object? parameter = null)
+    {
+        _entries = o;
+        _parameter = parameter;
+    }
+
+    public void Clear()
+    {
+        _entry = null;
+        _entries = null;
+        _parameter = null;
+        Type = null;
+    }
 }

@@ -39,8 +39,6 @@ public class SecurityService : ISecurityService
         }
         RefreshCache(securities);
 
-        _storage.Initialize(this);
-
         _isInitialized = true;
         return securities;
     }

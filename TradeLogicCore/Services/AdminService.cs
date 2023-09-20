@@ -242,6 +242,6 @@ public class AdminService : IAdminService
             balance.AssetId = asset?.Id ?? 0;
             balance.UpdateTime = DateTime.UtcNow;
         }
-        _persistence.Enqueue(new PersistenceTask<Balance>(balances) { ActionType = DatabaseActionType.Update });
+        _persistence.Enqueue(balances);
     }
 }

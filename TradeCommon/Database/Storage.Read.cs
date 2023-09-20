@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Database;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;

@@ -1,16 +1,16 @@
-﻿using System.Collections.Concurrent;
+﻿using Common;
+using System.Collections.Concurrent;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 public class Persistence : IDisposable
 {
     private readonly IStorage _storage;
-    private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
+    private readonly ConcurrentQueue<PersistenceTask> _tasks = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
+    private readonly Pool<PersistenceTask> _taskPool = new();
 
     private bool _isRunning;
-
-    public event Action<IPersistenceTask>? Persisted;
 
     public Persistence(IStorage storage)
     {
@@ -22,9 +22,28 @@ public class Persistence : IDisposable
         _storage = storage;
     }
 
-    public void Enqueue(IPersistenceTask task)
+    public void Enqueue<T>(T entry, object? parameter = null, bool isUpsert = true)
     {
-        _tasks.Enqueue(task);
+        if (entry != null)
+        {
+            var task = _taskPool.Lease();
+            task.SetEntry(entry, parameter);
+            task.IsUpsert = isUpsert;
+            task.Type = typeof(T);
+            _tasks.Enqueue(task);
+        }
+    }
+
+    public void Enqueue<T>(List<T> entries, object? parameter = null, bool isUpsert = true)
+    {
+        if (!entries.IsNullOrEmpty())
+        {
+            var task = _taskPool.Lease();
+            task.SetEntries(entries, parameter);
+            task.IsUpsert = isUpsert;
+            task.Type = typeof(T);
+            _tasks.Enqueue(task);
+        }
     }
 
     private async Task Run()
@@ -33,13 +52,9 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                if (task.ActionType == DatabaseActionType.Create)
-                    await _storage.Insert(task, false);
-                else if (task.ActionType == DatabaseActionType.Update)
-                    await _storage.Insert(task, true);
-                else
-                    return;
-                Persisted?.Invoke(task);
+                await _storage.Insert(task, task.IsUpsert);
+                task.Clear();
+                _taskPool.Return(task);
             }
             else
             {
@@ -52,7 +67,6 @@ public class Persistence : IDisposable
     {
         _isRunning = false;
         _cancellationTokenSource.Cancel();
-        Persisted = null;
         _tasks.Clear();
     }
 }

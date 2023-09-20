@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Text;
 using TradeCommon.Constants;
 
-namespace Common;
+namespace Common.Database;
 
 public class SqlReader<T> : IDisposable where T : new()
 {

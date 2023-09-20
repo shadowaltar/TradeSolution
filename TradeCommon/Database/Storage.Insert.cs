@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Database;
 using Microsoft.Data.Sqlite;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -15,92 +16,59 @@ public partial class Storage
 {
     private readonly string DatabaseFolder = Consts.DatabaseFolder;
 
-    public async Task Insert(IPersistenceTask task, bool isUpsert = true)
+    public async Task<int> Insert(PersistenceTask task, bool isUpsert = true)
     {
-        _log.Info("Persisting into database: " + task.GetType().Name);
+        if (task.Type == typeof(Trade))
+        {
+            return await Insert<Trade>(task);
+        }
+        if (task.Type == typeof(Position))
+        {
+            return await Insert<Position>(task);
+        }
+        if (task.Type == typeof(Order))
+        {
+            return await Insert<Order>(task);
+        }
 
-        if (task is PersistenceTask<OhlcPrice> priceTask)
+        if (task.Type == typeof(Balance))
         {
-            if (!priceTask.Entries.IsNullOrEmpty())
-                await UpsertPrices(priceTask.SecurityId, priceTask.IntervalType, priceTask.SecurityType, priceTask.Entries);
+            return await Insert<Balance>(task);
         }
-        else if (task is PersistenceTask<Order> orderTask)
+        if (task.Type == typeof(Account))
         {
-            if (!orderTask.Entries.IsNullOrEmpty())
-                foreach (var entry in orderTask.Entries)
-                    await InsertOrder(entry, isUpsert);
-            else if (orderTask.Entry != null)
-                await InsertOrder(orderTask.Entry, isUpsert);
+            return await Insert<Account>(task);
         }
-        else if (task is PersistenceTask<Trade> tradeTask)
+
+        if (task.Type == typeof(Security))
         {
-            if (!tradeTask.Entries.IsNullOrEmpty())
-                foreach (var entry in tradeTask.Entries)
-                    await InsertTrade(entry, isUpsert);
-            else if (tradeTask.Entry != null)
-                await InsertTrade(tradeTask.Entry, isUpsert);
+            return await Insert<Security>(task);
         }
-        else if (task is PersistenceTask<OpenOrderId> openOrderIdTask)
+        if (task.Type == typeof(FinancialStat))
         {
-            if (!openOrderIdTask.Entries.IsNullOrEmpty())
-                foreach (var entry in openOrderIdTask.Entries)
-                    await InsertOpenOrderId(entry);
-            else if (openOrderIdTask.Entry != null)
-                await InsertOpenOrderId(openOrderIdTask.Entry);
+            return await Insert<FinancialStat>(task);
         }
-        else if (task is PersistenceTask<Position> positionTask)
-        {
-            if (!positionTask.Entries.IsNullOrEmpty())
-                foreach (var entry in positionTask.Entries)
-                    await InsertPosition(entry, isUpsert);
-            else if (positionTask.Entry != null)
-                await InsertPosition(positionTask.Entry, isUpsert);
-        }
-        else if (task is PersistenceTask<Security> securityTask && !securityTask.Entries.IsNullOrEmpty())
-        {
-            if (securityTask.SecurityType == SecurityType.Equity)
-                await UpsertStockDefinitions(securityTask.Entries);
-            else if (securityTask.SecurityType == SecurityType.Fx)
-                await UpsertFxDefinitions(securityTask.Entries);
-        }
-        else if (task is PersistenceTask<Balance> balanceTask)
-        {
-            if (balanceTask.Entry != null)
-                await InsertBalance(balanceTask.Entry, true);
-            else if (!balanceTask.Entries.IsNullOrEmpty())
-                foreach (var entry in balanceTask.Entries)
-                    await InsertBalance(entry, true);
-        }
-        else if (task is PersistenceTask<FinancialStat> financialStatsTask && !financialStatsTask.Entries.IsNullOrEmpty())
-        {
-            await UpsertSecurityFinancialStats(financialStatsTask.Entries);
-        }
-        else if (task is PersistenceTask<Account> accountTask && accountTask.Entry != null)
-        {
-            await InsertAccount(accountTask.Entry, true);
-        }
-        else
-        {
-            throw new InvalidOperationException($"Persistence task type {task.GetType().Name} is not supported.");
-        }
+
+
+        throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
     }
 
-    public async Task<int> Insert<T>(IPersistenceTask task, bool isUpsert = true) where T : new()
+    public async Task<int> Insert<T>(PersistenceTask task) where T : class, new()
     {
-        if (task is PersistenceTask<T> pt)
+        var entry = task.GetEntry<T>();
+        if (entry != null)
         {
-            if (pt.Entry != null)
-            {
-                var count = await InsertOne<T>(pt.Entry, isUpsert);
-                _log.Info($"Persisted {count} entry into database: {typeof(T).Name}");
-                return count;
-            }
-            else if (!pt.Entries.IsNullOrEmpty())
-            {
-                var count = await InsertMany<T>(pt.Entries, isUpsert);
-                _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
-                return count;
-            }
+            var count = await InsertOne<T>(entry, task.IsUpsert);
+            _log.Info($"Persisted {count} entry into database: {typeof(T).Name}");
+            return count;
+        }
+
+        var entries = task.GetEntries<T>();
+        if (!entries.IsNullOrEmpty())
+        {
+            var count = await InsertMany<T>(entries, task.IsUpsert);
+            _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
+            return count;
         }
         throw new InvalidOperationException("Impossible case.");
     }
@@ -117,7 +85,7 @@ public partial class Storage
         return await writer.InsertOne(entry, isUpsert);
     }
 
-    public async Task<int> InsertMany<T>(List<T> entry, bool isUpsert) where T : new()
+    public async Task<int> InsertMany<T>(IList<T> entry, bool isUpsert) where T : new()
     {
         var type = typeof(T);
         var (tableName, database) = DatabaseNames.GetTableAndDatabaseName<T>();
@@ -404,9 +372,8 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return await writer.InsertOne(balance, isUpsert);
     }
 
-    public async Task<int> InsertOrder(Order order, bool isUpsert = true)
+    public async Task<int> InsertOrder(Order order, Security security, bool isUpsert = true)
     {
-        var security = GetSecurity(order.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetOrderTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Order.ToString(), out var writer))
@@ -417,9 +384,8 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return await writer.InsertOne(order, isUpsert);
     }
 
-    public async Task<int> InsertTrade(Trade trade, bool isUpsert = true)
+    public async Task<int> InsertTrade(Trade trade, Security security, bool isUpsert = true)
     {
-        var security = GetSecurity(trade.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetTradeTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Trade.ToString(), out var writer))
@@ -430,9 +396,8 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         return await writer.InsertOne(trade, isUpsert);
     }
 
-    public async Task<int> InsertPosition(Position position, bool isUpsert = true)
+    public async Task<int> InsertPosition(Position position, Security security, bool isUpsert = true)
     {
-        var security = GetSecurity(position.SecurityId);
         if (security == null) return 0;
         var tableName = DatabaseNames.GetPositionTableName(security.Type);
         if (!_writers.TryGetValue(DataType.Position.ToString(), out var writer))

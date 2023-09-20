@@ -326,7 +326,8 @@ public class OrderService : IOrderService, IDisposable
 
     public void Persist(Order order)
     {
-        _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+        var security = _securityService.GetSecurity(order.SecurityCode);
+        _persistence.Enqueue(order, security);
     }
 
     private void Persist(ExternalQueryState state)
@@ -337,9 +338,18 @@ public class OrderService : IOrderService, IDisposable
             var order = state.Get<Order>();
             // expect to have at least one
             if (!orders.IsNullOrEmpty())
-                _persistence.Enqueue(new PersistenceTask<Order>(orders) { ActionType = DatabaseActionType.Update });
+            {
+                // it is possible that the orders have different security
+                // so need to persist one by one
+                foreach (var o in orders)
+                {
+                    Persist(o);
+                }
+            }
             if (order != null)
-                _persistence.Enqueue(new PersistenceTask<Order>(order) { ActionType = DatabaseActionType.Update });
+            {
+                Persist(order);
+            }
         }
     }
 }

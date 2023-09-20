@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Database;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
@@ -11,12 +12,8 @@ public partial class Storage : IStorage
 {
     private readonly ILog _log = Logger.New();
     private readonly Dictionary<string, ISqlWriter> _writers = new();
-    private Func<int, Security>? _getSecurityFunction;
 
-    public void Initialize(ISecurityDefinitionProvider securityService)
-    {
-        _getSecurityFunction = securityService.GetSecurity;
-    }
+    public IDatabaseSchemaHelper SchemaHelper { get; } = new SqliteSchemaHelper();
 
     /// <summary>
     /// Execute a query and return a <see cref="DataTable"/>.
@@ -168,10 +165,5 @@ public partial class Storage : IStorage
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
-    }
-
-    private Security? GetSecurity(int securityId)
-    {
-        return _getSecurityFunction?.Invoke(securityId);
     }
 }

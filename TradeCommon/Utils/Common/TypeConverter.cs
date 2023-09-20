@@ -1,7 +1,4 @@
-﻿using CsvHelper;
-using System.Reflection;
-
-namespace Common;
+﻿namespace Common;
 public static class TypeConverter
 {
     public static TypeCode ToTypeCode(string typeString)
@@ -98,6 +95,77 @@ public static class TypeConverter
 
         if (type == typeof(bool) || type == typeof(bool?))
             return "BOOLEAN";
+
+        if (type.IsEnum)
+            return "VARCHAR";
+
+        return "VARCHAR";
+    }
+
+    public static string ToSnowflakeType(Type type)
+    {
+        if (type == typeof(int)
+            || type == typeof(long)
+            || type == typeof(int?)
+            || type == typeof(long?))
+            return "INTEGER";
+
+        if (type == typeof(decimal)
+            || type == typeof(double)
+            || type == typeof(decimal?)
+            || type == typeof(double?))
+            return "REAL";
+        if (type == typeof(string)
+            || type == typeof(char)
+            || type == typeof(char?))
+            return "VARCHAR";
+
+        if (type == typeof(DateTime)
+            || type == typeof(TimeSpan)
+            || type == typeof(DateTime?)
+            || type == typeof(TimeSpan?))
+            return "TIMESTAMP";
+
+        if (type == typeof(bool) || type == typeof(bool?))
+            return "BOOLEAN";
+
+        if (type.IsEnum)
+            return "VARCHAR";
+
+        return "VARCHAR";
+    }
+
+    public static string ToSqlServerType(Type type, bool containsUnicode = false)
+    {
+        if (type == typeof(int)
+            || type == typeof(int?))
+            return "INT";
+        if (type == typeof(long)
+            || type == typeof(long?))
+            return "BIGINT";
+
+        if (type == typeof(decimal)
+            || type == typeof(decimal?))
+            return "MONEY";
+        if (type == typeof(double)
+            || type == typeof(double?))
+            return "REAL";
+
+        if ((type == typeof(string) && !containsUnicode)
+            || type == typeof(char)
+            || type == typeof(char?))
+            return "VARCHAR";
+        if (type == typeof(string) && containsUnicode)
+            return "NVARCHAR";
+
+        if (type == typeof(DateTime)
+            || type == typeof(TimeSpan)
+            || type == typeof(DateTime?)
+            || type == typeof(TimeSpan?))
+            return "DATETIMEOFFSET";
+
+        if (type == typeof(bool) || type == typeof(bool?))
+            return "BIT";
 
         if (type.IsEnum)
             return "VARCHAR";

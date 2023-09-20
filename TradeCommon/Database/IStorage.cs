@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using Common.Database;
+using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -15,6 +16,8 @@ using TradeDataCore.Essentials;
 namespace TradeCommon.Database;
 public interface IStorage
 {
+    IDatabaseSchemaHelper SchemaHelper { get; }
+
     Task CreateAccountTable();
     Task CreateBalanceTable();
     Task CreateFinancialStatsTable();
@@ -25,20 +28,15 @@ public interface IStorage
     Task CreateSecurityTable(SecurityType type);
     Task<List<string>> CreateTradeTable(SecurityType securityType);
     Task CreateUserTable();
-
-    string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null);
-
-    string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null);
-
     Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null);
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
-    Task Insert(IPersistenceTask task, bool isUpsert = true);
-    Task<int> Insert<T>(IPersistenceTask task, bool isUpsert = true) where T : new();
+    Task<int> Insert(PersistenceTask task, bool isUpsert = true);
+    //Task<int> Insert<T>(PersistenceTask task, bool isUpsert = true) where T : new();
     Task<int> InsertAccount(Account account, bool isUpsert);
     Task<int> InsertBalance(Balance balance, bool isUpsert);
-    Task<int> InsertOrder(Order order, bool isUpsert = true);
-    Task<int> InsertPosition(Position position, bool isUpsert = true);
-    Task<int> InsertTrade(Trade trade, bool isUpsert = true);
+    Task<int> InsertOrder(Order order, Security security, bool isUpsert = true);
+    Task<int> InsertTrade(Trade trade, Security security, bool isUpsert = true);
+    Task<int> InsertPosition(Position position, Security security, bool isUpsert = true);
     Task InsertOpenOrderId(OpenOrderId openOrderId);
     Task<int> InsertUser(User user);
     Task<Account?> ReadAccount(string accountName, EnvironmentType environment);
@@ -63,8 +61,6 @@ public interface IStorage
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);
-
-    void Initialize(ISecurityDefinitionProvider securityService);
     Task<long> GetMax(string fieldName, string tableName, string databaseName);
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);

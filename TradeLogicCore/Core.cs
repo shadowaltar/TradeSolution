@@ -118,45 +118,41 @@ public class Core
     private async Task CacheAndReconcileRecentOrders(DateTime start, DateTime end, List<Security> securities)
     {
         if (securities.IsNullOrEmpty() || start > end) return;
-        var externalOrders = new Dictionary<long, Order>();
-        var internalOrders = new Dictionary<long, Order>();
 
         // sync external to internal
         foreach (var security in securities)
         {
             var externalResults = await _services.Order.GetOrders(security, start, end, true);
             var internalResults = await _services.Order.GetOrders(security, start, end);
-            externalOrders.AddRange(externalResults.ToDictionary(o => o.ExternalOrderId, o => o));
-            internalOrders.AddRange(internalResults.ToDictionary(o => o.ExternalOrderId, o => o));
-        }
-        var (toCreate, toUpdate, toDelete) = FindDifferences(externalOrders, internalOrders);
-        if (!toCreate.IsNullOrEmpty())
-        {
-            _services.Order.Update(toCreate);
-            _log.Info($"{toCreate.Count} recent orders are in external but not internal system and need to be inserted into database.");
-            foreach (var order in toCreate)
-            {
-                await Context.Storage.InsertOrder(order);
-            }
-        }
-        if (!toUpdate.IsNullOrEmpty())
-        {
-            _services.Order.Update(toUpdate.Values);
-            _log.Info($"{toUpdate.Count} recent orders in external are different from internal system and need to be updated into database.");
-            foreach (var order in toUpdate.Values)
-            {
-                await Context.Storage.InsertOrder(order);
-            }
-        }
+            var externalOrders = externalResults.ToDictionary(o => o.ExternalOrderId, o => o);
+            var internalOrders = internalResults.ToDictionary(o => o.ExternalOrderId, o => o);
 
-        // read again if necessary and cache them
-        if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
-        {
-            _services.Order.Update(internalOrders.Values);
-        }
-        else
-        {
-            foreach (var security in securities)
+            var (toCreate, toUpdate, toDelete) = FindDifferences(externalOrders, internalOrders);
+            if (!toCreate.IsNullOrEmpty())
+            {
+                _services.Order.Update(toCreate);
+                _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
+                foreach (var order in toCreate)
+                {
+                    await Context.Storage.InsertOrder(order, security);
+                }
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                _services.Order.Update(toUpdate.Values);
+                _log.Info($"{toUpdate.Count} recent orders for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
+                foreach (var order in toUpdate.Values)
+                {
+                    await Context.Storage.InsertOrder(order, security);
+                }
+            }
+
+            // read again if necessary and cache them
+            if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
+            {
+                _services.Order.Update(internalOrders.Values);
+            }
+            else
             {
                 var orders = await _services.Order.GetOrders(security, start, end);
                 _services.Order.Update(orders);
@@ -167,45 +163,41 @@ public class Core
     private async Task CacheAndReconcileRecentTrades(DateTime start, DateTime end, List<Security> securities)
     {
         if (securities.IsNullOrEmpty() || start > end) return;
-        var externalTrades = new Dictionary<long, Trade>();
-        var internalTrades = new Dictionary<long, Trade>();
         foreach (var security in securities)
         {
             var externalResults = await _services.Trade.GetTrades(security, start, end, true);
             var internalResults = await _services.Trade.GetTrades(security, start, end);
-            externalTrades.AddRange(externalResults.ToDictionary(o => o.ExternalTradeId, o => o));
-            internalTrades.AddRange(internalResults.ToDictionary(o => o.ExternalTradeId, o => o));
-        }
+            var externalTrades = externalResults.ToDictionary(o => o.ExternalTradeId, o => o);
+            var internalTrades = internalResults.ToDictionary(o => o.ExternalTradeId, o => o);
 
-        // sync external to internal
-        var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
-        if (!toCreate.IsNullOrEmpty())
-        {
-            _services.Trade.Update(toCreate);
-            _log.Info($"{toCreate.Count} recent trades are in external but not internal system and need to be inserted into database.");
-            foreach (var trade in toCreate)
-            {
-                await Context.Storage.InsertTrade(trade);
-            }
-        }
-        if (!toUpdate.IsNullOrEmpty())
-        {
-            _services.Trade.Update(toUpdate.Values);
-            _log.Info($"{toUpdate.Count} recent trades in external are different from internal system and need to be updated into database.");
-            foreach (var trade in toUpdate.Values)
-            {
-                await Context.Storage.InsertTrade(trade);
-            }
-        }
+            // sync external to internal
+            var (toCreate, toUpdate, toDelete) = FindDifferences(externalTrades, internalTrades);
 
-        // read again if necessary and cache them
-        if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
-        {
-            _services.Trade.Update(internalTrades.Values);
-        }
-        else
-        {
-            foreach (var security in securities)
+            if (!toCreate.IsNullOrEmpty())
+            {
+                _services.Trade.Update(toCreate);
+                _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
+                foreach (var trade in toCreate)
+                {
+                    await Context.Storage.InsertTrade(trade, security);
+                }
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                _services.Trade.Update(toUpdate.Values);
+                _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
+                foreach (var trade in toUpdate.Values)
+                {
+                    await Context.Storage.InsertTrade(trade, security);
+                }
+            }
+
+            // read again if necessary and cache them
+            if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
+            {
+                _services.Trade.Update(internalTrades.Values);
+            }
+            else
             {
                 var trades = await _services.Trade.GetTrades(security, start, end);
                 _services.Trade.Update(trades);
@@ -221,14 +213,14 @@ public class Core
             if (account == null && externalAccount != null)
             {
                 _log.Warn("Internally stored account is missing; will sync with external one.");
-                _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Create });
+                _services.Persistence.Enqueue(externalAccount);
 
             }
             else if (externalAccount != null && !externalAccount.Equals(account))
             {
                 _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
-                _services.Persistence.Enqueue(new PersistenceTask<Account>(externalAccount) { ActionType = DatabaseActionType.Update });
-                _services.Persistence.Enqueue(new PersistenceTask<Balance>(externalAccount.Balances));
+                _services.Persistence.Enqueue(externalAccount);
+                _services.Persistence.Enqueue(externalAccount.Balances);
             }
         }
     }
