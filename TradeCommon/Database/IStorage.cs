@@ -9,13 +9,15 @@ using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Integrity;
-using TradeCommon.Providers;
 using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 
 namespace TradeCommon.Database;
 public interface IStorage
 {
+    event Action<object, string> Success;
+    event Action<object, Exception, string> Failed;
+
     IDatabaseSchemaHelper SchemaHelper { get; }
 
     Task CreateAccountTable();
@@ -28,20 +30,15 @@ public interface IStorage
     Task CreateSecurityTable(SecurityType type);
     Task<List<string>> CreateTradeTable(SecurityType securityType);
     Task CreateUserTable();
-    Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null);
+    Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null) where T : class;
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
-    Task<int> Insert(PersistenceTask task, bool isUpsert = true);
-    //Task<int> Insert<T>(PersistenceTask task, bool isUpsert = true) where T : new();
-    Task<int> InsertAccount(Account account, bool isUpsert);
-    Task<int> InsertBalance(Balance balance, bool isUpsert);
-    Task<int> InsertOrder(Order order, Security security, bool isUpsert = true);
-    Task<int> InsertTrade(Trade trade, Security security, bool isUpsert = true);
-    Task<int> InsertPosition(Position position, Security security, bool isUpsert = true);
-    Task InsertOpenOrderId(OpenOrderId openOrderId);
-    Task<int> InsertUser(User user);
+    Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new();
+    Task<int> InsertOne<T>(T entry, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new();
+    Task<int> Insert(PersistenceTask task);
+    Task<int> Insert<T>(PersistenceTask task) where T : class, new();
     Task<Account?> ReadAccount(string accountName, EnvironmentType environment);
     Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
-    Task<List<Balance>> ReadBalances(int accountId);
+    Task<List<Asset>> ReadAssets(int accountId);
     Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType);
     Task<List<FinancialStat>> ReadFinancialStats();
     Task<List<FinancialStat>> ReadFinancialStats(int secId);
@@ -52,10 +49,11 @@ public interface IStorage
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
     IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<Security>> ReadSecurities(List<int>? ids = null);
-    Task<List<Security>> ReadSecurities(SecurityType type, string? exchange = null, List<int>? ids = null);
+    Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);
     Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end);
     Task<List<Trade>> ReadTrades(Security security, long orderId);
+    Task<List<Position>> ReadPositions(Account account);
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
     Task UpsertFxDefinitions(List<Security> entries);
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
@@ -65,5 +63,6 @@ public interface IStorage
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
+    Task<int> Run(string sql, string database);
     void PurgeDatabase();
 }

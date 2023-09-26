@@ -11,11 +11,16 @@ public static class Exceptions
         return new InvalidOperationException($"The security id {securityId} has no security defined. Check your security definition.");
     }
 
-    public static InvalidOperationException InvalidSecurityCode(string code)
+    public static InvalidOperationException InvalidSecurityCode(string? code)
     {
-        return new InvalidOperationException($"The security code {code} has no security defined. Check your security definition.");
+        return new InvalidOperationException($"The security code {code ?? "n/a"} has no security defined. Check your security definition.");
     }
-    
+
+    public static InvalidOperationException InvalidSecurity(string? code, string message)
+    {
+        return new InvalidOperationException($"The security with code {code ?? "n/a"} is invalid: " + message);
+    }
+
     public static InvalidOperationException MissingQuoteAsset(int securityId)
     {
         return new InvalidOperationException($"The security with id {securityId} must have an associated currency/quote asset. Check your security definition.");
@@ -31,7 +36,7 @@ public static class Exceptions
         return new InvalidOperationException($"The portfolio must hold an asset with code = {assetCode}.");
     }
 
-    public static InvalidOperationException MissingAssetPosition(int assetId)
+    public static InvalidOperationException MissingAsset(int assetId)
     {
         return new InvalidOperationException($"The portfolio must hold an asset with id = {assetId}.");
     }
@@ -50,7 +55,7 @@ public static class Exceptions
 
     public static Exception MissingBalance(int accountId, int assetId)
     {
-        return new InvalidOperationException($"Balance entry should exists: Account {accountId}; Asset {assetId}.");
+        return new InvalidOperationException($"Asset entry should exists: Account {accountId}; Asset {assetId}.");
     }
 
     public static Exception ContextNotInitialized()
@@ -88,14 +93,19 @@ public static class Exceptions
         return new InvalidOperationException("Must login first.");
     }
 
+    public static Exception InvalidAccount()
+    {
+        return new InvalidOperationException("Account missing or invalid.");
+    }
+
     public static Exception InvalidStorageDefinition()
     {
         return new InvalidOperationException("Must specify proper storage info");
     }
 
-    public static Exception InvalidPosition(long positionId, string message)
+    public static Exception InvalidPosition(long? positionId, string message)
     {
-        return new InvalidOperationException($"The position (id: {positionId}) is invalid: {message}.");
+        return new InvalidOperationException($"The position (id: {positionId?.ToString() ?? "missing"}) is invalid: {message}.");
     }
 
     public static Exception MissingSecurity()
@@ -105,11 +115,26 @@ public static class Exceptions
 
     public static Exception InvalidTradeServiceState(string message)
     {
-        return new InvalidOperationException("Invalid TradeService State: "+ message);
+        return new InvalidOperationException("Invalid TradeService State: " + message);
     }
 
     public static Exception InvalidOrderServiceState(string message)
     {
         return new InvalidOperationException("Invalid OrderService State: " + message);
+    }
+
+    public static Exception InvalidTradePositionCombination(string message)
+    {
+        return new InvalidOperationException(message);
+    }
+
+    public static Exception Invalid<T>(string message)
+    {
+        return new InvalidOperationException($"Invalid {typeof(T).Name}: {message}");
+    }
+
+    public static Exception Impossible()
+    {
+        return new InvalidOperationException("Impossible case is hit.");
     }
 }

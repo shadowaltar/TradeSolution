@@ -13,6 +13,7 @@ public enum ResultCode
     GetMiscOk,
     GetUserOk,
     GetAccountOk,
+    GetBalanceOk,
     LoginUserOk,
     LoginAccountOk,
     LoginUserAndAccountOk,
@@ -33,6 +34,8 @@ public enum ResultCode
 
     SubscriptionWaiting = 1000,
     UnsubscriptionWaiting,
+    
+    NoBalance,
 
     InvalidArgument = 4000,
     InvalidCredential,
@@ -47,9 +50,9 @@ public enum ResultCode
     GetMiscFailed,
     GetUserFailed,
     GetAccountFailed,
+    GetBalanceFailed,
     GetSomeAccountsFailed,
-    AccountNotOwnedByUser,
-    AccountHasNoAsset,
+    AccountNotOwnedByUser,    
     LoginUserFailed,
     LoginAccountFailed,
     LoginUserAndAccountFailed,

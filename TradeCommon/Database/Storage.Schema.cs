@@ -37,13 +37,14 @@ CREATE UNIQUE INDEX idx_{tableName}_email_environment
         await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.StaticData);
     }
 
-    public async Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null)
+    public async Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null) where T : class
     {
         string dropSql = SchemaHelper.CreateDropTableAndIndexSql<T>(tableNameOverride);
         string createSql = SchemaHelper.CreateCreateTableAndIndexSql<T>(tableNameOverride);
-        var tuple = DatabaseNames.GetTableAndDatabaseName<T>();
-        await DropThenCreate(dropSql, createSql, tuple.tableName, tuple.databaseName);
-        return tuple;
+        var (tableName, databaseName) = DatabaseNames.GetTableAndDatabaseName<T>();
+        tableName = tableNameOverride ?? tableName;
+        await DropThenCreate(dropSql, createSql, tableName, databaseName);
+        return (tableName, databaseName);
     }
 
     public async Task CreateAccountTable()
@@ -86,7 +87,7 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_ownerId
 DROP TABLE IF EXISTS {DatabaseNames.BalanceTable};
 DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId;
 DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_assetId;
-{SchemaHelper.GetDropTableUniqueIndexStatement<Balance>(DatabaseNames.BalanceTable)}
+{SchemaHelper.GetDropTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
 ";
         string createSql =
 @$"
@@ -98,9 +99,9 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
     LockedAmount REAL DEFAULT 0 NOT NULL,
     SettlingAmount REAL DEFAULT 0 NOT NULL,
     UpdateTime DATE
-    {SchemaHelper.GetCreateTableUniqueClause<Balance>()}
+    {SchemaHelper.GetCreateTableUniqueClause<Asset>()}
 );
-{SchemaHelper.GetCreateTableUniqueIndexStatement<Balance>(DatabaseNames.BalanceTable)}
+{SchemaHelper.GetCreateTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
 CREATE INDEX idx_{DatabaseNames.BalanceTable}_accountId
     ON {DatabaseNames.BalanceTable} (AccountId);
 CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
@@ -375,35 +376,26 @@ CREATE UNIQUE INDEX idx_{tableName}_securityType
 
         foreach (var tableName in tableNames)
         {
-            var dropSql =
-@$"
-DROP TABLE IF EXISTS {tableName};
-DROP INDEX IF EXISTS idx_{tableName}_securityId;
-DROP INDEX IF EXISTS idx_{tableName}_securityId_time;
-";
-            var createSql =
-    @$"
-CREATE TABLE IF NOT EXISTS {tableName} (
-    Id INTEGER PRIMARY KEY,
-    SecurityId INTEGER NOT NULL,
-    StartTime INT NOT NULL,
-    UpdateTime INT NOT NULL,
-    Quantity DOUBLE NOT NULL,
-    Price DOUBLE NOT NULL,
-    Currency VARCHAR(10),
-    RealizedPnl DOUBLE NOT NULL,
-    UNIQUE(Id)
-);
-CREATE UNIQUE INDEX idx_{tableName}_securityId
-    ON {tableName} (SecurityId);
-CREATE UNIQUE INDEX idx_{tableName}_securityId_startTime
-    ON {tableName} (SecurityId, StartTime);
-";
-
-            await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.ExecutionData);
+            await CreateTable<Position>(tableName);
         }
 
         return tableNames;
+    }
+
+    public async Task<string> CreateTradePositionReconciliation()
+    {
+        const string table = DatabaseNames.TradePositionReconciliation;
+        string dropSql = $@"DROP TABLE IF EXISTS {table};";
+        string createSql = $@"
+CREATE TABLE {table} (
+	SecurityId INTEGER NOT NULL,
+	LastPositionId INTEGER NOT NULL,
+	EndTime DATE NOT NULL,
+	Unique(SecurityId, LastPositionId, EndTime)
+);
+";
+        await DropThenCreate(dropSql, createSql, table, DatabaseNames.ExecutionData);
+        return table;
     }
 
     public async Task<long> GetMax(string fieldName, string tableName, string databaseName)

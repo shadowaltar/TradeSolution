@@ -3,38 +3,32 @@ using System.Runtime.CompilerServices;
 
 namespace TradeCommon.Database;
 
-public class PersistenceTask /*: IPersistenceTask*/
+public class PersistenceTask
 {
     private object? _entry;
     private IList? _entries;
-    private object? _parameter;
 
     public Type? Type { get; set; }
-
+    public string? TableNameOverride { get; set; }
     public bool IsUpsert { get; set; }
 
     public PersistenceTask()
     {
     }
 
-    public PersistenceTask(object entry, object? parameter = null, bool isUpsert = true)
+    public PersistenceTask(object entry, bool isUpsert = true, string? tableNameOverride = null)
     {
         _entry = entry;
-        _parameter = parameter;
+        TableNameOverride = tableNameOverride;
         IsUpsert = isUpsert;
     }
 
-    public PersistenceTask(IList entries, object? parameter = null, bool isUpsert = true)
+    public PersistenceTask(IList entries, bool isUpsert = true, string? tableNameOverride = null)
     {
         _entries = entries;
-        _parameter = parameter;
+        TableNameOverride = tableNameOverride;
         IsUpsert = isUpsert;
     }
-
-    //public Security? Security { get; set; }
-    //public int SecurityId { get; set; }
-    //public IntervalType IntervalType { get; set; }
-    //public SecurityType SecurityType { get; set; }
 
     public T? GetEntry<T>() where T : class
     {
@@ -50,23 +44,20 @@ public class PersistenceTask /*: IPersistenceTask*/
         return new List<T>(0);
     }
 
-    public void SetEntry(object o, object? parameter = null)
+    public void SetEntry(object o)
     {
         _entry = o;
-        _parameter = parameter;
     }
 
-    public void SetEntries(IList o, object? parameter = null)
+    public void SetEntries(IList o)
     {
         _entries = o;
-        _parameter = parameter;
     }
 
     public void Clear()
     {
         _entry = null;
         _entries = null;
-        _parameter = null;
         Type = null;
     }
 }

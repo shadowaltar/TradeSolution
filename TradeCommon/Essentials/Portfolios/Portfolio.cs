@@ -1,6 +1,4 @@
-﻿using TradeCommon.Essentials.Accounts;
-
-namespace TradeCommon.Essentials.Portfolios;
+﻿namespace TradeCommon.Essentials.Portfolios;
 
 /// <summary>
 /// Portfolio is an aggregation of positions including cash-position (uninvested/free cash).
@@ -9,50 +7,77 @@ public record Portfolio
 {
     public Dictionary<long, Position> Positions { get; } = new();
 
-    public Dictionary<long, Position> AssetPositions { get; } = new();
+    public Dictionary<long, Asset> Assets { get; } = new();
 
     public int AccountId { get; } = 0;
 
-    public Portfolio(Account account)
+    public Portfolio(int accountId, List<Position> positions)
     {
         var start = DateTime.UtcNow;
-        foreach (var balance in account.Balances)
+        foreach (var position in positions)
         {
-            var position = new Position
+            if (position.Security.IsAsset)
             {
-                Id = 0,
-                AccountId = balance.AccountId,
-                SecurityId = balance.AssetId,
-                SecurityCode = balance.AssetCode,
-                BaseAssetId = balance.AssetId,
-                QuoteAssetId = balance.AssetId,
-                Price = 0,
-                Quantity = balance.FreeAmount,
-                LockQuantity = balance.LockedAmount,
-                RealizedPnl = 0,
-                StartTime = start,
-                UpdateTime = start,
-            };
-            AssetPositions[position.SecurityId] = position;
+                Assets.Add(position.Id, position);
+            }
+            else
+            {
+                Positions.Add(position.Id, position);
+            }
+
+            // position = new Position
+            //{
+            //    Id = 0,
+            //    AccountId = position.AccountId,
+            //    Security = position.Security,
+            //    SecurityId = position.SecurityId,
+            //    SecurityCode = position.SecurityCode,
+            //    Price = 0,
+            //    Quantity = position.Quantity,
+            //    LockedQuantity = position.LockedQuantity,
+            //    StrategyLockedQuantity = position.StrategyLockedQuantity,
+            //    CreateTime = start,
+            //    UpdateTime = start,
+            //    CloseTime = DateTime.MaxValue,
+            //    StartNotional = 0, // price unknown
+            //    Notional = 0,
+            //    StartOrderId = 0,
+            //    EndOrderId = 0,
+            //    StartTradeId = 0,
+            //    EndTradeId = 0,
+            //    RealizedPnl = 0,
+            //    AccumulatedFee = 0,
+            //};
+            //Assets[position.SecurityId] = position;
         }
-        AccountId = account.Id;
+        AccountId = accountId;
     }
 
-    public decimal GetNotional(int securityId)
+    public virtual bool Equals(Portfolio? portfolio)
     {
-        if (Positions.TryGetValue(securityId, out var p))
+        if (portfolio == null) return false;
+        if (AccountId != portfolio.AccountId) return false;
+        if (Assets.Count != portfolio.Assets.Count) return false;
+
+        foreach (var asset in Assets.Values)
         {
-            return p.Quantity * p.Price;
+            if (!portfolio.Assets.TryGetValue(asset.Id, out var exists))
+                return false;
+            if (!exists.Equals(asset))
+                return false;
         }
-        return 0;
+        foreach (var position in Positions.Values)
+        {
+            if (!portfolio.Assets.TryGetValue(position.Id, out var exists))
+                return false;
+            if (!exists.Equals(position))
+                return false;
+        }
+        return true;
     }
 
-    public decimal GetTotalRealizedPnl(int securityId)
+    public override int GetHashCode()
     {
-        if (Positions.TryGetValue(securityId, out var p))
-        {
-            return p.RealizedPnl;
-        }
-        return 0;
+        return AccountId.GetHashCode();
     }
 }

@@ -19,7 +19,7 @@ public static class ObjectExtensions
         return o1!.CompareTo(o2);
     }
 
-    public static T FastCast<T>(this object o)
+    public static T As<T>(this object o)
     {
         return Unsafe.As<object, T>(ref o);
     }

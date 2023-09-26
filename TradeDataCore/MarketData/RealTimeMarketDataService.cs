@@ -51,11 +51,6 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null)
     {
         var errorDescription = "";
-        var externalNames = MarketDataSources.GetExternalNames(security);
-        if (externalNames.IsNullOrEmpty())
-        {
-            errorDescription = "Unknown combination of security type, sub-type and exchange name; security: " + security.Name;
-        }
         if (start != null && end != null && start > end)
         {
             errorDescription = "Start time must be smaller than end time";

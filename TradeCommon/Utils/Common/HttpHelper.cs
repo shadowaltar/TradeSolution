@@ -1,6 +1,8 @@
 ﻿using log4net;
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json.Nodes;
+using TradeCommon.Essentials;
 using TradeCommon.Externals;
 
 namespace Common;
@@ -11,7 +13,7 @@ public static class HttpHelper
     public static async Task ReadIntoFile(this HttpClient client, string url, string saveFilePath, ILog? log = null)
     {
         log ??= _log;
-
+        client.Timeout = TimeSpans.FiveSeconds;
         using var stream = await client.GetStreamAsync(url).ConfigureAwait(false);
         using var fileStream = new FileStream(saveFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
 
@@ -90,17 +92,27 @@ public static class HttpHelper
         }
     }
 
-    public static async Task<(HttpResponseMessage response, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request)
+    public static async Task<(HttpResponseMessage response, long elapsedMs)> TimedSendAsync(this HttpClient client, HttpRequestMessage request, ILog? log = null)
     {
-        // route to the fake client
-        if (client is FakeHttpClient fakeClient)
+        Stopwatch? swInner = null;
+        log ??= _log;
+        try
         {
-            return await fakeClient.TimedSendAsync(request);
+            // route to the fake client
+            if (client is FakeHttpClient fakeClient)
+            {
+                return await fakeClient.TimedSendAsync(request);
+            }
+            swInner = Stopwatch.StartNew();
+            var response = await client.SendAsync(request);
+            swInner.Stop();
+            _log.Info($"[{swInner.Elapsed.Seconds:F4}s] Called REST API ({request.Method}): {request.RequestUri}");
+            return (response, swInner.ElapsedMilliseconds);
         }
-        var swInner = Stopwatch.StartNew();
-        var response = await client.SendAsync(request);
-        swInner.Stop();
-        _log.Info($"[{swInner.Elapsed.Seconds:F4}s] Called REST API ({request.Method}): {request.RequestUri}");
-        return (response, swInner.ElapsedMilliseconds);
+        catch (Exception e)
+        {
+            log.Error($"Failed to send request to {request.RequestUri}. Error: " + e.Message, e);
+            return (new HttpResponseMessage(HttpStatusCode.NotFound), swInner?.ElapsedMilliseconds ?? 0);
+        }
     }
 }

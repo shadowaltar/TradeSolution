@@ -1,6 +1,8 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
 
@@ -9,10 +11,10 @@ namespace TradeCommon.Essentials.Trading;
 /// </summary>
 [Storage("orders", "execution")]
 [Unique(nameof(Id))]
+[Unique(nameof(ExternalOrderId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(SecurityId), nameof(CreateTime))]
-[Index(nameof(ExternalOrderId))]
-public class Order : IComparable<Order>, ICloneable
+public class Order : IComparable<Order>, ICloneable, ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
 {
     /// <summary>
     /// Unique order id.
@@ -38,6 +40,9 @@ public class Order : IComparable<Order>, ICloneable
     /// </summary>
     [DatabaseIgnore]
     public string SecurityCode { get; set; } = "";
+
+    [DatabaseIgnore]
+    public Security? Security { get; set; }
 
     /// <summary>
     /// The target account. This embeds the broker info.
@@ -130,18 +135,6 @@ public class Order : IComparable<Order>, ICloneable
     public int StrategyId { get; set; } = 0;
 
     /// <summary>
-    /// The broker's ID.
-    /// </summary>
-    [NotNull]
-    public int BrokerId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
-
-    /// <summary>
-    /// The exchange's ID.
-    /// </summary>
-    [NotNull]
-    public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
-
-    /// <summary>
     /// Any additional order parameters.
     /// </summary>
     [AsJson]
@@ -152,6 +145,15 @@ public class Order : IComparable<Order>, ICloneable
     /// </summary>
     [DatabaseIgnore]
     public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
+
+    /// <summary>
+    /// Gets if the order is successfully placed (either it is still alive or filled).
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsClosed => Status is OrderStatus.Failed 
+        or OrderStatus.Filled or OrderStatus.Cancelled or OrderStatus.Rejected
+        or OrderStatus.Rejected or OrderStatus.Deleted or OrderStatus.Expired
+        or OrderStatus.Prevented;
 
     public object Clone()
     {
@@ -179,8 +181,7 @@ public class Order : IComparable<Order>, ICloneable
         if (r != 0) r = ExternalCreateTime.CompareTo(other?.ExternalCreateTime);
         if (r != 0) r = ExternalUpdateTime.CompareTo(other?.ExternalUpdateTime);
         if (r != 0) r = TimeInForce.CompareTo(other?.TimeInForce);
-        if (r != 0) r = BrokerId.CompareTo(other?.BrokerId);
-        if (r != 0) r = ExchangeId.CompareTo(other?.ExchangeId);
+        if (r != 0) r = AccountId.CompareTo(other?.AccountId);
         if (AdvancedSettings != null)
         {
             if (r != 0) r = AdvancedSettings.TimeInForceTime.CompareTo(other?.AdvancedSettings?.TimeInForceTime);

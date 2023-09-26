@@ -58,16 +58,16 @@ WHERE
             ("$Name", accountName), ("$Environment", Environments.ToString(environment)));
     }
 
-    public async Task<List<Balance>> ReadBalances(int accountId)
+    public async Task<List<Asset>> ReadAssets(int accountId)
     {
-        var sqlPart = SqlReader<Balance>.GetSelectClause();
+        var sqlPart = SqlReader<Asset>.GetSelectClause();
         var tableName = DatabaseNames.BalanceTable;
         var dbName = DatabaseNames.StaticData;
         var sql =
 @$"
 {sqlPart} FROM {tableName} WHERE AccountId = $AccountId
 ";
-        return await SqlReader.Read<Balance>(tableName, dbName, sql, ("$AccountId", accountId));
+        return await SqlReader.Read<Asset>(tableName, dbName, sql, ("$AccountId", accountId));
     }
 
     public async Task<List<OpenOrderId>> ReadOpenOrderIds()
@@ -141,12 +141,28 @@ WHERE
 
     public async Task<List<Trade>> ReadTrades(Security security, long orderId)
     {
-        var dbName = DatabaseNames.ExecutionData;
+        var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>();
+        var tableName = DatabaseNames.GetTradeTableName(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
-        var secType = SecurityTypeConverter.Parse(security.Type);
-        var tableName = DatabaseNames.GetTradeTableName(secType);
         var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND OrderId = $OrderId";
         return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$OrderId", orderId));
+    }
+
+    public async Task<List<Position>> ReadPositions(Account account)
+    {
+        var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>();
+        var results = new List<Position>();
+        foreach (var secType in Enum.GetValues<SecurityType>())
+        {
+            var tableName = DatabaseNames.GetPositionTableName(secType);
+            if (tableName.IsBlank()) continue;
+
+            var sqlPart = SqlReader<Position>.GetSelectClause();
+            var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId";
+            var positions = await SqlReader.Read<Position>(tableName, dbName, sql, ("$AccountId", account.Id));
+            results.AddRange(positions);
+        }
+        return results;
     }
 
     public async Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type)
@@ -200,12 +216,11 @@ WHERE
         var results = new List<Security>();
         foreach (var exchange in Enum.GetValues<ExchangeType>())
         {
-            if (exchange == ExchangeType.Any) continue;
-            var exchStr = ExchangeTypeConverter.ToString(exchange);
+            if (exchange.IsUnknown()) continue;
             foreach (var type in Enum.GetValues<SecurityType>())
             {
                 if (type == SecurityType.Unknown) continue;
-                var partialResults = await ReadSecurities(type, exchStr, ids);
+                var partialResults = await ReadSecurities(type, exchange, ids);
                 if (partialResults == null)
                     continue;
                 results.AddRange(partialResults);
@@ -224,17 +239,16 @@ WHERE
             : $"{fieldName} IN ({string.Join(',', items)}){endingAnd}";
     }
 
-    public async Task<List<Security>> ReadSecurities(SecurityType type, string? exchange = null, List<int>? ids = null)
+    public async Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
         if (tableName.IsBlank())
             return new List<Security>();
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        if (exchange != null)
-            exchange = exchange.ToUpperInvariant();
         var typeStr = type.ToString().ToUpperInvariant();
+        var exchangeStr = exchange.ToString().ToUpperInvariant();
         var idClause = GetInClause("Id", ids, true);
-        var exchangeClause = exchange == null
+        var exchangeClause = exchange.IsUnknown()
             ? ""
             : "AND Exchange = $Exchange";
         string sql;
@@ -269,13 +283,15 @@ WHERE
         }
 
         SqlReader<Security>? sqlHelper = null;
-        return await SqlReader.Read(tableName, DatabaseNames.StaticData, sql, Transform,
-            ("$LocalEndDate", now), ("$Exchange", exchange?.ToUpperInvariant() ?? ""), ("$Type", typeStr));
+        return await SqlReader.Read(tableName, DatabaseNames.StaticData, sql, Read,
+            ("$LocalEndDate", now), ("$Exchange", exchangeStr), ("$Type", typeStr));
 
-        Security Transform(SqliteDataReader r)
+        Security Read(SqliteDataReader r)
         {
             sqlHelper ??= new SqlReader<Security>(r);
             var security = sqlHelper.Read();
+            security.SecurityType = SecurityTypeConverter.Parse(security.Type);
+            security.ExchangeType = ExchangeTypeConverter.Parse(security.Exchange);
             security.FxInfo = ReadFxSecurityInfo(sqlHelper);
             return security;
         }

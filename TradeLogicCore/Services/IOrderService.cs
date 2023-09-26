@@ -59,7 +59,7 @@ public interface IOrderService
     /// <param name="end"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Order>> GetOrders(Security security, DateTime start, DateTime end, bool requestExternal = false);
+    Task<List<Order>> GetOrders(Security security, DateTime start, DateTime? end, bool requestExternal = false);
 
     /// <summary>
     /// Get all open orders with an optional security name.

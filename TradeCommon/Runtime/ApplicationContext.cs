@@ -48,6 +48,8 @@ public class ApplicationContext
         private set => _exchange = value;
     }
 
+    public int AccountId { get; protected set; } = 0;
+
     /// <summary>
     /// Get the Id of the <see cref="Exchange"/>.
     /// </summary>

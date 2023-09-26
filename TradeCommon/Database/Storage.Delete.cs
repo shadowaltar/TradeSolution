@@ -1,4 +1,5 @@
-﻿using Common.Database;
+﻿using Common;
+using Common.Database;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Trading;
 
@@ -8,12 +9,7 @@ public partial class Storage
 {
     public async Task DeleteOpenOrderId(OpenOrderId openOrderId)
     {
-        var tableName = DatabaseNames.OpenOrderIdTable;
-        if (!_writers.TryGetValue(DataType.OpenOrderId.ToString(), out var writer))
-        {
-            writer = new SqlWriter<OpenOrderId>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-            _writers[DataType.OpenOrderId.ToString()] = writer;
-        }
+        var writer = _writers.GetOrCreate(DataType.OpenOrderId.ToString(), () => new SqlWriter<OpenOrderId>(this), (k, w) => Register(w));
         await writer.DeleteOne(openOrderId);
     }
 }

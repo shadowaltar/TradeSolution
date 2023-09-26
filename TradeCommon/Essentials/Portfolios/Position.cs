@@ -1,7 +1,8 @@
-﻿using Common;
-using TradeCommon.Constants;
-using TradeCommon.Essentials.Trading;
-using Common.Attributes;
+﻿using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Database;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
 
@@ -13,41 +14,17 @@ namespace TradeCommon.Essentials.Portfolios;
 /// When quantity reaches zero, another position should be created
 /// instead of modifying the closed one.
 /// </summary>
-public record Position
+[Storage("positions", DatabaseNames.ExecutionData)]
+[Unique(nameof(Id))]
+[Index(nameof(SecurityId))]
+[Index(nameof(CreateTime))]
+public sealed record Position : Asset
 {
     /// <summary>
-    /// Unique id of this position.
+    /// The time which the position is fully closed.
+    /// It should be the time when last trade fills.
     /// </summary>
-    public long Id { get; set; } = 0;
-
-    /// <summary>
-    /// The account id associated to this position.
-    /// </summary>
-    public int AccountId { get; set; } = 0;
-
-    /// <summary>
-    /// The time which the position is established.
-    /// It should be the first trade fills.
-    /// </summary>
-    public DateTime StartTime { get; set; } = DateTime.MinValue;
-
-    /// <summary>
-    /// The time which the position is updated.
-    /// </summary>
-    public DateTime UpdateTime { get; set; } = DateTime.MaxValue;
-
-    /// <summary>
-    /// The quantity which this position holds.
-    /// It is the sum of all buy + sell trades' quantities.
-    /// Negative indicates it is in short-selling state.
-    /// Zero means the position has been closed.
-    /// </summary>
-    public decimal Quantity { get; set; }
-
-    /// <summary>
-    /// The quantity which this position holds and cannot be traded.
-    /// </summary>
-    public decimal LockQuantity { get; set; }
+    public DateTime CloseTime { get; set; } = DateTime.MaxValue;
 
     /// <summary>
     /// The price of this position.
@@ -61,50 +38,21 @@ public record Position
     public decimal Notional { get; set; }
 
     /// <summary>
-    /// Position's security code.
+    /// The beginning notional amount.
     /// </summary>
-    public string? SecurityCode { get; set; } = null;
-
-    /// <summary>
-    /// The security id of this position.
-    /// If it is an equity position, it is the security definition Id.
-    /// If it is an fx position, it is the base-quote pair definition Id.
-    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc. 
-    /// </summary>
-    public int SecurityId { get; set; } = 0;
-
-    /// <summary>
-    /// Position base asset's Id.
-    /// If it is an equity position, it is the same as <see cref="SecurityId"/>.
-    /// If it is an fx position, it is the base asset Id.
-    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
-    /// </summary>
-    public int BaseAssetId { get; set; } = 0;
-
-    /// <summary>
-    /// Position quote asset's Id.
-    /// If it is an equity position, it is USD for US market, or HKD for HK market.
-    /// If it is an fx position, it is the quote asset Id.
-    /// If it is a cash position, it is the id of a pure asset, like USD, EUR, BTC etc.
-    /// </summary>
-    public int QuoteAssetId { get; set; } = 0;
+    public decimal StartNotional { get; set; }
 
     /// <summary>
     /// Realized pnl, which is the sum of all realized pnl from each closed trades.
     /// </summary>
     public decimal RealizedPnl { get; set; }
 
-    /// <summary>
-    /// All orders related to this position.
-    /// </summary>
-    [DatabaseIgnore]
-    public List<Order> Orders { get; set; } = new();
+    public long StartOrderId { get; set; }
+    public long EndOrderId { get; set; }
+    public long StartTradeId { get; set; }
+    public long EndTradeId { get; set; }
 
-    /// <summary>
-    /// All trades related to this position.
-    /// </summary>
-    [DatabaseIgnore]
-    public List<Trade> Trades { get; set; } = new();
+    public decimal AccumulatedFee { get; set; }
 
     /// <summary>
     /// Whether it is a closed position.
@@ -112,4 +60,37 @@ public record Position
     /// </summary>
     [DatabaseIgnore]
     public bool IsClosed => Quantity == 0;
+
+
+    public bool Equals(Position? obj)
+    {
+        if (!base.Equals(obj))
+            return false;
+
+        if (CloseTime == obj.CloseTime
+            && Price == obj.Price
+            && Notional == obj.Notional
+            && StartNotional == obj.StartNotional
+            && StartOrderId == obj.StartOrderId
+            && EndOrderId == obj.EndOrderId
+            && StartTradeId == obj.StartTradeId
+            && EndTradeId == obj.EndTradeId
+            && AccumulatedFee == obj.AccumulatedFee)
+            return true;
+        return false;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(base.GetHashCode(),
+                                CloseTime,
+                                Price,
+                                Notional,
+                                StartNotional,
+                                StartOrderId,
+                                EndOrderId,
+                                HashCode.Combine(StartTradeId,
+                                EndTradeId,
+                                AccumulatedFee));
+    }
 }

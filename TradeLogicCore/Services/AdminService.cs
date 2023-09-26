@@ -37,7 +37,6 @@ public class AdminService : IAdminService
                         IPortfolioService portfolioService,
                         ITradeService tradeService,
                         IExternalAccountManagement accountManagement,
-                        IExternalExecutionManagement execution,
                         IExternalConnectivityManagement connectivity)
     {
         Context = context;
@@ -49,9 +48,6 @@ public class AdminService : IAdminService
         _persistence = persistence;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
-
-        execution.BalancesChanged -= OnBalancesChanged;
-        execution.BalancesChanged += OnBalancesChanged;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
@@ -109,13 +105,9 @@ public class AdminService : IAdminService
         Context.Account = CurrentAccount;
 
         // setup portfolio
-        await _portfolioService.Initialize();
-
-        if (account.Balances.IsNullOrEmpty())
-        {
-            _log.Warn($"Account {accountName} has no assets.");
-            return ResultCode.AccountHasNoAsset;
-        }
+        var result = await _portfolioService.Initialize();
+        if (!result)
+            return ResultCode.SubscriptionFailed;
         return ResultCode.LoginUserAndAccountOk;
     }
 
@@ -141,7 +133,7 @@ public class AdminService : IAdminService
 
         user.ValidateOrThrow();
         user.AutoCorrect();
-        return await _storage.InsertUser(user);
+        return await _storage.InsertOne(user, false);
     }
 
     public async Task<User?> GetUser(string? userName, EnvironmentType environment)
@@ -161,7 +153,7 @@ public class AdminService : IAdminService
 
         account.ValidateOrThrow();
         account.AutoCorrect();
-        return await _storage.InsertAccount(account, false);
+        return await _storage.InsertOne(account, false);
     }
 
     public async Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false)
@@ -180,28 +172,16 @@ public class AdminService : IAdminService
                 _log.Error($"Failed to read account by name {accountName} from database in {environment}.");
                 return null;
             }
-            var balances = await _storage.ReadBalances(account.Id);
-            if (balances.IsNullOrEmpty())
-            {
-                _log.Warn($"Failed to read balances or no balance records related to account name {accountName} from database in {environment}.");
-            }
-            else
-            {
-                foreach (var balance in balances)
-                {
-                    balance.AssetCode = assets.FirstOrDefault(a => a.Id == balance.AssetId)?.Code ?? "";
-                }
-                account.Balances.AddRange(balances);
-            }
             return account;
         }
         else
         {
             var state = await _accountManagement.GetAccount(assets);
-            var account = state.Get<Account>();
-            if (account == null)
+            var accountAndBalances = state.Get<(Account a, List<Asset> b)>();
+            if (accountAndBalances.a == null)
                 return null;
 
+            var account = accountAndBalances.a;
             // when the stored & broker's external account names are the same
             // then must sync some info which are not on broker side
             if (account.ExternalAccount == CurrentAccount?.ExternalAccount)
@@ -210,38 +190,16 @@ public class AdminService : IAdminService
 
                 if (!account.CreateTime.IsValid())
                     account.CreateTime = account.UpdateTime;
-                if (!account.OwnerId.IsValid())
+                if (account.OwnerId <= 0)
                     account.OwnerId = CurrentUser.Id;
                 if (account.Name.IsBlank())
                     account.Name = CurrentAccount.Name;
                 if (account.Environment == EnvironmentType.Unknown)
                     account.Environment = Context.Environment;
-                if (!account.BrokerId.IsValid())
+                if (account.BrokerId <= 0)
                     account.BrokerId = Context.BrokerId;
-
-                foreach (var balance in account.Balances)
-                {
-                    balance.AccountId = account.Id;
-                    balance.UpdateTime = account.UpdateTime;
-                }
             }
             return account;
         }
-    }
-
-    private void OnBalancesChanged(List<Balance> balances)
-    {
-        var account = Context.Account ?? throw Exceptions.MustLogin();
-        foreach (var balance in balances)
-        {
-            var asset = _securityService.GetSecurity(balance.AssetCode);
-            if (asset == null)
-                _log.Error("Received a balance update with unknown asset id, asset code is: " + balance.AssetCode);
-
-            balance.AccountId = account.Id;
-            balance.AssetId = asset?.Id ?? 0;
-            balance.UpdateTime = DateTime.UtcNow;
-        }
-        _persistence.Enqueue(balances);
     }
 }

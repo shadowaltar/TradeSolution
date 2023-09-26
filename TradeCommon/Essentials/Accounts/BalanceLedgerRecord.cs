@@ -1,7 +1,7 @@
 ﻿namespace TradeCommon.Essentials.Accounts;
 
 /// <summary>
-/// Class to record any actions done onto the balance entries of an account.
+/// Class to record any actions done onto the asset entries of an account.
 /// </summary>
 /// <param name="UserId">Who performs this action.</param>
 /// <param name="AccountId">To which account this action performs on.</param>

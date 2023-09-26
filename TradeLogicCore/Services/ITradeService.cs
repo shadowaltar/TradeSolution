@@ -57,5 +57,6 @@ public interface ITradeService
     /// Update the internal state.
     /// </summary>
     /// <param name="trades"></param>
-    void Update(ICollection<Trade> trades);
+    /// <param name="security"></param>
+    void Update(ICollection<Trade> trades, Security? security = null);
 }

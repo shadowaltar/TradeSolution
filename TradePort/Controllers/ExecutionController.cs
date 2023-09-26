@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Common;
 using Microsoft.AspNetCore.Mvc;
-using System;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -38,13 +37,9 @@ public class ExecutionController : Controller
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="orderService"></param>
-    /// <param name="adminService"></param>
     /// <param name="portfolioService"></param>
     /// <param name="context"></param>
-    /// <param name="password">Required.</param>
-    /// <param name="exchange"></param>
-    /// <param name="environment"></param>
-    /// <param name="accountName">Account name.</param>
+    /// <param name="adminPassword">Required.</param>
     /// <param name="secTypeStr">Security type.</param>
     /// <param name="symbol">Symbol of security.</param>
     /// <param name="side">Side of order.</param>
@@ -54,16 +49,12 @@ public class ExecutionController : Controller
     /// <param name="stopLoss">Stop loss price of order. Must be > 0.</param>
     /// <param name="isFakeOrder">Send a fake order if true.</param>
     /// <returns></returns>
-    [HttpPost("{exchange}/accounts/{account}/orders/send")]
+    [HttpPost("orders/send")]
     public async Task<ActionResult> SendOrder([FromServices] ISecurityService securityService,
                                               [FromServices] IOrderService orderService,
-                                              [FromServices] IAdminService adminService,
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromServices] Context context,
-                                              [FromForm] string password,
-                                              [FromRoute(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-                                              [FromRoute(Name = "account")] string accountName = "",
-                                              [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+                                              [FromForm(Name = "admin-password")] string adminPassword,
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCTUSD",
                                               [FromQuery(Name = "side")] Side side = Side.None,
@@ -73,35 +64,31 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "stop-loss")] decimal stopLoss = 0.002m,
                                               [FromQuery(Name = "fake")] bool isFakeOrder = true)
     {
-        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
-        if (ControllerValidator.IsUnknown(environment, out br)) return br;
-        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
         if (side == Side.None) return BadRequest("Invalid side.");
         if (ControllerValidator.IsDecimalNegative(price, out br)) return br;
         if (ControllerValidator.IsDecimalNegativeOrZero(quantity, out br)) return br;
         if (ControllerValidator.IsDecimalNegativeOrZero(stopLoss, out br)) return br;
 
-        var security = await securityService.GetSecurity(symbol, exchange, secType);
+        var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         if (security == null) return BadRequest("Cannot find security.");
 
-        var supportedOrderType = new List<OrderType> { OrderType.Limit, OrderType.Market, OrderType.StopLimit, OrderType.Stop, OrderType.TakeProfit, OrderType.TakeProfitLimit };
+        var supportedOrderType = new List<OrderType> {
+            OrderType.Limit, OrderType.Market, OrderType.StopLimit,
+            OrderType.Stop, OrderType.TakeProfit, OrderType.TakeProfitLimit
+        };
         if (!supportedOrderType.Contains(orderType))
             return BadRequest("Currently only supports normal/stop/take-profit limit/market market orders.");
 
         if (price == 0 && orderType != OrderType.Market)
             return BadRequest("Only market order can have zero price.");
 
-        if (accountName.IsBlank() && context.Account == null)
-        {
-            return BadRequest("Either provide an account name, or login first.");
-        }
-        accountName = accountName.IsBlank() ? context.Account!.Name : accountName;
-        var account = await adminService.GetAccount(accountName, environment);
-        if (account == null) return BadRequest("Invalid or missing account.");
+        if (context.Account == null || context.Account.Name.IsBlank())
+            return BadRequest("Must login first.");
 
-        var order = orderService.CreateManualOrder(security, account.Id, price, quantity, side, orderType);
-        // TODO validate the remaining balance by rules defined from portfolio service only
+        var order = orderService.CreateManualOrder(security, context.Account.Id, price, quantity, side, orderType);
+        // TODO validate the remaining asset by rules defined from portfolio service only
         if (!portfolioService.Validate(order))
             return BadRequest("Invalid order price or quantity.");
 

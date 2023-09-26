@@ -77,6 +77,8 @@ public class DefinitionReader
                 Exchange = exchange,
                 Type = SecurityTypes.Fx,
                 SubType = SecurityTypes.Crypto,
+                SecurityType = SecurityType.Fx,
+                SecuritySubType = SecurityType.Crypto,
                 LotSize = 0, // it is meaningless to set lot size for asset entry
                 PricePrecision = assetPrecision,
                 QuantityPrecision = assetPrecision,

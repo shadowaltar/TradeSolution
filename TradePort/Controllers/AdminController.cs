@@ -31,7 +31,7 @@ public class AdminController : Controller
     /// <param name="environment"></param>
     /// <param name="exchange"></param>
     /// <returns></returns>
-    [HttpPost("login-environment")]
+    [HttpPost("login")]
     public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IAdminService adminService,
                                                            [FromForm(Name = "admin-password")] string adminPassword,
                                                            [FromForm(Name = "user-password")] string password,
@@ -53,47 +53,47 @@ public class AdminController : Controller
             : Ok(result);
     }
 
-    /// <summary>
-    /// Set application environment.
-    /// </summary>
-    /// <param name="adminService"></param>
-    /// <param name="adminPassword"></param>
-    /// <param name="environment"></param>
-    /// <param name="exchange"></param>
-    /// <returns></returns>
-    [HttpPost("set-environment")]
-    public ActionResult SetEnvironment([FromServices] IAdminService adminService,
-                                       [FromForm(Name = "admin-password")] string adminPassword,
-                                       [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
-                                       [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
-    {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsUnknown(environment, out br)) return br;
-        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+    ///// <summary>
+    ///// Set application environment.
+    ///// </summary>
+    ///// <param name="adminService"></param>
+    ///// <param name="adminPassword"></param>
+    ///// <param name="environment"></param>
+    ///// <param name="exchange"></param>
+    ///// <returns></returns>
+    //[HttpPost("set-environment")]
+    //public ActionResult SetEnvironment([FromServices] IAdminService adminService,
+    //                                   [FromForm(Name = "admin-password")] string adminPassword,
+    //                                   [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
+    //                                   [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
+    //{
+    //    if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+    //    if (ControllerValidator.IsUnknown(environment, out br)) return br;
+    //    if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
-        adminService.Initialize(environment, exchange, ExternalNames.Convert(exchange));
-        return Ok(environment);
-    }
+    //    adminService.Initialize(environment, exchange, ExternalNames.Convert(exchange));
+    //    return Ok(environment);
+    //}
 
-    /// <summary>
-    /// Login.
-    /// </summary>
-    /// <param name="adminService"></param>
-    /// <param name="userName"></param>
-    /// <param name="password"></param>
-    /// <param name="accountName"></param>
-    /// <returns></returns>
-    [HttpPost("login")]
-    public async Task<ActionResult> Login([FromServices] IAdminService adminService,
-                                          [FromQuery(Name = "user")] string userName,
-                                          [FromQuery(Name = "account-name")] string accountName,
-                                          [FromForm(Name = "user-password")] string password)
-    {
-        var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
-        return result != ResultCode.LoginUserAndAccountOk
-            ? BadRequest($"Failed to {nameof(Login)}; code: {result}")
-            : Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
-    }
+    ///// <summary>
+    ///// Login.
+    ///// </summary>
+    ///// <param name="adminService"></param>
+    ///// <param name="userName"></param>
+    ///// <param name="password"></param>
+    ///// <param name="accountName"></param>
+    ///// <returns></returns>
+    //[HttpPost("login")]
+    //public async Task<ActionResult> Login([FromServices] IAdminService adminService,
+    //                                      [FromQuery(Name = "user")] string userName,
+    //                                      [FromQuery(Name = "account-name")] string accountName,
+    //                                      [FromForm(Name = "user-password")] string password)
+    //{
+    //    var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
+    //    return result != ResultCode.LoginUserAndAccountOk
+    //        ? BadRequest($"Failed to {nameof(Login)}; code: {result}")
+    //        : Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
+    //}
 
     /// <summary>
     /// Get details of a user.
@@ -345,7 +345,7 @@ public class AdminController : Controller
             results = new();
             results.AddRange(await CreateTables(storage, DataType.User));
             results.AddRange(await CreateTables(storage, DataType.Account));
-            results.AddRange(await CreateTables(storage, DataType.Balance));
+            results.AddRange(await CreateTables(storage, DataType.Asset));
             results.AddRange(await CreateTables(storage, DataType.FinancialStat));
             results.AddRange(await CreateTables(storage, DataType.AlgoEntry));
             results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Fx));
@@ -372,7 +372,7 @@ public class AdminController : Controller
                 await storage.CreateAccountTable();
                 resultTableNames.Add(DatabaseNames.AccountTable);
                 break;
-            case DataType.Balance:
+            case DataType.Asset:
                 await storage.CreateBalanceTable();
                 resultTableNames.Add(DatabaseNames.BalanceTable);
                 break;

@@ -6,9 +6,6 @@ public enum ExchangeType
     [Description(ExternalNames.Unknown)]
     Unknown = 0,
 
-    [Description(ExternalNames.Unknown)]
-    Any = 0,
-
     [Description(ExternalNames.Hkex)]
     Hkex,
 

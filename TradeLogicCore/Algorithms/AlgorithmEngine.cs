@@ -177,9 +177,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         Interval = parameters.Interval;
         Parameters = parameters;
 
-        // initialize portfolio, and connect to external
-        await Services.Portfolio.Initialize();
-
         ShouldCloseOpenPositionsWhenHalted = parameters.ShouldCloseOpenPositionsWhenHalted;
         ShouldCloseOpenPositionsWhenStopped = parameters.ShouldCloseOpenPositionsWhenStopped;
 
@@ -204,7 +201,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         foreach (var security in pickedSecurities.Values)
         {
             var currencyAsset = security.EnsureCurrencyAsset();
-            var assetPosition = Services.Portfolio.GetAssetPosition(currencyAsset.Id);
+            var assetPosition = Services.Portfolio.GetAsset(currencyAsset.Id);
             if (assetPosition == null || assetPosition.Quantity <= 0)
             {
                 _log.Warn($"Cannot trade the picked security {security.Code}; the account may not have enough free asset to trade.");
@@ -544,14 +541,12 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         {
             var lastEntry = _lastEntriesBySecurityId.GetValueOrDefault(order.SecurityId);
         }
-        var security = Context.Services.Security.GetSecurity(order.SecurityId);
-        _persistence.Enqueue(order, security);
+        _persistence.Enqueue(order);
     }
 
     private void OnNextTrade(Trade trade)
     {
-        var security = Context.Services.Security.GetSecurity(trade.SecurityId);
-        _persistence.Enqueue(trade, security);
+        // TODO
     }
 
     private void OnHistoricalPriceEnd(int priceCount)
@@ -717,7 +712,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             var endTimeOfBar = GetOhlcEndTime(ohlcPrice, intervalType);
             var sl = GetStopLoss(ohlcPrice, Side.Buy, security);
             var tp = GetTakeProfit(ohlcPrice, Side.Buy, security);
-            var assetPosition = Services.Portfolio.GetPositionRelatedCurrencyAsset(entry.SecurityId);
+            var assetPosition = Services.Portfolio.GetPositionRelatedQuoteBalance(entry.SecurityId);
 
             if (IsBackTesting)
             {

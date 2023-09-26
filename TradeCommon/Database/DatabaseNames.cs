@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -20,7 +21,7 @@ public static class DatabaseNames
     public const string ExecutionData = "execution_data";
 
     public const string AccountTable = "accounts";
-    public const string BalanceTable = "balances";
+    public const string BalanceTable = "assets";
     public const string UserTable = "users";
 
     public const string StockDefinitionTable = "stock_definitions";
@@ -52,6 +53,8 @@ public static class DatabaseNames
     public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
     public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
 
+    public const string TradePositionReconciliation = "reconciled_trade_position";
+
     private static Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
 
     public static string GetDatabaseName<T>()
@@ -62,7 +65,7 @@ public static class DatabaseNames
         if (t == typeof(Position)) return ExecutionData;
 
         if (t == typeof(Account)) return StaticData;
-        if (t == typeof(Balance)) return StaticData;
+        if (t == typeof(Asset)) return StaticData;
 
         if (t == typeof(ExtendedOhlcPrice)) return MarketData;
         if (t == typeof(OhlcPrice)) return MarketData;
@@ -129,21 +132,21 @@ public static class DatabaseNames
         return GetTradeTableName(type, isErrorTable);
     }
 
-    public static string GetPositionTableName(SecurityType type, bool isErrorTable = false)
+    public static string? GetPositionTableName(SecurityType type, bool isErrorTable = false)
     {
         if (!isErrorTable)
             return type switch
             {
                 SecurityType.Equity => StockPositionTable,
                 SecurityType.Fx => FxPositionTable,
-                _ => throw new NotImplementedException()
+                _ => null
             };
         else
             return type switch
             {
                 SecurityType.Equity => ErrorStockPositionTable,
                 SecurityType.Fx => ErrorFxPositionTable,
-                _ => throw new NotImplementedException()
+                _ => null
             };
     }
 
@@ -194,21 +197,40 @@ public static class DatabaseNames
         };
     }
 
-    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>()
+    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T? entry = null) where T : class
     {
         var type = typeof(T);
-        if (_tableDatabaseNamesByType.TryGetValue(type, out var tuple))
+        var specificTable = "";
+        if (entry != null)
         {
-            return tuple;
+            if (entry is Order order)
+            {
+                specificTable = GetOrderTableName(order.Security?.Type ?? throw Exceptions.Invalid<Order>("Missing security in order."));
+            }
+            else if (entry is Trade trade)
+            {
+                specificTable = GetTradeTableName(trade.Security?.Type ?? throw Exceptions.Invalid<Trade>("Missing security in trade."));
+            }
+            else if (entry is Position position)
+            {
+                specificTable = GetPositionTableName(position.Security?.Type ?? throw Exceptions.Invalid<Position>("Missing security in position."));
+            }
         }
-        var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
-        var table = storageAttr.TableName;
-        var schema = storageAttr.SchemaName ?? "";
-        var database = storageAttr.DatabaseName;
-        if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
-        if (!schema.IsBlank())
-            table = $"{table}.{schema}";
-        _tableDatabaseNamesByType[type] = tuple = (table, database + DatabaseSuffix);
-        return tuple;
+
+        (string tableName, string databaseName) existing;
+        if (!_tableDatabaseNamesByType.TryGetValue(type, out existing))
+        {
+            var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
+            
+            var table = storageAttr.TableName;
+            var database = storageAttr.DatabaseName;
+            if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
+            if (!database.EndsWith(DatabaseSuffix))
+                database += DatabaseSuffix;
+            existing = (table, database);
+            _tableDatabaseNamesByType[type] = existing;
+        }
+        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
+        return (specificTable, existing.databaseName);
     }
 }

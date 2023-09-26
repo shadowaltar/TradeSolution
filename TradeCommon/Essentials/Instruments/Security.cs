@@ -1,4 +1,5 @@
 ﻿using Common.Attributes;
+using TradeCommon.Constants;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Instruments;
@@ -15,7 +16,7 @@ public class Security
     public string? Currency { get; set; }
 
     [DatabaseIgnore]
-    public Security? CurrencyAsset { get; set; }
+    public Security CurrencyAsset { get; set; }
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }
@@ -26,6 +27,16 @@ public class Security
 
     public int PricePrecision { get; set; }
     public int QuantityPrecision { get; set; }
+
+    [DatabaseIgnore]
+    public SecurityType SecurityType { get; set; }
+
+    [DatabaseIgnore]
+    public SecurityType SecuritySubType { get; set; }
+    [DatabaseIgnore]
+    public ExchangeType ExchangeType { get; set; }
+
+    public bool IsAsset => Id == CurrencyAsset.Id;
 
     /// <summary>
     /// Ensure and return the currency/quote asset.

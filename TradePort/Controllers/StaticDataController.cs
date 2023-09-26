@@ -43,20 +43,18 @@ public class StaticDataController : Controller
     /// Get all security definitions in exchangeStr.
     /// </summary>
     /// <param name="storage"></param>
-    /// <param name="exchange"></param>
     /// <param name="secTypeStr"></param>
     /// <param name="limit"></param>
     /// <returns></returns>
-    [HttpGet("securities/{exchangeStr}")]
+    [HttpGet("securities")]
     public async Task<IActionResult> GetSecurities([FromServices] IStorage storage,
-                                                   string exchange = ExternalNames.Binance,
+                                                   [FromQuery(Name = "exchange")] string exchTypeStr = ExternalNames.Binance,
                                                    [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                                    [FromQuery(Name = "limit")] int limit = 100)
     {
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
-
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(exchTypeStr, out ExchangeType exchange, out br)) return br;
+        
         var securities = await storage.ReadSecurities(secType, exchange);
 
         return Ok(securities.Take(limit));
@@ -140,23 +138,22 @@ public class StaticDataController : Controller
     }
 
     /// <summary>
-    /// Gets all security stats in the exchangeStr and save to database.
+    /// Gets all security stats from an exchange and save to database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("financial-stats/{exchangeStr}/get-and-save-all")]
+    [HttpGet("financial-stats/get-and-save-all")]
     public async Task<IActionResult> GetAndSaveHongKongSecurityStats([FromServices] IStorage storage,
-                                                                     string exchange = ExternalNames.Hkex,
+                                                                     [FromQuery(Name = "exchange")] string exchTypeStr = ExternalNames.Hkex,
                                                                      [FromQuery(Name = "sec-type")] string? secTypeStr = "equity")
     {
-        var secType = SecurityTypeConverter.Parse(secTypeStr);
-        if (secType == SecurityType.Unknown)
-            return BadRequest("Invalid sec-type string.");
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(exchTypeStr, out ExchangeType exchange, out br)) return br;
 
         var securities = await storage.ReadSecurities(secType, exchange);
         var reader = new ListedOptionReader();
         var stats = await reader.ReadUnderlyingStats(securities);
         if (stats == null)
-            return BadRequest("Failed to download or parse HK security stats.");
+            return BadRequest("Failed to download or parse security financial stats.");
 
         var count = await storage.UpsertSecurityFinancialStats(stats);
 

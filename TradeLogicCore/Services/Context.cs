@@ -50,7 +50,13 @@ public class Context : ApplicationContext
     public Account? Account
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _account;
-        internal set => _account = value;
+        internal set
+        {
+            if (value == null)
+                throw Exceptions.InvalidAccount();
+            _account = value;
+            AccountId = value.Id;
+        }
     }
 
     public void InitializeAlgorithmContext<T>(IAlgorithmEngine algorithmEngine, IAlgorithm<T> algorithm) where T : IAlgorithmVariables

@@ -50,7 +50,7 @@ public class PortfolioServiceTests
         var position = service.Create(trades[0]);
         for (int i = 1; i < trades.Count; i++)
         {
-            service.Merge(position, trades[i]);
+            service.Apply(position, trades[i]);
         }
     }
 }

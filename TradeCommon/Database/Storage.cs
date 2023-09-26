@@ -3,8 +3,7 @@ using Common.Database;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Providers;
+using TradeCommon.Constants;
 
 namespace TradeCommon.Database;
 
@@ -12,6 +11,9 @@ public partial class Storage : IStorage
 {
     private readonly ILog _log = Logger.New();
     private readonly Dictionary<string, ISqlWriter> _writers = new();
+
+    public event Action<object, string> Success;
+    public event Action<object, Exception, string> Failed;
 
     public IDatabaseSchemaHelper SchemaHelper { get; } = new SqliteSchemaHelper();
 
@@ -73,12 +75,6 @@ public partial class Storage : IStorage
         return entries;
     }
 
-    /// <summary>
-    /// Execute a query and return a <see cref="DataTable"/>. All values are in strings.
-    /// </summary>
-    /// <param name="sql"></param>
-    /// <param name="database"></param>
-    /// <returns></returns>
     public async Task<DataTable> Query(string sql, string database)
     {
         var entries = new DataTable();
@@ -116,6 +112,26 @@ public partial class Storage : IStorage
     }
 
     /// <summary>
+    /// Execute a query and return a <see cref="DataTable"/>. All values are in strings.
+    /// </summary>
+    /// <param name="sql"></param>
+    /// <param name="database"></param>
+    /// <returns></returns>
+    public async Task<int> Run(string sql, string database)
+    {
+        var entries = new DataTable();
+
+        using var connection = await Connect(database);
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+
+        var i = await command.ExecuteNonQueryAsync();
+
+        _log.Info($"Executed command in {database}. SQL: {sql}");
+        return i;
+    }
+
+    /// <summary>
     /// Check if a table exists.
     /// </summary>
     /// <param name="tableName"></param>
@@ -144,7 +160,7 @@ public partial class Storage : IStorage
         {
             foreach (var databaseName in databaseNames)
             {
-                var filePath = Path.Combine(DatabaseFolder, databaseName + ".db");
+                var filePath = Path.Combine(Consts.DatabaseFolder, databaseName + ".db");
                 File.Delete(filePath);
                 _log.Info($"Deleted database file: {filePath}");
             }
@@ -157,7 +173,7 @@ public partial class Storage : IStorage
 
     private string? GetConnectionString(string databaseName)
     {
-        return $"Data Source={Path.Combine(DatabaseFolder, databaseName)}.db";
+        return $"Data Source={Path.Combine(Consts.DatabaseFolder, databaseName)}.db";
     }
 
     private async Task<SqliteConnection> Connect(string database)
@@ -165,5 +181,23 @@ public partial class Storage : IStorage
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
+    }
+
+    private void Register(ISqlWriter writer)
+    {
+        writer.Success -= RaiseSuccess;
+        writer.Success += RaiseSuccess;
+        writer.Failed -= RaiseFailed;
+        writer.Failed += RaiseFailed;
+    }
+
+    private void RaiseSuccess(object entry, string methodName = "")
+    {
+        Success?.Invoke(entry, methodName);
+    }
+
+    private void RaiseFailed(object entry, Exception e, string methodName = "")
+    {
+        Failed?.Invoke(entry, e, methodName);
     }
 }

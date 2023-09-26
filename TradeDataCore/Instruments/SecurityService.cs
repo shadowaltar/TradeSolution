@@ -32,10 +32,14 @@ public class SecurityService : ISecurityService
         if (_isInitialized) return _securities.Values.ToList();
 
         var secTypes = Enum.GetValues<SecurityType>();
+        var exchangeTypes = Enum.GetValues<ExchangeType>();
         List<Security> securities = new();
         foreach (var secType in secTypes)
         {
-            securities.AddRange(await _storage.ReadSecurities(secType));
+            foreach (var exchangeType in exchangeTypes)
+            {
+                securities.AddRange(await _storage.ReadSecurities(secType, exchangeType));
+            }
         }
         RefreshCache(securities);
 
@@ -59,13 +63,13 @@ public class SecurityService : ISecurityService
     }
 
     public async Task<List<Security>> GetSecurities(SecurityType secType,
-                                                    ExchangeType exchange = ExchangeType.Unknown,
+                                                    ExchangeType exchange,
                                                     bool requestDatabase = false)
     {
         var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
         if (requestDatabase)
         {
-            var securities = await _storage.ReadSecurities(secType, exchStr);
+            var securities = await _storage.ReadSecurities(secType, exchange);
             RefreshCache(securities);
             return securities;
         }
@@ -156,8 +160,9 @@ public class SecurityService : ISecurityService
         }
     }
 
-    public Security? GetSecurity(string code)
+    public Security? GetSecurity(string? code)
     {
+        if (code.IsBlank()) return null;
         return _securitiesByCode.ThreadSafeGet(code);
     }
 
@@ -197,7 +202,8 @@ public class SecurityService : ISecurityService
             {
                 if (!security.Currency.IsBlank())
                 {
-                    security.CurrencyAsset = fxSecurities!.GetOrDefault(security.Currency);
+                    security.CurrencyAsset = fxSecurities!.GetOrDefault(security.Currency)
+                        ?? throw Exceptions.InvalidSecurity(security.Currency, "Cannot find currency asset code from existed fx entries.");
                 }
                 if (security.FxInfo != null)
                 {

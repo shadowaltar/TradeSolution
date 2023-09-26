@@ -71,28 +71,28 @@ public class OrderService : IOrderService, IDisposable
         return _orders.ThreadSafeValues();
     }
 
-    public async Task<List<Order>> GetOrders(Security security, DateTime start, DateTime end, bool requestExternal = false)
+    public async Task<List<Order>> GetOrders(Security security, DateTime start, DateTime? end, bool requestExternal = false)
     {
         var orders = new List<Order>();
         if (requestExternal)
         {
-            var state = await _execution.GetOrderHistory(security, start, end);
+            var state = await _execution.GetOrders(security, start: start, end: end);
             orders.AddOrAddRange(state.Get<List<Order>>(), state.Get<Order>());
             foreach (var order in orders)
             {
-                order.AccountId = _context.Account!.Id;
-                order.BrokerId = _context.BrokerId;
-                order.ExchangeId = _context.ExchangeId;
+                order.AccountId = _context.AccountId;
                 order.SecurityCode = security.Code;
+                order.Security = security;
             }
         }
         else
         {
-            orders = await _storage.ReadOrders(security, start, end);
+            orders = await _storage.ReadOrders(security, start, end ?? DateTime.UtcNow);
         }
         foreach (var order in orders)
         {
             order.SecurityCode = security.Code;
+            order.Security = security;
         }
         return orders;
     }
@@ -193,16 +193,15 @@ public class OrderService : IOrderService, IDisposable
         {
             Id = id,
             AccountId = accountId,
-            BrokerId = _context.BrokerId,
             CreateTime = now,
             UpdateTime = now,
-            ExchangeId = ExchangeIds.GetId(security.Exchange),
             ExternalOrderId = id, // it maybe changed later by the exchange/broker
             Price = price,
             Quantity = quantity,
             Type = orderType,
-            SecurityCode = security.Code,
+            Security = security,
             SecurityId = security.Id,
+            SecurityCode = security.Code,
             Side = side,
             Status = OrderStatus.Sending,
             StopPrice = 0,
@@ -230,8 +229,13 @@ public class OrderService : IOrderService, IDisposable
             order.AccountId = existingOrder.AccountId;
             order.CreateTime = existingOrder.CreateTime;
             order.SecurityId = existingOrder.SecurityId;
+            order.Security = existingOrder.Security;
             if (order.Status != existingOrder.Status)
             {
+                if (existingOrder.IsClosed)
+                {
+
+                }
                 _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
             _orders.ThreadSafeSet(oid, order);
@@ -304,9 +308,7 @@ public class OrderService : IOrderService, IDisposable
             {
                 order.Id = _orderIdGen.NewTimeBasedId;
             }
-            order.AccountId = _context.Account.Id;
-            order.BrokerId = _context.BrokerId;
-            order.ExchangeId = _context.ExchangeId;
+            order.AccountId = _context.AccountId;
             if (order.Status == OrderStatus.Live)
             {
                 _openOrders.ThreadSafeSet(order.Id, order);
@@ -326,8 +328,7 @@ public class OrderService : IOrderService, IDisposable
 
     public void Persist(Order order)
     {
-        var security = _securityService.GetSecurity(order.SecurityCode);
-        _persistence.Enqueue(order, security);
+        _persistence.Enqueue(order);
     }
 
     private void Persist(ExternalQueryState state)

@@ -9,7 +9,7 @@ public interface ISecurityDefinitionProvider
     /// </summary>
     /// <param name="code"></param>
     /// <returns></returns>
-    Security? GetSecurity(string code);
+    Security? GetSecurity(string? code);
 
     /// <summary>
     /// Gets a security by its unique id. Throws exception if not found.

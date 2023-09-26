@@ -345,6 +345,16 @@ public static class ReflectionUtils
             ami = new AttributeMetaInfo();
             _typeToAttributeInfo[t] = ami;
 
+            var uniqueAttrs = t.GetCustomAttributes<UniqueAttribute>().ToList();
+            for (int i = 0; i < uniqueAttrs.Count; i++)
+            {
+                UniqueAttribute? attr = uniqueAttrs[i];
+                if (i == 0)
+                    ami.PrimaryUniqueKey.AddRange(attr.FieldNames);
+
+                ami.AllUniqueKeys.Add(new HashSet<string>(attr.FieldNames));
+            }
+
             foreach (var (name, property) in GetPropertyToName(t))
             {
                 var ignoreAttr = property.GetCustomAttribute<DatabaseIgnoreAttribute>();

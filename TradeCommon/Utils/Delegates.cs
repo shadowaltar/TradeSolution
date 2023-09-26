@@ -16,7 +16,7 @@ public static class Delegates
     public delegate void TradeReceivedCallback(Trade trade);
     public delegate void TradesReceivedCallback(List<Trade> trades);
 
-    public delegate void BalanceChangedCallback(List<Balance> balances);
+    public delegate void BalanceChangedCallback(List<Asset> assets);
     public delegate void TransferredCallback(TransferAction transferAction);
 
     public delegate void OhlcPriceReceivedCallback(int securityId, OhlcPrice price, bool isComplete);

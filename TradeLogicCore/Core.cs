@@ -1,6 +1,6 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
+using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -65,9 +65,10 @@ public class Core
         await ReconcileOpenOrders();
 
         // check one week's historical order / trade only
-        var previousDay = startTime.AddDays(-7);
-        await CacheAndReconcileRecentOrders(previousDay, startTime, parameters.SecurityPool);
-        await CacheAndReconcileRecentTrades(previousDay, startTime, parameters.SecurityPool);
+        var previousDay = startTime.AddMonths(-1);
+        await CacheAndReconcileRecentOrders(previousDay, parameters.SecurityPool);
+        await CacheAndReconcileRecentTrades(previousDay, parameters.SecurityPool);
+        await ReconcilePositions(parameters.SecurityPool);
 
         var guid = Guid.NewGuid();
         _ = Task.Factory.StartNew(async () =>
@@ -115,15 +116,15 @@ public class Core
         return _algorithms.Values.ToList();
     }
 
-    private async Task CacheAndReconcileRecentOrders(DateTime start, DateTime end, List<Security> securities)
+    private async Task CacheAndReconcileRecentOrders(DateTime start, List<Security> securities)
     {
-        if (securities.IsNullOrEmpty() || start > end) return;
+        if (securities.IsNullOrEmpty() || start > DateTime.UtcNow) return;
 
         // sync external to internal
         foreach (var security in securities)
         {
-            var externalResults = await _services.Order.GetOrders(security, start, end, true);
-            var internalResults = await _services.Order.GetOrders(security, start, end);
+            var externalResults = await _services.Order.GetOrders(security, start, null, true);
+            var internalResults = await _services.Order.GetOrders(security, start, null);
             var externalOrders = externalResults.ToDictionary(o => o.ExternalOrderId, o => o);
             var internalOrders = internalResults.ToDictionary(o => o.ExternalOrderId, o => o);
 
@@ -134,7 +135,8 @@ public class Core
                 _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
                 foreach (var order in toCreate)
                 {
-                    await Context.Storage.InsertOrder(order, security);
+                    var table = DatabaseNames.GetOrderTableName(order.Security.Type);
+                    await Context.Storage.InsertOne(order, false, tableNameOverride: table);
                 }
             }
             if (!toUpdate.IsNullOrEmpty())
@@ -143,7 +145,8 @@ public class Core
                 _log.Info($"{toUpdate.Count} recent orders for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
                 foreach (var order in toUpdate.Values)
                 {
-                    await Context.Storage.InsertOrder(order, security);
+                    var table = DatabaseNames.GetOrderTableName(order.Security.Type);
+                    await Context.Storage.InsertOne(order, true, tableNameOverride: table);
                 }
             }
 
@@ -154,19 +157,21 @@ public class Core
             }
             else
             {
-                var orders = await _services.Order.GetOrders(security, start, end);
+                var orders = await _services.Order.GetOrders(security, start, null);
                 _services.Order.Update(orders);
             }
         }
     }
 
-    private async Task CacheAndReconcileRecentTrades(DateTime start, DateTime end, List<Security> securities)
+    private async Task CacheAndReconcileRecentTrades(DateTime start, List<Security> securities)
     {
-        if (securities.IsNullOrEmpty() || start > end) return;
+        _log.Info($"Reconciling internal vs external recent trades for account {Context.Account?.Name} for broker {Context.Broker} in environment {Context.Environment}.");
+
+        if (securities.IsNullOrEmpty() || start > DateTime.UtcNow) return;
         foreach (var security in securities)
         {
-            var externalResults = await _services.Trade.GetTrades(security, start, end, true);
-            var internalResults = await _services.Trade.GetTrades(security, start, end);
+            var externalResults = await _services.Trade.GetTrades(security, start, null, true);
+            var internalResults = await _services.Trade.GetTrades(security, start, null);
             var externalTrades = externalResults.ToDictionary(o => o.ExternalTradeId, o => o);
             var internalTrades = internalResults.ToDictionary(o => o.ExternalTradeId, o => o);
 
@@ -175,38 +180,46 @@ public class Core
 
             if (!toCreate.IsNullOrEmpty())
             {
-                _services.Trade.Update(toCreate);
+                _services.Trade.Update(toCreate, security);
                 _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
                 foreach (var trade in toCreate)
                 {
-                    await Context.Storage.InsertTrade(trade, security);
+                    var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
+                    await Context.Storage.InsertOne(trade, false, tableNameOverride: table);
                 }
             }
             if (!toUpdate.IsNullOrEmpty())
             {
-                _services.Trade.Update(toUpdate.Values);
+                _services.Trade.Update(toUpdate.Values, security);
                 _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
                 foreach (var trade in toUpdate.Values)
                 {
-                    await Context.Storage.InsertTrade(trade, security);
+                    var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
+                    await Context.Storage.InsertOne(trade, true, tableNameOverride: table);
                 }
             }
 
             // read again if necessary and cache them
             if (toCreate.IsNullOrEmpty() && toUpdate.IsNullOrEmpty() && toDelete.IsNullOrEmpty())
             {
-                _services.Trade.Update(internalTrades.Values);
+                _services.Trade.Update(internalTrades.Values, security);
             }
             else
             {
-                var trades = await _services.Trade.GetTrades(security, start, end);
-                _services.Trade.Update(trades);
+                var trades = await _services.Trade.GetTrades(security, start, null);
+                _services.Trade.Update(trades, security);
             }
         }
     }
 
+    /// <summary>
+    /// Find out differences of account and asset asset information between external vs internal system.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <returns></returns>
     private async Task ReconcileAccountAndBalance(User user)
     {
+        _log.Info($"Reconciling internal vs external accounts and asset assets for account {Context.Account?.Name} for broker {Context.Broker} in environment {Context.Environment}.");
         foreach (var account in user.Accounts)
         {
             var externalAccount = await _services.Admin.GetAccount(account.Name, account.Environment, true);
@@ -220,13 +233,17 @@ public class Core
             {
                 _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
                 _services.Persistence.Enqueue(externalAccount);
-                _services.Persistence.Enqueue(externalAccount.Balances);
             }
         }
     }
 
+    /// <summary>
+    /// Find out differences of open orders between external vs internal system.
+    /// </summary>
+    /// <returns></returns>
     private async Task ReconcileOpenOrders()
     {
+        _log.Info($"Reconciling internal vs external open orders for account {Context.Account?.Name} for broker {Context.Broker} in environment {Context.Environment}.");
         var externalOpenOrders = await _services.Order.GetOpenOrders(null, true);
         var internalOpenOrders = await _services.Order.GetOpenOrders();
 
@@ -248,6 +265,98 @@ public class Core
 
             }
         }
+    }
+
+    /// <summary>
+    /// Use all trades information to deduct if position records are correct.
+    /// </summary>
+    /// <returns></returns>
+    private async Task ReconcilePositions(List<Security> securities)
+    {
+        _log.Info($"Reconciling internal vs external position entries for account {Context.Account?.Name} for broker {Context.Broker} in environment {Context.Environment}.");
+
+        var dataTable = await Context.Storage.Query("SELECT SecurityId, LastPositionId, EndTime FROM " + DatabaseNames.TradePositionReconciliation, DatabaseNames.ExecutionData,
+            TypeCode.Int32, TypeCode.Int64, TypeCode.DateTime);
+        var reconciled = new Dictionary<int, (long, DateTime)>();
+        foreach (DataRow dataRow in dataTable.Rows)
+        {
+            var secId = (int)dataRow["SecurityId"];
+            if (secId <= 0)
+            {
+                _log.Error("Found invalid security id in table " + DatabaseNames.TradePositionReconciliation);
+                continue;
+            }
+            var lastPositionId = (long)dataRow["LastPositionId"];
+            var dateTime = (DateTime)dataRow["EndTime"];
+            reconciled[secId] = (lastPositionId, dateTime); // table itself already guaranteed uniqueness
+        }
+
+        foreach (var security in securities)
+        {
+            List<Trade> trades;
+            Position? position = null;
+            var lastTime = DateTime.MinValue;
+            var openPositionId = 0L;
+
+            if (reconciled.TryGetValue(security.Id, out var tuple))
+            {
+                openPositionId = tuple.Item1;
+                lastTime = tuple.Item2;
+                trades = await _services.Trade.GetTrades(security, lastTime, null, true);
+            }
+            else
+            {
+                trades = await _services.Trade.GetTrades(security, new DateTime(2023, 9, 1), null);
+            }
+
+            trades = trades.OrderBy(t => t.Time).Where(t => t.Time > lastTime).ToList();
+
+            var positions = new List<Position>();
+
+            if (openPositionId == 0)
+            {
+                // case 1, no open position
+                position = _services.Portfolio.Reconcile(trades);
+                if (position != null)
+                {
+                    openPositionId = position.IsClosed ? 0 : position.Id; // if closed, mark the pid as 0 which means 'there is no open position'
+                    lastTime = position.UpdateTime;
+                }
+            }
+            else
+            {
+                // case 2, there is one open position
+                position = _services.Portfolio.GetPosition(security.Id);
+                // if it does not exist, we assume it is the reconcilation table goes wrong
+                if (position == null)
+                {
+                    // TODO delete reconcilation entry
+                }
+                else
+                {
+                    position = _services.Portfolio.Reconcile(trades, position);
+                    openPositionId = position?.Id ?? 0;
+                    lastTime = position?.UpdateTime ?? DateTime.MinValue;
+                }
+            }
+
+            if (position != null)
+            {
+                // save reconcilation result
+                var i = await Context.Storage.Run(
+                    $"INSERT INTO {DatabaseNames.TradePositionReconciliation} (SecurityId, LastPositionId, EndTime) VALUES ({security.Id}, {openPositionId}, {lastTime:yyyyMMdd-HHmmssfff})",
+                    DatabaseNames.ExecutionData);
+                if (i > 0)
+                {
+                    _log.Info($"Updated position reconciliation record for security {security.Code}. Last open position id is {(openPositionId <= 0 ? "nil" : openPositionId)} at {(openPositionId <= 0 ? "nil" : lastTime.ToString("yyyyMMdd-HHmmssfff"))}");
+                }
+                else
+                {
+                    _log.Info($"Failed to update position reconciliation record for security {security.Code}.");
+                }
+            }
+        }
+
     }
 
     public static (List<TV>, Dictionary<TK, TV>, List<TK>) FindDifferences<TK, TV>(Dictionary<TK, TV> primary, Dictionary<TK, TV> secondary)

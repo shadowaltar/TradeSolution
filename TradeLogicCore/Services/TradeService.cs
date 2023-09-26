@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -57,9 +58,17 @@ public class TradeService : ITradeService, IDisposable
         {
             _assetsByCode.Clear();
             var assets = _securityService.GetAssets(_context.Exchange);
-            foreach (var item in assets)
+            foreach (var asset in assets)
             {
-                _assetsByCode[item.Code] = item;
+                _assetsByCode[asset.Code] = asset;
+            }
+        }
+        lock (_assetsById)
+        {
+            _assetsById.Clear();
+            foreach (var (_, asset) in _assetsByCode)
+            {
+                _assetsById[asset.Id] = asset;
             }
         }
     }
@@ -149,7 +158,7 @@ public class TradeService : ITradeService, IDisposable
         if (requestExternal)
         {
             var state = await _execution.GetTrades(security, start: start, end: end);
-            trades = state.GetAll<Trade>();
+            trades = state.GetAll<Trade>() ?? new();
         }
         else
         {
@@ -157,26 +166,8 @@ public class TradeService : ITradeService, IDisposable
             var e = end ?? DateTime.MaxValue;
             trades = await _storage.ReadTrades(security, s, e);
         }
-        FixTempTrades(trades, security);
+        Update(trades, security);
         return trades ?? new List<Trade>();
-    }
-
-    private void FixTempTrades(List<Trade>? trades, Security security)
-    {
-        if (trades.IsNullOrEmpty()) return;
-        foreach (var trade in trades)
-        {
-            if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
-            {
-                trade.FeeAssetId = _assetsByCode.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : 0;
-            }
-            if (trade.FeeAssetCode.IsBlank() && trade.FeeAssetId != 0)
-            {
-                trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
-            }
-            trade.SecurityId = security.Id;
-            trade.SecurityCode = security.Code;
-        }
     }
 
     public List<Trade> GetTrades(long orderId)
@@ -226,19 +217,22 @@ public class TradeService : ITradeService, IDisposable
             var order = new Order
             {
                 Id = _orderIdGen.NewTimeBasedId,
-                SecurityCode = security.Code,
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
                 Quantity = quantity,
                 Side = side,
                 Type = OrderType.Market,
                 Status = OrderStatus.Sending,
+
+                Security = security,
+                SecurityId = security.Id,
+                SecurityCode = security.Code,
             };
             await _orderService.SendOrder(order);
         }
     }
 
-    public void Update(ICollection<Trade> trades)
+    public void Update(ICollection<Trade> trades, Security? security = null)
     {
         foreach (var trade in trades)
         {
@@ -258,6 +252,40 @@ public class TradeService : ITradeService, IDisposable
                     trade.OrderId = order.Id;
                 }
             }
+
+            if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
+            {
+                trade.FeeAssetId = _assetsByCode.ThreadSafeTryGet(trade.FeeAssetCode ?? "", out var asset) ? asset.Id : 0;
+            }
+            if (trade.FeeAssetCode.IsBlank() && trade.FeeAssetId != 0)
+            {
+                trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
+            }
+
+            if (trade.SecurityId <= 0 || trade.SecurityCode.IsNullOrEmpty() || trade.Security == null)
+            {
+                if (security == null)
+                {
+                    if (!trade.SecurityCode.IsNullOrEmpty())
+                    {
+                        security = _securityService.GetSecurity(trade.SecurityCode!) ?? throw Exceptions.MissingSecurity();
+                    }
+                    else if (trade.SecurityId > 0)
+                    {
+                        security = AsyncHelper.RunSync(() => _securityService.GetSecurity(trade.SecurityId)) ?? throw Exceptions.MissingSecurity();
+                    }
+                    else if (trade.Security != null)
+                    {
+                        security = trade.Security;
+                    }
+                    if (security == null)
+                        throw Exceptions.MissingSecurity();
+                }
+                trade.SecurityId = security.Id;
+                trade.SecurityCode = security.Code;
+                trade.Security = security;
+            }
+
             _trades.ThreadSafeSet(trade.Id, trade);
             _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
         }
@@ -312,7 +340,6 @@ public class TradeService : ITradeService, IDisposable
 
     private void Persist(Trade trade)
     {
-        var security = _securityService.GetSecurity(trade.SecurityCode);
-        _persistence.Enqueue(trade, security);
+        _persistence.Enqueue(trade);
     }
 }

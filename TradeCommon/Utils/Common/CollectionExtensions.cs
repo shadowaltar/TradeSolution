@@ -272,6 +272,36 @@ public static class CollectionExtensions
         }
     }
 
+    public static Dictionary<TKey, TElement> SafeToDictionary<TSource, TKey, TElement>(this List<TSource> source,
+                                                                                       Func<TSource, TKey> keySelector,
+                                                                                       Func<TSource, TElement> elementSelector,
+                                                                                       out List<TSource>? failedItems)
+        where TKey : notnull
+    {
+        failedItems = null;
+        var results = new Dictionary<TKey, TElement>(source.Count);
+        foreach (var item in source)
+        {
+            var k = keySelector(item);
+            var v = elementSelector(item);
+
+            if (!results.TryAdd(k, v))
+            {
+                failedItems ??= new List<TSource>();
+                failedItems.Add(item);
+            }
+        }
+        return results;
+    }
+
+    public static void AddRange<T>(this HashSet<T> set, IEnumerable<T> values)
+    {
+        foreach (var value in values)
+        {
+            set.Add(value);
+        }
+    }
+
     public static IEnumerable<T> RandomElements<T>(this IList<T> list, int count)
     {
         for (var i = 0; i < count; i++)

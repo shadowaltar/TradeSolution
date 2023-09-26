@@ -1,5 +1,4 @@
-﻿using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using static TradeCommon.Utils.Delegates;
@@ -30,7 +29,10 @@ public interface IExternalExecutionManagement
 
     Task<ExternalQueryState> GetOpenOrders(Security? security = null);
 
-    Task<ExternalQueryState> GetOrderHistory(Security security, DateTime start, DateTime end);
+    Task<ExternalQueryState> GetOrders(Security security,
+                                       long oldestExternalOrderId = long.MinValue,
+                                       DateTime? start = null,
+                                       DateTime? end = null);
 
     Task<ExternalQueryState> UpdateOrder(Order order);
 
@@ -44,5 +46,8 @@ public interface IExternalExecutionManagement
     /// <returns></returns>
     Task<ExternalQueryState> GetMarketTrades(Security security);
 
-    Task<ExternalQueryState> GetTrades(Security security, long orderId = long.MinValue, DateTime? start = null, DateTime? end = null);
+    Task<ExternalQueryState> GetTrades(Security security,
+                                       long oldestExternalOrderId = long.MinValue,
+                                       DateTime? start = null,
+                                       DateTime? end = null);
 }

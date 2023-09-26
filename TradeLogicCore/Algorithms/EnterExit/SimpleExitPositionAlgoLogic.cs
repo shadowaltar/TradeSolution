@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
@@ -66,18 +67,17 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
-            AccountId = position.AccountId,
-            SecurityCode = current.Security.Code,
-            SecurityId = position.SecurityId,
-            BrokerId = _context.BrokerId,
+            AccountId = _context.AccountId,
             CreateTime = exitTime,
-            ExchangeId = _context.ExchangeId,
             Quantity = position.Quantity,
             Side = Side.Sell,
             Status = OrderStatus.Sending,
             TimeInForce = TimeInForceType.GoodTillCancel,
             Price = exitPrice,
             Type = OrderType.Limit,
+            Security = current.Security,
+            SecurityId = current.Security.Id,
+            SecurityCode = current.Security.Code,
         };
         return await _orderService.SendOrder(order);
     }

@@ -10,8 +10,6 @@ public class FakeHttpContent : HttpContent
 {
     public string HardcodeContent { get; set; } = "{}";
 
-    private readonly MemoryStream _Stream = new MemoryStream();
-
     protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
     {
         if (HardcodeContent == null)

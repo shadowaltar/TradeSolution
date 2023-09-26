@@ -1,7 +1,8 @@
 ﻿using Common;
-using TradeCommon.Constants;
 using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
 
@@ -14,7 +15,7 @@ namespace TradeCommon.Essentials.Trading;
 [Unique(nameof(ExternalTradeId))]
 [Index(nameof(SecurityId))]
 [Storage("trades", "execution")]
-public class Trade : IComparable<Trade>
+public class Trade : IComparable<Trade>, ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
 {
     /// <summary>
     /// Unique trade id.
@@ -32,7 +33,10 @@ public class Trade : IComparable<Trade>
     /// Security code (will not be saved to database).
     /// </summary>
     [DatabaseIgnore]
-    public string? SecurityCode { get; set; }
+    public string SecurityCode { get; set; }
+
+    [DatabaseIgnore]
+    public Security Security { get; set; }
 
     /// <summary>
     /// The order id associated with this trade.
@@ -95,16 +99,10 @@ public class Trade : IComparable<Trade>
     public string? FeeAssetCode { get; set; }
 
     /// <summary>
-    /// The broker's ID.
+    /// The account ID.
     /// </summary>
     [NotNull]
-    public int BrokerId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
-
-    /// <summary>
-    /// The exchange's ID.
-    /// </summary>
-    [NotNull]
-    public int ExchangeId { get; set; } = ExternalNames.BrokerTypeToIds[BrokerType.Unknown];
+    public int AccountId { get; set; } = 0;
 
     /// <summary>
     /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
@@ -124,8 +122,7 @@ public class Trade : IComparable<Trade>
         if (r != 0) r = Quantity.CompareTo(trade?.Quantity);
         if (r != 0) r = Fee.CompareTo(trade?.Fee);
         if (r != 0) r = FeeAssetCode.SafeCompareTo(trade?.FeeAssetCode);
-        if (r != 0) r = BrokerId.CompareTo(trade?.BrokerId);
-        if (r != 0) r = ExchangeId.CompareTo(trade?.ExchangeId);
+        if (r != 0) r = AccountId.CompareTo(trade?.AccountId);
         if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);
         return r;
     }

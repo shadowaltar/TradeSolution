@@ -49,7 +49,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         var securityId = current.SecurityId;
-        var asset = _portfolioService.GetPositionRelatedCurrencyAsset(securityId);
+        var asset = _portfolioService.GetPositionRelatedQuoteBalance(securityId);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
         var now = DateTime.UtcNow;
 
@@ -57,16 +57,15 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
-            SecurityId = securityId,
-            AccountId = asset.AccountId,
-            BrokerId = _context.BrokerId,
+            AccountId = _context.AccountId,
             Side = side,
             CreateTime = now,
             UpdateTime = now,
-            ExchangeId = _context.ExchangeId,
             Type = OrderType.Limit,
             Price = enterPrice,
             Quantity = size,
+            Security = current.Security,
+            SecurityId = securityId,
             SecurityCode = current.Security.Code,
             Status = OrderStatus.New,
             TimeInForce = TimeInForceType.GoodTillCancel,
@@ -85,18 +84,17 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                 var slOrder = new Order
                 {
                     Id = _orderIdGen.NewTimeBasedId,
-                    SecurityId = securityId,
-                    AccountId = asset.AccountId,
-                    BrokerId = _context.BrokerId,
+                    AccountId = _context.AccountId,
                     ParentOrderId = order.Id,
                     Side = side == Side.Buy ? Side.Sell : Side.Buy,
                     CreateTime = now,
                     UpdateTime = now,
-                    ExchangeId = _context.ExchangeId,
                     Type = OrderType.StopLimit,
                     Price = stopLossPrice,
                     StopPrice = (stopLossPrice + enterPrice) / 2m, // trigger price at the mid
                     Quantity = size,
+                    Security = current.Security,
+                    SecurityId = securityId,
                     SecurityCode = current.Security.Code,
                 };
                 state = await _orderService.SendOrder(slOrder);
@@ -115,18 +113,17 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                 var tpOrder = new Order
                 {
                     Id = _orderIdGen.NewTimeBasedId,
-                    SecurityId = securityId,
-                    AccountId = asset.AccountId,
-                    BrokerId = _context.BrokerId,
+                    AccountId = _context.AccountId,
                     ParentOrderId = order.Id,
                     Side = side == Side.Buy ? Side.Sell : Side.Buy,
                     CreateTime = now,
                     UpdateTime = now,
-                    ExchangeId = _context.ExchangeId,
                     Type = OrderType.TakeProfitLimit,
                     Price = takeProfitPrice,
                     StopPrice = (takeProfitPrice + enterPrice) / 2m, // trigger price at the mid
                     Quantity = size,
+                    Security = current.Security,
+                    SecurityId = securityId,
                     SecurityCode = current.Security.Code,
                 };
                 state = await _orderService.SendOrder(tpOrder);
@@ -150,7 +147,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         current.IsLong = true;
         current.LongCloseType = CloseType.None;
         // TODO current sizing happens here
-        var asset = _portfolioService.GetPositionRelatedCurrencyAsset(securityId);
+        var asset = _portfolioService.GetPositionRelatedQuoteBalance(securityId);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
         SyncOpenOrderToEntry(current, size, enterPrice, enterTime, stopLossPrice, takeProfitPrice);

@@ -17,7 +17,7 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
     {
         var positions = _portfolioService.GetOpenPositions();
         var asset = security.EnsureCurrencyAsset();
-        var assetPosition = _portfolioService.GetAssetPosition(asset.Id);
+        var assetPosition = _portfolioService.GetAsset(asset.Id);
         if (assetPosition == null)
             return 0; // the account holds no such currency / asset for trading
         var freeBalance = assetPosition.Quantity;

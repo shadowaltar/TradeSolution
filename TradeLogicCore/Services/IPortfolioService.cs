@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 
@@ -19,7 +20,30 @@ public interface IPortfolioService
     /// (usually via <see cref="IAdminService.Login(string, string?, string?, TradeCommon.Runtime.EnvironmentType)"/>).
     /// </summary>
     /// <returns></returns>
-    Task Initialize();
+    Task<bool> Initialize();
+
+    /// <summary>
+    /// Create a new position by a trade.
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <returns></returns>
+    Position Create(Trade trade);
+
+    /// <summary>
+    /// Create (and cache) one or more new position by a series of trades.
+    /// </summary>
+    /// <param name="trades"></param>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    
+    Position? Reconcile(List<Trade> trades, Position? position = null);
+
+    /// <summary>
+    /// Apply a trade to an existing position.
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="trade"></param>
+    void Apply(Position position, Trade trade);
 
     List<Position> GetOpenPositions();
 
@@ -35,14 +59,14 @@ public interface IPortfolioService
     /// </summary>
     /// <param name="assetId"></param>
     /// <returns></returns>
-    Position GetAssetPosition(int assetId);
+    Asset GetAsset(int assetId);
 
     /// <summary>
     /// Get asset's position given a position's security ID.
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    Position GetPositionRelatedCurrencyAsset(int securityId);
+    Asset GetPositionRelatedQuoteBalance(int securityId);
 
     /// <summary>
     /// Spend the free quantity in the related asset position given a security Id.
@@ -69,7 +93,7 @@ public interface IPortfolioService
     /// </summary>
     /// <param name="externalName"></param>
     /// <returns></returns>
-    List<Balance> GetExternalBalances(string externalName);
+    List<Asset> GetExternalBalances(string externalName);
 
     decimal GetRealizedPnl(Security security);
 
@@ -78,25 +102,25 @@ public interface IPortfolioService
     bool Validate(Order order);
 
     /// <summary>
-    /// Deposit assets to current account's specific balance indicated by <paramref name="assetId"/>.
+    /// Deposit assets to current account's specific asset indicated by <paramref name="assetId"/>.
     /// If asset is not found, throws exception.
     /// </summary>
     /// <param name="assetId"></param>
     /// <param name="quantity"></param>
     /// <returns></returns>
-    Task<Balance?> Deposit(int assetId, decimal quantity);
+    Task<Asset?> Deposit(int assetId, decimal quantity);
 
     /// <summary>
-    /// Deposit assets to specific account's specific balance indicated by <paramref name="accountId"/> and <paramref name="assetId"/>.
+    /// Deposit assets to specific account's specific asset indicated by <paramref name="accountId"/> and <paramref name="assetId"/>.
     /// If targeting current account and asset is not found, throws exception; otherwise returns null.
     /// </summary>
     /// <param name="accountId"></param>
     /// <param name="assetId"></param>
     /// <param name="quantity"></param>
     /// <returns></returns>
-    Task<Balance?> Deposit(int accountId, int assetId, decimal quantity);
+    Task<Asset?> Deposit(int accountId, int assetId, decimal quantity);
 
-    Task<Balance?> Withdraw(int assetId, decimal quantity);
+    Task<Asset?> Withdraw(int assetId, decimal quantity);
 
     /// <summary>
     /// Create an opposite side order from a known position.
@@ -106,8 +130,8 @@ public interface IPortfolioService
     /// <param name="position"></param>
     /// <param name="security"></param>
     /// <returns></returns>
-    Order CreateCloseOrder(Position position, Security? security = null);
-    
+    Order CreateCloseOrder(Asset position, Security? security = null);
+
     /// <summary>
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.

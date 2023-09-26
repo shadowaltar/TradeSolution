@@ -7,8 +7,8 @@ using TradeCommon.Database;
 
 namespace TradeCommon.Essentials.Accounts;
 
+[Storage(DatabaseNames.UserTable, DatabaseNames.StaticData)]
 [Unique(nameof(Name), nameof(Environment)), Unique(nameof(Email), nameof(Environment))]
-[Storage(DatabaseNames.UserTable, null, DatabaseNames.StaticData)]
 public class User
 {
     [AutoIncrementOnInsert]

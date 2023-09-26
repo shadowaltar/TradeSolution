@@ -11,7 +11,7 @@ namespace Common.Database;
 
 public class SqliteSchemaHelper : IDatabaseSchemaHelper
 {
-    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null)
+    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null) where T : class
     {
         var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
         if (attr == null) throw new InvalidOperationException("Must provide table name.");
@@ -75,7 +75,7 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         return sb.ToString();
     }
 
-    public string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null)
+    public string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null) where T : class
     {
         var type = typeof(T);
         var (table, _) = DatabaseNames.GetTableAndDatabaseName<T>();
@@ -106,7 +106,7 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         return sb.ToString();
     }
 
-    public string CreateCreateTableAndIndexSql<T>(string? tableNameOverride = null)
+    public string CreateCreateTableAndIndexSql<T>(string? tableNameOverride = null) where T : class
     {
         var type = typeof(T);
         var (table, _) = DatabaseNames.GetTableAndDatabaseName<T>();
@@ -266,11 +266,48 @@ ON {tableName}
     public string GetDropTableUniqueIndexStatement<T>(string tableName)
     {
         var type = typeof(T);
-        var uniqueKeys = type.GetCustomAttribute<UniqueAttribute>()?.FieldNames;
-        if (uniqueKeys.IsNullOrEmpty())
-            return "";
-        return @$"
-DROP INDEX IF EXISTS 
-    idx_{tableName}_{string.Join("_", uniqueKeys.Select(k => k.FirstCharLowerCase()))};";
+        var attributeInfo = ReflectionUtils.GetAttributeInfo<T>();
+        var sb = new StringBuilder();
+        foreach (var keys in attributeInfo.AllUniqueKeys)
+        {
+            if (keys.IsNullOrEmpty())
+                continue;
+            sb.Append("DROP INDEX IF EXISTS IX_").Append(tableName).AppendJoin('_', keys).AppendLine(";");
+        }
+        return sb.ToString();
+    }
+
+    public string CreateDeleteSql<T>(char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix,
+                                     string? tableNameOverride = null) where T : class
+    {
+        var (tableName, _) = DatabaseNames.GetTableAndDatabaseName<T>();
+        tableName = tableNameOverride ?? tableName;
+        var attributeInfo = ReflectionUtils.GetAttributeInfo<T>();
+        var uniqueKey = attributeInfo.PrimaryUniqueKey.ToArray();
+        var sb = new StringBuilder("DELETE FROM ")
+            .Append(tableName)
+            .Append(" WHERE ");
+        for (int i = 0; i < uniqueKey.Length; i++)
+        {
+            string? name = uniqueKey[i];
+            sb.Append(name).Append(" = ").Append(placeholderPrefix).Append(name);
+            if (i != uniqueKey.Length - 1)
+                sb.Append(" AND ");
+        }
+        return sb.ToString();
+    }
+
+    public string CreateDeleteSql<T>(string whereClause,
+                                     string? tableNameOverride = null) where T : class
+    {
+        var (tableName, _) = DatabaseNames.GetTableAndDatabaseName<T>();
+        tableName = tableNameOverride ?? tableName;
+        var attributeInfo = ReflectionUtils.GetAttributeInfo<T>();
+        var uniqueKey = attributeInfo.PrimaryUniqueKey.ToArray();
+        var sb = new StringBuilder("DELETE FROM ")
+            .Append(tableName)
+            .Append(" WHERE ")
+            .Append(whereClause);
+        return sb.ToString();
     }
 }

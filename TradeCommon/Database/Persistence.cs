@@ -1,4 +1,5 @@
 ﻿using Common;
+using Microsoft.Extensions.Primitives;
 using System.Collections.Concurrent;
 using TradeCommon.Runtime;
 
@@ -22,26 +23,28 @@ public class Persistence : IDisposable
         _storage = storage;
     }
 
-    public void Enqueue<T>(T entry, object? parameter = null, bool isUpsert = true)
+    public void Enqueue<T>(T entry, string? tableNameOverride = null, bool isUpsert = true)
     {
         if (entry != null)
         {
             var task = _taskPool.Lease();
-            task.SetEntry(entry, parameter);
+            task.SetEntry(entry);
             task.IsUpsert = isUpsert;
             task.Type = typeof(T);
+            task.TableNameOverride = tableNameOverride;
             _tasks.Enqueue(task);
         }
     }
 
-    public void Enqueue<T>(List<T> entries, object? parameter = null, bool isUpsert = true)
+    public void Enqueue<T>(List<T> entries, string? tableNameOverride = null, bool isUpsert = true)
     {
         if (!entries.IsNullOrEmpty())
         {
             var task = _taskPool.Lease();
-            task.SetEntries(entries, parameter);
+            task.SetEntries(entries);
             task.IsUpsert = isUpsert;
             task.Type = typeof(T);
+            task.TableNameOverride = tableNameOverride;
             _tasks.Enqueue(task);
         }
     }
@@ -52,7 +55,7 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                await _storage.Insert(task, task.IsUpsert);
+                await _storage.Insert(task);
                 task.Clear();
                 _taskPool.Return(task);
             }

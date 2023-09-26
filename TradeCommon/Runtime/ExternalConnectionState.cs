@@ -8,6 +8,7 @@ using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeCommon.Runtime;
@@ -48,7 +49,7 @@ public record ExternalQueryState : INetworkTimeState
     public long TotalTime { get; set; }
 
     public T? Get<T>() => Content is T typed ? typed : default;
-    
+
     public List<T>? GetAll<T>()
     {
         if (Content is T typed)
@@ -344,21 +345,13 @@ public static class ExternalQueryStates
 
     public static ExternalQueryState UpdateOrder(Order cancelledOrder, Order updatedOrder, ExternalQueryState cancelState, ExternalQueryState sendState)
     {
-        ResultCode compositeResult;
-        switch (cancelState.ResultCode)
+        var compositeResult = cancelState.ResultCode switch
         {
-            case ResultCode.CancelOrderOk when sendState.ResultCode == ResultCode.SendOrderOk:
-                compositeResult = ResultCode.UpdateOrderOk;
-                break;
-            case ResultCode.CancelOrderOk when sendState.ResultCode == ResultCode.SendOrderFailed:
-                compositeResult = ResultCode.UpdateOrderSendFailed;
-                break;
-            case ResultCode.CancelOrderFailed:
-                compositeResult = ResultCode.UpdateOrderCancelFailed;
-                break;
-            default:
-                throw new InvalidOperationException($"Invalid combination of result codes from cancel state ({cancelState.ResultCode}) and send state ({sendState.ResultCode})");
-        }
+            ResultCode.CancelOrderOk when sendState.ResultCode == ResultCode.SendOrderOk => ResultCode.UpdateOrderOk,
+            ResultCode.CancelOrderOk when sendState.ResultCode == ResultCode.SendOrderFailed => ResultCode.UpdateOrderSendFailed,
+            ResultCode.CancelOrderFailed => ResultCode.UpdateOrderCancelFailed,
+            _ => throw new InvalidOperationException($"Invalid combination of result codes from cancel state ({cancelState.ResultCode}) and send state ({sendState.ResultCode})"),
+        };
         var state = new ExternalQueryState
         {
             Content = null,
@@ -375,31 +368,31 @@ public static class ExternalQueryStates
         return state;
     }
 
-    public static ExternalQueryState QueryAccounts(string? content, string? connId, params Account[] accounts)
+    public static ExternalQueryState QueryAccount(string? content, string? connId, Account account)
     {
         return new ExternalQueryState
         {
-            Content = accounts.Length == 1 ? accounts[0] : accounts,
+            Content = account,
             ResponsePayload = content,
             Action = ActionType.GetAccount,
             ExternalId = BrokerId,
-            ResultCode = accounts.All(a => a != null) ? ResultCode.GetAccountOk : accounts.All(a => a == null) ? ResultCode.GetAccountFailed : ResultCode.GetSomeAccountsFailed,
+            ResultCode = account == null ? ResultCode.GetAccountFailed : ResultCode.GetAccountOk,
             UniqueConnectionId = connId,
-            Description = accounts.Length == 1 ? $"Get an account" : $"Get {accounts.Length} account(s)",
+            Description = $"Get account.",
         };
     }
 
-    public static ExternalQueryState InvalidAccount(string content, string connId)
+    public static ExternalQueryState QueryBalances(string? content, string? connId, List<Asset> assets)
     {
         return new ExternalQueryState
         {
-            Content = null,
+            Content = assets,
             ResponsePayload = content,
             Action = ActionType.GetAccount,
             ExternalId = BrokerId,
-            ResultCode = ResultCode.GetAccountFailed,
+            ResultCode = assets == null ? ResultCode.GetBalanceFailed : assets.Count == 0 ? ResultCode.NoBalance : ResultCode.GetBalanceFailed,
             UniqueConnectionId = connId,
-            Description = "Failed to get account info",
+            Description = $"Get {assets?.Count} assets.",
         };
     }
 

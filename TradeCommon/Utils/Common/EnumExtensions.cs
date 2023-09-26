@@ -72,4 +72,9 @@ public static class EnumExtensions
         if (value == null) return default;
         return Enum.TryParse<T>(value, out var t) ? t : default;
     }
+
+    public static bool IsUnknown<T>(this T value) where T : struct, Enum
+    {
+        return value.As<int>() == 0;
+    }
 }

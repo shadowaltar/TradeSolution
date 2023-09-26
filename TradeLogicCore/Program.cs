@@ -63,9 +63,18 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        //var storage = new Storage();
-        //var x = await storage.CreateTable<AlgoEntry>();
-        //var y = await storage.CreateTradeTable(SecurityType.Fx);
+        var storage = new Storage();
+
+        //foreach (var secType in new SecurityType[] { SecurityType.Equity, SecurityType.Fx })
+        //{
+        //    await storage.CreateOrderTable(secType);
+        //    await storage.CreateTradeTable(secType);
+
+        //    await storage.CreatePositionTable(secType);
+        //}
+        var x = await storage.CreateTable<Asset>();
+        var y = await storage.CreateTable<Position>();
+        //var y = await storage.CreateTradeTable(Secu<rityType.Fx);
 
         await RunMacMimicWebService();
         //await NewOrderDemo();
@@ -78,6 +87,18 @@ public class Program
 
     private static async Task RunMacMimicWebService()
     {
+
+        static void OnStorageSuccess(object entry, string method)
+        {
+            if (entry is Account)
+            {
+
+            }
+        }
+
+        static void OnStorageFailed(object entry, Exception e, string method)
+        {
+        }
         // mimic set env + login
 
         var environment = _testEnvironment;
@@ -104,7 +125,9 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var context = Dependencies.ComponentContext.Resolve<Context>();
         var core = Dependencies.ComponentContext.Resolve<Core>();
-
+        var storage = Dependencies.ComponentContext.Resolve<IStorage>();
+        storage.Success += OnStorageSuccess;
+        storage.Failed += OnStorageFailed;
         var broker = ExternalNames.Convert(exchange);
         services.Admin.Initialize(environment, exchange, broker);
 
@@ -113,10 +136,9 @@ public class Program
         if (result != ResultCode.LoginUserAndAccountOk)
             return;
 
-
         //var order = new Order
         //{
-        //    AccountId = context.Account.Id,
+        //    AccountId = context.AccountId,
         //    SecurityCode = security.Code,
         //    SecurityId = security.Id,
         //    BrokerId = context.BrokerId,
@@ -182,19 +204,14 @@ public class Program
                         File.Delete(_fakeSecretFilePath);
                         File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
                         return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                        break;
                     }
                 case ResultCode.GetAccountFailed:
                     {
-                        var account = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                        _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
                         return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                        break;
                     }
-                case ResultCode.AccountHasNoAsset:
-                    {
-                        var balance = await services.Portfolio.Deposit(security.CurrencyAsset.Id, 1000m);
-                        break;
-                    }
+                default:
+                    throw new InvalidOperationException("Invalid case.");
             }
         }
         return result;
@@ -322,6 +339,7 @@ public class Program
         {
             SecurityCode = "BTCUSDT",
             SecurityId = security.Id,
+            Security = security,
             Price = 10000,
             Quantity = 0.01m,
             Side = Side.Buy,
@@ -405,7 +423,7 @@ public class Program
                 foreach (var sl in stopLosses)
                 {
                     var asset = security.EnsureCurrencyAsset();
-                    var assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                    var assetPosition = services.Portfolio.GetAsset(asset.Id);
                     var initQuantity = assetPosition.Quantity.ToDouble();
                     var securityPool = new List<Security> { security };
 
@@ -430,7 +448,7 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                    assetPosition = services.Portfolio.GetAsset(asset.Id);
                     var endQuantity = assetPosition.Quantity.ToDouble();
                     var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                     if (annualizedReturn == 0)
@@ -572,7 +590,7 @@ public class Program
                     foreach (var stopLoss in stopLosses)
                     {
                         var asset = security.EnsureCurrencyAsset();
-                        var assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                        var assetPosition = services.Portfolio.GetAsset(asset.Id);
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
                         var algorithm = new MovingAverageCrossing(context, fast, slow, stopLoss);
@@ -596,7 +614,7 @@ public class Program
                             continue;
                         }
 
-                        assetPosition = services.Portfolio.GetAssetPosition(asset.Id);
+                        assetPosition = services.Portfolio.GetAsset(asset.Id);
                         var endQuantity = assetPosition.Quantity.ToDouble();
                         var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                         if (annualizedReturn == 0)
