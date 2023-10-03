@@ -132,6 +132,11 @@ public static class Exceptions
     {
         return new InvalidOperationException($"Invalid {typeof(T).Name}: {message}");
     }
+    
+    public static Exception Invalid(object? message)
+    {
+        return new InvalidOperationException($"Invalid case: {message}");
+    }
 
     public static Exception Impossible()
     {

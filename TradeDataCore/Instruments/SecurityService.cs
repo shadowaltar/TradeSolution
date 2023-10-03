@@ -1,6 +1,8 @@
 ﻿using Common;
 using Iced.Intel;
+using log4net;
 using Microsoft.Identity.Client.Extensions.Msal;
+using SQLitePCL;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -13,6 +15,7 @@ using TradeDataCore.Essentials;
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
 {
+    private static readonly ILog _log = Logger.New();
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<string, Security> _securitiesByCode = new();
     private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
@@ -169,6 +172,46 @@ public class SecurityService : ISecurityService
     public Security GetSecurity(int securityId)
     {
         return _securities.ThreadSafeGet(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);
+    }
+
+    public bool Fix(SecurityRelatedEntry entry, Security? security = null)
+    {
+        if (entry.SecurityId > 0)
+        {
+            security ??= GetSecurity(entry.SecurityId);
+            if (security == null)
+            {
+                _log.Error("Failed to find security, id: " + entry.SecurityId);
+                return false;
+            }
+            entry.SecurityCode = security.Code;
+            entry.Security = security;
+        }
+        else if (!entry.SecurityCode.IsBlank())
+        {
+            security ??= GetSecurity(entry.SecurityCode);
+            if (security == null)
+            {
+                _log.Error("Failed to find security, code: " + entry.SecurityCode);
+                return false;
+            }
+            entry.SecurityId = security.Id;
+            entry.Security = security;
+        }
+        else if (entry.Security != null) // rare case, optional security comes first
+        {
+            security ??= entry.Security;
+            entry.SecurityCode = security.Code;
+            entry.SecurityId = security.Id;
+            entry.Security = security;
+        }
+
+        if (entry.SecurityCode.IsBlank() || entry.SecurityId <= 0 || entry.Security == null)
+        {
+            _log.Error("Failed to fix entry: " + entry);
+            return false;
+        }
+        return true;
     }
 
     /// <summary>

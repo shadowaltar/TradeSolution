@@ -168,7 +168,7 @@ public static class SqlReader
     /// <param name="transformFunc"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<List<T>> Read<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
+    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
     {
         try
         {
@@ -209,7 +209,7 @@ public static class SqlReader
     /// <param name="sql"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<List<T>> Read<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
     {
         try
         {
@@ -240,7 +240,6 @@ public static class SqlReader
             return new();
         }
     }
-
 
     /// <summary>
     /// Read a table and parse the results into a list by a given transformation function.

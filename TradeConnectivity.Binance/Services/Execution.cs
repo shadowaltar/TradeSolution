@@ -480,7 +480,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     public async Task<ExternalQueryState> UpdateOrder(Order updatedOrder)
     {
         // TODO Not Tested
-        var toCancel = (Order)updatedOrder.Clone();
+        var toCancel = updatedOrder with { };
         var cancelState = await CancelOrder(toCancel);
         var sendState = await SendOrder(updatedOrder);
         return ExternalQueryStates.UpdateOrder(toCancel, updatedOrder, cancelState, sendState);
@@ -630,7 +630,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     /// Get the assets via account api [SIGNED].
     /// </summary>
     /// <returns></returns>
-    public async Task<ExternalQueryState> GetBalances()
+    public async Task<ExternalQueryState> GetAssetPositions(string accountId)
     {
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/account";
@@ -643,7 +643,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""assets"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
         var assets = new List<Asset>();
-        var balanceArray = json["assets"]?.AsArray();
+        var balanceArray = json["balances"]?.AsArray();
+        var updateTime = json.GetUtcFromUnixMs("updateTime");
         if (balanceArray != null)
         {
             foreach (var balanceObj in balanceArray)
@@ -656,14 +657,16 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                 {
                     SecurityCode = code,
                     Quantity = free,
-                    LockedQuantity = locked
+                    LockedQuantity = locked,
+                    CreateTime = DateTime.MinValue,
+                    UpdateTime = updateTime,
                 };
                 assets.Add(asset);
             }
             // guarantee ordering
             assets.Sort(Sorters.CodeSorter);
         }
-        return ExternalQueryStates.QueryBalances(content, connId, assets).RecordTimes(rtt, swOuter);
+        return ExternalQueryStates.QueryAssets(content, connId, assets).RecordTimes(rtt, swOuter);
     }
 
     /// <summary>
@@ -992,8 +995,15 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         var url = $"{_connectivity.RootUrl}/api/v3/userDataStream";
         using var request = _requestBuilder.BuildApiKey(HttpMethod.Put, url, new List<(string, string)> { ("listenKey", _listenKey) });
-        var response = _httpClient.Send(request);
-        if (!response.ParseJsonObject(out _, out _, out _))
-            _log.Error($"Heartbeat for listen-key {_listenKey} cannot be sent. CurrentTime: {DateTime.UtcNow:yyyyMMdd-HHmmss}");
+        try
+        {
+            var response = _httpClient.Send(request);
+            if (!response.ParseJsonObject(out _, out _, out _))
+                _log.Error($"Heartbeat request for listen-key {_listenKey} cannot be sent. CurrentTime: {DateTime.UtcNow:yyyyMMdd-HHmmss}");
+        }
+        catch (TimeoutException te)
+        {
+            _log.Error($"Heartbeat request for listen-key {_listenKey} timed out.", te);
+        }
     }
 }

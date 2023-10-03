@@ -1,7 +1,7 @@
-﻿using Common.Attributes;
-using System.Diagnostics.CodeAnalysis;
+﻿using Common;
+using Common.Attributes;
 using TradeCommon.Database;
-using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
@@ -18,8 +18,16 @@ namespace TradeCommon.Essentials.Portfolios;
 [Unique(nameof(Id))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
-public sealed record Position : Asset
+public sealed record Position : Asset, IComparable<Position>
 {
+    [DatabaseIgnore]
+    private static readonly IdGenerator _positionIdGenerator;
+
+    static Position()
+    {
+        _positionIdGenerator = IdGenerators.Get<Position>();
+    }
+
     /// <summary>
     /// The time which the position is fully closed.
     /// It should be the time when last trade fills.
@@ -61,6 +69,28 @@ public sealed record Position : Asset
     [DatabaseIgnore]
     public bool IsClosed => Quantity == 0;
 
+    public int CompareTo(Position? other)
+    {
+        if (other == null) return 1;
+        var r = base.CompareTo(other);
+        if (r != 0) r = CloseTime.CompareTo(other.CloseTime);
+        if (r != 0) r = Price.CompareTo(other.Price);
+        if (r != 0) r = Notional.CompareTo(other.Notional);
+        if (r != 0) r = StartNotional.CompareTo(other.StartNotional);
+        if (r != 0) r = RealizedPnl.CompareTo(other.RealizedPnl);
+        if (r != 0) r = StartOrderId.CompareTo(other.StartOrderId);
+        if (r != 0) r = EndOrderId.CompareTo(other.EndOrderId);
+        if (r != 0) r = StartTradeId.CompareTo(other.StartTradeId);
+        if (r != 0) r = EndTradeId.CompareTo(other.EndTradeId);
+        if (r != 0) r = AccumulatedFee.CompareTo(other.AccumulatedFee);
+        return r;
+    }
+
+    public override bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    {
+        if (other is not Position position) return false;
+        return CompareTo(position) == 0;
+    }
 
     public bool Equals(Position? obj)
     {
@@ -92,5 +122,47 @@ public sealed record Position : Asset
                                 HashCode.Combine(StartTradeId,
                                 EndTradeId,
                                 AccumulatedFee));
+    }
+
+    public override string ToString()
+    {
+        return $"[{Id}][{CreateTime:yyMMdd-HHmmss}][{(CloseTime==DateTime.MaxValue? "": CloseTime.ToString("yyMMdd-HHmmss"))}]" +
+            $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
+    }
+
+    /// <summary>
+    /// Create a new position by a trade.
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <returns></returns>
+    public static Position Create(Trade trade)
+    {
+        var position = new Position
+        {
+            Id = _positionIdGenerator.NewTimeBasedId,
+            AccountId = trade.AccountId,
+
+            Security = trade.Security,
+            SecurityId = trade.SecurityId,
+            SecurityCode = trade.SecurityCode,
+
+            CreateTime = trade.Time,
+            UpdateTime = trade.Time,
+            CloseTime = DateTime.MaxValue,
+
+            Quantity = trade.Quantity,
+            Price = trade.Price,
+            LockedQuantity = 0,
+            Notional = trade.Quantity * trade.Price,
+            StartNotional = trade.Quantity * trade.Price,
+            RealizedPnl = 0,
+
+            StartOrderId = trade.OrderId,
+            StartTradeId = trade.Id,
+            EndOrderId = 0,
+            EndTradeId = 0,
+        };
+
+        return position;
     }
 }

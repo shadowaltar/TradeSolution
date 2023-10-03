@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -21,6 +20,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 {
     private static readonly ILog _log = Logger.New();
 
+    private readonly Context _context;
+    private readonly IServices _services;
+    private readonly Persistence _persistence;
     private readonly AutoResetEvent _signal = new(false);
 
     private readonly int _engineThreadId;
@@ -29,9 +31,9 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     private readonly TimeSpan _interval;
     private readonly IdGenerator _positionIdGen;
 
-    private IReadOnlyDictionary<int, Security>? _pickedSecurities;
+    private readonly EngineParameters _engineParameters;
 
-    private readonly Persistence _persistence;
+    private IReadOnlyDictionary<int, Security>? _pickedSecurities;
 
     /// <summary>
     /// Caches algo-entries related to last time frame.
@@ -58,16 +60,12 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     /// Caches entries which open positions. Will be removed when a position is closed.
     /// </summary>
     private readonly Dictionary<int, Dictionary<long, AlgoEntry>> _openedEntriesBySecurityIds = new();
-
     private int _totalCurrentOpenPositions = 0;
 
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
 
     public event Action? ReachedDesignatedEndTime;
 
-    public Context Context { get; }
-
-    public IServices Services { get; }
 
     public bool IsBackTesting { get; private set; } = true;
 
@@ -87,7 +85,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     public Account? Account { get; protected set; }
 
-    public AlgoStartupParameters? Parameters { get; private set; }
+    public AlgorithmParameters? Parameters { get; private set; }
 
     public DateTime? DesignatedHaltTime { get; protected set; }
 
@@ -101,21 +99,18 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     public IntervalType Interval { get; protected set; }
 
-    public bool ShouldCloseOpenPositionsWhenHalted { get; protected set; }
-
-    public bool ShouldCloseOpenPositionsWhenStopped { get; protected set; }
-
     public AlgoStopTimeType WhenToStopOrHalt { get; protected set; }
 
     public int AlgoVersionId { get; private set; }
 
     public int AlgoBatchId { get; private set; }
 
-    public AlgorithmEngine(Context context)
+    public AlgorithmEngine(Context context, EngineParameters? engineParameters = null)
     {
-        Context = context;
-        Services = context.Services;
-        _persistence = Services.Persistence;
+        _context = context;
+        _services = context.Services;
+        _persistence = _services.Persistence;
+        _engineParameters = engineParameters ?? new EngineParameters();
 
         _engineThreadId = Environment.CurrentManagedThreadId;
 
@@ -124,7 +119,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     public void Initialize(IAlgorithm<T> algorithm)
     {
-        Context.InitializeAlgorithmContext(this, algorithm);
+        _context.InitializeAlgorithmContext(this, algorithm);
 
         Algorithm = algorithm;
         Sizing = algorithm.Sizing;
@@ -163,13 +158,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         }
     }
 
-    public async Task<int> Run(AlgoStartupParameters parameters)
+    public async Task<int> Run(AlgorithmParameters parameters)
     {
         if (Screening == null) throw Exceptions.InvalidAlgorithmEngineState();
 
         TotalPriceEventCount = 0;
-        User = Services.Admin.CurrentUser;
-        Account = Services.Admin.CurrentAccount;
+        User = _services.Admin.CurrentUser;
+        Account = _services.Admin.CurrentAccount;
         Parameters = parameters;
         if (User == null || Account == null)
             return 0;
@@ -177,20 +172,18 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         Interval = parameters.Interval;
         Parameters = parameters;
 
-        ShouldCloseOpenPositionsWhenHalted = parameters.ShouldCloseOpenPositionsWhenHalted;
-        ShouldCloseOpenPositionsWhenStopped = parameters.ShouldCloseOpenPositionsWhenStopped;
+        _services.MarketData.NextOhlc -= OnNextPrice;
+        _services.MarketData.NextOhlc += OnNextPrice;
+        _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
+        _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
+        _services.Order.NextOrder -= OnNextOrder;
+        _services.Order.NextOrder += OnNextOrder;
+        _services.Trade.NextTrade -= OnNextTrade;
+        _services.Trade.NextTrade += OnNextTrade;
 
-        Services.MarketData.NextOhlc -= OnNextPrice;
-        Services.MarketData.NextOhlc += OnNextPrice;
-        Services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
-        Services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
-        Services.Order.NextOrder -= OnNextOrder;
-        Services.Order.NextOrder += OnNextOrder;
-        Services.Trade.NextTrade -= OnNextTrade;
-        Services.Trade.NextTrade += OnNextTrade;
-
-        // close opened positions
-        CloseAllOpenPositions();
+        // close open positions
+        if (_engineParameters.CloseOpenPositionsOnStart)
+            CloseAllOpenPositions();
 
         // pick security to trade
         // check associated asset's position, and map any existing position into algo entry
@@ -201,13 +194,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         foreach (var security in pickedSecurities.Values)
         {
             var currencyAsset = security.EnsureCurrencyAsset();
-            var assetPosition = Services.Portfolio.GetAsset(currencyAsset.Id);
+            var assetPosition = _services.Portfolio.GetAssetBySecurityId(currencyAsset.Id);
             if (assetPosition == null || assetPosition.Quantity <= 0)
             {
                 _log.Warn($"Cannot trade the picked security {security.Code}; the account may not have enough free asset to trade.");
                 continue;
             }
-            await Services.MarketData.SubscribeOhlc(security, Interval);
+            await _services.MarketData.SubscribeOhlc(security, Interval);
             subscriptionCount++;
         }
         SetAlgoEffectiveTimeRange(parameters.TimeRange);
@@ -215,7 +208,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         // prepare algo entry related info
         AlgoVersionId = DateTime.UtcNow.Date.ToDateNumber();
         var (table, database) = DatabaseNames.GetTableAndDatabaseName<AlgoEntry>();
-        AlgoBatchId = Convert.ToInt32(await Context.Storage.GetMax(nameof(AlgoEntry.BatchId), table, database));
+        AlgoBatchId = Convert.ToInt32(await _context.Storage.GetMax(nameof(AlgoEntry.BatchId), table, database));
 
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
@@ -231,13 +224,13 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         _log.Info("Algorithm Engine is shutting down.");
 
         _runningState = AlgoRunningState.Stopped;
-        Services.MarketData.NextOhlc -= OnNextPrice;
-        Services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
-        await Services.MarketData.UnsubscribeAllOhlcs();
+        _services.MarketData.NextOhlc -= OnNextPrice;
+        _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
+        await _services.MarketData.UnsubscribeAllOhlcs();
         var securities = Screening.GetAll();
         foreach (var security in securities.Values)
         {
-            await Services.MarketData.UnsubscribeOhlc(security, Interval);
+            await _services.MarketData.UnsubscribeOhlc(security, Interval);
         }
         // unblock the main thread and let it finish
         _signal.Set();
@@ -391,11 +384,11 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     private void ClosePositionIfNeeded()
     {
-        if (_runningState == AlgoRunningState.Stopped && ShouldCloseOpenPositionsWhenStopped && _openedEntriesBySecurityIds.Count != 0)
+        if (_runningState == AlgoRunningState.Stopped && _engineParameters.CloseOpenPositionsOnStop && _openedEntriesBySecurityIds.Count != 0)
         {
             CloseAllOpenPositions();
         }
-        else if (_runningState == AlgoRunningState.Halted && ShouldCloseOpenPositionsWhenHalted && _totalCurrentOpenPositions > 0)
+        else if (_runningState == AlgoRunningState.Halted && _engineParameters.CloseOpenPositionsOnStop && _totalCurrentOpenPositions > 0)
         {
             CloseAllOpenPositions();
         }
@@ -712,7 +705,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             var endTimeOfBar = GetOhlcEndTime(ohlcPrice, intervalType);
             var sl = GetStopLoss(ohlcPrice, Side.Buy, security);
             var tp = GetTakeProfit(ohlcPrice, Side.Buy, security);
-            var assetPosition = Services.Portfolio.GetPositionRelatedQuoteBalance(entry.SecurityId);
+            var assetPosition = _services.Portfolio.GetPositionRelatedQuoteBalance(entry.SecurityId);
 
             if (IsBackTesting)
             {
@@ -952,8 +945,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var securities = Parameters.SecurityPool;
         foreach (var security in securities)
         {
-            Services.Order.CancelAllOpenOrders(security);
+            _services.Order.CancelAllOpenOrders(security);
         }
-        Services.Portfolio.CloseAllPositions();
+        _services.Portfolio.CloseAllPositions();
     }
 }

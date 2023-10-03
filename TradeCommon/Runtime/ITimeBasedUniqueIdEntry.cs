@@ -2,5 +2,7 @@
 
 public interface ITimeBasedUniqueIdEntry
 {
-    public long Id { get; set; }
+    long Id { get; set; }
+
+    bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other);
 }

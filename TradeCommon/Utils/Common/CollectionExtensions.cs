@@ -159,44 +159,51 @@ public static class CollectionExtensions
         if (!dictionary.TryGetValue(key, out var value))
         {
             value = defaultValue;
-            dictionary[key] = value;
         }
         return value;
     }
 
-    public static (Dictionary<Tk, Tv> primaryOnly, Dictionary<Tk, Tv> contentDiffs, Dictionary<Tk, Tv> secondaryOnly)
-        FindDifferences<Tk, Tv>(this IDictionary<Tk, Tv> primary, IDictionary<Tk, Tv> secondary)
-        where Tk : notnull
-        where Tv : IComparable<Tv>
+    public static (List<TV>, Dictionary<TK, TV>, List<TK>) FindDifferences<TK, TV>(
+        Dictionary<TK, TV> primary, Dictionary<TK, TV> secondary, Func<TV, TV, bool>? comparisonFunc = null)
     {
-        var primaryOnly = new Dictionary<Tk, Tv>();
-        var contentDiffs = new Dictionary<Tk, Tv>();
-        var secondaryOnly = new Dictionary<Tk, Tv>();
+        var toCreate = new List<TV>();
+        var toUpdate = new Dictionary<TK, TV>();
+        var toDelete = new List<TK>();
         foreach (var (id, first) in primary)
         {
             if (secondary.TryGetValue(id, out var second))
             {
-                if (second.CompareTo(first) != 0)
-                    contentDiffs[id] = first;
+                if (comparisonFunc != null)
+                {
+                    if (!comparisonFunc.Invoke(first, second))
+                        toUpdate[id] = first;
+                }
+                else if (!second.Equals(first))
+                    toUpdate[id] = first;
             }
             else
             {
-                primaryOnly[id] = first;
+                toCreate.Add(first);
             }
         }
         foreach (var (id, second) in secondary)
         {
             if (primary.TryGetValue(id, out var first))
             {
-                if (second.CompareTo(first) != 0)
-                    contentDiffs[id] = first;
+                if (comparisonFunc != null)
+                {
+                    if (!comparisonFunc.Invoke(first, second))
+                        toUpdate[id] = first;
+                }
+                else if (!second.Equals(first))
+                    toUpdate[id] = first;
             }
             else
             {
-                secondaryOnly[id] = second;
+                toDelete.Add(id);
             }
         }
-        return (primaryOnly, contentDiffs, secondaryOnly);
+        return (toCreate, toUpdate, toDelete);
     }
 
     public static (List<T>, List<T>) FindDifferences<T>(this IList<T> primary, IList<T> secondary)
@@ -322,5 +329,22 @@ public static class CollectionExtensions
     public static T RandomElement<T>(this T[] array)
     {
         return array[_random.Next(array.Length)];
+    }
+
+    public static int Hash<T>(this IList<T> list)
+    {
+        if (list == null) throw new ArgumentNullException(nameof(list));
+
+        int hash = 17;
+        unchecked
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                var value = list[i];
+                if (value == null) continue;
+                hash = 31 * hash + value.GetHashCode();
+            }
+        }
+        return hash;
     }
 }

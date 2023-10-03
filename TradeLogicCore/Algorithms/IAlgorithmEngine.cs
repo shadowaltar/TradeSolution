@@ -42,15 +42,11 @@ public interface IAlgorithmEngine
 
     IntervalType Interval { get; }
 
-    bool ShouldCloseOpenPositionsWhenHalted { get; }
-
-    bool ShouldCloseOpenPositionsWhenStopped { get; }
-
     AlgoStopTimeType WhenToStopOrHalt { get; }
 
-    AlgoStartupParameters? Parameters { get; }
+    AlgorithmParameters? Parameters { get; }
 
-    Task<int> Run(AlgoStartupParameters parameters);
+    Task<int> Run(AlgorithmParameters parameters);
 
     Task Stop();
 

@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Essentials.Portfolios;
+﻿using TradeCommon.Runtime;
+
+namespace TradeCommon.Essentials.Portfolios;
 
 /// <summary>
 /// Portfolio is an aggregation of positions including cash-position (uninvested/free cash).
@@ -11,46 +13,33 @@ public record Portfolio
 
     public int AccountId { get; } = 0;
 
-    public Portfolio(int accountId, List<Position> positions)
+    public Portfolio(int accountId,
+                     List<Position> positions,
+                     List<Asset> assets)
     {
-        var start = DateTime.UtcNow;
+        AccountId = accountId;
+        foreach (var asset in assets)
+        {
+            if (!asset.Security.IsAsset)
+                throw Exceptions.InvalidSecurity(asset.Security.Code, "Expecting a security for asset position.");
+            Assets.Add(asset.Id, asset);
+        }
         foreach (var position in positions)
         {
             if (position.Security.IsAsset)
-            {
-                Assets.Add(position.Id, position);
-            }
-            else
-            {
-                Positions.Add(position.Id, position);
-            }
-
-            // position = new Position
-            //{
-            //    Id = 0,
-            //    AccountId = position.AccountId,
-            //    Security = position.Security,
-            //    SecurityId = position.SecurityId,
-            //    SecurityCode = position.SecurityCode,
-            //    Price = 0,
-            //    Quantity = position.Quantity,
-            //    LockedQuantity = position.LockedQuantity,
-            //    StrategyLockedQuantity = position.StrategyLockedQuantity,
-            //    CreateTime = start,
-            //    UpdateTime = start,
-            //    CloseTime = DateTime.MaxValue,
-            //    StartNotional = 0, // price unknown
-            //    Notional = 0,
-            //    StartOrderId = 0,
-            //    EndOrderId = 0,
-            //    StartTradeId = 0,
-            //    EndTradeId = 0,
-            //    RealizedPnl = 0,
-            //    AccumulatedFee = 0,
-            //};
-            //Assets[position.SecurityId] = position;
+                throw Exceptions.InvalidSecurity(position.Security.Code, "Expecting a security for normal position.");
+            Positions.Add(position.Id, position);
         }
-        AccountId = accountId;
+    }
+
+    public Asset? GetAssetBySecurityId(int securityId)
+    {
+        return Assets.Values.FirstOrDefault(a => a.SecurityId == securityId);
+    }
+
+    public Position? GetPositionBySecurityId(int securityId)
+    {
+        return Positions.Values.FirstOrDefault(a => a.SecurityId == securityId);
     }
 
     public virtual bool Equals(Portfolio? portfolio)
@@ -79,5 +68,10 @@ public record Portfolio
     public override int GetHashCode()
     {
         return AccountId.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+        return $"Portfolio: acctId {AccountId}, pos {Positions.Count}, asset {Assets.Count}";
     }
 }

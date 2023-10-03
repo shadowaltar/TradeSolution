@@ -1,12 +1,15 @@
 ﻿using Common;
 using Common.Database;
 using Microsoft.Data.Sqlite;
+using System;
 using System.Data;
+using System.Xml.Linq;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -48,8 +51,7 @@ WHERE
     public async Task<Account?> ReadAccount(string accountName, EnvironmentType environment)
     {
         var sqlPart = SqlReader<Account>.GetSelectClause();
-        var tableName = DatabaseNames.AccountTable;
-        var dbName = DatabaseNames.StaticData;
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Account>();
         var sql =
 @$"
 {sqlPart} FROM {tableName} WHERE Name = $Name AND Environment = $Environment
@@ -61,13 +63,12 @@ WHERE
     public async Task<List<Asset>> ReadAssets(int accountId)
     {
         var sqlPart = SqlReader<Asset>.GetSelectClause();
-        var tableName = DatabaseNames.BalanceTable;
-        var dbName = DatabaseNames.StaticData;
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Asset>();
         var sql =
 @$"
 {sqlPart} FROM {tableName} WHERE AccountId = $AccountId
 ";
-        return await SqlReader.Read<Asset>(tableName, dbName, sql, ("$AccountId", accountId));
+        return await SqlReader.ReadMany<Asset>(tableName, dbName, sql, ("$AccountId", accountId));
     }
 
     public async Task<List<OpenOrderId>> ReadOpenOrderIds()
@@ -76,7 +77,7 @@ WHERE
         var tableName = DatabaseNames.OpenOrderIdTable;
         var dbName = DatabaseNames.ExecutionData;
         var sql = @$"{sqlPart} FROM {tableName}";
-        return await SqlReader.Read<OpenOrderId>(tableName, dbName, sql);
+        return await SqlReader.ReadMany<OpenOrderId>(tableName, dbName, sql);
     }
 
     public async Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end)
@@ -87,7 +88,7 @@ WHERE
         var secType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetOrderTableName(secType);
         var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND CreateTime >= $StartTime AND UpdateTime <= $EndTime";
-        return await SqlReader.Read<Order>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
+        return await SqlReader.ReadMany<Order>(tableName, dbName, sql, ("$StartTime", start), ("$EndTime", end));
     }
 
     public async Task<List<Order>> ReadOpenOrders(Security? security = null, SecurityType securityType = SecurityType.Unknown)
@@ -99,7 +100,7 @@ WHERE
         {
             var tableName = DatabaseNames.GetOrderTableName(securityType);
             var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND Type = {securityType.ToString().ToUpperInvariant()}";
-            return await SqlReader.Read<Order>(tableName, dbName, sql);
+            return await SqlReader.ReadMany<Order>(tableName, dbName, sql);
         }
         else if (security == null && securityType == SecurityType.Unknown)
         {
@@ -112,7 +113,7 @@ WHERE
                 var tableName = DatabaseNames.GetOrderTableName(securityType);
                 var idClause = GetInClause("OrderId", ooIds.Select(i => i.OrderId).ToList(), false);
                 var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND {idClause}";
-                results.AddRange(await SqlReader.Read<Order>(tableName, dbName, sql));
+                results.AddRange(await SqlReader.ReadMany<Order>(tableName, dbName, sql));
             }
             return results;
         }
@@ -125,7 +126,7 @@ WHERE
             }
             var tableName = DatabaseNames.GetOrderTableName(securityType);
             var sql = @$"{sqlPart} FROM {tableName} WHERE Status = 'LIVE' AND SecurityId = {security.Id}";
-            return await SqlReader.Read<Order>(tableName, dbName, sql);
+            return await SqlReader.ReadMany<Order>(tableName, dbName, sql);
         }
     }
 
@@ -136,7 +137,7 @@ WHERE
         var secType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetTradeTableName(secType);
         var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND Time >= $StartTime AND Time <= $EndTime";
-        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$StartTime", start), ("$EndTime", end));
+        return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$StartTime", start), ("$EndTime", end));
     }
 
     public async Task<List<Trade>> ReadTrades(Security security, long orderId)
@@ -145,7 +146,7 @@ WHERE
         var tableName = DatabaseNames.GetTradeTableName(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
         var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND OrderId = $OrderId";
-        return await SqlReader.Read<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$OrderId", orderId));
+        return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$OrderId", orderId));
     }
 
     public async Task<List<Position>> ReadPositions(Account account)
@@ -159,7 +160,7 @@ WHERE
 
             var sqlPart = SqlReader<Position>.GetSelectClause();
             var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId";
-            var positions = await SqlReader.Read<Position>(tableName, dbName, sql, ("$AccountId", account.Id));
+            var positions = await SqlReader.ReadMany<Position>(tableName, dbName, sql, ("$AccountId", account.Id));
             results.AddRange(positions);
         }
         return results;
@@ -229,7 +230,7 @@ WHERE
         return results;
     }
 
-    private string GetInClause<T>(string fieldName, List<T>? items, bool withEndingAnd)
+    public string GetInClause<T>(string fieldName, List<T>? items, bool withEndingAnd)
     {
         var endingAnd = withEndingAnd ? " AND " : "";
         return items.IsNullOrEmpty()
@@ -283,7 +284,7 @@ WHERE
         }
 
         SqlReader<Security>? sqlHelper = null;
-        return await SqlReader.Read(tableName, DatabaseNames.StaticData, sql, Read,
+        return await SqlReader.ReadMany(tableName, DatabaseNames.StaticData, sql, Read,
             ("$LocalEndDate", now), ("$Exchange", exchangeStr), ("$Type", typeStr));
 
         Security Read(SqliteDataReader r)
@@ -326,7 +327,7 @@ WHERE
 SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 ";
-        return await SqlReader.Read<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql);
+        return await SqlReader.ReadMany<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql);
     }
 
     public async Task<List<FinancialStat>> ReadFinancialStats(int secId)
@@ -337,7 +338,7 @@ SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 WHERE SecurityId = $SecurityId
 ";
-        return await SqlReader.Read<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql, ("$SecurityId", secId));
+        return await SqlReader.ReadMany<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, sql, ("$SecurityId", secId));
     }
 
     public async Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType)
@@ -345,7 +346,7 @@ WHERE SecurityId = $SecurityId
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var sql = $@"SELECT * FROM (SELECT COUNT(StartTime) as Count, DATE(StartTime) as Date, SecurityId FROM {tableName}
 GROUP BY DATE(startTime), SecurityId)";
-        return await SqlReader.Read(tableName, DatabaseNames.MarketData, sql, Transform);
+        return await SqlReader.ReadMany(tableName, DatabaseNames.MarketData, sql, Transform);
 
         MissingPriceSituation Transform(SqliteDataReader r) => new(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
     }
@@ -371,7 +372,7 @@ WHERE
             ("$StartTime", start),
             ("$EndTime", end),
         };
-        return await SqlReader.Read(tableName, DatabaseNames.MarketData, sql, Transform, parameters);
+        return await SqlReader.ReadMany(tableName, DatabaseNames.MarketData, sql, Transform, parameters);
 
         OhlcPrice Transform(SqliteDataReader r)
         {
@@ -537,23 +538,54 @@ WHERE
         return results;
     }
 
-    private async Task<T?> ReadOne<T>(string sql, string tableName, string databaseName, params (string, object)[] parameters) where T : new()
+    public async Task<List<PositionReconciliationRecord>> ReadPositionReconciliationRecords(List< int> securityIds)
     {
-        using var connection = await Connect(DatabaseNames.StaticData);
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        foreach (var (key, value) in parameters)
-        {
-            command.Parameters.AddWithValue(key, value);
-        }
-
-        using var r = await command.ExecuteReaderAsync();
-        using var sqlHelper = new SqlReader<T>(r);
-        T? t = default;
-        while (await r.ReadAsync())
-        {
-            t = sqlHelper.Read();
-        }
-        return t;
+        var selectSql = SqlReader<PositionReconciliationRecord>.GetSelectClause();
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<PositionReconciliationRecord>();
+        var inClause = GetInClause<int>(nameof(PositionReconciliationRecord.SecurityId), securityIds, false);
+        var sql =
+@$"
+{selectSql} FROM {tableName} WHERE {inClause}
+";
+        return await SqlReader.ReadMany<PositionReconciliationRecord>(tableName, dbName, sql);
     }
+
+    //private async Task<T?> ReadOne<T>(string sql, string databaseName, params (string, object)[] parameters) where T : new()
+    //{
+    //    using var connection = await Connect(databaseName);
+    //    using var command = connection.CreateCommand();
+    //    command.CommandText = sql;
+    //    foreach (var (key, value) in parameters)
+    //    {
+    //        command.Parameters.AddWithValue(key, value);
+    //    }
+
+    //    using var r = await command.ExecuteReaderAsync();
+    //    using var sqlHelper = new SqlReader<T>(r);
+    //    T? t = default;
+    //    while (await r.ReadAsync())
+    //    {
+    //        t = sqlHelper.Read();
+    //    }
+    //    return t;
+    //}
+
+    //private async Task<List<T>> ReadMany<T>(string sql, string databaseName, params (string, object)[] parameters) where T : new()
+    //{
+    //    using var connection = await Connect(databaseName);
+    //    using var command = connection.CreateCommand();
+    //    command.CommandText = sql;
+    //    foreach (var (key, value) in parameters)
+    //    {
+    //        command.Parameters.AddWithValue(key, value);
+    //    }
+    //    using var r = await command.ExecuteReaderAsync();
+    //    using var sqlHelper = new SqlReader<T>(r);
+    //    List<T> results = new();
+    //    while (await r.ReadAsync())
+    //    {
+    //        results.Add(sqlHelper.Read());
+    //    }
+    //    return results;
+    //}
 }

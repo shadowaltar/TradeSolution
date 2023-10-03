@@ -1,4 +1,7 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using Common;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Providers;
 
@@ -17,4 +20,12 @@ public interface ISecurityDefinitionProvider
     /// <param name="securityId"></param>
     /// <returns></returns>
     Security GetSecurity(int securityId);
+
+    /// <summary>
+    /// Fix any missing security info in given entry.
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    bool Fix(SecurityRelatedEntry entry, Security? security = null);
 }

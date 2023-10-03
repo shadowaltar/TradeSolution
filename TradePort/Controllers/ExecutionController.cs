@@ -216,7 +216,7 @@ public class ExecutionController : Controller
             default:
                 return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgoStartupParameters(core.Environment == EnvironmentType.Test,
+        var parameters = new AlgorithmParameters(core.Environment == EnvironmentType.Test,
                                                    adminService.CurrentUser.Name,
                                                    adminService.CurrentAccount.Name,
                                                    core.Environment,

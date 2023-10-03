@@ -3,7 +3,6 @@ using Common;
 using log4net;
 using log4net.Config;
 using OfficeOpenXml;
-using System;
 using System.Diagnostics;
 using System.Text;
 using TradeCommon.Calculations;
@@ -24,7 +23,6 @@ using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
-using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
@@ -69,11 +67,15 @@ public class Program
         //{
         //    await storage.CreateOrderTable(secType);
         //    await storage.CreateTradeTable(secType);
-
         //    await storage.CreatePositionTable(secType);
         //}
-        var x = await storage.CreateTable<Asset>();
-        var y = await storage.CreateTable<Position>();
+        //await storage.CreateTable<Asset>();
+        //await storage.CreateTable<Order>("stock_orders");
+        //await storage.CreateTable<Order>("fx_orders");
+        //await storage.CreateTable<Trade>("stock_trades");
+        //await storage.CreateTable<Trade>("fx_trades");
+        //await storage.CreateTable<Position>("stock_positions");
+        //await storage.CreateTable<Position>("fx_positions");
         //var y = await storage.CreateTradeTable(Secu<rityType.Fx);
 
         await RunMacMimicWebService();
@@ -90,10 +92,6 @@ public class Program
 
         static void OnStorageSuccess(object entry, string method)
         {
-            if (entry is Account)
-            {
-
-            }
         }
 
         static void OnStorageFailed(object entry, Exception e, string method)
@@ -136,30 +134,6 @@ public class Program
         if (result != ResultCode.LoginUserAndAccountOk)
             return;
 
-        //var order = new Order
-        //{
-        //    AccountId = context.AccountId,
-        //    SecurityCode = security.Code,
-        //    SecurityId = security.Id,
-        //    BrokerId = context.BrokerId,
-        //    CreateTime = DateTime.UtcNow,
-        //    ExchangeId = context.ExchangeId,
-        //    Quantity = 1m,
-        //    Side = Side.Sell,
-        //    Status = OrderStatus.Sending,
-        //    TimeInForce = TimeInForceType.GoodTillCancel,
-        //    Price = 0,
-        //    Type = OrderType.Market,
-        //};
-        //for (int i = 0; i < 10; i++)
-        //{
-        //    order.Id = IdGenerators.Get<Order>().NewTimeBasedId;
-        //    await services.Order.SendOrder(order);
-        //}
-        //Thread.Sleep(100000);
-        //return;
-
-
         AlgoEffectiveTimeRange? algoTimeRange = null;
         switch (core.Environment)
         {
@@ -172,7 +146,7 @@ public class Program
             default:
                 return;
         }
-        var parameters = new AlgoStartupParameters(false, context.User!.Name,
+        var parameters = new AlgorithmParameters(false, context.User!.Name,
             context.Account!.Name, core.Environment, core.Exchange, core.Broker, interval,
             new List<Security> { security }, algoTimeRange);
         _log.Info("Execute algorithm with parameters: " + parameters);
@@ -194,27 +168,30 @@ public class Program
     private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment, Security security)
     {
         var result = await services.Admin.Login(userName, password, accountName, services.Context.Environment);
-        if (result != ResultCode.LoginUserAndAccountOk)
+        if (result == ResultCode.LoginUserAndAccountOk)
         {
-            switch (result)
-            {
-                case ResultCode.GetSecretFailed:
-                case ResultCode.SecretMalformed:
-                    {
-                        File.Delete(_fakeSecretFilePath);
-                        File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
-                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                    }
-                case ResultCode.GetAccountFailed:
-                    {
-                        _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                        return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                    }
-                default:
-                    throw new InvalidOperationException("Invalid case.");
-            }
+            return result;
         }
-        return result;
+
+        switch (result)
+        {
+            case ResultCode.GetSecretFailed:
+            case ResultCode.SecretMalformed:
+                {
+                    File.Delete(_fakeSecretFilePath);
+                    File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                }
+            case ResultCode.GetAccountFailed:
+                {
+                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                }
+            case ResultCode.SubscriptionFailed:
+                throw new InvalidOperationException("Subscription failed.");
+            default:
+                throw Exceptions.Invalid(result);
+        }
     }
 
     //private static async Task Run()
@@ -435,7 +412,7 @@ public class Program
                     engine.Initialize(algorithm);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
+                    var algoStartParams = new AlgorithmParameters(true, _testUserName, _testAccountName,
                         _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
 
@@ -599,7 +576,7 @@ public class Program
                         var engine = new AlgorithmEngine<MacVariables>(context);
                         engine.Initialize(algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                        var algoStartParams = new AlgoStartupParameters(true, _testUserName, _testAccountName,
+                        var algoStartParams = new AlgorithmParameters(true, _testUserName, _testAccountName,
                             _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
 
                         await engine.Run(algoStartParams);

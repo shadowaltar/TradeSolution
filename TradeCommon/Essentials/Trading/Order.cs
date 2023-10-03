@@ -1,20 +1,18 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
-using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
 
 /// <summary>
-/// Action to buy or sell a security.
+/// The object of an action to buy or sell a security.
 /// </summary>
 [Storage("orders", "execution")]
 [Unique(nameof(Id))]
 [Unique(nameof(ExternalOrderId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(SecurityId), nameof(CreateTime))]
-public class Order : IComparable<Order>, ICloneable, ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
+public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUniqueIdEntry
 {
     /// <summary>
     /// Unique order id.
@@ -28,21 +26,6 @@ public class Order : IComparable<Order>, ICloneable, ITimeBasedUniqueIdEntry, IS
     /// </summary>
     [NotNull, Positive]
     public long ExternalOrderId { get; set; } = 0;
-
-    /// <summary>
-    /// The id of security to be or already being bought / sold.
-    /// </summary>
-    [NotNull, Positive]
-    public int SecurityId { get; set; } = 0;
-
-    /// <summary>
-    /// Security code (will not be saved to database).
-    /// </summary>
-    [DatabaseIgnore]
-    public string SecurityCode { get; set; } = "";
-
-    [DatabaseIgnore]
-    public Security? Security { get; set; }
 
     /// <summary>
     /// The target account. This embeds the broker info.
@@ -150,18 +133,10 @@ public class Order : IComparable<Order>, ICloneable, ITimeBasedUniqueIdEntry, IS
     /// Gets if the order is successfully placed (either it is still alive or filled).
     /// </summary>
     [DatabaseIgnore]
-    public bool IsClosed => Status is OrderStatus.Failed 
+    public bool IsClosed => Status is OrderStatus.Failed
         or OrderStatus.Filled or OrderStatus.Cancelled or OrderStatus.Rejected
         or OrderStatus.Rejected or OrderStatus.Deleted or OrderStatus.Expired
         or OrderStatus.Prevented;
-
-    public object Clone()
-    {
-        var advanced = AdvancedSettings?.Clone();
-        var order = (Order)MemberwiseClone();
-        order.AdvancedSettings = (AdvancedOrderSettings?)advanced;
-        return order;
-    }
 
     public int CompareTo(Order? other)
     {
@@ -192,6 +167,12 @@ public class Order : IComparable<Order>, ICloneable, ITimeBasedUniqueIdEntry, IS
         return r;
     }
 
+    public bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    {
+        if (other is not Order order) return false;
+        return CompareTo(order) == 0;
+    }
+
     public override string ToString()
     {
         return $"[{Id}][{ExternalOrderId}][{CreateTime:yyMMdd-HHmmss}][{Status}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
@@ -204,7 +185,6 @@ public class AdvancedOrderSettings : ICloneable
     public double TrailingValue { get; set; }
     public double TrailingSpread { get; set; }
     public DateTime TimeInForceTime { get; set; }
-
     public object Clone()
     {
         return MemberwiseClone();

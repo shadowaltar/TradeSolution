@@ -176,12 +176,11 @@ public class AdminService : IAdminService
         }
         else
         {
-            var state = await _accountManagement.GetAccount(assets);
-            var accountAndBalances = state.Get<(Account a, List<Asset> b)>();
-            if (accountAndBalances.a == null)
+            var state = await _accountManagement.GetAccount();
+            var account = state.Get<Account>();
+            if (account == null)
                 return null;
 
-            var account = accountAndBalances.a;
             // when the stored & broker's external account names are the same
             // then must sync some info which are not on broker side
             if (account.ExternalAccount == CurrentAccount?.ExternalAccount)

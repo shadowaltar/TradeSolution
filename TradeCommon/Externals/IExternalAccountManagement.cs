@@ -9,5 +9,5 @@ public interface IExternalAccountManagement
 
     Task<ExternalQueryState> GetAccount(string accountType);
 
-    Task<ExternalQueryState> GetAccount(List<Security>? assets = null);
+    Task<ExternalQueryState> GetAccount();
 }

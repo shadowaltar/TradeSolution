@@ -345,7 +345,7 @@ public static class ReflectionUtils
             ami = new AttributeMetaInfo();
             _typeToAttributeInfo[t] = ami;
 
-            var uniqueAttrs = t.GetCustomAttributes<UniqueAttribute>().ToList();
+            var uniqueAttrs = t.GetDistinctAttributes<UniqueAttribute>().ToList();
             for (int i = 0; i < uniqueAttrs.Count; i++)
             {
                 UniqueAttribute? attr = uniqueAttrs[i];

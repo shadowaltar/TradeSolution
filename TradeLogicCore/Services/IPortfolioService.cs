@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -23,20 +23,20 @@ public interface IPortfolioService
     Task<bool> Initialize();
 
     /// <summary>
-    /// Create a new position by a trade.
+    /// Create or update (and cache) a position by a trade.
     /// </summary>
     /// <param name="trade"></param>
+    /// <param name="existing"></param>
     /// <returns></returns>
-    Position Create(Trade trade);
+    Position CreateOrUpdate(Trade trade, Position? existing = null);
 
     /// <summary>
-    /// Create (and cache) one or more new position by a series of trades.
+    /// Create or update (and cache) one or more positions by a series of trades.
     /// </summary>
     /// <param name="trades"></param>
     /// <param name="position"></param>
     /// <returns></returns>
-    
-    Position? Reconcile(List<Trade> trades, Position? position = null);
+    Position? CreateOrUpdate(List<Trade> trades, Position? position = null);
 
     /// <summary>
     /// Apply a trade to an existing position.
@@ -48,18 +48,32 @@ public interface IPortfolioService
     List<Position> GetOpenPositions();
 
     /// <summary>
-    /// Get position given its security ID.
+    /// Get position given its Id.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    Position? GetPosition(long id);
+
+    /// <summary>
+    /// Get position given its security Id.
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    Position? GetPosition(int securityId);
+    Position? GetPositionBySecurityId(int securityId);
 
     /// <summary>
-    /// Get asset's position given its asset (security) ID.
+    /// Get asset position given its Id.
     /// </summary>
-    /// <param name="assetId"></param>
+    /// <param name="id"></param>
     /// <returns></returns>
-    Asset GetAsset(int assetId);
+    Asset? GetAsset(long id);
+
+    /// <summary>
+    /// Get asset position given its security Id.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <returns></returns>
+    Asset? GetAssetBySecurityId(int securityId);
 
     /// <summary>
     /// Get asset's position given a position's security ID.
@@ -87,13 +101,6 @@ public interface IPortfolioService
     decimal Realize(int securityId, decimal realizedPnl);
 
     List<Position> GetPositions();
-
-    /// <summary>
-    /// TODO revise
-    /// </summary>
-    /// <param name="externalName"></param>
-    /// <returns></returns>
-    List<Asset> GetExternalBalances(string externalName);
 
     decimal GetRealizedPnl(Security security);
 
@@ -137,4 +144,8 @@ public interface IPortfolioService
     /// create corresponding opposite side orders and send.
     /// </summary>
     Task CloseAllPositions();
+
+    Task<List<Asset>> GetAssets(Account account, bool requestExternal = false);
+    void Update(List<Asset> assets, bool isInitializing = false);
+    void Update(List<Position> positions, bool isInitializing = false);
 }

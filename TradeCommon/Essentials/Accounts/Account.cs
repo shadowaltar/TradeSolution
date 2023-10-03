@@ -79,7 +79,7 @@ public class Account : ITimeRelatedEntry
     {
         if (obj is not Account account) return false;
 
-        var r = Id == account.Id &&
+        return Id == account.Id &&
                Name == account.Name &&
                OwnerId == account.OwnerId &&
                ExternalAccount == account.ExternalAccount &&
@@ -90,8 +90,6 @@ public class Account : ITimeRelatedEntry
                (FeeStructure == account.FeeStructure || Conditions.BothBlank(FeeStructure, account.FeeStructure)) &&
                CreateTime == account.CreateTime &&
                UpdateTime == account.UpdateTime;
-
-        return false;
     }
 
     public override int GetHashCode()

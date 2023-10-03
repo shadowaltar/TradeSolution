@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
@@ -15,7 +16,7 @@ namespace TradeCommon.Essentials.Portfolios;
 [Unique(nameof(SecurityId), nameof(AccountId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
-public record Asset : ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
+public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUniqueIdEntry
 {
     /// <summary>
     /// Unique id of this asset asset.
@@ -30,19 +31,6 @@ public record Asset : ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
 
     public DateTime CreateTime { get; set; }
     public DateTime UpdateTime { get; set; }
-
-    /// <summary>
-    /// The asset security id.
-    /// </summary>
-    public int SecurityId { get; set; } = 0;
-
-    /// <summary>
-    /// Asset's asset security code, like USD, EUR, BTC etc. 
-    /// </summary>
-    public string? SecurityCode { get; set; } = null;
-
-    [DatabaseIgnore]
-    public Security Security { get; set; }
 
     /// <summary>
     /// Amount of asset being held which is free to use.
@@ -88,5 +76,25 @@ public record Asset : ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
                                 Quantity,
                                 LockedQuantity,
                                 StrategyLockedQuantity);
+    }
+
+    public virtual int CompareTo(Asset? other)
+    {
+        if (other == null) return 1;
+        var r = AccountId.CompareTo(other.AccountId);
+        if (r == 0) r = CreateTime.CompareTo(other.CreateTime);
+        if (r == 0) r = UpdateTime.CompareTo(other.UpdateTime);
+        if (r == 0) r = SecurityId.CompareTo(other.SecurityId);
+        if (r == 0) r = SecurityCode.CompareTo(other.SecurityCode);
+        if (r == 0) r = Quantity.CompareTo(other.Quantity);
+        if (r == 0) r = LockedQuantity.CompareTo(other.LockedQuantity);
+        if (r == 0) r = StrategyLockedQuantity.CompareTo(other.StrategyLockedQuantity);
+        return r;
+    }
+
+    public virtual bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    {
+        if (other is not Asset asset) return false;
+        return CompareTo(asset) == 0;
     }
 }

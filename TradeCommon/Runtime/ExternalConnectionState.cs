@@ -382,7 +382,7 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState QueryBalances(string? content, string? connId, List<Asset> assets)
+    public static ExternalQueryState QueryAssets(string? content, string? connId, List<Asset> assets)
     {
         return new ExternalQueryState
         {

@@ -18,7 +18,7 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
 
         var tableName = tableNameOverride ?? attr.TableName;
         var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        var uniqueKeyNames = typeof(T).GetCustomAttributes<UniqueAttribute>()
+        var uniqueKeyNames = typeof(T).GetDistinctAttributes<UniqueAttribute>()
             .FirstOrDefault()?.FieldNames ?? Array.Empty<string>();
         var targetFieldNames = properties.Select(pair => pair.Key).ToList();
         var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
@@ -84,8 +84,8 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         var sb = new StringBuilder();
         sb.Append($"DROP TABLE IF EXISTS ").Append(table).AppendLine(";");
 
-        var uniqueAttributes = type.GetCustomAttributes<UniqueAttribute>().ToList();
-        var indexAttributes = type.GetCustomAttributes<IndexAttribute>().ToList();
+        var uniqueAttributes = type.GetDistinctAttributes<UniqueAttribute>().Distinct().ToList();
+        var indexAttributes = type.GetDistinctAttributes<IndexAttribute>().Distinct().ToList();
 
         for (int i = 0; i < uniqueAttributes.Count; i++)
         {
@@ -113,8 +113,8 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         table = tableNameOverride ?? table;
 
         var properties = ReflectionUtils.GetPropertyToName(type);
-        var uniqueAttributes = type.GetCustomAttributes<UniqueAttribute>().ToList();
-        var indexAttributes = type.GetCustomAttributes<IndexAttribute>().ToList();
+        var uniqueAttributes = type.GetDistinctAttributes<UniqueAttribute>().ToList();
+        var indexAttributes = type.GetDistinctAttributes<IndexAttribute>().ToList();
         var primaryUniqueKeys = uniqueAttributes.FirstOrDefault()?.FieldNames;
 
         // find attributes attached to a record type's constructor parameter
@@ -140,7 +140,14 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         sb.Append($"CREATE TABLE IF NOT EXISTS ")
             .Append(table).AppendLine(" (");
 
-        foreach (var (name, property) in properties)
+        var sortedProperties = properties.OrderBy(p => p.Key).ToList();
+        var idProperty = sortedProperties.FirstOrDefault(p => p.Key == "Id");
+        if (idProperty.Value != null)
+        {
+            sortedProperties.Remove(idProperty);
+            sortedProperties.Insert(0, idProperty);
+        }
+        foreach (var (name, property) in sortedProperties)
         {
             var typeString = TypeConverter.ToSqliteType(property.PropertyType);
 

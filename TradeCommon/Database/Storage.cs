@@ -4,6 +4,7 @@ using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Misc;
 
 namespace TradeCommon.Database;
 

@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -23,9 +24,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly ITradeService _tradeService;
     private readonly ISecurityDefinitionProvider _securityService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<long, long> _orderToPositionIds = new();
     private readonly Dictionary<long, Position> _closedPositions = new();
-    private readonly Dictionary<int, Position> _openPositionsBySecurityId = new();
     private readonly object _lock = new();
 
     public Portfolio InitialPortfolio { get; private set; }
@@ -51,7 +50,11 @@ public class PortfolioService : IPortfolioService, IDisposable
         _securityService = securityService;
         _persistence = persistence;
 
+        _tradeService.NextTrade -= OnNewTrade;
         _tradeService.NextTrade += OnNewTrade;
+        _tradeService.NextTrades -= OnNewTrades;
+        _tradeService.NextTrades += OnNewTrades;
+        _execution.BalancesChanged -= OnBalancesChanged;
         _execution.BalancesChanged += OnBalancesChanged;
 
         _orderIdGenerator = IdGenerators.Get<Order>();
@@ -80,17 +83,19 @@ public class PortfolioService : IPortfolioService, IDisposable
         _persistence.Enqueue(assets, isUpsert: true);
     }
 
+    private void OnNewTrades(List<Trade> trades)
+    {
+        foreach (var trade in trades)
+        {
+            OnNewTrade(trade);
+        }
+    }
+
     private void OnNewTrade(Trade trade)
     {
-        var orderId = trade.OrderId;
-        long positionId;
-        lock (_lock)
-        {
-            if (!_orderToPositionIds.TryGetValue(orderId, out positionId))
-                return;
-        }
-
-        var position = Portfolio.Positions.ThreadSafeGet(positionId, _lock);
+        // one security to one position
+        var securityId = trade.SecurityId;
+        var position = Portfolio.GetPositionBySecurityId(securityId);
         // either create a new position, or merge the trade into it
         if (position != null)
         {
@@ -98,9 +103,8 @@ public class PortfolioService : IPortfolioService, IDisposable
 
             if (position.IsClosed)
             {
-                Portfolio.Positions.ThreadSafeRemove(positionId, _lock);
-                _openPositionsBySecurityId.ThreadSafeRemove(position.SecurityId, _lock);
-                _closedPositions.ThreadSafeSet(positionId, position, _lock);
+                Portfolio.Positions.ThreadSafeRemove(position.Id, _lock);
+                _closedPositions.ThreadSafeSet(position.Id, position, _lock);
                 PositionClosed?.Invoke(position);
             }
             else
@@ -110,6 +114,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
         else
         {
+            var orderId = trade.OrderId;
             // must be the order to open a position
             var order = _orderService.GetOrder(orderId);
             if (order == null)
@@ -118,13 +123,11 @@ public class PortfolioService : IPortfolioService, IDisposable
                 _log.Error("A trade comes without an associated order!");
                 return;
             }
-            position = Create(trade);
-
+            position = Position.Create(trade);
             PositionCreated?.Invoke(position);
-
-            _openPositionsBySecurityId.ThreadSafeSet(position.SecurityId, position, _lock);
-            _persistence.Enqueue(position);
         }
+        // update existing, or save a new position to db
+        _persistence.Enqueue(position);
     }
 
     public List<Position> GetOpenPositions()
@@ -139,24 +142,46 @@ public class PortfolioService : IPortfolioService, IDisposable
         return _closedPositions.ThreadSafeValues(_lock);
     }
 
-    public List<Asset> GetCurrentBalances()
+    public Position? GetPosition(long id)
     {
-        throw new NotImplementedException();
+        return Portfolio.Positions!.GetOrDefault(id);
     }
 
-    public List<Asset> GetExternalBalances(string externalName)
+    public Position? GetPositionBySecurityId(int securityId)
     {
-        throw new NotImplementedException();
+        return Portfolio.Positions.Values.FirstOrDefault(p => p.SecurityId == securityId);
     }
 
-    public Position? GetPosition(int securityId)
+    public Asset? GetAsset(long id)
     {
-        return Portfolio.Positions!.GetOrDefault(securityId);
+        return Portfolio.Assets.GetOrDefault(id);
     }
 
-    public Asset GetAsset(int assetId)
+    public Asset? GetAssetBySecurityId(int securityId)
     {
-        return Portfolio.Assets!.GetOrDefault(assetId) ?? throw Exceptions.MissingAssetPosition(assetId.ToString());
+        return Portfolio.Assets.Values.FirstOrDefault(a => a.SecurityId == securityId);
+    }
+
+
+    public async Task<List<Asset>> GetAssets(Account account, bool requestExternal = false)
+    {
+        // TODO only supports single account process
+        if (_context.Account != account) throw Exceptions.InvalidAccount();
+        List<Asset> assets;
+        if (requestExternal)
+        {
+            var state = await _execution.GetAssetPositions(account.ExternalAccount);
+            assets = state.Get<List<Asset>>()!;
+        }
+        else
+        {
+            assets = await _storage.ReadAssets(account.Id);
+        }
+        foreach (var asset in assets)
+        {
+            if (!_securityService.Fix(asset)) continue;
+        }
+        return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
 
     public Asset GetPositionRelatedQuoteBalance(int securityId)
@@ -194,65 +219,21 @@ public class PortfolioService : IPortfolioService, IDisposable
         var positions = await _context.Storage.ReadPositions(_context.Account);
         foreach (var position in positions)
         {
-            position.Security = _securityService.GetSecurity(position.SecurityId);
+            if (!_securityService.Fix(position)) continue;
+        }
+
+        var assets = await _context.Storage.ReadAssets(_context.AccountId);
+        foreach (var asset in assets)
+        {
+            if (!_securityService.Fix(asset)) continue;
         }
 
         // closedPositions need not be initialized
         // currentPosition by SecurityId should be initialized;
         // must be two different instances
-        InitialPortfolio = new Portfolio(_context.AccountId, positions);
-        Portfolio = new Portfolio(_context.AccountId, positions);
-        if (!positions.IsNullOrEmpty())
-        {
-            foreach (var position in positions)
-            {
-                if (position.IsClosed)
-                    continue;
-                if (position.Security.IsAsset)
-                    throw Exceptions.InvalidSecurity(position.SecurityCode, "Expect a non-asset security here.");
-
-                InitialPortfolio.Positions[position.Id] = position;
-                Portfolio.Positions[position.Id] = position;
-            }
-        }
-
+        InitialPortfolio = new Portfolio(_context.AccountId, positions, assets);
+        Portfolio = new Portfolio(_context.AccountId, positions, assets);
         return true;
-    }
-
-    /// <summary>
-    /// Creates a new position entry by a trade.
-    /// </summary>
-    /// <param name="trade"></param>
-    /// <returns></returns>
-    public Position Create(Trade trade)
-    {
-        var position = new Position
-        {
-            Id = _positionIdGenerator.NewTimeBasedId,
-            AccountId = _context.AccountId,
-
-            Security = trade.Security,
-            SecurityId = trade.SecurityId,
-            SecurityCode = trade.SecurityCode,
-
-            CreateTime = trade.Time,
-            UpdateTime = trade.Time,
-            CloseTime = DateTime.MaxValue,
-
-            Quantity = trade.Quantity,
-            Price = trade.Price,
-            LockedQuantity = 0,
-            Notional = trade.Quantity * trade.Price,
-            StartNotional = trade.Quantity * trade.Price,
-            RealizedPnl = 0,
-
-            StartOrderId = trade.OrderId,
-            StartTradeId = trade.Id,
-            EndOrderId = 0,
-            EndTradeId = 0,
-        };
-
-        return position;
     }
 
     public void Apply(Position position, Trade trade)
@@ -268,7 +249,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
         position.Notional = notional;
         position.Quantity = quantity;
-        position.Price = notional / quantity;
+        position.Price = quantity == 0 ? 0 : notional / quantity;
         position.AccumulatedFee += trade.Fee;
 
         if (quantity == 0)
@@ -286,22 +267,19 @@ public class PortfolioService : IPortfolioService, IDisposable
         if (position.SecurityCode.IsBlank()) throw Exceptions.InvalidPosition(position.Id, "missing security code");
         if (_context.Account == null) throw Exceptions.MustLogin();
 
-        var secId = securityOverride?.Id ?? position.SecurityId;
-        var security = _securityService.GetSecurity(secId);
-
         return new Order
         {
             Id = _orderIdGenerator.NewTimeBasedId,
             CreateTime = DateTime.UtcNow,
             UpdateTime = DateTime.UtcNow,
-            Quantity = position.Quantity,
+            Quantity = Math.Abs(position.Quantity),
             Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
             Type = OrderType.Market,
             TimeInForce = TimeInForceType.GoodTillCancel,
             Status = OrderStatus.Sending,
 
             AccountId = _context.AccountId,
-            ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId, // this is a temp one, should be updated later
+            ExternalOrderId = 0, // this is a temp one, should be updated later
             FilledQuantity = 0,
             ExternalCreateTime = DateTime.MinValue,
             ExternalUpdateTime = DateTime.MinValue,
@@ -309,9 +287,9 @@ public class PortfolioService : IPortfolioService, IDisposable
             Price = 0,
             StopPrice = 0,
 
-            Security = security,
-            SecurityId = secId,
-            SecurityCode = security.Code,
+            Security = position.Security,
+            SecurityId = position.SecurityId,
+            SecurityCode = position.SecurityCode,
         };
     }
 
@@ -321,6 +299,8 @@ public class PortfolioService : IPortfolioService, IDisposable
         var positions = Portfolio.Positions.ThreadSafeValues(_lock);
         foreach (var position in positions)
         {
+            if (position.IsClosed) continue;
+
             var order = CreateCloseOrder(position);
             await _orderService.SendOrder(order);
         }
@@ -390,6 +370,54 @@ public class PortfolioService : IPortfolioService, IDisposable
     //    position.Price = newPrice;
     //    position.RealizedPnl += newPnl;
     //}
+
+    public void Update(List<Position> positions, bool isInitializing = false)
+    {
+        if (isInitializing)
+        {
+            InitialPortfolio.Positions.Clear();
+            Portfolio.Positions.Clear();
+        }
+
+        foreach (var position in positions)
+        {
+            if (!_securityService.Fix(position))
+            {
+                continue;
+            }
+            if (position.IsClosed)
+            {
+                _closedPositions[position.Id] = position;
+            }
+            if (isInitializing)
+            {
+                InitialPortfolio.Positions[position.Id] = position;
+            }
+            Portfolio.Positions[position.Id] = position;
+        }
+    }
+
+    public void Update(List<Asset> assets, bool isInitializing = false)
+    {
+        if (isInitializing)
+        {
+            InitialPortfolio.Assets.Clear();
+            Portfolio.Assets.Clear();
+        }
+        foreach (var asset in assets)
+        {
+            if (!_securityService.Fix(asset))
+            {
+                continue;
+            }
+            asset.AccountId = _context.AccountId;
+            if (isInitializing)
+            {
+                InitialPortfolio.Assets[asset.Id] = asset;
+            }
+            Portfolio.Assets[asset.Id] = asset;
+        }
+    }
 
     public void Dispose()
     {
@@ -504,35 +532,70 @@ public class PortfolioService : IPortfolioService, IDisposable
         throw Exceptions.MissingAsset(assetId);
     }
 
-    public Position? Reconcile(List<Trade> trades, Position? position = null)
+    public Position CreateOrUpdate(Trade trade, Position? existing = null)
+    {
+        if (existing == null)
+            existing = Position.Create(trade);
+        else
+            Apply(existing, trade);
+        if (existing == null) throw Exceptions.Impossible();
+
+        if (!existing.IsClosed)
+        {
+            InitialPortfolio.Positions[existing.Id] = existing;
+            Portfolio.Positions[existing.Id] = existing;
+        }
+        else
+        {
+            existing.EndOrderId = trade.OrderId;
+            existing.EndTradeId = trade.Id;
+            existing.CloseTime = trade.Time;
+        }
+        _persistence.Enqueue(existing);
+        PositionCreated?.Invoke(existing!);
+        return existing;
+    }
+
+    public Position? CreateOrUpdate(List<Trade> trades, Position? existing = null)
     {
         if (trades.IsNullOrEmpty())
         {
-            return position;
+            return existing;
         }
 
+        var groups = trades.GroupBy(t => t.SecurityId);
+
+        foreach (var groupOfTrades in groups)
+        {
+            if (existing != null && existing.SecurityId == groupOfTrades.Key)
+            {
+
+            }
+        }
         foreach (var trade in trades)
         {
-            if (position == null)
-                position = Create(trade);
+            if (existing == null)
+                existing = Position.Create(trade);
             else
-                Apply(position, trade);
+                Apply(existing, trade);
         }
-        if (position == null) throw Exceptions.Impossible();
+        if (existing == null) throw Exceptions.Impossible();
 
-        InitialPortfolio.Positions[position.Id] = position;
-        Portfolio.Positions[position.Id] = position;
+        if (!existing.IsClosed)
+        {
+            InitialPortfolio.Positions[existing.Id] = existing;
+            Portfolio.Positions[existing.Id] = existing;
+        }
+        else
+        {
+            var lastTrade = trades.Last();
+            existing.EndOrderId = lastTrade.OrderId;
+            existing.EndTradeId = lastTrade.Id;
+            existing.CloseTime = lastTrade.Time;
+        }
+        _persistence.Enqueue(existing);
 
-        _openPositionsBySecurityId.ThreadSafeSet(position!.SecurityId, position, _lock);
-        _persistence.Enqueue(position);
-
-        PositionCreated?.Invoke(position!);
-        return position;
-    }
-
-    private void Persist(Position position)
-    {
-        if (position?.Security == null) throw Exceptions.InvalidPosition(position?.Id, "Missing position or invalid security.");
-        _persistence.Enqueue(position);
+        PositionCreated?.Invoke(existing!);
+        return existing;
     }
 }

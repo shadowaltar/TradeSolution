@@ -5,6 +5,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -55,6 +56,7 @@ public interface IStorage
     Task<List<Trade>> ReadTrades(Security security, long orderId);
     Task<List<Position>> ReadPositions(Account account);
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
+    Task<List<PositionReconciliationRecord>> ReadPositionReconciliationRecords(List<int> securityIds);
     Task UpsertFxDefinitions(List<Security> entries);
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);

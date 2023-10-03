@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
@@ -15,28 +14,13 @@ namespace TradeCommon.Essentials.Trading;
 [Unique(nameof(ExternalTradeId))]
 [Index(nameof(SecurityId))]
 [Storage("trades", "execution")]
-public class Trade : IComparable<Trade>, ITimeBasedUniqueIdEntry, ISecurityRelatedEntry
+public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUniqueIdEntry
 {
     /// <summary>
     /// Unique trade id.
     /// </summary>
     [NotNull]
     public long Id { get; set; } = 0;
-
-    /// <summary>
-    /// Security id.
-    /// </summary>
-    [NotNull]
-    public int SecurityId { get; set; } = 0;
-
-    /// <summary>
-    /// Security code (will not be saved to database).
-    /// </summary>
-    [DatabaseIgnore]
-    public string SecurityCode { get; set; }
-
-    [DatabaseIgnore]
-    public Security Security { get; set; }
 
     /// <summary>
     /// The order id associated with this trade.
@@ -55,6 +39,12 @@ public class Trade : IComparable<Trade>, ITimeBasedUniqueIdEntry, ISecurityRelat
     /// </summary>
     [NotNull]
     public long ExternalOrderId { get; set; } = 0;
+
+    /// <summary>
+    /// The related position's Id.
+    /// </summary>
+    [NotNull]
+    public long PositionId { get; set; } = 0;
 
     /// <summary>
     /// Trade execution time.
@@ -125,6 +115,12 @@ public class Trade : IComparable<Trade>, ITimeBasedUniqueIdEntry, ISecurityRelat
         if (r != 0) r = AccountId.CompareTo(trade?.AccountId);
         if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);
         return r;
+    }
+
+    public bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    {
+        if (other is not Trade trade) return false;
+        return CompareTo(trade) == 0;
     }
 
     public override string ToString()

@@ -4,13 +4,13 @@ namespace TradeCommon.Utils;
 
 public class Sorters
 {
-    public static IComparer<ISecurityRelatedEntry> CodeSorter { get; } = new CodeSorterImpl();
-    public static IComparer<ISecurityRelatedEntry> IdSorter { get; } = new IdSorterImpl();
+    public static IComparer<SecurityRelatedEntry> CodeSorter { get; } = new CodeSorterImpl();
+    public static IComparer<SecurityRelatedEntry> IdSorter { get; } = new IdSorterImpl();
     public static IComparer<ITimeRelatedEntry> CreateTimeSorter { get; } = new CreateTimeSorterImpl();
 
-    public class CodeSorterImpl : IComparer<ISecurityRelatedEntry>
+    public class CodeSorterImpl : IComparer<SecurityRelatedEntry>
     {
-        public int Compare(ISecurityRelatedEntry? x, ISecurityRelatedEntry? y)
+        public int Compare(SecurityRelatedEntry? x, SecurityRelatedEntry? y)
         {
             if (x == null && y == null) return 0;
             if (x == null) return -1;
@@ -18,9 +18,9 @@ public class Sorters
             return x.SecurityCode.CompareTo(y.SecurityCode);
         }
     }
-    public class IdSorterImpl : IComparer<ISecurityRelatedEntry>
+    public class IdSorterImpl : IComparer<SecurityRelatedEntry>
     {
-        public int Compare(ISecurityRelatedEntry? x, ISecurityRelatedEntry? y)
+        public int Compare(SecurityRelatedEntry? x, SecurityRelatedEntry? y)
         {
             if (x == null && y == null) return 0;
             if (x == null) return -1;

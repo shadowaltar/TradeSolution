@@ -47,7 +47,7 @@ public class AccountManager : IExternalAccountManagement
     /// If a list of asset is provided, the assets will be created too.
     /// </summary>
     /// <returns></returns>
-    public async Task<ExternalQueryState> GetAccount(List<Security>? assets = null)
+    public async Task<ExternalQueryState> GetAccount()
     {
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/account";

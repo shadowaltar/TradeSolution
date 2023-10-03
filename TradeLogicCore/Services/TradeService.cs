@@ -3,6 +3,7 @@ using log4net;
 using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
@@ -77,10 +78,16 @@ public class TradeService : ITradeService, IDisposable
     {
         InternalOnNextTrade(trade);
         UpdateTradeByOrderId(trade);
-        //UpdateOrderFilledPrice(trade.OrderId);
-
+        UpdatePositionId(trade);
         NextTrade?.Invoke(trade);
-        Persist(trade);
+        _persistence.Enqueue(trade);
+    }
+
+    private void UpdatePositionId(Trade trade)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(trade.SecurityId)
+            ?? _context.Services.Portfolio.CreateOrUpdate(trade);
+        trade.PositionId = position.Id;
     }
 
     private void OnTradesReceived(List<Trade> trades)
@@ -90,16 +97,8 @@ public class TradeService : ITradeService, IDisposable
             InternalOnNextTrade(trade);
         }
         UpdateTradesByOrderId(trades);
-        //foreach (var orderId in trades.Select(t => t.OrderId))
-        //{
-        //    UpdateOrderFilledPrice(orderId);
-        //}
-
         NextTrades?.Invoke(trades);
-        foreach (var trade in trades)
-        {
-            Persist(trade);
-        }
+        _persistence.Enqueue(trades);
     }
 
     private void InternalOnNextTrade(Trade trade)
@@ -136,9 +135,23 @@ public class TradeService : ITradeService, IDisposable
             trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
         }
         trade.SecurityId = order.SecurityId;
+        trade.Security = order.Security;
         trade.OrderId = order.Id;
         _trades.ThreadSafeSet(trade.Id, trade);
         _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
+
+        if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var ts))
+        {
+            ts = _tradesByOrderId.GetOrCreate(order.Id);
+            ts.Add(trade);
+        }
+
+        // try to find related position id, if not exist, create one immediately
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(trade.SecurityId);
+        if (position == null)
+        {
+            // 
+        }
     }
 
     public void Dispose()
@@ -262,29 +275,7 @@ public class TradeService : ITradeService, IDisposable
                 trade.FeeAssetCode = _assetsById.ThreadSafeTryGet(trade.FeeAssetId, out var asset) ? asset.Code : "";
             }
 
-            if (trade.SecurityId <= 0 || trade.SecurityCode.IsNullOrEmpty() || trade.Security == null)
-            {
-                if (security == null)
-                {
-                    if (!trade.SecurityCode.IsNullOrEmpty())
-                    {
-                        security = _securityService.GetSecurity(trade.SecurityCode!) ?? throw Exceptions.MissingSecurity();
-                    }
-                    else if (trade.SecurityId > 0)
-                    {
-                        security = AsyncHelper.RunSync(() => _securityService.GetSecurity(trade.SecurityId)) ?? throw Exceptions.MissingSecurity();
-                    }
-                    else if (trade.Security != null)
-                    {
-                        security = trade.Security;
-                    }
-                    if (security == null)
-                        throw Exceptions.MissingSecurity();
-                }
-                trade.SecurityId = security.Id;
-                trade.SecurityCode = security.Code;
-                trade.Security = security;
-            }
+            if (!_securityService.Fix(trade, security)) continue;
 
             _trades.ThreadSafeSet(trade.Id, trade);
             _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
@@ -336,10 +327,5 @@ public class TradeService : ITradeService, IDisposable
             return;
 
         _orderService.Persist(order);
-    }
-
-    private void Persist(Trade trade)
-    {
-        _persistence.Enqueue(trade);
     }
 }

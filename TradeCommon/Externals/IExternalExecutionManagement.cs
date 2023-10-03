@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using static TradeCommon.Utils.Delegates;
@@ -50,4 +51,11 @@ public interface IExternalExecutionManagement
                                        long oldestExternalOrderId = long.MinValue,
                                        DateTime? start = null,
                                        DateTime? end = null);
+
+    /// <summary>
+    /// Get the asset positions related to an account.
+    /// </summary>
+    /// <param name="account"></param>
+    /// <returns></returns>
+    Task<ExternalQueryState> GetAssetPositions(string accountId);
 }
