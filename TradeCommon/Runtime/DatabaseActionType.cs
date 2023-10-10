@@ -1,9 +1,11 @@
 ﻿namespace TradeCommon.Runtime;
 public enum DatabaseActionType
 {
-    Create,
+    Unknown,
+    Insert,
     Read,
     Update,
-    Delete
+    Upsert,
+    Delete,
 }
 

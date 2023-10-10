@@ -11,13 +11,13 @@ public interface IEnterPositionAlgoLogic
 
     ITransactionFeeLogic? FeeLogic { get; set; }
 
-    Task<List<ExternalQueryState>> Open(AlgoEntry current,
-                                        AlgoEntry? last,
-                                        decimal enterPrice,
-                                        Side side,
-                                        DateTime enterTime,
-                                        decimal stopLossPrice,
-                                        decimal takeProfitPrice);
+    Task<ExternalQueryState> Open(AlgoEntry current,
+                                  AlgoEntry? last,
+                                  decimal enterPrice,
+                                  Side side,
+                                  DateTime enterTime,
+                                  decimal stopLossPrice,
+                                  decimal takeProfitPrice);
 
     void BackTestOpen(AlgoEntry current,
                       AlgoEntry? last,

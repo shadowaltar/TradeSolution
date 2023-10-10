@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Attributes;
+using TradeCommon.Calculations;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -16,17 +18,13 @@ namespace TradeCommon.Essentials.Portfolios;
 /// </summary>
 [Storage("positions", DatabaseNames.ExecutionData)]
 [Unique(nameof(Id))]
+[Unique(nameof(StartOrderId), nameof(StartTradeId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
-public sealed record Position : Asset, IComparable<Position>
+public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 {
     [DatabaseIgnore]
-    private static readonly IdGenerator _positionIdGenerator;
-
-    static Position()
-    {
-        _positionIdGenerator = IdGenerators.Get<Position>();
-    }
+    private static readonly IdGenerator _positionIdGenerator = IdGenerators.Get<Position>();
 
     /// <summary>
     /// The time which the position is fully closed.
@@ -42,23 +40,69 @@ public sealed record Position : Asset, IComparable<Position>
 
     /// <summary>
     /// The notional amount of this position, which is price * quantity.
+    /// It is also the gross pnl (unrealized if quantity != 0, otherwise realized).
     /// </summary>
     public decimal Notional { get; set; }
 
     /// <summary>
-    /// The beginning notional amount.
+    /// The intended entering side.
     /// </summary>
-    public decimal StartNotional { get; set; }
+    public Side Side { get; set; }
 
     /// <summary>
-    /// Realized pnl, which is the sum of all realized pnl from each closed trades.
+    /// All the long trades' sum of quantity.
     /// </summary>
-    public decimal RealizedPnl { get; set; }
+    public decimal LongQuantity { get; set; }
 
+    /// <summary>
+    /// All the short trades' sum of quantity.
+    /// </summary>
+    public decimal ShortQuantity { get; set; }
+
+    /// <summary>
+    /// All the long trades' weighted average price.
+    /// </summary>
+    public decimal LongPrice { get; set; }
+
+    /// <summary>
+    /// All the short trades' weighted average price.
+    /// </summary>
+    public decimal ShortPrice { get; set; }
+
+    /// <summary>
+    /// All the long trades' notional amount.
+    /// </summary>
+    public decimal LongNotional { get; set; }
+
+    /// <summary>
+    /// All the short trades' notional amount.
+    /// </summary>
+    public decimal ShortNotional { get; set; }
+
+    /// <summary>
+    /// First order's id when the position is opened.
+    /// </summary>
     public long StartOrderId { get; set; }
+
+    /// <summary>
+    /// Last order's id when the position is closed.
+    /// </summary>
     public long EndOrderId { get; set; }
+
+    /// <summary>
+    /// First trade's id when the position is opened.
+    /// </summary>
     public long StartTradeId { get; set; }
+
+    /// <summary>
+    /// Last trade's id when the position is closed.
+    /// </summary>
     public long EndTradeId { get; set; }
+
+    /// <summary>
+    /// Count of trades in this position.
+    /// </summary>
+    public int TradeCount { get; set; }
 
     public decimal AccumulatedFee { get; set; }
 
@@ -69,65 +113,31 @@ public sealed record Position : Asset, IComparable<Position>
     [DatabaseIgnore]
     public bool IsClosed => Quantity == 0;
 
-    public int CompareTo(Position? other)
+    /// <summary>
+    /// Apply a trade to this position.
+    /// If the position is closed after applied, returns true.
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <returns></returns>
+    public bool Apply(Trade trade)
     {
-        if (other == null) return 1;
-        var r = base.CompareTo(other);
-        if (r != 0) r = CloseTime.CompareTo(other.CloseTime);
-        if (r != 0) r = Price.CompareTo(other.Price);
-        if (r != 0) r = Notional.CompareTo(other.Notional);
-        if (r != 0) r = StartNotional.CompareTo(other.StartNotional);
-        if (r != 0) r = RealizedPnl.CompareTo(other.RealizedPnl);
-        if (r != 0) r = StartOrderId.CompareTo(other.StartOrderId);
-        if (r != 0) r = EndOrderId.CompareTo(other.EndOrderId);
-        if (r != 0) r = StartTradeId.CompareTo(other.StartTradeId);
-        if (r != 0) r = EndTradeId.CompareTo(other.EndTradeId);
-        if (r != 0) r = AccumulatedFee.CompareTo(other.AccumulatedFee);
-        return r;
-    }
+        if (trade.SecurityId != SecurityId || trade.AccountId != AccountId)
+            throw Exceptions.InvalidTradePositionCombination("The trade does not belong to the ");
 
-    public override bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
-    {
-        if (other is not Position position) return false;
-        return CompareTo(position) == 0;
-    }
+        trade.ApplyTo(this);
 
-    public bool Equals(Position? obj)
-    {
-        if (!base.Equals(obj))
-            return false;
+        UpdateTime = trade.Time;
+        TradeCount++;
+        AccumulatedFee += trade.Fee;
 
-        if (CloseTime == obj.CloseTime
-            && Price == obj.Price
-            && Notional == obj.Notional
-            && StartNotional == obj.StartNotional
-            && StartOrderId == obj.StartOrderId
-            && EndOrderId == obj.EndOrderId
-            && StartTradeId == obj.StartTradeId
-            && EndTradeId == obj.EndTradeId
-            && AccumulatedFee == obj.AccumulatedFee)
+        if (IsClosed)
+        {
+            EndOrderId = trade.OrderId;
+            EndTradeId = trade.Id;
+            CloseTime = trade.Time;
             return true;
+        }
         return false;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(base.GetHashCode(),
-                                CloseTime,
-                                Price,
-                                Notional,
-                                StartNotional,
-                                StartOrderId,
-                                EndOrderId,
-                                HashCode.Combine(StartTradeId,
-                                EndTradeId,
-                                AccumulatedFee));
-    }
-
-    public override string ToString()
-    {
-        return $"[{Id}][{CreateTime:yyMMdd-HHmmss}][{(CloseTime==DateTime.MaxValue? "": CloseTime.ToString("yyMMdd-HHmmss"))}]" +
-            $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
     }
 
     /// <summary>
@@ -150,19 +160,166 @@ public sealed record Position : Asset, IComparable<Position>
             UpdateTime = trade.Time,
             CloseTime = DateTime.MaxValue,
 
+            Side = trade.Side,
+
             Quantity = trade.Quantity,
             Price = trade.Price,
-            LockedQuantity = 0,
             Notional = trade.Quantity * trade.Price,
-            StartNotional = trade.Quantity * trade.Price,
-            RealizedPnl = 0,
+
+            LongQuantity = trade.Side == Side.Buy ? trade.Quantity : 0,
+            LongPrice = trade.Side == Side.Buy ? trade.Price : 0,
+            LongNotional = trade.Side == Side.Buy ? trade.Quantity * trade.Price : 0,
+
+            ShortQuantity = trade.Side == Side.Sell ? trade.Quantity : 0,
+            ShortPrice = trade.Side == Side.Sell ? trade.Price : 0,
+            ShortNotional = trade.Side == Side.Sell ? trade.Quantity * trade.Price : 0,
+
+            LockedQuantity = 0,
 
             StartOrderId = trade.OrderId,
             StartTradeId = trade.Id,
             EndOrderId = 0,
             EndTradeId = 0,
+
+            TradeCount = 1,
+            AccumulatedFee = trade.Fee,
         };
 
         return position;
+    }
+
+    public static IEnumerable<Position> CreateOrApply(List<Trade> trades, Position? position = null)
+    {
+        if (trades.IsNullOrEmpty())
+        {
+            if (position != null)
+            {
+                yield return position;
+            }
+            yield break;
+        }
+
+        foreach (var trade in trades)
+        {
+            if (position == null)
+            {
+                position = Create(trade);
+                trade.PositionId = position.Id;
+            }
+            else
+            {
+                var isClosed = position.Apply(trade);
+                trade.PositionId = position.Id;
+                if (isClosed)
+                {
+                    yield return position;
+                    position = null;
+                }
+            }
+        }
+        if (position != null)
+            yield return position;
+    }
+
+    /// <summary>
+    /// Create a new position, or apply the trade and change the internal
+    /// state of given position.
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public static Position? CreateOrApply(Trade trade, Position? position = null)
+    {
+        if (position == null)
+        {
+            position = Create(trade);
+        }
+        else
+        {
+            position.Apply(trade);
+        }
+        trade.PositionId = position.Id;
+        return position;
+    }
+
+    public PositionRecord CreateRecord()
+    {
+        return new PositionRecord
+        {
+            EndTime = UpdateTime,
+            PositionId = Id,
+            SecurityId = SecurityId,
+            TradeCount = TradeCount,
+            IsClosed = IsClosed,
+        };
+    }
+
+    public int CompareTo(Position? other)
+    {
+        if (other == null) return 1;
+        var r = base.CompareTo(other);
+        if (r != 0) r = CloseTime.CompareTo(other.CloseTime);
+
+        if (r != 0) r = Price.CompareTo(other.Price);
+        if (r != 0) r = Notional.CompareTo(other.Notional);
+
+        if (r != 0) r = LongQuantity.CompareTo(other.LongQuantity);
+        if (r != 0) r = LongPrice.CompareTo(other.LongPrice);
+        if (r != 0) r = LongNotional.CompareTo(other.LongNotional);
+        if (r != 0) r = ShortQuantity.CompareTo(other.ShortQuantity);
+        if (r != 0) r = ShortPrice.CompareTo(other.ShortPrice);
+        if (r != 0) r = ShortNotional.CompareTo(other.ShortNotional);
+
+        if (r != 0) r = StartOrderId.CompareTo(other.StartOrderId);
+        if (r != 0) r = EndOrderId.CompareTo(other.EndOrderId);
+        if (r != 0) r = StartTradeId.CompareTo(other.StartTradeId);
+        if (r != 0) r = EndTradeId.CompareTo(other.EndTradeId);
+
+        if (r != 0) r = TradeCount.CompareTo(other.TradeCount);
+
+        if (r != 0) r = AccumulatedFee.CompareTo(other.AccumulatedFee);
+        return r;
+    }
+
+    public override bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    {
+        if (other is not Position position) return false;
+        return CompareTo(position) == 0;
+    }
+
+    public bool Equals(Position? obj)
+    {
+        if (!base.Equals(obj))
+            return false;
+
+        return CompareTo(obj) == 0;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(base.GetHashCode(),
+                                CloseTime,
+                                HashCode.Combine(
+                                Price,
+                                Notional,
+                                LongPrice,
+                                LongQuantity,
+                                LongNotional,
+                                ShortPrice,
+                                ShortQuantity,
+                                ShortNotional),
+                                HashCode.Combine(
+                                StartOrderId,
+                                EndOrderId,
+                                StartTradeId,
+                                EndTradeId,
+                                TradeCount,
+                                AccumulatedFee));
+    }
+
+    public override string ToString()
+    {
+        return $"[{Id}][{CreateTime:yyMMdd-HHmmss}][{(CloseTime == DateTime.MaxValue ? "" : CloseTime.ToString("yyMMdd-HHmmss"))}]" +
+            $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
     }
 }

@@ -1,5 +1,6 @@
 ﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
+using static TradeCommon.Utils.Delegates;
 
 namespace TradeLogicCore.Services;
 
@@ -8,14 +9,15 @@ public interface ITradeService
     /// <summary>
     /// Event invoked when a single trade is received.
     /// </summary>
-    event Action<Trade>? NextTrade;
+    event TradeReceivedCallback? NextTrade;
 
     /// <summary>
     /// Event invoked when a list of trades are received simultaneously.
     /// For example, an order matches multiple depths in an order book
     /// will result in multiple trades.
+    /// The bool flag indicates whether all trades are of the same security.
     /// </summary>    
-    event Action<List<Trade>>? NextTrades;
+    event TradesReceivedCallback? NextTrades;
 
     void Initialize();
 
@@ -26,6 +28,10 @@ public interface ITradeService
     /// <returns></returns>
     Task<List<Trade>> GetMarketTrades(Security security);
 
+    Task<List<Trade>> GetExternalTrades(Security security, DateTime? start = null, DateTime? end = null);
+    
+    Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null);
+
     /// <summary>
     /// Get the executed trades for a given security.
     /// </summary>
@@ -34,7 +40,7 @@ public interface ITradeService
     /// <param name="end"></param>
     /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Trade>> GetTrades(Security security, DateTime? start = null, DateTime? end = null, bool requestExternal = false);
+    List<Trade> GetTrades(Security security, DateTime? start = null, DateTime? end = null);
 
     /// <summary>
     /// Get the trades related to an order.
@@ -51,7 +57,6 @@ public interface ITradeService
     /// <param name="orderId"></param>
     /// <returns></returns>
     List<Trade> GetTrades(long orderId);
-    Task CloseAllPositions(Security security);
 
     /// <summary>
     /// Update the internal state.

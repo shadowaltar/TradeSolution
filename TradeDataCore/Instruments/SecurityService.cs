@@ -245,7 +245,7 @@ public class SecurityService : ISecurityService
             {
                 if (!security.Currency.IsBlank())
                 {
-                    security.CurrencyAsset = fxSecurities!.GetOrDefault(security.Currency)
+                    security.QuoteSecurity = fxSecurities!.GetOrDefault(security.Currency)
                         ?? throw Exceptions.InvalidSecurity(security.Currency, "Cannot find currency asset code from existed fx entries.");
                 }
                 if (security.FxInfo != null)
@@ -257,7 +257,7 @@ public class SecurityService : ISecurityService
                     if (!security.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.QuoteCurrency, out var quoteAsset))
                     {
                         security.FxInfo.QuoteAsset = quoteAsset;
-                        security.CurrencyAsset = quoteAsset;
+                        security.QuoteSecurity = quoteAsset;
                         security.Currency = security.FxInfo.QuoteCurrency;
                     }
                     if (security.FxInfo.IsAsset)
@@ -266,7 +266,7 @@ public class SecurityService : ISecurityService
                         // no base asset
                         security.FxInfo.BaseAsset = null;
                         security.FxInfo.QuoteAsset = security;
-                        security.CurrencyAsset = security;
+                        security.QuoteSecurity = security;
                         security.Currency = security.Code;
                     }
                 }

@@ -35,11 +35,17 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     private readonly IdGenerator _tradeIdGenerator;
     private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
 
-    private static readonly Dictionary<OrderType, string> _orderTypeToParameters = new() {
+    private readonly MessageBroker<EventInvokerTask> _broker = new();
+
+    private static readonly Dictionary<OrderType, string> _orderTypeToParameters = new()
+    {
         { OrderType.Limit, "LIMIT" }, { OrderType.Market, "MARKET" },
         { OrderType.Stop, "STOP_LOSS" }, { OrderType.StopLimit, "STOP_LOSS_LIMIT" },
         { OrderType.TakeProfit, "TAKE_PROFIT" }, { OrderType.TakeProfitLimit, "TAKE_PROFIT_LIMIT" },
     };
+
+    private bool _canSendEvent = true;
+    private readonly object _sendEventLock = new();
 
     private string? _listenKey;
     private Timer? _listenKeyTimer;
@@ -54,7 +60,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     public event TradeReceivedCallback? TradeReceived;
     public event TradesReceivedCallback? TradesReceived;
 
-    public event BalanceChangedCallback? BalancesChanged;
+    public event AssetsChangedCallback? AssetsChanged;
     public event TransferredCallback? Transferred;
 
     public Execution(IExternalConnectivityManagement connectivity,
@@ -63,11 +69,12 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                      KeyManager keyManager)
     {
         _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
-        _httpClient.Timeout = TimeSpans.FiveSeconds;
 
         _connectivity = connectivity;
         _context = context;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
+        _broker.NewItem += a => a.Run();
+
         _cancelIdGenerator = new IdGenerator("CancelOrderIdGen");
         _tradeIdGenerator = new IdGenerator("TradeIdGen");
     }
@@ -133,17 +140,20 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             order.Status = OrderStatus.UnknownResponse;
             return ExternalQueryStates.Error(ActionType.SendOrder, ResultCode.SendOrderFailed, content, connId, errorMessage);
         }
+        isOk = true;
         // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
         var trades = new List<Trade>();
-        Parse(jsonNode, order, trades); // will change the order status accordingly
 
+        Parse(jsonNode, order, trades); // will change the order status accordingly
         var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
 
-        // raise events
-        OrderPlaced?.Invoke(order.IsSuccessful, state);
-        if (!trades.IsNullOrEmpty())
-            TradesReceived?.Invoke(trades);
-
+        // raise events, and prevent other places to invoke events
+        _broker.Enqueue(new EventInvokerTask(() =>
+        {
+            OrderPlaced?.Invoke(order.IsSuccessful, state);
+            if (!trades.IsNullOrEmpty())
+                TradesReceived?.Invoke(trades, true);
+        }));
         return state;
 
         void Parse(JsonObject json, Order order, List<Trade> trades)
@@ -161,6 +171,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             order.ExternalUpdateTime = json.GetUtcFromUnixMs("workingTime");
             order.Price = json.GetDecimal("price"); // need trades to get the price if type = MARKET
             order.UpdateTime = DateUtils.Max(order.ExternalCreateTime, order.ExternalUpdateTime);
+
             var fillsObj = json["fills"]?.AsArray();
             if (fillsObj != null && fillsObj.Count != 0)
             {
@@ -188,6 +199,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         FeeAssetCode = item.GetString("commissionAsset"),
                         FeeAssetId = 0, // cannot be determined until executing in service layer logic
                         Time = order.ExternalUpdateTime,
+                        PositionId = 0 // TODO
                     };
                     trades.Add(trade);
                     averagePrice = (averagePrice * tradedQuantity + trade.Price * trade.Quantity) / (tradedQuantity + trade.Quantity);
@@ -688,7 +700,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
             // mark the retrieved listen-key, and automatically ping it for aliveness
             _listenKey = jsonNode.GetString("listenKey");
-            _listenKeyTimer = new Timer(SendHeartbeat, null, 0, TimeSpan.FromMinutes(1).Milliseconds);
+            _listenKeyTimer = new Timer(SendHeartbeat, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
 
             // subscribe to the listen key in order to listen to order/trade/account changes
             Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={_listenKey}");
@@ -870,7 +882,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             };
                             assets.Add(asset);
                         }
-                        BalancesChanged?.Invoke(assets);
+                        AssetsChanged?.Invoke(assets);
                     }
                     break;
                 case "balanceUpdate": // asset changes due to deposit or withdrawal or fund transfer
@@ -950,13 +962,12 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         StopPrice = stopPrice,
                         StrategyId = strategyId,
                     };
-                    OrderReceived?.Invoke(order);
-
+                    Trade? trade = null;
                     // if a trade is generated
                     if (externalTradeId > 0)
                     {
                         // TODO probably use lastExecQty
-                        var trade = new Trade
+                        trade = new Trade
                         {
                             Id = _tradeIdGenerator.NewTimeBasedId,
                             ExternalOrderId = externalOrderId,
@@ -973,9 +984,17 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             Price = 0, // TODO
                             Quantity = 0, // TODO
                             Time = updateTime, // TODO
+                            PositionId = 0, // TODO
+                            Security = null, // TODO
                         };
-                        TradeReceived?.Invoke(trade);
                     }
+
+                    _broker.Enqueue(new EventInvokerTask(() =>
+                    {
+                        OrderReceived?.Invoke(order);
+                        if (trade != null)
+                            TradeReceived?.Invoke(trade);
+                    }));
 
                     break;
                 default:
@@ -1004,6 +1023,21 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         catch (TimeoutException te)
         {
             _log.Error($"Heartbeat request for listen-key {_listenKey} timed out.", te);
+        }
+    }
+
+    private class EventInvokerTask
+    {
+        private readonly Action _action;
+
+        public EventInvokerTask(Action action)
+        {
+            _action = action;
+        }
+
+        public void Run()
+        {
+            _action.Invoke();
         }
     }
 }

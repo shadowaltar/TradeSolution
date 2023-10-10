@@ -1,4 +1,5 @@
 ﻿using log4net;
+using TradeCommon.Essentials.Instruments;
 
 namespace Common;
 public static class Utils
@@ -33,5 +34,12 @@ public static class Utils
             }
         }
         return default;
+    }
+
+    public static bool IsValid(this Security? security)
+    {
+        if (security == null) return false;
+        if (!security.Id.IsValid() || security.Code.IsBlank()) return false;
+        return true;
     }
 }

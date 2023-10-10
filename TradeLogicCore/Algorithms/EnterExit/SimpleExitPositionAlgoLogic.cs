@@ -4,6 +4,7 @@ using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Services;
 
@@ -78,6 +79,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             Security = current.Security,
             SecurityId = current.Security.Id,
             SecurityCode = current.Security.Code,
+            Comment = Comments.AlgoExit,
         };
         return await _orderService.SendOrder(order);
     }

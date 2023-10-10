@@ -6,11 +6,6 @@ using TradeCommon.Runtime;
 namespace TradeLogicCore.Algorithms.Parameters;
 
 public record AlgorithmParameters(bool IsBackTesting,
-                                  string UserName,
-                                  string AccountName,
-                                  EnvironmentType Environment,
-                                  ExchangeType Exchange,
-                                  BrokerType Broker,
                                   IntervalType Interval,
                                   List<Security> SecurityPool,
                                   AlgoEffectiveTimeRange TimeRange)

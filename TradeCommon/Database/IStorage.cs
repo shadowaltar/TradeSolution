@@ -33,10 +33,15 @@ public interface IStorage
     Task CreateUserTable();
     Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null) where T : class;
     Task DeleteOpenOrderId(OpenOrderId openOrderId);
-    Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new();
-    Task<int> InsertOne<T>(T entry, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new();
+    Task<int> MoveToError<T>(T entry) where T : SecurityRelatedEntry, new();
+
+    Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null) where T : class, new();
+    Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null) where T : class, new();
     Task<int> Insert(PersistenceTask task);
     Task<int> Insert<T>(PersistenceTask task) where T : class, new();
+    Task<int> Delete(PersistenceTask task);
+    Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
+    Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null) where T : class, new();
     Task<Account?> ReadAccount(string accountName, EnvironmentType environment);
     Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
     Task<List<Asset>> ReadAssets(int accountId);
@@ -53,10 +58,13 @@ public interface IStorage
     Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);
     Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end);
-    Task<List<Trade>> ReadTrades(Security security, long orderId);
-    Task<List<Position>> ReadPositions(Account account);
+    Task<List<Trade>> ReadTrades(Security security, long smallestPositionId);
+    Task<List<Trade>> ReadTradesByOrderId(Security security, long orderId);
+    Task<List<Trade>> ReadTradesByPositionId(Security security, long positionId);
+    Task<Position?> ReadPosition(Security security, long positionId);
+    Task<List<Position>> ReadPositions(Account account, DateTime start, bool isOpenedOnly = false);
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
-    Task<List<PositionReconciliationRecord>> ReadPositionReconciliationRecords(List<int> securityIds);
+    Task<List<PositionRecord>> ReadPositionRecords(List<int> securityIds);
     Task UpsertFxDefinitions(List<Security> entries);
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
@@ -65,6 +73,10 @@ public interface IStorage
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
-    Task<int> Run(string sql, string database);
+    Task<int> RunOne(string sql, string database);
+    Task<int> RunMany(List<string> sqls, string database);
     void PurgeDatabase();
+
+    void RaiseSuccess(object entry, string methodName = "");
+    void RaiseFailed(object entry, Exception e, string methodName = "");
 }

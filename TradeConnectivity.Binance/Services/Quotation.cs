@@ -51,6 +51,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType)
     {
+        // TODO TEMP TEST
+        intervalType = IntervalType.OneSecond;
+
         if (intervalType == IntervalType.Unknown)
         {
             intervalType = IntervalType.OneMinute;

@@ -16,7 +16,7 @@ public class Security
     public string? Currency { get; set; }
 
     [DatabaseIgnore]
-    public Security CurrencyAsset { get; set; }
+    public Security QuoteSecurity { get; set; }
     public string? Cusip { get; set; }
     public string? Isin { get; set; }
     public string? YahooTicker { get; set; }
@@ -36,7 +36,7 @@ public class Security
     [DatabaseIgnore]
     public ExchangeType ExchangeType { get; set; }
 
-    public bool IsAsset => Id == CurrencyAsset.Id;
+    public bool IsAsset => Id == QuoteSecurity.Id;
 
     /// <summary>
     /// Ensure and return the currency/quote asset.
@@ -45,7 +45,7 @@ public class Security
     /// <returns></returns>
     public Security EnsureCurrencyAsset()
     {
-        return CurrencyAsset ?? FxInfo?.QuoteAsset ?? throw Exceptions.MissingQuoteAsset(Code);
+        return QuoteSecurity ?? FxInfo?.QuoteAsset ?? throw Exceptions.MissingQuoteAsset(Code);
     }
 
     public decimal RoundLotSize(decimal proposedQuantity)

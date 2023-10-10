@@ -26,8 +26,10 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public int VersionId => 20230916;
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
-    public decimal StopLossRatio { get; } = 0.02m;
-
+    public decimal LongStopLossRatio { get; } = 0.02m;
+    public decimal LongTakeProfitRatio { get; }
+    public decimal ShortStopLossRatio { get; }
+    public decimal ShortTakeProfitRatio { get; }
     public IPositionSizingAlgoLogic Sizing { get; set; }
     public IEnterPositionAlgoLogic Entering { get; set; }
     public IExitPositionAlgoLogic Exiting { get; set; }
@@ -38,8 +40,10 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public MovingAverageCrossing(Context context,
                                  int fast,
                                  int slow,
-                                 decimal stopLossRatio = decimal.MinValue,
-                                 decimal takeProfitRatio = decimal.MinValue,
+                                 decimal longStopLossRatio = decimal.MinValue,
+                                 decimal longTakeProfitRatio = decimal.MinValue,
+                                 decimal shortStopLossRatio = decimal.MinValue,
+                                 decimal shortTakeProfitRatio = decimal.MinValue,
                                  IPositionSizingAlgoLogic? sizing = null,
                                  ISecurityScreeningAlgoLogic? screening = null,
                                  IEnterPositionAlgoLogic? entering = null,
@@ -51,11 +55,14 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
         Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
-        Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, stopLossRatio, takeProfitRatio);
+        Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, longStopLossRatio, longTakeProfitRatio, shortStopLossRatio, shortTakeProfitRatio);
         FastParam = fast;
         SlowParam = slow;
-        StopLossRatio = stopLossRatio;
-
+        LongStopLossRatio = longStopLossRatio;
+        LongTakeProfitRatio = longTakeProfitRatio;
+        ShortStopLossRatio = shortStopLossRatio;
+        ShortTakeProfitRatio = shortTakeProfitRatio;
+        
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
     }
@@ -190,6 +197,13 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         crossing = 0;
         return false;
     }
+
+    public override string ToString()
+    {
+        return $"Algo - Moving Average Crossing: Fast [{_fastMa.GetType().Name}:{FastParam}], Slow [{_slowMa.GetType().Name}:{SlowParam}]," +
+            $" LongSL% [{LongStopLossRatio}], LongTP% [{LongTakeProfitRatio}]," +
+            $" ShortSL% [{ShortStopLossRatio}], ShortTP% [{ShortTakeProfitRatio}]";
+    }
 }
 
 public record MacVariables : IAlgorithmVariables
@@ -216,4 +230,9 @@ public record MacVariables : IAlgorithmVariables
     /// -1 the other way round. 0 means no crossing after the flag is reset.
     /// </summary>
     public int FastXSlow { get; set; } = 0;
+
+    public override string ToString()
+    {
+        return $"F:{Fast:G4}, S:{Slow:G4}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
+    }
 }

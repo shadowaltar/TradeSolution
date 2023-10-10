@@ -1,13 +1,14 @@
 ﻿using Common;
-using Common.Database;
 using Microsoft.Data.Sqlite;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 
@@ -15,47 +16,55 @@ public partial class Storage
 {
     public async Task<int> Insert(PersistenceTask task)
     {
-        bool isUpsert = task.IsUpsert;
+        int count;
         if (task.Type == typeof(Trade))
         {
-            return await Insert<Trade>(task);
+            count = await Insert<Trade>(task);
         }
-        if (task.Type == typeof(Position))
+        else if (task.Type == typeof(Position))
         {
-            return await Insert<Position>(task);
+            count = await Insert<Position>(task);
         }
-        if (task.Type == typeof(Order))
+        else if (task.Type == typeof(Order))
         {
-            return await Insert<Order>(task);
+            count = await Insert<Order>(task);
         }
-        if (task.Type == typeof(Asset))
+        else if (task.Type == typeof(Asset))
         {
-            return await Insert<Asset>(task);
+            count = await Insert<Asset>(task);
         }
-        if (task.Type == typeof(Account))
+        else if (task.Type == typeof(Account))
         {
-            return await Insert<Account>(task);
+            count = await Insert<Account>(task);
         }
-
-        if (task.Type == typeof(Security))
+        else if (task.Type == typeof(PositionRecord))
         {
-            return await Insert<Security>(task);
+            count = await Insert<PositionRecord>(task);
         }
-        if (task.Type == typeof(FinancialStat))
+        else if (task.Type == typeof(Security))
         {
-            return await Insert<FinancialStat>(task);
+            count = await Insert<Security>(task);
         }
-
-
-        throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
+        else if (task.Type == typeof(FinancialStat))
+        {
+            count = await Insert<FinancialStat>(task);
+        }
+        else
+            throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
+        return count;
     }
 
     public async Task<int> Insert<T>(PersistenceTask task) where T : class, new()
     {
+        if (task.Action != DatabaseActionType.Insert && task.Action != DatabaseActionType.Upsert)
+        {
+            _log.Warn("Invalid db action type.");
+            return 0;
+        }
         var entry = task.GetEntry<T>();
         if (entry != null)
         {
-            var count = await InsertOne(entry, task.IsUpsert, task.TableNameOverride);
+            var count = await InsertOne(entry, task.Action == DatabaseActionType.Upsert);
             _log.Info($"Persisted {count} entry into database: {typeof(T).Name}");
             return count;
         }
@@ -63,29 +72,27 @@ public partial class Storage
         var entries = task.GetEntries<T>();
         if (!entries.IsNullOrEmpty())
         {
-            var count = await InsertMany(entries, task.IsUpsert, task.TableNameOverride);
+            var count = await InsertMany(entries, task.Action == DatabaseActionType.Upsert);
             _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
             return count;
         }
-        throw new InvalidOperationException("Impossible case.");
+        throw Exceptions.Impossible();
     }
 
     public async Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null) where T : class, new()
     {
-        var type = typeof(T);
-        var writer = _writers.GetOrCreate(type.Name, () => new SqlWriter<T>(this), (_, w) => Register(w));
-        var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>(entry);
+        var writer = _writers.Get<T>();
+        var (t, _) = DatabaseNames.GetTableAndDatabaseName(entry);
         return await writer.InsertOne(entry, isUpsert, tableNameOverride ?? t);
     }
 
-    public async Task<int> InsertMany<T>(IList<T> entry, bool isUpsert, string? tableNameOverride = null) where T : class, new()
+    public async Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null) where T : class, new()
     {
-        if (entry.Count == 0)
+        if (entries.Count == 0)
             return 0;
-        var type = typeof(T);
-        var writer = _writers.GetOrCreate(type.Name, () => new SqlWriter<T>(this), (_, w) => Register(w));
-        var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>(entry.First());
-        return await writer.InsertMany(entry, isUpsert, tableNameOverride ?? t);
+        var writer = _writers.Get<T>();
+        var (t, _) = DatabaseNames.GetTableAndDatabaseName(entries.First());
+        return await writer.InsertMany(entries, isUpsert, tableNameOverride ?? t);
     }
 
     public async Task UpsertStockDefinitions(List<Security> entries)
@@ -141,7 +148,8 @@ DO UPDATE SET
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            _log.Info($"Upserted {entries.Count} entries into securities table.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {entries.Count} entries into securities table.");
         }
         catch (Exception e)
         {
@@ -204,7 +212,8 @@ DO UPDATE SET
                 count++;
             }
             transaction.Commit();
-            _log.Info($"Upserted {entries.Count} entries into securities table.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {entries.Count} entries into securities table.");
         }
         catch (Exception e)
         {
@@ -267,7 +276,8 @@ DO UPDATE SET
                 count++;
             }
             transaction.Commit();
-            _log.Info($"Upserted {count} prices into prices table.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {count} prices into prices table.");
         }
         catch (Exception e)
         {
@@ -314,7 +324,8 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
                 await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            _log.Info($"Upserted {count} entries into {tableName} table.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {count} entries into {tableName} table.");
         }
         catch (Exception e)
         {
@@ -329,93 +340,4 @@ DO UPDATE SET MarketCap = excluded.MarketCap;
         await connection.CloseAsync();
         return count;
     }
-
-    //public async Task<int> InsertUser(User user)
-    //{
-    //    var writer = _writers.GetOrCreate(nameof(User), () => new SqlWriter<User>(this), (_, w) => Register(w));
-    //    return await writer.InsertOne(user, false);
-    //}
-
-    //public async Task<int> InsertAccount(Account account, bool isUpsert)
-    //{
-    //    var writer = _writers.GetOrCreate(nameof(Account), () => new SqlWriter<Account>(this), (_, w) => Register(w));
-    //    var tableName = DatabaseNames.AccountTable;
-    //    if (!_writers.TryGetValue(DataType.Account.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<Account>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
-    //        _writers[DataType.Account.ToString()] = writer;
-    //    }
-    //    return await writer.InsertOne(account, isUpsert);
-    //}
-
-    public async Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new()
-    {
-        var writer = _writers.GetOrCreate(typeof(T).Name, () => new SqlWriter<T>(this), (_, w) => Register(w));
-        return await writer.InsertMany(entries, isUpsert, tableNameOverride);
-    }
-
-    public async Task<int> InsertOne<T>(T entry, bool isUpsert, string? sql = null, string? tableNameOverride = null) where T : class, new()
-    {
-        var writer = _writers.GetOrCreate(typeof(T).Name, () => new SqlWriter<T>(this), (_, w) => Register(w));
-        return await writer.InsertOne(entry, isUpsert, tableNameOverride);
-    }
-
-    //public async Task<int> InsertBalance(Asset asset, bool isUpsert)
-    //{
-    //    var tableName = DatabaseNames.BalanceTable;
-    //    if (!_writers.TryGetValue(DataType.Asset.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<Asset>(this, tableName, DatabaseFolder, DatabaseNames.StaticData);
-    //        _writers[DataType.Asset.ToString()] = writer;
-    //    }
-    //    return await writer.InsertOne(asset, isUpsert);
-    //}
-
-    //public async Task<int> InsertOrder(Order order, Security security, bool isUpsert = true)
-    //{
-    //    if (security == null) return 0;
-    //    var tableName = DatabaseNames.GetOrderTableName(security.Type);
-    //    if (!_writers.TryGetValue(DataType.Order.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<Order>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-    //        _writers[DataType.Order.ToString()] = writer;
-    //    }
-    //    return await writer.InsertOne(order, isUpsert, tableName);
-    //}
-
-    //public async Task<int> InsertTrade(Trade trade, Security security, bool isUpsert = true)
-    //{
-    //    if (security == null) return 0;
-    //    var tableName = DatabaseNames.GetTradeTableName(security.Type);
-    //    if (!_writers.TryGetValue(DataType.Trade.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<Trade>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-    //        _writers[DataType.Trade.ToString()] = writer;
-    //    }
-    //    return await writer.InsertOne(trade, isUpsert);
-    //}
-
-    //public async Task<int> InsertPosition(Position position, Security security, bool isUpsert = true)
-    //{
-    //    if (security == null) return 0;
-    //    var tableName = DatabaseNames.GetPositionTableName(security.Type);
-    //    if (!_writers.TryGetValue(DataType.Position.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<Position>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-    //        _writers[DataType.Position.ToString()] = writer;
-    //    }
-    //    return await writer.InsertOne(position, isUpsert);
-    //}
-
-    //public async Task InsertOpenOrderId(OpenOrderId openOrderId)
-    //{
-    //    var writer = _writers.GetOrCreate(nameof(OpenOrderId), () => new SqlWriter<OpenOrderId>(this), (_, w) => Register(w));
-    //    var tableName = DatabaseNames.OpenOrderIdTable;
-    //    if (!_writers.TryGetValue(DataType.OpenOrderId.ToString(), out var writer))
-    //    {
-    //        writer = new SqlWriter<OpenOrderId>(this, tableName, DatabaseFolder, DatabaseNames.ExecutionData);
-    //        _writers[DataType.OpenOrderId.ToString()] = writer;
-    //    }
-    //    await writer.InsertOne(openOrderId, false);
-    //}
 }

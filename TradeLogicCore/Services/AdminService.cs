@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common;
 using log4net;
 using Microsoft.IdentityModel.Tokens;
@@ -52,6 +53,7 @@ public class AdminService : IAdminService
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
+        _log.Info($"Initializing admin-service: {environment}, {exchange}, {broker}");
         Context.Initialize(_container, environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
 
@@ -61,6 +63,7 @@ public class AdminService : IAdminService
 
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
     {
+        _log.Info($"Logging in user and account: {userName}, {accountName}, {environment}");
         if (userName.IsBlank()) return ResultCode.InvalidArgument;
         if (password.IsBlank()) return ResultCode.InvalidArgument;
         if (accountName.IsBlank()) return ResultCode.InvalidArgument;
@@ -103,6 +106,12 @@ public class AdminService : IAdminService
 
         Context.User = CurrentUser;
         Context.Account = CurrentAccount;
+
+        var isExternalAvailable = await Ping();
+        if (!isExternalAvailable)
+        {
+            return ResultCode.ConnectionFailed;
+        }
 
         // setup portfolio
         var result = await _portfolioService.Initialize();
@@ -200,5 +209,10 @@ public class AdminService : IAdminService
             }
             return account;
         }
+    }
+
+    public async Task<bool> Ping()
+    {
+        return _connectivity.Ping();
     }
 }

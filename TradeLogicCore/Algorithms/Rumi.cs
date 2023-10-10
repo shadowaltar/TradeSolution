@@ -25,12 +25,19 @@ public class Rumi : IAlgorithm<RumiVariables>
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
     public int RumiParam { get; } = 1;
-    public decimal StopLossRatio { get; } = 0;
 
     public IPositionSizingAlgoLogic Sizing { get; }
     public IEnterPositionAlgoLogic Entering { get; }
     public IExitPositionAlgoLogic Exiting { get; }
     public ISecurityScreeningAlgoLogic Screening { get; set; }
+
+    public decimal LongStopLossRatio { get; set; }
+
+    public decimal LongTakeProfitRatio { get; set; }
+
+    public decimal ShortStopLossRatio { get; set; }
+
+    public decimal ShortTakeProfitRatio { get; set; }
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
     {
@@ -41,7 +48,8 @@ public class Rumi : IAlgorithm<RumiVariables>
         FastParam = fast;
         SlowParam = slow;
         RumiParam = rumi;
-        StopLossRatio = stopLossRatio;
+        LongStopLossRatio = stopLossRatio;
+        ShortStopLossRatio = stopLossRatio;
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
         _slowMa = new ExponentialMovingAverageV2(SlowParam, 2, "SLOW EMA");

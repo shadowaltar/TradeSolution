@@ -37,12 +37,12 @@ public enum OrderStatus
     /// Broker submitted the order to exchange and waiting for feedback.
     /// </summary>
     Submitting = 5,
-    /// <summary>
-    /// The order is submitted in exchange. Alias of <see cref="Live"/>.
-    /// Used by:
-    ///     Binance
-    /// </summary>
-    New = 10,
+    ///// <summary>
+    ///// The order is submitted in exchange. Alias of <see cref="Live"/>.
+    ///// Used by:
+    /////     Binance
+    ///// </summary>
+    //New = 10,
     /// <summary>
     /// The order is submitted and alive in exchange.
     /// </summary>

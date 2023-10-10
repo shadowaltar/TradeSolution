@@ -13,7 +13,6 @@ public static class HttpHelper
     public static async Task ReadIntoFile(this HttpClient client, string url, string saveFilePath, ILog? log = null)
     {
         log ??= _log;
-        client.Timeout = TimeSpans.FiveSeconds;
         using var stream = await client.GetStreamAsync(url).ConfigureAwait(false);
         using var fileStream = new FileStream(saveFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
 

@@ -1,2 +1,2 @@
 ﻿namespace TradeLogicCore.Algorithms.Parameters;
-public record AlgoMetaInfo(Guid Id, string TypeName, AlgorithmParameters Parameters);
+public record AlgoMetaInfo(string Id, string TypeName, AlgorithmParameters Parameters);

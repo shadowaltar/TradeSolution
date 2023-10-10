@@ -50,4 +50,9 @@ public record OhlcPrice()
         { PriceElementType.Typical3, new(p => (p.H + p.L + p.C) / 3m) },
         { PriceElementType.Typical4, new(p => (p.O + p.H + p.L + p.C) / 4m) }
     };
+
+    public override string? ToString()
+    {
+        return $"[{T:yyyyMMdd-HHmmss}] {O:G29}|{H:G29}|{L:G29}|{C:G29}, {V:G29}";
+    }
 }

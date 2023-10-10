@@ -152,7 +152,7 @@ public static class CollectionExtensions
         return value;
     }
 
-    public static Tv? GetOrDefault<T, Tv>(this IDictionary<T, Tv?> dictionary, T key, Tv? defaultValue = default) where T : notnull
+    public static Tv? GetOrDefault<T, Tv>(this IReadOnlyDictionary<T, Tv> dictionary, T key, Tv? defaultValue = default) where T : notnull
     {
         if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
 
@@ -233,6 +233,15 @@ public static class CollectionExtensions
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
 
+    /// <summary>
+    /// Thread-safe version of <see cref="GetOrDefault{T, Tv}(IReadOnlyDictionary{T, Tv}, T, Tv?)"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
     public static Tv? ThreadSafeGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;

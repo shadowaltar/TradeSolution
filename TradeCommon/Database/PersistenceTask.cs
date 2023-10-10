@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Runtime.CompilerServices;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 
@@ -10,24 +11,10 @@ public class PersistenceTask
 
     public Type? Type { get; set; }
     public string? TableNameOverride { get; set; }
-    public bool IsUpsert { get; set; }
+    public DatabaseActionType Action { get; set; } = DatabaseActionType.Unknown;
 
     public PersistenceTask()
     {
-    }
-
-    public PersistenceTask(object entry, bool isUpsert = true, string? tableNameOverride = null)
-    {
-        _entry = entry;
-        TableNameOverride = tableNameOverride;
-        IsUpsert = isUpsert;
-    }
-
-    public PersistenceTask(IList entries, bool isUpsert = true, string? tableNameOverride = null)
-    {
-        _entries = entries;
-        TableNameOverride = tableNameOverride;
-        IsUpsert = isUpsert;
     }
 
     public T? GetEntry<T>() where T : class
@@ -59,5 +46,6 @@ public class PersistenceTask
         _entry = null;
         _entries = null;
         Type = null;
+        Action = DatabaseActionType.Unknown;
     }
 }

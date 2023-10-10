@@ -117,6 +117,8 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
     /// </summary>
     public int StrategyId { get; set; } = 0;
 
+    public string? Comment { get; set; } = null;
+
     /// <summary>
     /// Any additional order parameters.
     /// </summary>
@@ -175,7 +177,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[{Id}][{ExternalOrderId}][{CreateTime:yyMMdd-HHmmss}][{Status}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}";
+        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}], {Side} p*q:{Price}*{Quantity},";
     }
 }
 

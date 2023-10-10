@@ -1,5 +1,7 @@
 ﻿using Microsoft.Identity.Client;
 using System;
+using System.Runtime.CompilerServices;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 
 namespace TradeCommon.Runtime;
@@ -34,6 +36,11 @@ public static class Exceptions
     public static InvalidOperationException MissingAssetPosition(string assetCode)
     {
         return new InvalidOperationException($"The portfolio must hold an asset with code = {assetCode}.");
+    }
+
+    public static InvalidOperationException MissingAssetPosition(Security relatedSecurity)
+    {
+        return new InvalidOperationException($"The portfolio must hold an asset which is used for security = {relatedSecurity.Code}/{relatedSecurity.Id}.");
     }
 
     public static InvalidOperationException MissingAsset(int assetId)
@@ -128,18 +135,30 @@ public static class Exceptions
         return new InvalidOperationException(message);
     }
 
-    public static Exception Invalid<T>(string message)
+    public static Exception Invalid<T>(object? message, [CallerArgumentExpression(nameof(message))] string? argName = null)
     {
-        return new InvalidOperationException($"Invalid {typeof(T).Name}: {message}");
-    }
-    
-    public static Exception Invalid(object? message)
-    {
-        return new InvalidOperationException($"Invalid case: {message}");
+        return new InvalidOperationException($"Invalid {typeof(T).Name} from parameter {argName}: {message}");
     }
 
-    public static Exception Impossible()
+    public static Exception Invalid(object? message, [CallerArgumentExpression(nameof(message))] string? argName = null)
     {
-        return new InvalidOperationException("Impossible case is hit.");
+        return new InvalidOperationException($"Invalid case from parameter {argName}: {message}");
+    }
+
+    public static Exception InvalidOrder(object? message)
+    {
+        return new InvalidOperationException($"Invalid order parameters: {message}");
+    }
+
+    public static Exception Impossible(object? message = null)
+    {
+        if (message == null)
+            return new InvalidOperationException("Impossible case is hit.");
+        return new InvalidOperationException("Impossible case is hit: " + message);
+    }
+
+    public static Exception InvalidSecurityInTrades()
+    {
+        return new InvalidOperationException("Trades must with the same security.");
     }
 }

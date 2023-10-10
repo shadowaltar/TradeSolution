@@ -51,28 +51,58 @@ public interface IOrderService
     Order? GetOrder(long orderId);
 
     /// <summary>
-    /// Get all orders given by a time range, and optional security name.
-    /// Either from external if <paramref name="requestExternal"/> == true, or from data storage.
+    /// Get all orders from external for a specific security and optional time range.
     /// </summary>
     /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
-    /// <param name="requestExternal"></param>
     /// <returns></returns>
-    Task<List<Order>> GetOrders(Security security, DateTime start, DateTime? end, bool requestExternal = false);
-
+    Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null);
+    
     /// <summary>
-    /// Get all open orders with an optional security name.
-    /// Either from external if <paramref name="requestExternal"/> == true, or from current execution session.
+    /// Get all orders from storage for a specific security and optional time range.
     /// </summary>
     /// <param name="security"></param>
-    /// <param name="requestExternal"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
     /// <returns></returns>
-    Task<List<Order>> GetOpenOrders(Security? security = null, bool requestExternal = false);
+    Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null);
+
+    /// <summary>
+    /// Get cached orders for a specific security and optional time range.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <returns></returns>
+    List<Order> GetOrders(Security security, DateTime start, DateTime? end = null);
+
+    /// <summary>
+    /// Get cached open orders; when optional security is specified, only return the open orders related to that security.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    List<Order> GetOpenOrders(Security? security = null);
+
+    /// <summary>
+    /// Get stord open orders; when optional security is specified, only return the open orders related to that security.
+    /// NOTE: it will also update cache.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    Task<List<Order>> GetStoredOpenOrders(Security? security = null);
+
+    /// <summary>
+    /// Get open orders from external; when optional security is specified, only return the open orders related to that security.
+    /// NOTE: it will not update cache.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    Task<List<Order>> GetExternalOpenOrders(Security? security = null);
 
     /// <summary>
     /// Get all the orders in this execution session.
-    /// </summary>
+    /// </summary> 
     /// <returns></returns>
     List<Order> GetOrders(Security? security = null, bool requestExternal = false);
 
@@ -112,6 +142,7 @@ public interface IOrderService
     /// <param name="quantity"></param>
     /// <param name="side"></param>
     /// <param name="timeInForce"></param>
+    /// <param name="comment"></param>
     /// <returns></returns>
     Order CreateManualOrder(Security security,
                             int account,
@@ -119,13 +150,15 @@ public interface IOrderService
                             decimal quantity,
                             Side side,
                             OrderType orderType = OrderType.Limit,
-                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel,
+                            string comment = "manual");
 
     /// <summary>
     /// Update the internal state.
     /// </summary>
     /// <param name="orders"></param>
-    void Update(ICollection<Order> orders);
+    /// <param name="security"></param>
+    void Update(ICollection<Order> orders, Security? security = null);
 
     /// <summary>
     /// Persist an order to data storage.

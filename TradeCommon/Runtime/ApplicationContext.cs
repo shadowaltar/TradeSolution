@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common;
+using log4net;
 using System.Net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -7,6 +8,7 @@ using TradeCommon.Database;
 namespace TradeCommon.Runtime;
 public class ApplicationContext
 {
+    protected static readonly ILog _log = Logger.New();
     protected IComponentContext? _container;
 
     private readonly List<string> _preferredAssetCodes = new();
@@ -15,6 +17,8 @@ public class ApplicationContext
     private int _exchangeId;
     private BrokerType _broker;
     private int _brokerId;
+
+    public string AlgoSessionId { get; } = "";
 
     public bool IsExternalProhibited { get; private set; }
 
@@ -27,8 +31,8 @@ public class ApplicationContext
     public ApplicationContext(IStorage storage)
     {
         Storage = storage;
+        AlgoSessionId = Guid.NewGuid().ToString();
     }
-
 
     /// <summary>
     /// Get current environment.
@@ -106,8 +110,9 @@ public class ApplicationContext
         ExternalConnectionStates.BrokerId = BrokerId;
     }
 
-    public void SetPreferredAssets(params string[] assetCodes)
+    public bool SetPreferredAssets(params string[] assetCodes)
     {
+        _log.Info($"Set preferred assets: " + string.Join(", ", assetCodes));
         _preferredAssetCodes.Clear();
         _preferredAssetCodes.AddRange(assetCodes);
         if (_preferredAssetCodes.IsNullOrEmpty())
@@ -117,5 +122,6 @@ public class ApplicationContext
             _preferredAssetCodes.Add("BUSD");
             _preferredAssetCodes.Add("USD");
         }
+        return true;
     }
 }

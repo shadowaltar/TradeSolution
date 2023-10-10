@@ -17,7 +17,7 @@ public interface IExternalExecutionManagement
     event TradeReceivedCallback? TradeReceived;
     event TradesReceivedCallback? TradesReceived;
 
-    event BalanceChangedCallback? BalancesChanged;
+    event AssetsChangedCallback? AssetsChanged;
     event TransferredCallback? Transferred;
 
     Task<ExternalConnectionState> Subscribe();

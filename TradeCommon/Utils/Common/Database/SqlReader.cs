@@ -189,7 +189,8 @@ public static class SqlReader
                 results.Add(entry);
             }
             sw.Stop();
-            _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
             await connection.CloseAsync();
             return results;
         }
@@ -230,7 +231,8 @@ public static class SqlReader
                 var entry = sqlHelper.Read();
                 results.Add(entry);
             }
-            _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"[{sw.Elapsed.TotalSeconds:F4}ms] Read {results.Count} entries from {tableName} table in {databaseName}.");
             await connection.CloseAsync();
             return results;
         }
@@ -269,7 +271,8 @@ public static class SqlReader
             while (await r.ReadAsync())
             {
                 var entry = transformFunc(r);
-                _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
+                if (_log.IsDebugEnabled)
+                    _log.Debug($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
                 await connection.CloseAsync();
                 return entry;
             }
@@ -309,7 +312,8 @@ public static class SqlReader
             while (await r.ReadAsync())
             {
                 var entry = sqlHelper.Read();
-                _log.Info($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
+                if (_log.IsDebugEnabled)
+                    _log.Debug($"[{sw.Elapsed.TotalSeconds:F4}ms] Read 1 entry from {tableName} table in {databaseName}.");
                 await connection.CloseAsync();
                 return entry;
             }

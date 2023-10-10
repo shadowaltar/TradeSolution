@@ -406,7 +406,7 @@ public static class ExternalQueryStates
             ExternalId = BrokerId,
             ResultCode = isOk ? ResultCode.SendOrderOk : ResultCode.SendOrderFailed,
             UniqueConnectionId = connId,
-            Description = content,
+            Description = $"Send {order.SecurityCode} order.",
         };
     }
 

@@ -1,8 +1,6 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Database;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
@@ -13,7 +11,6 @@ namespace TradeCommon.Essentials.Portfolios;
 
 [Storage("assets", DatabaseNames.ExecutionData)]
 [Unique(nameof(Id))]
-[Unique(nameof(SecurityId), nameof(AccountId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
 public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUniqueIdEntry
@@ -42,8 +39,6 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
     /// </summary>
     public decimal LockedQuantity { get; set; }
 
-    public decimal StrategyLockedQuantity { get; set; }
-
     public override string ToString()
     {
         return $"[{Id}] Security[{SecurityId},{SecurityCode}], {Quantity}, {UpdateTime:yyyyMMdd-HHmmss}";
@@ -51,19 +46,9 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
 
     public virtual bool Equals(Asset? obj)
     {
-        if (obj == null)
-            return false;
-
-        if (Id == obj.Id
-            && AccountId == obj.AccountId
-            && CreateTime == obj.CreateTime
-            && UpdateTime == obj.UpdateTime
-            && SecurityId == obj.SecurityId
-            && Quantity == obj.Quantity
-            && LockedQuantity == obj.LockedQuantity
-            && StrategyLockedQuantity == obj.StrategyLockedQuantity)
-            return true;
-        return false;
+        if (obj == null) return false;
+        if (Id != obj.Id) return false;
+        return CompareTo(obj) == 0;
     }
 
     public override int GetHashCode()
@@ -74,8 +59,7 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
                                 UpdateTime,
                                 SecurityId,
                                 Quantity,
-                                LockedQuantity,
-                                StrategyLockedQuantity);
+                                LockedQuantity);
     }
 
     public virtual int CompareTo(Asset? other)
@@ -88,7 +72,6 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
         if (r == 0) r = SecurityCode.CompareTo(other.SecurityCode);
         if (r == 0) r = Quantity.CompareTo(other.Quantity);
         if (r == 0) r = LockedQuantity.CompareTo(other.LockedQuantity);
-        if (r == 0) r = StrategyLockedQuantity.CompareTo(other.StrategyLockedQuantity);
         return r;
     }
 

@@ -133,7 +133,7 @@ public class ExecutionController : Controller
             return BadRequest("Must login first.");
         }
 
-        var orders = await orderService.GetOrders(security, DateTime.MinValue, DateTime.UtcNow, true);
+        var orders = await orderService.GetExternalOrders(security, DateTime.MinValue);
         return Ok(orders);
     }
 
@@ -216,15 +216,7 @@ public class ExecutionController : Controller
             default:
                 return BadRequest("Invalid environment.");
         }
-        var parameters = new AlgorithmParameters(core.Environment == EnvironmentType.Test,
-                                                   adminService.CurrentUser.Name,
-                                                   adminService.CurrentAccount.Name,
-                                                   core.Environment,
-                                                   core.Exchange,
-                                                   core.Broker,
-                                                   interval,
-                                                   new List<Security> { security },
-                                                   algoTimeRange);
+        var parameters = new AlgorithmParameters(core.Environment == EnvironmentType.Test, interval, new List<Security> { security }, algoTimeRange);
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         algorithm.Screening = screening;
@@ -234,14 +226,13 @@ public class ExecutionController : Controller
 
     [HttpPost("algos/stop")]
     public async Task<ActionResult> StopAlgorithm([FromQuery(Name = "admin-password")] string? adminPassword,
-                                                  [FromQuery(Name = "algo-guid")] string? algoGuidStr)
+                                                  [FromQuery(Name = "algo-guid")] string? algoSessionId)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(algoGuidStr, out Guid guid, out br)) return br;
         if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
 
         var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
-        await core.StopAlgorithm(guid);
+        await core.StopAlgorithm(algoSessionId);
         return Ok();
     }
 

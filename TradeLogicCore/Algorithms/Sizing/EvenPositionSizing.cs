@@ -15,7 +15,7 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
 
     public decimal GetAvailableNewPositionQuantity(Security security, int maxConcurrentPositionCount)
     {
-        var positions = _portfolioService.GetOpenPositions();
+        var positions = _portfolioService.GetPositions();
         var asset = security.EnsureCurrencyAsset();
         var assetPosition = _portfolioService.GetAsset(asset.Id);
         if (assetPosition == null)
@@ -30,7 +30,7 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
         return 0;
     }
 
-    public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry last, decimal price, DateTime time)
+    public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry? last, decimal price, DateTime time)
     {
         throw new NotImplementedException();
     }

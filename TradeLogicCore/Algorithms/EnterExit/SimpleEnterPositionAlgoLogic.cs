@@ -1,8 +1,10 @@
 ﻿using Common;
 using log4net;
 using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
@@ -38,40 +40,26 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         _context = context;
     }
 
-    public async Task<List<ExternalQueryState>> Open(AlgoEntry current,
-                                                     AlgoEntry? last,
-                                                     decimal enterPrice,
-                                                     Side side,
-                                                     DateTime enterTime,
-                                                     decimal stopLossPrice,
-                                                     decimal takeProfitPrice)
+    public async Task<ExternalQueryState> Open(AlgoEntry current,
+                                               AlgoEntry? last,
+                                               decimal enterPrice,
+                                               Side side,
+                                               DateTime enterTime,
+                                               decimal stopLossPrice,
+                                               decimal takeProfitPrice)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
-        var securityId = current.SecurityId;
-        var asset = _portfolioService.GetPositionRelatedQuoteBalance(securityId);
-        var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
-        var now = DateTime.UtcNow;
+        var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id)
+            ?? throw Exceptions.MissingAssetPosition(current.Security.QuoteSecurity.Code);
 
-        var states = new List<ExternalQueryState>();
-        var order = new Order
-        {
-            Id = _orderIdGen.NewTimeBasedId,
-            AccountId = _context.AccountId,
-            Side = side,
-            CreateTime = now,
-            UpdateTime = now,
-            Type = OrderType.Limit,
-            Price = enterPrice,
-            Quantity = size,
-            Security = current.Security,
-            SecurityId = securityId,
-            SecurityCode = current.Security.Code,
-            Status = OrderStatus.New,
-            TimeInForce = TimeInForceType.GoodTillCancel,
-        };
+        var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
+        var order = CreateOrder(OrderType.Limit, side, enterTime, enterPrice, size, current.Security, comment: Comments.AlgoEnter);
+
+        current.OrderId = order.Id;
+
         var state = await _orderService.SendOrder(order);
-        states.Add(state);
+        state.SubStates = new();
 
         if (stopLossPrice.IsValid())
         {
@@ -81,24 +69,11 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             }
             else
             {
-                var slOrder = new Order
-                {
-                    Id = _orderIdGen.NewTimeBasedId,
-                    AccountId = _context.AccountId,
-                    ParentOrderId = order.Id,
-                    Side = side == Side.Buy ? Side.Sell : Side.Buy,
-                    CreateTime = now,
-                    UpdateTime = now,
-                    Type = OrderType.StopLimit,
-                    Price = stopLossPrice,
-                    StopPrice = (stopLossPrice + enterPrice) / 2m, // trigger price at the mid
-                    Quantity = size,
-                    Security = current.Security,
-                    SecurityId = securityId,
-                    SecurityCode = current.Security.Code,
-                };
-                state = await _orderService.SendOrder(slOrder);
-                states.Add(state);
+                var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
+                var stopPrice = (stopLossPrice + enterPrice) / 2m; // trigger price at the mid
+                var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLoss);
+                var subState = await _orderService.SendOrder(slOrder);
+                state.SubStates.Add(subState);
             }
         }
 
@@ -110,27 +85,53 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             }
             else
             {
-                var tpOrder = new Order
-                {
-                    Id = _orderIdGen.NewTimeBasedId,
-                    AccountId = _context.AccountId,
-                    ParentOrderId = order.Id,
-                    Side = side == Side.Buy ? Side.Sell : Side.Buy,
-                    CreateTime = now,
-                    UpdateTime = now,
-                    Type = OrderType.TakeProfitLimit,
-                    Price = takeProfitPrice,
-                    StopPrice = (takeProfitPrice + enterPrice) / 2m, // trigger price at the mid
-                    Quantity = size,
-                    Security = current.Security,
-                    SecurityId = securityId,
-                    SecurityCode = current.Security.Code,
-                };
-                state = await _orderService.SendOrder(tpOrder);
-                states.Add(state);
+                var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
+                var stopPrice = (takeProfitPrice + enterPrice) / 2m; // trigger price at the mid
+                var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfit);
+                var subState = await _orderService.SendOrder(tpOrder);
+                state.SubStates.Add(subState);
             }
         }
-        return states;
+        return state;
+    }
+
+    private Order CreateOrder(OrderType type, Side side, DateTime time, decimal price, decimal quantity, Security security, decimal? stopPrice = null, string comment = "")
+    {
+        if (side == Side.None) throw Exceptions.Invalid<Side>(side);
+        if (!time.IsValid()) throw Exceptions.Invalid<DateTime>(time);
+        if (!price.IsValid() || price <= 0) throw Exceptions.Invalid<decimal>(price);
+        if (!quantity.IsValid() || quantity <= 0) throw Exceptions.Invalid<decimal>(quantity);
+        if (!security.IsValid()) throw Exceptions.Invalid<Security>(security);
+        if (!security.QuoteSecurity.IsValid()) throw Exceptions.Invalid<Security>("Security's quote security is: " + security.QuoteSecurity);
+        if (stopPrice != null && (!stopPrice.IsValid() || stopPrice <= 0)) throw Exceptions.Invalid<decimal>(stopPrice);
+
+        var assetPosition = _context.Services.Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
+        if (assetPosition == null || !assetPosition.Security.IsValid()) throw Exceptions.Invalid<Security>("asset position security is: " + assetPosition?.Security);
+        if (assetPosition.Quantity < quantity)
+            throw Exceptions.InvalidOrder($"Insufficient quote asset to be traded. Existing: {assetPosition.Quantity}; desired: {quantity}");
+
+        var order = new Order
+        {
+            Id = _orderIdGen.NewTimeBasedId,
+            AccountId = _context.AccountId,
+            Side = side,
+            CreateTime = time,
+            UpdateTime = time,
+            Type = type,
+            Price = price,
+            Quantity = quantity,
+            Security = security,
+            SecurityId = security.Id,
+            SecurityCode = security.Code,
+            Status = OrderStatus.Sending,
+            TimeInForce = TimeInForceType.GoodTillCancel,
+            Comment = comment,
+        };
+        if (stopPrice != null)
+        {
+            order.StopPrice = stopPrice.Value;
+        }
+        return order;
     }
 
     public void BackTestOpen(AlgoEntry current,
@@ -143,11 +144,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
     {
         if (!_context.IsBackTesting) return;
 
-        var securityId = current.SecurityId;
-        current.IsLong = true;
-        current.LongCloseType = CloseType.None;
         // TODO current sizing happens here
-        var asset = _portfolioService.GetPositionRelatedQuoteBalance(securityId);
+        var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
         SyncOpenOrderToEntry(current, size, enterPrice, enterTime, stopLossPrice, takeProfitPrice);

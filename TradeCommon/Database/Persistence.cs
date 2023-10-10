@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.Extensions.Primitives;
 using System.Collections.Concurrent;
 using TradeCommon.Runtime;
 
@@ -11,42 +10,78 @@ public class Persistence : IDisposable
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly Pool<PersistenceTask> _taskPool = new();
 
+    private int _currentThreadId;
+    private bool _isEmpty = true;
     private bool _isRunning;
 
     public Persistence(IStorage storage)
     {
         Task.Factory.StartNew(async (t) =>
         {
+            _currentThreadId = Thread.CurrentThread.ManagedThreadId;
+
             _isRunning = true;
             await Run();
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
         _storage = storage;
     }
 
-    public void Enqueue<T>(T entry, string? tableNameOverride = null, bool isUpsert = true)
+    public int Insert<T>(T entry, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false)
     {
-        if (entry != null)
-        {
-            var task = _taskPool.Lease();
-            task.SetEntry(entry);
-            task.IsUpsert = isUpsert;
-            task.Type = typeof(T);
-            task.TableNameOverride = tableNameOverride;
+        if (entry == null)
+            return 0;
+
+        var task = _taskPool.Lease();
+        task.SetEntry(entry);
+        task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
+        task.Type = typeof(T);
+        task.TableNameOverride = tableNameOverride;
+        if (!isSynchronous)
             _tasks.Enqueue(task);
-        }
+        else
+            return AsyncHelper.RunSync(() => RunTask(task));
+        return int.MinValue;
     }
 
-    public void Enqueue<T>(List<T> entries, string? tableNameOverride = null, bool isUpsert = true)
+    public int Insert<T>(List<T> entries, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false)
     {
-        if (!entries.IsNullOrEmpty())
-        {
-            var task = _taskPool.Lease();
-            task.SetEntries(entries);
-            task.IsUpsert = isUpsert;
-            task.Type = typeof(T);
-            task.TableNameOverride = tableNameOverride;
+        if (entries.IsNullOrEmpty())
+            return 0;
+
+        var task = _taskPool.Lease();
+        task.SetEntries(entries);
+        task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
+        task.Type = typeof(T);
+        task.TableNameOverride = tableNameOverride;
+        if (!isSynchronous)
             _tasks.Enqueue(task);
-        }
+        else
+            return AsyncHelper.RunSync(() => RunTask(task));
+        return int.MinValue;
+    }
+
+    public PersistenceTask? Delete<T>(T entry, string? tableNameOverride = null)
+    {
+        if (entry == null)
+            return null;
+
+        var task = _taskPool.Lease();
+        task.SetEntry(entry);
+        task.Action = DatabaseActionType.Delete;
+        task.Type = typeof(T);
+        task.TableNameOverride = tableNameOverride;
+        _tasks.Enqueue(task);
+        return task;
+    }
+    
+    /// <summary>
+    /// Block until all queued database actions are finished.
+    /// </summary>
+    public void WaitAll()
+    {
+        if (Environment.CurrentManagedThreadId == _currentThreadId)
+            throw Exceptions.Invalid("Must not call method to wait for all tasks to finish inside the Persistence instance.");
+        Threads.WaitUntil(() => _isEmpty);
     }
 
     private async Task Run()
@@ -55,21 +90,34 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                await _storage.Insert(task);
-                task.Clear();
+                _isEmpty = true;
+                _ = await RunTask(task);
                 _taskPool.Return(task);
             }
             else
             {
+                _isEmpty = false;
                 Thread.Sleep(100);
             }
         }
+    }
+
+    private async Task<int> RunTask(PersistenceTask task)
+    {
+        var count = 0;
+        if (task.Action is DatabaseActionType.Insert or DatabaseActionType.Upsert)
+            count = await _storage.Insert(task);
+        else if (task.Action is DatabaseActionType.Delete)
+            count = await _storage.Delete(task);
+        task.Clear();
+        return count;
     }
 
     public void Dispose()
     {
         _isRunning = false;
         _cancellationTokenSource.Cancel();
+        _taskPool.Dispose();
         _tasks.Clear();
     }
 }

@@ -1,8 +1,8 @@
 ﻿using Common.Attributes;
-using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Algorithms;
 
@@ -12,7 +12,7 @@ namespace TradeCommon.Essentials.Algorithms;
 [Storage("algorithm_entries", "algorithm")]
 [Unique(nameof(BatchId), nameof(AlgoId), nameof(VersionId), nameof(Time))]
 [Index(nameof(BatchId))]
-public record AlgoEntry
+public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
 {
     /// <summary>
     /// The id of batch of algorithm execution.
@@ -37,12 +37,6 @@ public record AlgoEntry
     /// </summary>
     [NotNull]
     public long PositionId { get; set; } = 0;
-
-    [NotNull]
-    public int SecurityId { get; set; } = 0;
-
-    [DatabaseIgnore]
-    public Security Security { get; set; }
 
     [NotNull]
     public DateTime Time { get; set; }
@@ -78,6 +72,11 @@ public record AlgoEntry
     public bool IsShort { get; set; }
     public CloseType ShortCloseType { get; set; }
 
+    /// <summary>
+    /// The open or close position order Id. If no order it equals to zero.
+    /// </summary>
+    public long OrderId { get; set; }
+
     public decimal Quantity { get; set; }
 
     /// <summary>
@@ -94,17 +93,17 @@ public record AlgoEntry
     /// <summary>
     /// Notional value of this entry. Current Price * Quantity being hold.
     /// </summary>
-    public decimal? Notional { get; set; }
+    public decimal Notional { get; set; }
 
     /// <summary>
     /// Realized return of this entry which is just closed. 1 - Exit Price / Enter Price.
     /// </summary>
-    public decimal? RealizedReturn { get; set; }
+    public decimal RealizedReturn { get; set; }
 
     /// <summary>
     /// Realized PNL of this entry which is just closed. (Exit Price - Enter Price) * Quantity held.
     /// </summary>
-    public decimal? RealizedPnl { get; set; }
+    public decimal RealizedPnl { get; set; }
 
 
     /// <summary>
@@ -120,11 +119,14 @@ public record AlgoEntry
     [Positive]
     public decimal FeeAssetId { get; set; }
 
-    public decimal? ActualQuantity { get; set; }
-    public decimal? ActualEnterPrice { get; set; }
-    public decimal? ActualExitPrice { get; set; }
-    public decimal? ActualRealizedReturn { get; set; }
-    public decimal? ActualRealizedPnl { get; set; }
+    public decimal FilledQuantity { get; set; }
+
+    public decimal LongPrice { get; set; }
+    public decimal LongNotional { get; set; }
+    public decimal LongQuantity { get; set; }
+    public decimal ShortQuantity { get; set; }
+    public decimal ShortPrice { get; set; }
+    public decimal ShortNotional { get; set; }
 }
 
 public record AlgoEntry<T> : AlgoEntry

@@ -15,7 +15,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly List<string> _targetFieldNames;
+    private readonly string[] _targetFieldNames;
     private readonly Dictionary<string, string> _targetFieldNamePlaceHolders;
     private readonly Dictionary<string, PropertyInfo> _properties;
     private readonly string[] _uniqueKeyNames;
@@ -58,7 +58,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         // for UNIQUE() clause
         // the other unique attributes are only for indexes
         _uniqueKeyNames = ReflectionUtils.GetAttributeInfo<T>().PrimaryUniqueKey.ToArray();
-        _targetFieldNames = _properties.Select(pair => pair.Key).ToList();
+        _targetFieldNames = _properties.Select(pair => pair.Key).ToArray();
         _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => _placeholderPrefix + fn);
 
         AutoIncrementOnInsertFieldNames = _properties.Where(pair => pair.Value.GetCustomAttribute<AutoIncrementOnInsertAttribute>() != null)
@@ -67,6 +67,45 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         _valueGetter = ReflectionUtils.GetValueGetter<T>();
 
         _storage = storage;
+    }
+
+    public async Task<int> InsertOne<T1>(T1 entry, bool isUpsert, string? tableNameOverride = null)
+    {
+        var result = 0;
+        if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
+        if (entry == null)
+            return 0;
+
+        var tableName = tableNameOverride ?? _defaultTableName;
+        using var connection = await Connect();
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            var sql = GetInsertSql(isUpsert, tableName);
+            command.CommandText = sql;
+            var e = (T)(object)entry;
+
+            SetCommandParameters(command, e);
+            result = await command.ExecuteNonQueryAsync();
+
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted 1 {typeof(T).Name} entry into {tableName} table.");
+
+            RaiseSuccess(entry);
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to upsert into {tableName} table.", e);
+            RaiseFailed(entry, e);
+        }
+        finally
+        {
+            command?.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return result;
     }
 
     public async Task<int> InsertMany<T1>(IList<T1> entries, bool isUpsert, string? tableNameOverride = null)
@@ -94,7 +133,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
                 result += await command.ExecuteNonQueryAsync();
             }
             transaction.Commit();
-            _log.Info($"Upserted {result} entries into {tableName} table.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {result} entries into {tableName} table.");
 
             RaiseSuccess(entries);
         }
@@ -113,39 +153,88 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         return result;
     }
 
-    public async Task<int> UpsertOne<T1>(T1 entry, string? tableNameOverride = null)
-    {
-        if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
-        return await InsertOne(entry, true, tableNameOverride);
-    }
-
-    public async Task<int> InsertOne<T1>(T1 entry, bool isUpsert, string? tableNameOverride = null)
+    public async Task<int> MoveOne<T1>(T1 entry, bool isUpsert, string fromTableName, string toTableName)
     {
         var result = 0;
         if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
         if (entry == null)
             return 0;
 
+        using var connection = await Connect();
+        using var transaction = connection.BeginTransaction();
+        SqliteCommand? insertCommand = null;
+        SqliteCommand? deleteCommand = null;
+        try
+        {
+            var e = (T)(object)entry;
+
+            insertCommand = connection.CreateCommand();
+            var insertSql = GetInsertSql(isUpsert, toTableName);
+            insertCommand.CommandText = insertSql;
+            SetCommandParameters(insertCommand, e);
+            result = await insertCommand.ExecuteNonQueryAsync();
+            if (result != 1)
+            {
+                throw new Exception("Failed to insert during move.");
+            }
+            deleteCommand = connection.CreateCommand();
+            var deleteSql = GetDeleteSql(fromTableName);
+            deleteCommand.CommandText = deleteSql;
+            SetCommandParameters(deleteCommand, e, _uniqueKeyNames);
+            result = await deleteCommand.ExecuteNonQueryAsync();
+            if (result != 1)
+            {
+                throw new Exception("Failed to insert during move.");
+            }
+
+            transaction.Commit();
+
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Moved 1 {typeof(T).Name} entry from {fromTableName} to {toTableName}.");
+
+            RaiseSuccess(entry);
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to move from {fromTableName} to {toTableName}.", e);
+            transaction.Rollback();
+            RaiseFailed(entry, e);
+        }
+        finally
+        {
+            insertCommand?.Dispose();
+            deleteCommand?.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return result;
+    }
+
+    public async Task<int> DeleteOne<T1>(T1 entry, string? tableNameOverride = null)
+    {
+        if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
+        if (entry == null)
+            return 0;
+
+        var result = 0;
         var tableName = tableNameOverride ?? _defaultTableName;
         using var connection = await Connect();
         SqliteCommand? command = null;
         try
         {
             command = connection.CreateCommand();
-            var sql = GetInsertSql(isUpsert, tableName);
+            var sql = GetDeleteSql(tableName);
             command.CommandText = sql;
             var e = (T)(object)entry;
-
-            SetCommandParameters(command, e);
+            SetCommandParameters(command, e, _uniqueKeyNames);
             result = await command.ExecuteNonQueryAsync();
-
-            _log.Info($"Upserted 1 {typeof(T).Name} entry into {tableName} table.");
-
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Deleted 1 entry from {tableName} table.");
             RaiseSuccess(entry);
         }
         catch (Exception e)
         {
-            _log.Error($"Failed to upsert into {tableName} table.", e);
+            _log.Error($"Failed to delete from {tableName} table.", e);
             RaiseFailed(entry, e);
         }
         finally
@@ -157,59 +246,41 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         return result;
     }
 
-    private void RaiseSuccess(object entry, [CallerMemberName] string methodName = "")
+    public async Task<int> DeleteMany<T1>(IList<T1> entries, string? tableNameOverride = null)
     {
-        Success?.Invoke(entry, methodName);
-    }
-
-    private void RaiseFailed(object entry, Exception e, [CallerMemberName] string methodName = "")
-    {
-        Failed?.Invoke(entry, e, methodName);
-    }
-
-    public async Task<int> DeleteOne<T1>(T1 entry, string? tableNameOverride = null)
-    {
+        var result = 0;
         if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
 
-        var result = 0;
-        var tableName = tableNameOverride ?? _defaultTableName;
         using var connection = await Connect();
         using var transaction = connection.BeginTransaction();
-        var count = 0;
+
+        var tableName = tableNameOverride ?? _defaultTableName;
         SqliteCommand? command = null;
         try
         {
             command = connection.CreateCommand();
             var sql = GetDeleteSql(tableName);
             command.CommandText = sql;
-
-            foreach (var name in _uniqueKeyNames)
+            foreach (object? entry in entries)
             {
                 if (entry == null)
                     continue;
 
-                var placeholder = _targetFieldNamePlaceHolders[name];
-                var value = _valueGetter.Get((T)(object)entry, name);
-                if (value == null) // unique key columns should never be null
-                    return -1;
-                // by default treat enum value as upper string
-                if (value.GetType().IsEnum)
-                    command.Parameters.AddWithValue(placeholder, value.ToString()!.ToUpperInvariant());
-                else
-                    command.Parameters.AddWithValue(placeholder, value);
+                command.Parameters.Clear();
+                SetCommandParameters(command, (T)entry);
+                result += await command.ExecuteNonQueryAsync();
             }
-            count++;
-            result = await command.ExecuteNonQueryAsync();
-
-            _log.Info($"Deleted 1 entry from {tableName} table.");
             transaction.Commit();
-            RaiseSuccess(entry);
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Deleted {result} entries from {tableName} table.");
+
+            RaiseSuccess(entries);
         }
         catch (Exception e)
         {
             _log.Error($"Failed to delete from {tableName} table.", e);
             transaction.Rollback();
-            RaiseFailed(entry, e);
+            RaiseFailed(entries, e);
         }
         finally
         {
@@ -308,9 +379,11 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         return false;
     }
 
-    private void SetCommandParameters(DbCommand command, T entry)
+    private void SetCommandParameters(DbCommand command, T entry, params string[] targetFieldNames)
     {
-        foreach (var name in _targetFieldNames)
+        targetFieldNames = targetFieldNames.IsNullOrEmpty() ? _targetFieldNames : targetFieldNames;
+
+        foreach (var name in targetFieldNames)
         {
             var placeholder = _targetFieldNamePlaceHolders[name];
 
@@ -333,18 +406,27 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             }
         }
     }
+
+    private void RaiseSuccess(object entry, [CallerMemberName] string methodName = "")
+    {
+        Success?.Invoke(entry, methodName);
+    }
+
+    private void RaiseFailed(object entry, Exception e, [CallerMemberName] string methodName = "")
+    {
+        Failed?.Invoke(entry, e, methodName);
+    }
 }
 
 public interface ISqlWriter
 {
-    Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null);
-
     Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null);
-
-    Task<int> UpsertOne<T>(T entry, string? tableNameOverride = null);
-
+    Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null);
     Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null);
+    Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null);
+    Task<int> MoveOne<T1>(T1 entry, bool isUpsert, string fromTableName, string toTableName);
 
     event Action<object, string> Success;
+
     event Action<object, Exception, string> Failed;
 }

@@ -23,29 +23,24 @@ public interface IPortfolioService
     Task<bool> Initialize();
 
     /// <summary>
-    /// Create or update (and cache) a position by a trade.
-    /// </summary>
-    /// <param name="trade"></param>
-    /// <param name="existing"></param>
-    /// <returns></returns>
-    Position CreateOrUpdate(Trade trade, Position? existing = null);
-
-    /// <summary>
     /// Create or update (and cache) one or more positions by a series of trades.
     /// </summary>
     /// <param name="trades"></param>
-    /// <param name="position"></param>
+    /// <param name="isSameSecurity"></param>
     /// <returns></returns>
-    Position? CreateOrUpdate(List<Trade> trades, Position? position = null);
+    void Process(List<Trade> trades, bool isSameSecurity);
 
     /// <summary>
-    /// Apply a trade to an existing position.
+    /// Create or update (and cache) one position by one trade.
     /// </summary>
-    /// <param name="position"></param>
     /// <param name="trade"></param>
-    void Apply(Position position, Trade trade);
+    void Process(Trade trade);
 
-    List<Position> GetOpenPositions();
+    /// <summary>
+    /// Gets all open positions (a shallow copy of list of positions).
+    /// </summary>
+    /// <returns></returns>
+    List<Position> GetPositions();
 
     /// <summary>
     /// Get position given its Id.
@@ -76,35 +71,22 @@ public interface IPortfolioService
     Asset? GetAssetBySecurityId(int securityId);
 
     /// <summary>
-    /// Get asset's position given a position's security ID.
+    /// Spend the free quantity in the related asset position given a security.
     /// </summary>
-    /// <param name="securityId"></param>
-    /// <returns></returns>
-    Asset GetPositionRelatedQuoteBalance(int securityId);
-
-    /// <summary>
-    /// Spend the free quantity in the related asset position given a security Id.
-    /// </summary>
-    /// <param name="securityId"></param>
+    /// <param name="security"></param>
     /// <param name="quantity"></param>
     /// <returns></returns>
-    void SpendAsset(int securityId, decimal quantity);
+    void SpendAsset(Security security, decimal quantity);
 
-    /// <summary>
-    /// Realize the pnl from the trade just closed, related to a specific security;
-    /// then set the quantity and notional value of its related asset position.
-    /// Returns the new total realized pnl of this security.
-    /// </summary>
-    /// <param name="securityId"></param>
-    /// <param name="realizedPnl"></param>
-    /// <returns></returns>
-    decimal Realize(int securityId, decimal realizedPnl);
-
-    List<Position> GetPositions();
-
-    decimal GetRealizedPnl(Security security);
-
-    ProfitLoss GetUnrealizedPnl(Security security);
+    ///// <summary>
+    ///// Realize the pnl from the trade just closed, related to a specific security;
+    ///// then set the quantity and notional value of its related asset position.
+    ///// Returns the new total realized pnl of this security.
+    ///// </summary>
+    ///// <param name="security"></param>
+    ///// <param name="realizedPnl"></param>
+    ///// <returns></returns>
+    //decimal Realize(Security security, decimal realizedPnl);
 
     bool Validate(Order order);
 
@@ -135,17 +117,32 @@ public interface IPortfolioService
     /// an overriding security can be provided.
     /// </summary>
     /// <param name="position"></param>
+    /// <param name="comment"></param>
     /// <param name="security"></param>
     /// <returns></returns>
-    Order CreateCloseOrder(Asset position, Security? security = null);
+    Order CreateCloseOrder(Asset position, string comment, Security? security = null);
 
     /// <summary>
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    Task CloseAllPositions();
+    Task CloseAllOpenPositions(string orderComment);
 
-    Task<List<Asset>> GetAssets(Account account, bool requestExternal = false);
-    void Update(List<Asset> assets, bool isInitializing = false);
-    void Update(List<Position> positions, bool isInitializing = false);
+    /// <summary>
+    /// Get positions from storage.
+    /// Optionally can specify the account which the positions belong to, and
+    /// the lower bound (inclusive) of position update time.
+    /// </summary>
+    /// <param name="account"></param>
+    /// <param name="start"></param>
+    /// <returns></returns>
+    Task<List<Position>> GetStoragePositions(Account? account = null, DateTime? start = null);
+
+    Task<List<Asset>> GetExternalAssets(Account? account = null);
+
+    Task<List<Asset>> GetStorageAssets(Account? account = null);
+
+    void UpdatePortfolio(List<Asset> assets, bool isInitializing = false);
+
+    void UpdatePortfolio(List<Position> positions, bool isInitializing = false);
 }

@@ -1,6 +1,9 @@
 ﻿using Common;
 using Common.Attributes;
+using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Calculations;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
@@ -13,6 +16,7 @@ namespace TradeCommon.Essentials.Trading;
 [Unique(nameof(Id))]
 [Unique(nameof(ExternalTradeId))]
 [Index(nameof(SecurityId))]
+[Index(nameof(PositionId))]
 [Storage("trades", "execution")]
 public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUniqueIdEntry
 {
@@ -23,7 +27,7 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     public long Id { get; set; } = 0;
 
     /// <summary>
-    /// The order id associated with this trade.
+    /// The order id associated with this 
     /// </summary>
     [NotNull]
     public long OrderId { get; set; } = 0;
@@ -53,25 +57,25 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     public DateTime Time { get; set; }
 
     /// <summary>
-    /// Side of this trade.
+    /// Side of this 
     /// </summary>
     [NotNull]
     public Side Side { get; set; }
 
     /// <summary>
-    /// The execution price of this trade.
+    /// The execution price of this 
     /// </summary>
     [NotNull]
     public decimal Price { get; set; }
 
     /// <summary>
-    /// The executed quantity in this trade.
+    /// The executed quantity in this 
     /// </summary>
     [NotNull]
     public decimal Quantity { get; set; }
 
     /// <summary>
-    /// The fee incurred in this trade.
+    /// The fee incurred in this 
     /// </summary>
     [NotNull]
     public decimal Fee { get; set; }
@@ -100,6 +104,30 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     [DatabaseIgnore]
     public int BestMatch { get; set; } = 0;
 
+    /// <summary>
+    /// Calculate weighted average price, quantity and notional amount to 
+    /// </summary>
+    /// <param name="entry"></param>
+    public void ApplyTo(ILongShortEntry entry)
+    {
+        var sign = Side == Side.Sell ? -1 : Side == Side.Buy ? 1 : 0;
+        if (Side == Side.Buy)
+        {
+            entry.LongNotional += Price * Quantity;
+            entry.LongQuantity += Quantity;
+            entry.LongPrice = entry.LongNotional.ZeroDivision(entry.LongQuantity);
+        }
+        else if (Side == Side.Sell)
+        {
+            entry.ShortNotional += Price * Quantity;
+            entry.ShortQuantity += Quantity;
+            entry.ShortPrice = entry.ShortNotional.ZeroDivision(entry.ShortQuantity);
+        }
+        entry.Notional = entry.ShortNotional - entry.LongNotional;
+        entry.Quantity += sign * Quantity;
+        entry.Price = entry.Notional.ZeroDivision(entry.Quantity);
+    }
+
     public int CompareTo(Trade? trade)
     {
         var r = SecurityId.CompareTo(trade?.SecurityId);
@@ -125,6 +153,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[{Id}][{ExternalTradeId}][{Time:yyMMdd-HHmmss}] secId:{SecurityId}, p:{Price}, q:{Quantity}, side:{Side}, oid:{OrderId}, eoid:{ExternalOrderId}";
+        return $"[Id:{Id}][ETId:{ExternalTradeId}][{Time:yyMMdd-HHmmss}][SecId:{SecurityId}][PId:{PositionId}], {Side} p*q:{Price}*{Quantity}, [OId:{OrderId}][EOId:{ExternalOrderId}]";
     }
 }

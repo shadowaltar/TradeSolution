@@ -1,10 +1,10 @@
 ﻿using System.Collections.Concurrent;
 
 namespace Common;
-public class Pool<T> where T : class, new()
+public class Pool<T> : IDisposable where T : class, new()
 {
     private readonly ConcurrentBag<T> _objects = new();
-
+    private bool _isDisposed = false;
     private int _leasedCount = 0;
     private int _expectedCount = 0;
 
@@ -43,6 +43,7 @@ public class Pool<T> where T : class, new()
     /// <returns></returns>
     public T Lease()
     {
+        if (_isDisposed) throw new ObjectDisposedException(GetType().Name);
         if (_objects.TryTake(out var item))
         {
             Interlocked.Increment(ref _leasedCount);
@@ -62,7 +63,14 @@ public class Pool<T> where T : class, new()
     /// <param name="item"></param>
     public void Return(T item)
     {
+        if (_isDisposed) throw new ObjectDisposedException(GetType().Name);
         _objects.Add(item);
         Interlocked.Decrement(ref _leasedCount);
+    }
+
+    public void Dispose()
+    {
+        _isDisposed = true;
+        _objects.Clear();
     }
 }

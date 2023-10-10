@@ -84,49 +84,49 @@ public static class DatabaseNames
         };
     }
 
-    public static string GetOrderTableName(SecurityType type, bool isErrorTable = false)
+    public static string? GetOrderTableName(SecurityType type, bool isErrorTable = false)
     {
         if (!isErrorTable)
             return type switch
             {
                 SecurityType.Equity => StockOrderTable,
                 SecurityType.Fx => FxOrderTable,
-                _ => throw new NotImplementedException()
+                _ => null,
             };
         else
             return type switch
             {
                 SecurityType.Equity => ErrorStockOrderTable,
                 SecurityType.Fx => ErrorFxOrderTable,
-                _ => throw new NotImplementedException()
+                _ => null,
             };
     }
 
-    public static string GetOrderTableName(string securityType, bool isErrorTable = false)
+    public static string? GetOrderTableName(string securityType, bool isErrorTable = false)
     {
         var type = SecurityTypeConverter.Parse(securityType);
         return GetOrderTableName(type, isErrorTable);
     }
 
-    public static string GetTradeTableName(SecurityType type, bool isErrorTable = false)
+    public static string? GetTradeTableName(SecurityType type, bool isErrorTable = false)
     {
         if (!isErrorTable)
             return type switch
             {
                 SecurityType.Equity => StockTradeTable,
                 SecurityType.Fx => FxTradeTable,
-                _ => throw new NotImplementedException()
+                _ => null,
             };
         else
             return type switch
             {
                 SecurityType.Equity => ErrorStockTradeTable,
                 SecurityType.Fx => ErrorFxTradeTable,
-                _ => throw new NotImplementedException()
+                _ => null,
             };
     }
 
-    public static string GetTradeTableName(string securityType, bool isErrorTable = false)
+    public static string? GetTradeTableName(string securityType, bool isErrorTable = false)
     {
         var type = SecurityTypeConverter.Parse(securityType);
         return GetTradeTableName(type, isErrorTable);
@@ -150,7 +150,7 @@ public static class DatabaseNames
             };
     }
 
-    public static string GetPositionTableName(string securityType, bool isErrorTable = false)
+    public static string? GetPositionTableName(string securityType, bool isErrorTable = false)
     {
         var type = SecurityTypeConverter.Parse(securityType);
         return GetPositionTableName(type, isErrorTable);

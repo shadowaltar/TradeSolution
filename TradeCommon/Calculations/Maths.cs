@@ -1,7 +1,7 @@
 ﻿using Common;
 
 namespace TradeCommon.Calculations;
-public class Maths
+public static class Maths
 {
     public static double GetAnnualizedReturn(double start, double end, DateTime startTime, DateTime endTime)
     {
@@ -27,5 +27,11 @@ public class Maths
             squaredSum += (item - x) * (item - x);
         }
         return (double)Math.Sqrt(squaredSum / (values.Count - (isSample ? 1 : 0)));
+    }
+
+    public static decimal ZeroDivision(this decimal numerator, decimal denominator, decimal valueIfZeroDevision = 0m)
+    {
+        if (denominator == 0) return valueIfZeroDevision;
+        return numerator / denominator;
     }
 }

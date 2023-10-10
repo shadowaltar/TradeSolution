@@ -1,9 +1,7 @@
 ﻿using Common;
 using Common.Database;
 using Microsoft.Data.Sqlite;
-using System;
 using System.Data;
-using System.Xml.Linq;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -136,11 +134,21 @@ WHERE
         var sqlPart = SqlReader<Trade>.GetSelectClause();
         var secType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetTradeTableName(secType);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND Time >= $StartTime AND Time <= $EndTime";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND Time >= $StartTime AND Time <= $EndTime ORDER BY Id";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$StartTime", start), ("$EndTime", end));
     }
 
-    public async Task<List<Trade>> ReadTrades(Security security, long orderId)
+    public async Task<List<Trade>> ReadTrades(Security security, long smallestPositionId)
+    {
+        var dbName = DatabaseNames.ExecutionData;
+        var sqlPart = SqlReader<Trade>.GetSelectClause();
+        var secType = SecurityTypeConverter.Parse(security.Type);
+        var tableName = DatabaseNames.GetTradeTableName(secType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND PositionId >= $PositionId ORDER BY Id";
+        return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$PositionId", smallestPositionId));
+    }
+
+    public async Task<List<Trade>> ReadTradesByOrderId(Security security, long orderId)
     {
         var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>();
         var tableName = DatabaseNames.GetTradeTableName(security.SecurityType);
@@ -148,8 +156,25 @@ WHERE
         var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND OrderId = $OrderId";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$OrderId", orderId));
     }
+    public async Task<List<Trade>> ReadTradesByPositionId(Security security, long positionId)
+    {
+        var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>();
+        var tableName = DatabaseNames.GetTradeTableName(security.SecurityType);
+        var sqlPart = SqlReader<Trade>.GetSelectClause();
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND PositionId = $PositionId";
+        return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$PositionId", positionId));
+    }
 
-    public async Task<List<Position>> ReadPositions(Account account)
+    public async Task<Position?> ReadPosition(Security security, long positionId)
+    {
+        var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>();
+        var tableName = DatabaseNames.GetTradeTableName(security.SecurityType);
+        var sqlPart = SqlReader<Position>.GetSelectClause();
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = $SecurityId AND PositionId = $PositionId";
+        return await SqlReader.ReadOne<Position>(tableName, dbName, sql, ("$SecurityId", security.Id), ("$PositionId", positionId));
+    }
+
+    public async Task<List<Position>> ReadPositions(Account account, DateTime start, bool isOpenedOnly = false)
     {
         var (_, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>();
         var results = new List<Position>();
@@ -158,9 +183,10 @@ WHERE
             var tableName = DatabaseNames.GetPositionTableName(secType);
             if (tableName.IsBlank()) continue;
 
+            var openedOnlyPart = isOpenedOnly ? "AND Quantity <> 0 " : "";
             var sqlPart = SqlReader<Position>.GetSelectClause();
-            var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId";
-            var positions = await SqlReader.ReadMany<Position>(tableName, dbName, sql, ("$AccountId", account.Id));
+            var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND UpdateTime >= $StartTime {openedOnlyPart}ORDER BY Id";
+            var positions = await SqlReader.ReadMany<Position>(tableName, dbName, sql, ("$AccountId", account.Id), ("$StartTime", start));
             results.AddRange(positions);
         }
         return results;
@@ -432,7 +458,8 @@ WHERE
             count++;
             yield return price;
         }
-        _log.Info($"Read {count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {count} entries from {tableName} table in {DatabaseNames.MarketData}.");
     }
 
     public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
@@ -474,7 +501,8 @@ LIMIT $EntryCount
             );
             results.Add(price);
         }
-        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }
 
@@ -534,58 +562,19 @@ WHERE
             );
             list.Add(price);
         }
-        _log.Info($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
         return results;
     }
 
-    public async Task<List<PositionReconciliationRecord>> ReadPositionReconciliationRecords(List< int> securityIds)
+    public async Task<List<PositionRecord>> ReadPositionRecords(List<int> securityIds)
     {
-        var selectSql = SqlReader<PositionReconciliationRecord>.GetSelectClause();
-        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<PositionReconciliationRecord>();
-        var inClause = GetInClause<int>(nameof(PositionReconciliationRecord.SecurityId), securityIds, false);
-        var sql =
-@$"
-{selectSql} FROM {tableName} WHERE {inClause}
-";
-        return await SqlReader.ReadMany<PositionReconciliationRecord>(tableName, dbName, sql);
+        const string sid = nameof(PositionRecord.SecurityId);
+
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<PositionRecord>();
+        var selectSql = SqlReader<PositionRecord>.GetSelectClause();
+        var inClause = GetInClause(sid, securityIds, false);
+        var sql = $"{selectSql} FROM {tableName} WHERE {inClause}";
+        return await SqlReader.ReadMany<PositionRecord>(tableName, dbName, sql);
     }
-
-    //private async Task<T?> ReadOne<T>(string sql, string databaseName, params (string, object)[] parameters) where T : new()
-    //{
-    //    using var connection = await Connect(databaseName);
-    //    using var command = connection.CreateCommand();
-    //    command.CommandText = sql;
-    //    foreach (var (key, value) in parameters)
-    //    {
-    //        command.Parameters.AddWithValue(key, value);
-    //    }
-
-    //    using var r = await command.ExecuteReaderAsync();
-    //    using var sqlHelper = new SqlReader<T>(r);
-    //    T? t = default;
-    //    while (await r.ReadAsync())
-    //    {
-    //        t = sqlHelper.Read();
-    //    }
-    //    return t;
-    //}
-
-    //private async Task<List<T>> ReadMany<T>(string sql, string databaseName, params (string, object)[] parameters) where T : new()
-    //{
-    //    using var connection = await Connect(databaseName);
-    //    using var command = connection.CreateCommand();
-    //    command.CommandText = sql;
-    //    foreach (var (key, value) in parameters)
-    //    {
-    //        command.Parameters.AddWithValue(key, value);
-    //    }
-    //    using var r = await command.ExecuteReaderAsync();
-    //    using var sqlHelper = new SqlReader<T>(r);
-    //    List<T> results = new();
-    //    while (await r.ReadAsync())
-    //    {
-    //        results.Add(sqlHelper.Read());
-    //    }
-    //    return results;
-    //}
 }

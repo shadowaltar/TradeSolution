@@ -12,6 +12,7 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -61,30 +62,25 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var storage = new Storage();
-
-        //foreach (var secType in new SecurityType[] { SecurityType.Equity, SecurityType.Fx })
-        //{
-        //    await storage.CreateOrderTable(secType);
-        //    await storage.CreateTradeTable(secType);
-        //    await storage.CreatePositionTable(secType);
-        //}
-        //await storage.CreateTable<Asset>();
-        //await storage.CreateTable<Order>("stock_orders");
-        //await storage.CreateTable<Order>("fx_orders");
-        //await storage.CreateTable<Trade>("stock_trades");
-        //await storage.CreateTable<Trade>("fx_trades");
-        //await storage.CreateTable<Position>("stock_positions");
-        //await storage.CreateTable<Position>("fx_positions");
-        //var y = await storage.CreateTradeTable(Secu<rityType.Fx);
-
+        //await ResetOrderTradePosition();
         await RunMacMimicWebService();
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
         //await Run();
+    }
 
-        Console.WriteLine("Finished.");
+    private static async Task ResetOrderTradePosition()
+    {
+        var storage = new Storage();
+        await storage.CreateTable<Order>("stock_orders");
+        await storage.CreateTable<Trade>("stock_trades");
+        await storage.CreateTable<Position>("stock_positions");
+        await storage.CreateTable<Order>("fx_orders");
+        await storage.CreateTable<Trade>("fx_trades");
+        await storage.CreateTable<Position>("fx_positions");
+        await storage.CreateTable<PositionRecord>();
+        await storage.CreateTable<AlgoEntry<object>>();
     }
 
     private static async Task RunMacMimicWebService()
@@ -107,13 +103,16 @@ public class Program
         var email = _testEmail;
 
         var exchange = ExchangeType.Binance;
-        var symbol = "BTCBUSD";
+        var symbol = "BTCUSDT";
+        var quoteCode = "USDT";
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
         var slowMa = 7;
         var stopLoss = 0.0005m;
         var takeProfit = 0.0005m;
+        var initialFixedQuantity = 100;
+
         _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";
         _fakeSecretFilePath = Path.Combine(Consts.DatabaseFolder, $"{Environments.ToString(environment)}_{userName}_{accountName}");
 
@@ -132,7 +131,10 @@ public class Program
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var result = await Login(services, userName, password, email, accountName, accountType, context.Environment, security);
         if (result != ResultCode.LoginUserAndAccountOk)
+        {
+            _log.Error("Login user / account failed: " + result);
             return;
+        }
 
         AlgoEffectiveTimeRange? algoTimeRange = null;
         switch (core.Environment)
@@ -146,21 +148,29 @@ public class Program
             default:
                 return;
         }
-        var parameters = new AlgorithmParameters(false, context.User!.Name,
-            context.Account!.Name, core.Environment, core.Exchange, core.Broker, interval,
-            new List<Security> { security }, algoTimeRange);
-        _log.Info("Execute algorithm with parameters: " + parameters);
 
+        var fiat = securityService.GetSecurity(quoteCode) ?? throw Exceptions.Impossible(quoteCode + " definition does not exist.");
+        var fiatAsset = services.Portfolio.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCode + " asset does not exist.");
+        var lockedAmount = fiatAsset.Quantity - initialFixedQuantity;
+        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCode} asset quantity < {initialFixedQuantity}");
+
+        var parameters = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
-        var sizing = new SimplePositionSizingLogic(PositionSizingMethod.Constant, fixedAmount: 1000);
+        var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed, lockedAmount: lockedAmount);
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
 
-        context.SetPreferredAssets("BUSD", "TUSD", "USDT");
-        var guid = await core.StartAlgorithm(parameters, algorithm);
+        _log.Info("Execute algorithm with parameters #1: " + parameters);
+        _log.Info("Execute algorithm with parameters #2: " + algorithm);
 
-        Thread.Sleep(TimeSpan.FromMinutes(10));
+        var isAssetSet = context.SetPreferredAssets("BUSD", "TUSD", "USDT");
+        var guid = await core.StartAlgorithm(parameters, algorithm);
+        
+        while (true)
+        {
+            Thread.Sleep(5000);
+        }
 
         await core.StopAlgorithm(guid);
     }
@@ -187,10 +197,8 @@ public class Program
                     _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
                     return await Login(services, userName, password, email, accountName, accountType, environment, security);
                 }
-            case ResultCode.SubscriptionFailed:
-                throw new InvalidOperationException("Subscription failed.");
             default:
-                throw Exceptions.Invalid(result);
+                return result;
         }
     }
 
@@ -322,6 +330,7 @@ public class Program
             Side = Side.Buy,
             Type = OrderType.Limit,
             TimeInForce = TimeInForceType.GoodTillCancel,
+            Comment = "Demo",
         };
         await Task.Run(async () =>
         {
@@ -337,7 +346,7 @@ public class Program
         async void AfterOrderSent(Order order)
         {
             _log.Info("Order sent: " + order);
-            var orders = await orderService.GetOpenOrders();
+            var orders = orderService.GetOpenOrders();
 
             foreach (var openOrder in orders)
             {
@@ -347,8 +356,9 @@ public class Program
             orderService.CancelOrder(order.Id);
         }
 
-        static void OnNewTradesReceived(List<Trade> trades)
+        static void OnNewTradesReceived(List<Trade> trades, bool isSameSecurity)
         {
+            if (!isSameSecurity) throw new Exception("!");
             foreach (var trade in trades)
             {
                 _log.Info("Trade received: " + trade);
@@ -412,8 +422,7 @@ public class Program
                     engine.Initialize(algorithm);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoStartParams = new AlgorithmParameters(true, _testUserName, _testAccountName,
-                        _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
+                    var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
                     await engine.Run(algoStartParams);
 
                     var entries = engine.GetAllEntries(security.Id);
@@ -576,8 +585,7 @@ public class Program
                         var engine = new AlgorithmEngine<MacVariables>(context);
                         engine.Initialize(algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                        var algoStartParams = new AlgorithmParameters(true, _testUserName, _testAccountName,
-                            _testEnvironment, _testExchange, _testBroker, interval, securityPool, timeRange);
+                        var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
 
                         await engine.Run(algoStartParams);
 

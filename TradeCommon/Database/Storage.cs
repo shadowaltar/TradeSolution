@@ -4,19 +4,23 @@ using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Misc;
 
 namespace TradeCommon.Database;
 
 public partial class Storage : IStorage
 {
     private readonly ILog _log = Logger.New();
-    private readonly Dictionary<string, ISqlWriter> _writers = new();
+    private readonly SqlWriters _writers;
 
-    public event Action<object, string> Success;
-    public event Action<object, Exception, string> Failed;
+    public event Action<object, string>? Success;
+    public event Action<object, Exception, string>? Failed;
 
     public IDatabaseSchemaHelper SchemaHelper { get; } = new SqliteSchemaHelper();
+
+    public Storage()
+    {
+        _writers = new SqlWriters(this);
+    }
 
     /// <summary>
     /// Execute a query and return a <see cref="DataTable"/>.
@@ -118,10 +122,8 @@ public partial class Storage : IStorage
     /// <param name="sql"></param>
     /// <param name="database"></param>
     /// <returns></returns>
-    public async Task<int> Run(string sql, string database)
+    public async Task<int> RunOne(string sql, string database)
     {
-        var entries = new DataTable();
-
         using var connection = await Connect(database);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
@@ -130,6 +132,32 @@ public partial class Storage : IStorage
 
         _log.Info($"Executed command in {database}. SQL: {sql}");
         return i;
+    }
+
+    public async Task<int> RunMany(List<string> sqls, string database)
+    {
+        var count = 0;
+        using var connection = await Connect(database);
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            foreach (var sql in sqls)
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                var i = await command.ExecuteNonQueryAsync();
+                count += i;
+            }
+            transaction.Commit();
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to run many sqls. ", e);
+            transaction.Rollback();
+        }
+
+        _log.Info($"Executed multiple commands in {database}. SQLs:{Environment.NewLine}{string.Join(Environment.NewLine, sqls)}");
+        return count;
     }
 
     /// <summary>
@@ -192,13 +220,51 @@ public partial class Storage : IStorage
         writer.Failed += RaiseFailed;
     }
 
-    private void RaiseSuccess(object entry, string methodName = "")
+    public void RaiseSuccess(object entry, string methodName = "")
     {
         Success?.Invoke(entry, methodName);
     }
 
-    private void RaiseFailed(object entry, Exception e, string methodName = "")
+    public void RaiseFailed(object entry, Exception e, string methodName = "")
     {
         Failed?.Invoke(entry, e, methodName);
+    }
+
+    protected class SqlWriters
+    {
+        private readonly Dictionary<string, ISqlWriter> _writers = new();
+        private readonly IStorage _storage;
+
+        public SqlWriters(IStorage storage)
+        {
+            _storage = storage;
+        }
+
+        public ISqlWriter Get<T>() where T : class, new()
+        {
+            lock (_writers)
+            {
+                var type = typeof(T);
+                var name = type.Name;
+                if (!_writers.TryGetValue(name, out var writer))
+                {
+                    writer = new SqlWriter<T>(_storage);
+                    writer.Success += RaiseSuccess;
+                    writer.Failed += RaiseFailed;
+                    _writers[name] = writer;
+                }
+                return writer;
+            }
+        }
+
+        protected void RaiseSuccess(object entry, string methodName = "")
+        {
+            _storage.RaiseSuccess(entry, methodName);
+        }
+
+        protected void RaiseFailed(object entry, Exception e, string methodName = "")
+        {
+            _storage.RaiseFailed(entry, e, methodName);
+        }
     }
 }

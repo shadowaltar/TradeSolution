@@ -22,6 +22,12 @@ public interface IAdminService
     /// <returns></returns>
     Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment);
 
+    /// <summary>
+    /// Ping external service.
+    /// </summary>
+    /// <returns></returns>
+    Task<bool> Ping();
+
     void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker);
 
     Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false);

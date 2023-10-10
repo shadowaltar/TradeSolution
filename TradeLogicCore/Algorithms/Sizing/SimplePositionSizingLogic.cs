@@ -16,15 +16,17 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
     public decimal RelativeMax { get; }
     public decimal AbsoluteMax { get; }
     public decimal FixedAmount { get; }
+    public decimal LockedAmount { get; }
 
-    public SimplePositionSizingLogic(PositionSizingMethod sizingMethod = PositionSizingMethod.AsLargeAsPossible,
+    public SimplePositionSizingLogic(PositionSizingMethod sizingMethod = PositionSizingMethod.All,
                                      decimal? relativeMin = null,
                                      decimal? absoluteMin = null,
                                      decimal? relativeMax = null,
                                      decimal? absoluteMax = null,
-                                     decimal? fixedAmount = null)
+                                     decimal? fixedAmount = null,
+                                     decimal? lockedAmount = null)
     {
-        if (sizingMethod == PositionSizingMethod.Constant && !fixedAmount.IsValid())
+        if (sizingMethod == PositionSizingMethod.Fixed && !fixedAmount.IsValid())
         {
             throw new InvalidOperationException("Must specify a fixed amount for Constant method.");
         }
@@ -60,9 +62,10 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
         RelativeMax = relativeMax ?? decimal.MinValue;
         AbsoluteMax = absoluteMax ?? decimal.MinValue;
         FixedAmount = fixedAmount ?? decimal.MinValue;
+        LockedAmount = lockedAmount ?? decimal.MinValue;
     }
 
-    public decimal GetSize(decimal freeAmount, AlgoEntry current, AlgoEntry last, decimal price, DateTime time)
+    public decimal GetSize(decimal freeAmount, AlgoEntry current, AlgoEntry? last, decimal price, DateTime time)
     {
         if (current.Security == null) throw Exceptions.MissingSecurity();
         var quantity = GetTradingAmount(freeAmount) / price;
@@ -79,7 +82,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
 
         switch (SizingMethod)
         {
-            case PositionSizingMethod.AsLargeAsPossible:
+            case PositionSizingMethod.All:
                 var max = decimal.MinValue;
                 var max1 = decimal.MinValue;
                 var max2 = decimal.MinValue;
@@ -113,10 +116,22 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
                 if (min.IsValid())
                     return Math.Min(freeAmount, min);
                 return 0;
-            case PositionSizingMethod.Constant:
+            case PositionSizingMethod.Fixed:
                 if (FixedAmount.IsValid())
                     return Math.Min(FixedAmount, freeAmount);
-                throw new InvalidOperationException("Must specify a fixed amount for Constant method.");
+                throw new InvalidOperationException("Must specify a fixed amount for Fixed sizing method.");
+            case PositionSizingMethod.PreserveFixed:
+                if (LockedAmount.IsValid())
+                {
+                    var free = freeAmount - LockedAmount;
+                    if (free <= 0)
+                    {
+                        _log.Warn($"Expect to lock away {LockedAmount} but the free amount is just {freeAmount}. Returns zero.");
+                        return 0;
+                    }
+                    return free;
+                }
+                throw new InvalidOperationException("Must specify a locked amount for PreseveFixed sizing method.");
             case PositionSizingMethod.Zero:
                 return 0;
             default:
@@ -129,7 +144,8 @@ public enum PositionSizingMethod
 {
     Unknown,
     Zero,
-    Constant,
-    AsLargeAsPossible,
+    Fixed,
+    All,
+    PreserveFixed,// always preserve fixed amount
     AsSmallAsPossible,
 }

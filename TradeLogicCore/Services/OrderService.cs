@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
@@ -71,52 +72,66 @@ public class OrderService : IOrderService, IDisposable
         return _orders.ThreadSafeValues();
     }
 
-    public async Task<List<Order>> GetOrders(Security security, DateTime start, DateTime? end, bool requestExternal = false)
+    public async Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null)
     {
         var orders = new List<Order>();
-        if (requestExternal)
-        {
-            var state = await _execution.GetOrders(security, start: start, end: end);
-            orders.AddOrAddRange(state.Get<List<Order>>(), state.Get<Order>());
-            foreach (var order in orders)
-            {
-                order.AccountId = _context.AccountId;
-                order.SecurityCode = security.Code;
-                order.Security = security;
-            }
-        }
-        else
-        {
-            orders = await _storage.ReadOrders(security, start, end ?? DateTime.UtcNow);
-        }
+        var state = await _execution.GetOrders(security, start: start, end: end);
+        orders.AddOrAddRange(state.Get<List<Order>>(), state.Get<Order>());
         foreach (var order in orders)
         {
-            order.SecurityCode = security.Code;
-            order.Security = security;
+            order.AccountId = _context.AccountId;
         }
+        Update(orders, security);
         return orders;
     }
 
-    public async Task<List<Order>> GetOpenOrders(Security? security = null, bool requestExternal = false)
+    public async Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null)
     {
-        if (security != null)
-            Assertion.Shall(ExchangeTypeConverter.Parse(security.Exchange) == _context.Exchange);
+        var orders = await _storage.ReadOrders(security, start, end ?? DateTime.UtcNow);
+        Update(orders, security);
+        return orders;
+    }
 
-        if (requestExternal)
+    public List<Order> GetOrders(Security security, DateTime start, DateTime? end = null)
+    {
+        var e = end ?? DateTime.MaxValue;
+        return _orders.ThreadSafeValues()
+            .Where(o => o.SecurityId == security.Id && o.CreateTime <= start && o.UpdateTime >= e).ToList();
+    }
+
+    public async Task<List<Order>> GetExternalOpenOrders(Security? security = null)
+    {
+        if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
+        var orders = new List<Order>();
+        var state = await _execution.GetOpenOrders(security);
+        orders.AddOrAddRange(state.Get<List<Order>>(), state.Get<Order>());
+        Update(orders, security);
+        return orders;
+    }
+
+    public async Task<List<Order>> GetStoredOpenOrders(Security? security = null)
+    {
+        if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
+
+        var orders = await _storage.ReadOpenOrders(security);
+        lock (_openOrders)
         {
-            var state = await _execution.GetOpenOrders(security);
-            var orders = state.Get<List<Order>>();
-            if (orders == null)
+            foreach (var openOrder in orders)
             {
-                var order = state.Get<Order>();
-                return order == null ? new List<Order>() : new List<Order> { order };
+                _openOrders[openOrder.Id] = openOrder;
             }
-            return orders;
         }
-        else
-        {
-            return _openOrders.IsNullOrEmpty() ? await _storage.ReadOpenOrders(security) : _openOrders.ThreadSafeValues();
-        }
+        Update(orders, security);
+        return orders;
+    }
+
+    public List<Order> GetOpenOrders(Security? security = null)
+    {
+        if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
+        if (security == null)
+            return _openOrders.ThreadSafeValues();
+
+        return _openOrders.ThreadSafeValues().Where(o => o.SecurityId == security.Id).ToList();
     }
 
     public async Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false)
@@ -143,11 +158,9 @@ public class OrderService : IOrderService, IDisposable
             // persistence probably happens twice: one is before send (status = Sending)
             // the other is if order is accepted by external execution logic
             // and its new status (like Live / Filled) piggy-backed in the response
+            _orders.ThreadSafeSet(order.Id, order);
             Persist(order);
             var state = await _execution.SendOrder(order);
-            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
-            _log.Info("Sent a new order: " + order);
-
             return state;
         }
     }
@@ -185,7 +198,8 @@ public class OrderService : IOrderService, IDisposable
                                    decimal quantity,
                                    Side side,
                                    OrderType orderType = OrderType.Limit,
-                                   TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+                                   TimeInForceType timeInForce = TimeInForceType.GoodTillCancel,
+                                   string comment = "manual")
     {
         var id = _orderIdGen.NewTimeBasedId;
         var now = DateTime.UtcNow;
@@ -207,6 +221,7 @@ public class OrderService : IOrderService, IDisposable
             StopPrice = 0,
             StrategyId = Consts.ManualTradingStrategyId,
             TimeInForce = timeInForce,
+            Comment = comment,
         };
     }
 
@@ -217,11 +232,17 @@ public class OrderService : IOrderService, IDisposable
     /// <param name="order"></param>
     private void OnOrderReceived(Order order)
     {
+        _log.Info("TEST--------- " + order);
+
+        _securityService.Fix(order);
+
         var eoid = order.ExternalOrderId;
         var oid = order.Id;
+        // already cached the order in SENDING state
         if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
         {
             // TODO
+            throw Exceptions.Impossible("Before order is received it has been cached as a SENDING order");
         }
         else
         {
@@ -236,7 +257,8 @@ public class OrderService : IOrderService, IDisposable
                 {
 
                 }
-                _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
+                if (_log.IsDebugEnabled)
+                    _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
             _orders.ThreadSafeSet(oid, order);
         }
@@ -244,8 +266,8 @@ public class OrderService : IOrderService, IDisposable
         if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
         {
             _openOrders.ThreadSafeSet(order.Id, order);
-            _ordersByExternalId.ThreadSafeSet(eoid, order);
         }
+        _ordersByExternalId.ThreadSafeSet(eoid, order);
 
         Persist(order);
         NextOrder?.Invoke(order);
@@ -257,20 +279,13 @@ public class OrderService : IOrderService, IDisposable
         {
             _log.Warn("Received a sent order action with issue.");
         }
-
         var order = state.Get<Order>();
         if (order == null)
         {
             _log.Warn("Received a state object without content!");
             return;
         }
-
-        _orders.ThreadSafeSet(order.Id, order, _lock);
-        _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order, _lock);
-
-        _log.Info("Sent order: " + order);
-
-        Persist(order);
+        OnOrderReceived(order);
         AfterOrderSent?.Invoke(order);
     }
 
@@ -300,15 +315,27 @@ public class OrderService : IOrderService, IDisposable
         OrderCancelled?.Invoke(order);
     }
 
-    public void Update(ICollection<Order> orders)
+    public void Update(ICollection<Order> orders, Security? security = null)
     {
         foreach (var order in orders)
         {
             if (order.Id <= 0)
             {
-                order.Id = _orderIdGen.NewTimeBasedId;
+                // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
+                var possibleSameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
+                if (possibleSameOrder != null)
+                    order.Id = possibleSameOrder.Id;
+                else
+                    order.Id = _orderIdGen.NewTimeBasedId;
             }
             order.AccountId = _context.AccountId;
+
+            if (!_securityService.Fix(order, security))
+            {
+                _log.Warn("Failed to fix security info for order: " + order);
+                continue;
+            }
+
             if (order.Status == OrderStatus.Live)
             {
                 _openOrders.ThreadSafeSet(order.Id, order);
@@ -328,7 +355,9 @@ public class OrderService : IOrderService, IDisposable
 
     public void Persist(Order order)
     {
-        _persistence.Enqueue(order);
+        if (!_securityService.Fix(order))
+            throw Exceptions.Impossible();
+        _persistence.Insert(order);
     }
 
     private void Persist(ExternalQueryState state)

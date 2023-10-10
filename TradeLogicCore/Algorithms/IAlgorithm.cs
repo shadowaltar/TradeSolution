@@ -15,6 +15,10 @@ public interface IAlgorithm
     IExitPositionAlgoLogic Exiting { get; }
     ISecurityScreeningAlgoLogic Screening { get; }
     IPositionSizingAlgoLogic Sizing { get; }
+    decimal LongStopLossRatio { get; }
+    decimal LongTakeProfitRatio { get; }
+    decimal ShortStopLossRatio { get; }
+    decimal ShortTakeProfitRatio { get; }
 }
 
 public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables

@@ -2,6 +2,7 @@
 using Moq;
 using NUnit.Framework;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeDataCore.Instruments;
@@ -31,7 +32,6 @@ public class PortfolioServiceTests
             Mock.Of<IExternalExecutionManagement>(),
             Mock.Of<Context>(),
             Mock.Of<IOrderService>(),
-            Mock.Of<ITradeService>(),
             Mock.Of<ISecurityService>(),
             Mock.Of<Persistence>());
         foreach (var input in _fakeTradeInputs)
@@ -47,10 +47,10 @@ public class PortfolioServiceTests
             trades.Add(trade);
         }
 
-        var position = service.Create(trades[0]);
+        var position = Position.Create(trades[0]);
         for (int i = 1; i < trades.Count; i++)
         {
-            service.Apply(position, trades[i]);
+            position.Apply(trades[i]);
         }
     }
 }
