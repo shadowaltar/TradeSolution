@@ -65,6 +65,12 @@ public class PortfolioService : IPortfolioService, IDisposable
                 continue;
             }
 
+            var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
+            if (existingAsset != null)
+                asset.Id = existingAsset.Id;
+            else
+                asset.Id = _assetIdGenerator.NewTimeBasedId;
+
             asset.AccountId = account.Id;
             asset.UpdateTime = DateTime.UtcNow;
         }
@@ -258,7 +264,10 @@ public class PortfolioService : IPortfolioService, IDisposable
             var order = CreateCloseOrder(position, orderComment);
             await _orderService.SendOrder(order);
             // need to wait for a while to 
-            Threads.WaitUntil(() => Portfolio.GetPosition(position.Id)?.EndOrderId == order.Id, pollingMs: 1000);
+            Threads.WaitUntil(() =>
+            {
+                return Portfolio.GetPosition(position.Id)?.EndOrderId == order.Id;
+            }, pollingMs: 1000);
         }
         _context.Services.Persistence.WaitAll();
 

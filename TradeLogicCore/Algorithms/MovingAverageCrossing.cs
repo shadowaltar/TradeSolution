@@ -49,6 +49,13 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
                                  IEnterPositionAlgoLogic? entering = null,
                                  IExitPositionAlgoLogic? exiting = null)
     {
+        FastParam = fast;
+        SlowParam = slow;
+        LongStopLossRatio = longStopLossRatio <= 0 ? decimal.MinValue : longStopLossRatio;
+        LongTakeProfitRatio = longTakeProfitRatio <= 0 ? decimal.MinValue : longTakeProfitRatio;
+        ShortStopLossRatio = shortStopLossRatio <= 0 ? decimal.MinValue : shortStopLossRatio;
+        ShortTakeProfitRatio = shortTakeProfitRatio <= 0 ? decimal.MinValue : shortTakeProfitRatio;
+
         _context = context;
 
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
@@ -56,13 +63,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
         Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
         Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, longStopLossRatio, longTakeProfitRatio, shortStopLossRatio, shortTakeProfitRatio);
-        FastParam = fast;
-        SlowParam = slow;
-        LongStopLossRatio = longStopLossRatio;
-        LongTakeProfitRatio = longTakeProfitRatio;
-        ShortStopLossRatio = shortStopLossRatio;
-        ShortTakeProfitRatio = shortTakeProfitRatio;
-        
+
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
     }

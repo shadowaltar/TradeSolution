@@ -110,7 +110,7 @@ public class Program
         var fastMa = 3;
         var slowMa = 7;
         var stopLoss = 0.0005m;
-        var takeProfit = 0.0005m;
+        var takeProfit = 0m;// 0.0005m;
         var initialFixedQuantity = 100;
 
         _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";

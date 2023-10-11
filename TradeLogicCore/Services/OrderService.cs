@@ -249,8 +249,7 @@ public class OrderService : IOrderService, IDisposable
             order.Id = existingOrder.Id;
             order.AccountId = existingOrder.AccountId;
             order.CreateTime = existingOrder.CreateTime;
-            order.SecurityId = existingOrder.SecurityId;
-            order.Security = existingOrder.Security;
+            _securityService.Fix(order);
             if (order.Status != existingOrder.Status)
             {
                 if (existingOrder.IsClosed)

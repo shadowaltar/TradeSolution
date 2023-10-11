@@ -74,7 +74,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         _context = context;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
         _broker.NewItem += a => a.Run();
-
+        _broker.Run();
         _cancelIdGenerator = new IdGenerator("CancelOrderIdGen");
         _tradeIdGenerator = new IdGenerator("TradeIdGen");
     }
@@ -850,6 +850,9 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     private void OnStreamingDataReceived(byte[] bytes)
     {
         string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+
+        _log.Info("Received JSON:" + Environment.NewLine + json);
+
         try
         {
             // expect { "stream": "...", "data": {...}}

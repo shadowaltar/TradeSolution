@@ -8,7 +8,7 @@ public static class Json
         return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(obj));
     }
 
-    public static string Serialize<T>(T obj)
+    public static string Serialize<T>(T obj, bool isPretty = false)
     {
         return JsonSerializer.Serialize<T>(obj);
     }

@@ -153,6 +153,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[Id:{Id}][ETId:{ExternalTradeId}][{Time:yyMMdd-HHmmss}][SecId:{SecurityId}][PId:{PositionId}], {Side} p*q:{Price}*{Quantity}, [OId:{OrderId}][EOId:{ExternalOrderId}]";
+        return $"[Id:{Id}][ETId:{ExternalTradeId}][{Time:yyMMdd-HHmmss}][SecId:{SecurityId}][PId:{PositionId}], {Side} p*q:{Price:G29}*{Quantity:G29}, [OId:{OrderId}][EOId:{ExternalOrderId}]";
     }
 }

@@ -90,13 +90,13 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                _isEmpty = true;
+                _isEmpty = false;
                 _ = await RunTask(task);
                 _taskPool.Return(task);
             }
             else
             {
-                _isEmpty = false;
+                _isEmpty = true;
                 Thread.Sleep(100);
             }
         }

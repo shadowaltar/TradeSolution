@@ -56,12 +56,13 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
         var order = CreateOrder(OrderType.Limit, side, enterTime, enterPrice, size, current.Security, comment: Comments.AlgoEnter);
 
+        current.Quantity = size;
         current.OrderId = order.Id;
 
         var state = await _orderService.SendOrder(order);
         state.SubStates = new();
 
-        if (stopLossPrice.IsValid())
+        if (stopLossPrice.IsValid() && stopLossPrice > 0)
         {
             if (stopLossPrice >= enterPrice)
             {
@@ -77,7 +78,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             }
         }
 
-        if (takeProfitPrice.IsValid())
+        if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
         {
             if (takeProfitPrice <= enterPrice)
             {
@@ -114,6 +115,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         {
             Id = _orderIdGen.NewTimeBasedId,
             AccountId = _context.AccountId,
+            ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
             Side = side,
             CreateTime = time,
             UpdateTime = time,

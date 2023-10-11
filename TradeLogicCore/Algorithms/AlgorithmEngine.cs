@@ -172,21 +172,23 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         Interval = parameters.Interval;
         Parameters = parameters;
 
-        // close open positions
-        if (_engineParameters.CloseOpenPositionsOnStart)
-            CloseAllOpenPositions(Comments.CloseAllBeforeStart);
-
-        // subscribe to events
-        _services.MarketData.NextOhlc -= OnNextPrice;
-        _services.MarketData.NextOhlc += OnNextPrice;
-        _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
-        _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
+        // close positions need these events
         _services.Order.NextOrder -= OnNextOrder;
         _services.Order.NextOrder += OnNextOrder;
         _services.Trade.NextTrade -= OnNextTrade;
         _services.Trade.NextTrade += OnNextTrade;
         _services.Trade.NextTrades -= OnNextTrades;
         _services.Trade.NextTrades += OnNextTrades;
+
+        // close open positions
+        if (_engineParameters.CloseOpenPositionsOnStart)
+            CloseAllOpenPositions(Comments.CloseAllBeforeStart);
+
+        // subscribe to events
+        _services.MarketData.NextOhlc -= OnNextOhlcPrice;
+        _services.MarketData.NextOhlc += OnNextOhlcPrice;
+        _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
+        _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
 
         // pick security to trade
         // check associated asset's position, and map any existing position into algo entry
@@ -228,7 +230,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         _log.Info("Algorithm Engine is shutting down.");
 
         _runningState = AlgoRunningState.Stopped;
-        _services.MarketData.NextOhlc -= OnNextPrice;
+        _services.MarketData.NextOhlc -= OnNextOhlcPrice;
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
         await _services.MarketData.UnsubscribeAllOhlcs();
         var securities = Screening.GetAll();
@@ -268,23 +270,12 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
     // TEMP TODO TEST
     private DateTime _lastPriceTime = DateTime.UtcNow;
 
-    /// <summary>
-    /// Handler which is invoked when price feed notifies a new price object arrives.
-    /// We expect this is a separated thread from the original engine.
-    /// </summary>
-    /// <param name="securityId"></param>
-    /// <param name="ohlcPrice"></param>
-    /// <param name="isComplete"></param>
-    private void OnNextPrice(int securityId, OhlcPrice ohlcPrice, bool isComplete)
+    private async void OnNextOhlcPrice(int securityId, OhlcPrice price, bool isComplete)
     {
-        ClosePositionIfNeeded();
-
-        if (!CanAcceptPrice())
-            return;
-
-        if (ohlcPrice.T - _lastPriceTime > TimeSpans.FifteenSeconds)
+        // TEMP TODO TEST
+        if (price.T - _lastPriceTime > TimeSpans.ThirtySeconds)
         {
-            _lastPriceTime = ohlcPrice.T;
+            _lastPriceTime = price.T;
         }
         else
         {
@@ -292,11 +283,28 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             return;
         }
 
-        //if (!isComplete)
-        //{
-        //    _log.Info("Received incomplete price.");
-        //    return;
-        //}
+        await ProcessPrice(securityId, price, isComplete);
+    }
+
+    /// <summary>
+    /// Handler which is invoked when price feed notifies a new price object arrives.
+    /// We expect this is a separated thread from the original engine.
+    /// </summary>
+    /// <param name="securityId"></param>
+    /// <param name="ohlcPrice"></param>
+    /// <param name="isComplete"></param>
+    private async Task ProcessPrice(int securityId, OhlcPrice ohlcPrice, bool isComplete)
+    {
+        ClosePositionIfNeeded();
+
+        if (!CanAcceptPrice())
+            return;
+
+        if (!isComplete)
+        {
+            _log.Info("Received incomplete price.");
+            return;
+        }
 
         TotalPriceEventCount++;
 
@@ -311,7 +319,7 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         var security = _pickedSecurities?.GetOrDefault(securityId);
         CancelOpenOrder(security);
 
-        Update(securityId, ohlcPrice);
+        await Update(securityId, ohlcPrice);
     }
 
     private void CancelOpenOrder(Security? security)
@@ -556,6 +564,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
 
     private void OnNextOrder(Order order)
     {
+        if (_runningState == AlgoRunningState.NotYetStarted)
+            return;
         if (order.Status == OrderStatus.Live)
         {
         }
@@ -570,20 +580,25 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
         else if (order.Status == OrderStatus.Filled)
         {
             var lastEntry = _lastEntriesBySecurityId.GetValueOrDefault(order.SecurityId);
+            if (lastEntry == null) throw Exceptions.Impossible("AlgoEntry must already exist before any response of filled order, order Id: " + order.Id);
         }
-        _persistence.Insert(order);
     }
 
     private void OnNextTrade(Trade trade)
     {
+        if (_runningState == AlgoRunningState.NotYetStarted)
+            return;
         var entry = InternalOnNextTrade(trade);
-        if (entry == null) throw Exceptions.Impossible("AlgoEntry must exist when applying trades to it.");
-        _persistence.Insert(entry);
+        if (entry == null) throw Exceptions.Impossible("AlgoEntry must exist when applying before any response of successful trade, trade Id: " + trade.Id);
+        trade.ApplyTo(entry);
     }
 
     private void OnNextTrades(List<Trade> trades, bool isSameSecurity)
     {
-        if (trades.IsNullOrEmpty()) return;
+        if (_runningState == AlgoRunningState.NotYetStarted)
+            return;
+        if (trades.IsNullOrEmpty())
+            return;
 
         if (isSameSecurity)
         {
@@ -592,7 +607,6 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
                 // it is safe to assume trades are from the same order
                 var entry = InternalOnNextTrades(trades);
                 if (entry == null) throw Exceptions.Impossible("AlgoEntry must exist when applying trades to it.");
-                _persistence.Insert(entry);
             }
             else if (trades.Count == 1)
             {
@@ -844,6 +858,11 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
                 // must cache before open a position
                 _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
                 var state = await EnterLogic.Open(current, last, ohlcPrice.C, Side.Buy, time, sl, tp);
+                if (state.ResultCode != ResultCode.SendOrderOk)
+                {
+                    current.IsLong = false;
+                    current.LongCloseType = CloseType.None;
+                }
             }
 
             Algorithm.AfterLongOpened(current);
@@ -1001,6 +1020,8 @@ public class AlgorithmEngine<T> : IAlgorithmEngine<T> where T : IAlgorithmVariab
             Side.Sell => Algorithm.ShortTakeProfitRatio,
             _ => throw Exceptions.InvalidSide(),
         };
+        if (!tpRatio.IsValid() && tpRatio <= 0)
+            return 0;
         return decimal.Round(price.C * (1 + tpRatio), security.PricePrecision, MidpointRounding.ToNegativeInfinity);
     }
 

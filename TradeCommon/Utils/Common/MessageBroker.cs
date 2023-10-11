@@ -15,6 +15,9 @@ public class MessageBroker<T> : IDisposable
         _queue.Enqueue(item);
     }
 
+    /// <summary>
+    /// Start the message broker.
+    /// </summary>
     public void Run()
     {
         Task.Factory.StartNew(t =>

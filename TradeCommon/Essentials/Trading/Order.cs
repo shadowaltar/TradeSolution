@@ -177,7 +177,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}], {Side} p*q:{Price}*{Quantity},";
+        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}], {Side} p*q:{Price:G29}*{Quantity:G29},";
     }
 }
 

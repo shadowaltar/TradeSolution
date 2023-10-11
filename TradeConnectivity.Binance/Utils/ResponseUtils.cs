@@ -109,6 +109,8 @@ public static class ResponseUtils
         content = AsyncHelper.RunSync(response.Content.ReadAsStringAsync);
         try
         {
+            _log.Info("Received JSON:" + Environment.NewLine + content);
+
             jsonNode = JsonNode.Parse(content);
         }
         catch (Exception e)
