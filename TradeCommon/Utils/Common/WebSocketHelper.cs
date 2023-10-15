@@ -1,4 +1,4 @@
-﻿using System;
+﻿using log4net;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
@@ -6,6 +6,8 @@ using System.Text;
 namespace Common;
 public static class WebSocketHelper
 {
+    private static readonly ILog _log = Logger.New();
+
     public static async Task<string?> ListenOne(string url, int timeoutMs = 10000)
     {
         Uri uri = new(url);
@@ -42,32 +44,46 @@ public static class WebSocketHelper
     /// <param name="uri"></param>
     /// <param name="parseResultFunc"></param>
     /// <returns></returns>
-    public static ClientWebSocket Listen(this Uri uri, Action<byte[]> parseResultFunc)
+    public static void Listen(this Uri uri, Action<byte[]> parseResultFunc, Action<ClientWebSocket> webSocketCreatedFunc)
     {
         ClientWebSocket ws = new();
-
-        _ = Task.Factory.StartNew(async t =>
+        Task.Factory.StartNew(async t =>
         {
-            await ws.ConnectAsync(uri, default);
-            var buffer = new byte[1024];
-            var bytes = new List<byte>();
-            var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), default);
-            while (!result.CloseStatus.HasValue)
+            do
             {
-                if (result.MessageType != WebSocketMessageType.Text)
-                    continue;
+                ws = new();
+                try
+                {
+                    await ws.ConnectAsync(uri, default);
+                    webSocketCreatedFunc.Invoke(ws);
 
-                bytes.AddRange(buffer.Take(result.Count));
+                    var buffer = new byte[1024];
+                    var bytes = new List<byte>();
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), default);
+                    while (!result.CloseStatus.HasValue)
+                    {
+                        if (result.MessageType != WebSocketMessageType.Text)
+                            continue;
 
-                if (!result.EndOfMessage)
-                    continue;
-                parseResultFunc.Invoke(bytes.ToArray());
-                bytes.Clear();
-                result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            }
+                        bytes.AddRange(buffer.Take(result.Count));
+
+                        if (!result.EndOfMessage)
+                            continue;
+                        parseResultFunc.Invoke(bytes.ToArray());
+                        bytes.Clear();
+                        result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                    }
+                }
+                catch (WebSocketException e)
+                {
+                    _log.Error("Web socket is faulted. Exception message: " + e.Message, e);
+                }
+                finally
+                {
+                    ws?.Dispose();
+                }
+            } while (true);
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
-
-        return ws;
     }
 
     public static async Task Send(this ClientWebSocket ws, string payload)

@@ -4,6 +4,7 @@ using log4net;
 using System.Net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Algorithms;
 
 namespace TradeCommon.Runtime;
 public class ApplicationContext
@@ -18,7 +19,7 @@ public class ApplicationContext
     private BrokerType _broker;
     private int _brokerId;
 
-    public string AlgoSessionId { get; } = "";
+    public long AlgoBatchId { get; }
 
     public bool IsExternalProhibited { get; private set; }
 
@@ -31,7 +32,7 @@ public class ApplicationContext
     public ApplicationContext(IStorage storage)
     {
         Storage = storage;
-        AlgoSessionId = Guid.NewGuid().ToString();
+        AlgoBatchId = IdGenerators.Get<AlgoBatch>().NewTimeBasedId;
     }
 
     /// <summary>
@@ -52,6 +53,7 @@ public class ApplicationContext
         private set => _exchange = value;
     }
 
+    public int UserId { get; protected set; } = 0;
     public int AccountId { get; protected set; } = 0;
 
     /// <summary>

@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Constants;
+﻿using TradeCommon.Essentials.Instruments;
+
+namespace TradeCommon.Constants;
 public static class Consts
 {
     public const string DefaultDateFormat = "yyyyMMdd";
@@ -7,11 +9,18 @@ public static class Consts
     public static readonly string[] YesStrings = { "TRUE", "true", "True", "Yes", "yes", "YES", "T", "Y", "t", "y", "1" };
     public static readonly string[] NoStrings = { "FALSE", "false", "False", "No", "no", "NO", "F", "N", "f", "n", "0" };
 
-    public const int ManualTradingStrategyId = 0;
+    public const int DefaultStrategyId = 0;
+
+    public const int ManualTradingStrategyId = 1;
 
     public const char SqlCommandPlaceholderPrefix = '$';
 
     public static readonly string DatabaseFolder = @"C:\Temp\Data";
 
     public const int EnumDatabaseTypeSize = 20;
+
+    public static readonly SecurityType[] SupportedSecurityTypes = new[] {
+        SecurityType.Fx,
+        SecurityType.Equity,
+    };
 }

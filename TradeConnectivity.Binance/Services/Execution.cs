@@ -44,9 +44,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         { OrderType.TakeProfit, "TAKE_PROFIT" }, { OrderType.TakeProfitLimit, "TAKE_PROFIT_LIMIT" },
     };
 
-    private bool _canSendEvent = true;
-    private readonly object _sendEventLock = new();
-
     private string? _listenKey;
     private Timer? _listenKeyTimer;
 
@@ -127,7 +124,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         }
         if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
         {
-            parameters.Add(("price", order.Price.ToString()));
+            parameters.Add(("price", order.Price != 0 ? order.Price.ToString() : order.StopPrice.ToString()));
             parameters.Add(("stopPrice", order.StopPrice.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
         }
@@ -324,7 +321,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         FeeAssetId = 0,
                         FeeAssetCode = "",
                         OrderId = 0,
-                        BestMatch = 0,
                         SecurityId = security.Id,
                         SecurityCode = "",
                         ExternalTradeId = tradeId,
@@ -705,11 +701,16 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             // subscribe to the listen key in order to listen to order/trade/account changes
             Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={_listenKey}");
 
-            var webSocket = uri.Listen(OnStreamingDataReceived);
-            _webSockets[_listenKey] = webSocket;
+            string message = "";
+            uri.Listen(OnStreamingDataReceived, ws =>
+            {
+                message = $"Subscribed to user streaming data, listen-key: {_listenKey}";
+                _log.Info(message);
+                _webSockets[_listenKey] = ws;
+            });
 
-            var message = $"Subscribed to user streaming data, listen-key: {_listenKey}";
-            _log.Info(message);
+            Threads.WaitUntil(() => _webSockets.ContainsKey(_listenKey));
+
             return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeExecutionData, message);
         }
         catch (Exception e)
@@ -783,7 +784,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Price = rootObj.GetDecimal("price"),
             Quantity = rootObj.GetDecimal("origQty"),
             FilledQuantity = rootObj.GetDecimal("executedQty"),
-            Status = rootObj.GetString("status").ConvertDescriptionToEnum(OrderStatus.Unknown),
+            Status = OrderStatusConverter.ParseBinance(rootObj.GetString("status")),
             TimeInForce = rootObj.GetString("timeInForce").ConvertDescriptionToEnum(TimeInForceType.Unknown),
             Type = rootObj.GetString("type").ConvertDescriptionToEnum(OrderType.Unknown),
             Side = rootObj.GetString("side").ConvertDescriptionToEnum<Side>(),
@@ -809,7 +810,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                 Fee = rootObj.GetDecimal("commission"),
                 FeeAssetCode = rootObj.GetString("commissionAsset"),
                 Side = rootObj.GetBoolean("isBuyer") ? Side.Buy : Side.Sell,
-                BestMatch = rootObj.GetBoolean("isBestMatch") ? 1 : -1,
+                // rootObj.GetBoolean("isBestMatch") ? 1 : -1,
                 AccountId = _context.AccountId,
 
                 // the trades got from external are lacking some ids
@@ -938,6 +939,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     var trailingDelta = jsonNode.GetDecimal("d");
                     var trailingTime = jsonNode.GetUtcFromUnixMs("D");
                     var strategyId = jsonNode.GetInt("j");
+                    strategyId = strategyId == int.MinValue ? Consts.DefaultStrategyId : strategyId;
                     var strategyType = jsonNode.GetInt("J");
                     var workingTime = jsonNode.GetUtcFromUnixMs("W"); // appears if the order is on order book
                     var isUsingSor = jsonNode.GetBoolean("uS");
@@ -969,7 +971,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     // if a trade is generated
                     if (externalTradeId > 0)
                     {
-                        // TODO probably use lastExecQty
                         trade = new Trade
                         {
                             Id = _tradeIdGenerator.NewTimeBasedId,
@@ -982,13 +983,11 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             Fee = fee,
                             FeeAssetCode = feeAssetCode,
                             FeeAssetId = 0, // need to be filled later
-                            BestMatch = 0,
                             OrderId = 0, // need to be filled later
-                            Price = 0, // TODO
-                            Quantity = 0, // TODO
+                            Price = lastExecutedPrice, // TODO
+                            Quantity = lastExecutedQuantity, // TODO
                             Time = updateTime, // TODO
                             PositionId = 0, // TODO
-                            Security = null, // TODO
                         };
                     }
 
@@ -1026,6 +1025,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         catch (TimeoutException te)
         {
             _log.Error($"Heartbeat request for listen-key {_listenKey} timed out.", te);
+        }
+        catch (HttpRequestException hre)
+        {
+            _log.Error($"Failed to send/receive heartbeat for listen-key {_listenKey}.", hre);
         }
     }
 

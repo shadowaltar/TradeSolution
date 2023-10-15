@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -161,8 +162,15 @@ public interface IOrderService
     void Update(ICollection<Order> orders, Security? security = null);
 
     /// <summary>
-    /// Persist an order to data storage.
+    /// Clear cached orders which their positions are closed.
+    /// Or specify a closed position and clear its related orders.
     /// </summary>
-    /// <param name="order"></param>
-    void Persist(Order order);
+    /// <param name="position"></param>
+    void ClearCachedClosedPositionOrders(Position? position = null);
+
+    ///// <summary>
+    ///// Persist an order to data storage.
+    ///// </summary>
+    ///// <param name="order"></param>
+    //void Persist(Order order);
 }

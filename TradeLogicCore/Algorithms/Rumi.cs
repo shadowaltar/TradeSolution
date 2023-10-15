@@ -1,8 +1,10 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
@@ -10,13 +12,14 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
-public class Rumi : IAlgorithm<RumiVariables>
+public class Rumi : IAlgorithm
 {
-    private static readonly ILog _log = Logger.New();
-
     private readonly SimpleMovingAverage _fastMa;
     private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
+    private readonly Context _context;
+
+    public AlgorithmParameters AlgorithmParameters { get; set; }
 
     public int Id => 2;
 
@@ -25,6 +28,7 @@ public class Rumi : IAlgorithm<RumiVariables>
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
     public int RumiParam { get; } = 1;
+    public bool AllowMultipleOpenOrders => false;
 
     public IPositionSizingAlgoLogic Sizing { get; }
     public IEnterPositionAlgoLogic Entering { get; }
@@ -41,6 +45,7 @@ public class Rumi : IAlgorithm<RumiVariables>
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
     {
+        _context = context;
         Sizing = new SimplePositionSizingLogic();
         Screening = new SimpleSecurityScreeningAlgoLogic();
         Entering = new SimpleEnterPositionAlgoLogic(context);
@@ -56,19 +61,19 @@ public class Rumi : IAlgorithm<RumiVariables>
         _rumiMa = new SimpleMovingAverage(RumiParam, "RUMI SMA");
     }
 
-    public decimal GetSize(decimal availableCash, AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, decimal price, DateTime time)
+    public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry last, decimal price, DateTime time)
     {
         return Sizing.GetSize(availableCash, current, last, price, time);
     }
 
-    public RumiVariables CalculateVariables(decimal price, AlgoEntry<RumiVariables>? last)
+    public object CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new RumiVariables();
         var lastVariables = last?.Variables;
         var fast = _fastMa.Next(price);
         var slow = _slowMa.Next(price);
         var rumi = (fast.IsValid() && slow.IsValid()) ? _rumiMa.Next(fast - slow) : decimal.MinValue;
-        var lastRumi = lastVariables?.Rumi ?? decimal.MinValue;
+        var lastRumi = (lastVariables as RumiVariables)?.Rumi ?? decimal.MinValue;
 
         variables.Fast = fast;
         variables.Slow = slow;
@@ -78,10 +83,10 @@ public class Rumi : IAlgorithm<RumiVariables>
         return variables;
     }
 
-    public bool IsLongSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsLongSignal(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
-        var lastRumi = last.Variables!.Rumi;
-        var rumi = current.Variables!.Rumi;
+        var lastRumi = ((RumiVariables)last.Variables).Rumi;
+        var rumi = ((RumiVariables)current.Variables).Rumi;
         var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0;
 
         //if (isSignal && current.Variables.Fast < currentPrice.C)
@@ -92,10 +97,10 @@ public class Rumi : IAlgorithm<RumiVariables>
         return isSignal;
     }
 
-    public bool IsCloseLongSignal(AlgoEntry<RumiVariables> current, AlgoEntry<RumiVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public bool IsCloseLongSignal(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
-        var lastRumi = last.Variables!.Rumi;
-        var rumi = current.Variables!.Rumi;
+        var lastRumi = ((RumiVariables)last.Variables).Rumi;
+        var rumi = ((RumiVariables)current.Variables).Rumi;
         var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi > 0 && rumi < 0;
         return isSignal;
     }
@@ -104,6 +109,54 @@ public class Rumi : IAlgorithm<RumiVariables>
     {
         Assertion.ShallNever(signal1 == 1 && signal2 == 1);
         Assertion.ShallNever(signal1 == -1 && signal2 == -1);
+    }
+
+    public void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
+    {
+        var lastRumi = ((RumiVariables)last.Variables).Rumi;
+        var rumi = ((RumiVariables)current.Variables).Rumi;
+        var isSignal = lastRumi.IsValid() && rumi.IsValid() && lastRumi < 0 && rumi > 0;
+        current.LongSignal = isSignal ? SignalType.Open : SignalType.None;
+    }
+
+    public bool CanOpenLong(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        if (openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open)
+            return true;
+        return false;
+    }
+
+    public bool CanOpenShort(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        if (openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open)
+            return true;
+        return false;
+    }
+
+    public bool CanCloseLong(AlgoEntry current)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+               && position.Side == Side.Buy
+               && current.LongCloseType == CloseType.None
+               && current.LongSignal == SignalType.Close;
+    }
+
+    public bool CanCloseShort(AlgoEntry current)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+               && position.Side == Side.Sell
+               && current.ShortCloseType == CloseType.None
+               && current.ShortSignal == SignalType.Close;
+    }
+
+    public bool CanCancel(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        return !openOrders.IsNullOrEmpty();
     }
 }
 

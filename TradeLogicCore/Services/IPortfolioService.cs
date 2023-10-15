@@ -14,6 +14,8 @@ public interface IPortfolioService
 
     Portfolio Portfolio { get; }
 
+    bool HasPosition { get; }
+
     /// <summary>
     /// Initialize portfolio service.
     /// Expected to be executed after account and user are specified
@@ -55,6 +57,8 @@ public interface IPortfolioService
     /// <param name="securityId"></param>
     /// <returns></returns>
     Position? GetPositionBySecurityId(int securityId);
+
+    Side GetOpenPositionSide(int securityId);
 
     /// <summary>
     /// Get asset position given its Id.
@@ -145,4 +149,6 @@ public interface IPortfolioService
     void UpdatePortfolio(List<Asset> assets, bool isInitializing = false);
 
     void UpdatePortfolio(List<Position> positions, bool isInitializing = false);
+    
+    void ClearCachedClosedPositions(bool isInitializing = false);
 }

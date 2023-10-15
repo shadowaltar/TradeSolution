@@ -114,6 +114,14 @@ public static class CollectionExtensions
             collection[keySelector(item)] = valueSelector(item);
     }
 
+    public static void Move<T>(this IList<T> collection, T item, int index)
+    {
+        if (!collection.Remove(item))
+            throw new InvalidOperationException("Collection does not contain the specific item.");
+
+        collection.Insert(index, item);
+    }
+
     public static IEnumerable<List<T>> Split<T>(this IEnumerable<T> items, int bucketSize = 30)
     {
         if (bucketSize <= 0)
@@ -260,6 +268,15 @@ public static class CollectionExtensions
         }
     }
 
+    public static T? ThreadSafeFirst<T>(this IEnumerable<T> collection, Func<T, bool> selector, object? @lock = null)
+    {
+        object lockObject = @lock != null ? @lock : collection;
+        lock (lockObject)
+        {
+            return collection.FirstOrDefault(selector);
+        }
+    }
+
     public static bool ThreadSafeTryGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
@@ -285,6 +302,54 @@ public static class CollectionExtensions
         lock (lockObject)
         {
             return dictionary.Values.ToList();
+        }
+    }
+
+    public static bool ThreadSafeAdd<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : set;
+        lock (lockObject)
+        {
+            return set.Add(value);
+        }
+    }
+
+    public static bool ThreadSafeContains<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : set;
+        lock (lockObject)
+        {
+            return set.Contains(value);
+        }
+    }
+
+    /// <summary>
+    /// [Thread-safe] check if set contains given value. If yes returns true,
+    /// otherwise returns false and also add the value into the set.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="set"></param>
+    /// <param name="value"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
+    public static bool ThreadSafeContainsElseAdd<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : set;
+        lock (lockObject)
+        {
+            var r = set.Contains(value);
+            if (r) return true;
+            set.Add(value);
+            return false;
+        }
+    }
+
+    public static bool ThreadSafeRemove<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : set;
+        lock (lockObject)
+        {
+            return set.Remove(value);
         }
     }
 

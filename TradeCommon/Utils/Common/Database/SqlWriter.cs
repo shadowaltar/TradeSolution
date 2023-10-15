@@ -161,7 +161,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             return 0;
 
         using var connection = await Connect();
-        using var transaction = connection.BeginTransaction();
+        using SqliteTransaction transaction = connection.BeginTransaction();
         SqliteCommand? insertCommand = null;
         SqliteCommand? deleteCommand = null;
         try
@@ -304,7 +304,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         {
             return dropSql;
         }
-        dropSql = _storage.SchemaHelper.CreateDropTableAndIndexSql<T>(tableName);
+        dropSql = _storage.SqlHelper.CreateDropTableAndIndexSql<T>(tableName);
         DropTableAndIndexSqls[tableName] = dropSql;
         return dropSql;
     }
@@ -331,7 +331,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         {
             return deleteSql;
         }
-        deleteSql = _storage.SchemaHelper.CreateDeleteSql<T>(tableNameOverride: tableName);
+        deleteSql = _storage.SqlHelper.CreateDeleteSql<T>(tableNameOverride: tableName);
         DeleteSqls[tableName] = deleteSql;
         return deleteSql;
     }
@@ -355,13 +355,13 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
         if (isUpsert)
         {
-            upsertSql = _storage.SchemaHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
+            upsertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
             UpsertSqls[tableName] = upsertSql;
             return upsertSql;
         }
         else
         {
-            insertSql = _storage.SchemaHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
+            insertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
             InsertSqls[tableName] = insertSql;
             return insertSql;
         }

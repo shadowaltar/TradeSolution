@@ -31,6 +31,11 @@ public class Persistence : IDisposable
         if (entry == null)
             return 0;
 
+        if (entry is SecurityRelatedEntry sre)
+        {
+            Assertion.ShallNever(sre.Security == null);
+        }
+
         var task = _taskPool.Lease();
         task.SetEntry(entry);
         task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
@@ -48,6 +53,14 @@ public class Persistence : IDisposable
         if (entries.IsNullOrEmpty())
             return 0;
 
+        foreach (var entry in entries)
+        {
+            if (entry is SecurityRelatedEntry sre)
+            {
+                Assertion.ShallNever(sre.Security == null);
+            }
+        }
+
         var task = _taskPool.Lease();
         task.SetEntries(entries);
         task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
@@ -64,6 +77,11 @@ public class Persistence : IDisposable
     {
         if (entry == null)
             return null;
+
+        if (entry is SecurityRelatedEntry sre)
+        {
+            Assertion.ShallNever(sre.Security == null);
+        }
 
         var task = _taskPool.Lease();
         task.SetEntry(entry);
@@ -92,7 +110,6 @@ public class Persistence : IDisposable
             {
                 _isEmpty = false;
                 _ = await RunTask(task);
-                _taskPool.Return(task);
             }
             else
             {
@@ -110,6 +127,7 @@ public class Persistence : IDisposable
         else if (task.Action is DatabaseActionType.Delete)
             count = await _storage.Delete(task);
         task.Clear();
+        _taskPool.Return(task);
         return count;
     }
 

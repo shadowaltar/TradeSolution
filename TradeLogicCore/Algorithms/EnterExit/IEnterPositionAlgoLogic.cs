@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
@@ -7,6 +8,8 @@ using TradeLogicCore.Algorithms.Sizing;
 namespace TradeLogicCore.Algorithms.EnterExit;
 public interface IEnterPositionAlgoLogic
 {
+    bool IsOpening { get; }
+
     IPositionSizingAlgoLogic Sizing { get; }
 
     ITransactionFeeLogic? FeeLogic { get; set; }

@@ -1,9 +1,9 @@
-﻿using TradeCommon.Essentials;
+﻿using TradeCommon.Algorithms;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
-using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
 
@@ -44,31 +44,27 @@ public interface IAlgorithmEngine
 
     AlgoStopTimeType WhenToStopOrHalt { get; }
 
-    AlgorithmParameters? Parameters { get; }
+    AlgorithmParameters? AlgoParameters { get; }
+    
+    EngineParameters? EngineParameters { get; }
 
     Task<int> Run(AlgorithmParameters parameters);
 
     Task Stop();
+    
+    AlgoBatch AlgoBatch { get; }
 
-    /// <summary>
-    /// Gets the algo entries currently stands for opened positions.
-    /// </summary>
-    Dictionary<long, AlgoEntry> GetOpenEntries(int securityId);
-}
-
-public interface IAlgorithmEngine<T> : IAlgorithmEngine where T : IAlgorithmVariables
-{
-    IAlgorithm<T>? Algorithm { get; }
+    IAlgorithm? Algorithm { get; }
 
     /// <summary>
     /// Gets all the algo entries created during engine execution.
     /// </summary>
-    List<AlgoEntry<T>> GetAllEntries(int securityId);
+    List<AlgoEntry> GetAllEntries(int securityId);
 
     /// <summary>
     /// Gets the algo entries only related to trading activities during engine execution.
     /// </summary>
-    List<AlgoEntry<T>> GetExecutionEntries(int securityId);
+    List<AlgoEntry> GetExecutionEntries(int securityId);
 
     /// <summary>
     /// Runs the procedure to update the engine internal status.

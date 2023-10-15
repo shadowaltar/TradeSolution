@@ -30,6 +30,8 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public Portfolio Portfolio { get; private set; }
 
+    public bool HasPosition => Portfolio.HasPosition;
+
     public event Action<Position>? PositionCreated;
     public event Action<Position>? PositionUpdated;
     public event Action<List<Position>>? PositionsUpdated;
@@ -47,24 +49,19 @@ public class PortfolioService : IPortfolioService, IDisposable
         _orderService = orderService;
         _securityService = securityService;
         _persistence = persistence;
-        _execution.AssetsChanged -= OnBalancesChanged;
-        _execution.AssetsChanged += OnBalancesChanged;
+        _execution.AssetsChanged -= OnAssetsChanged;
+        _execution.AssetsChanged += OnAssetsChanged;
 
         _orderIdGenerator = IdGenerators.Get<Order>();
         _assetIdGenerator = IdGenerators.Get<Asset>();
     }
 
-    private void OnBalancesChanged(List<Asset> assets)
+    private void OnAssetsChanged(List<Asset> assets)
     {
         var account = _context.Account ?? throw Exceptions.MustLogin();
         foreach (var asset in assets)
         {
-            if (!_securityService.Fix(asset))
-            {
-                _log.Error("Received an asset update with unknown asset id, asset code is: " + asset.SecurityCode);
-                continue;
-            }
-
+            _securityService.Fix(asset);
             var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
             if (existingAsset != null)
                 asset.Id = existingAsset.Id;
@@ -76,53 +73,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
         _persistence.Insert(assets, isUpsert: true);
     }
-
-    //private void OnNewTrades(List<Trade> trades)
-    //{
-    //    foreach (var trade in trades)
-    //    {
-    //        OnNewTrade(trade);
-    //    }
-    //}
-
-    //private void OnNewTrade(Trade trade)
-    //{
-    //    // one security to one position
-    //    var securityId = trade.SecurityId;
-    //    var position = Portfolio.GetPositionBySecurityId(securityId);
-    //    // either create a new position, or merge the trade into it
-    //    if (position != null)
-    //    {
-    //        position.Apply(trade);
-
-    //        if (position.IsClosed)
-    //        {
-    //            Portfolio.RemovePosition(position.Id);
-    //            _closedPositions.ThreadSafeSet(position.Id, position, _lock);
-    //            PositionClosed?.Invoke(position);
-    //        }
-    //        else
-    //        {
-    //            PositionUpdated?.Invoke(position);
-    //        }
-    //    }
-    //    else
-    //    {
-    //        var orderId = trade.OrderId;
-    //        // must be the order to open a position
-    //        var order = _orderService.GetOrder(orderId);
-    //        if (order == null)
-    //        {
-    //            // a trade without an order which should not happen
-    //            _log.Error("A trade comes without an associated order!");
-    //            return;
-    //        }
-    //        position = Position.Create(trade);
-    //        PositionCreated?.Invoke(position);
-    //    }
-    //    // update existing, or save a new position to db
-    //    _persistence.Insert(position);
-    //}
 
     public List<Position> GetPositions()
     {
@@ -170,8 +120,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         var assets = state.Get<List<Asset>>()!;
         foreach (var asset in assets)
         {
-            if (!_securityService.Fix(asset))
-                continue;
+            _securityService.Fix(asset);
         }
         return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
@@ -182,8 +131,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         var assets = await _storage.ReadAssets(account.Id);
         foreach (var asset in assets)
         {
-            if (!_securityService.Fix(asset))
-                continue;
+            _securityService.Fix(asset);
         }
         return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
@@ -201,13 +149,13 @@ public class PortfolioService : IPortfolioService, IDisposable
         var positions = await _context.Storage.ReadPositions(_context.Account, DateTime.MinValue, true);
         foreach (var position in positions)
         {
-            if (!_securityService.Fix(position)) continue;
+            _securityService.Fix(position);
         }
 
         var assets = await _context.Storage.ReadAssets(_context.AccountId);
         foreach (var asset in assets)
         {
-            if (!_securityService.Fix(asset)) continue;
+            _securityService.Fix(asset);
         }
 
         // closedPositions need not be initialized
@@ -266,38 +214,10 @@ public class PortfolioService : IPortfolioService, IDisposable
             // need to wait for a while to 
             Threads.WaitUntil(() =>
             {
-                return Portfolio.GetPosition(position.Id)?.EndOrderId == order.Id;
+                var cp = _closedPositions.ThreadSafeGet(position.Id);
+                return cp != null;
             }, pollingMs: 1000);
         }
-        _context.Services.Persistence.WaitAll();
-
-        //// if it is fx+crypto, sell all non-basic assets if previously traded
-        //var assets = Portfolio.GetAssets();
-        //foreach (var asset in assets)
-        //{
-        //    if (_context.PreferredAssetCodes.Contains(asset.SecurityCode))
-        //        continue;
-
-        //    // cannot close an asset directly, need to pair it up with a quote asset
-        //    // eg. to close BTC position, with known preferred assets USDT and TUSD,
-        //    // will try to use BTCUSDT to close position, then BTCTUSD if BTCUSDT is not available
-        //    Security? security = null;
-        //    var codes = _context.PreferredAssetCodes.Select(c => asset.SecurityCode + c).ToList();
-        //    foreach (var code in codes)
-        //    {
-        //        security = _securityService.GetSecurity(code);
-        //        if (security != null) break;
-        //    }
-
-        //    if (security != null)
-        //    {
-        //        var order = CreateCloseOrder(asset, orderComment, security);
-        //        await _orderService.SendOrder(order);
-        //    }
-
-        //    // TEMP TODO
-        //    break;
-        //}
     }
 
     public void UpdatePortfolio(List<Position> positions, bool isInitializing = false)
@@ -310,8 +230,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
         foreach (var position in positions)
         {
-            if (!_securityService.Fix(position))
-                continue;
+            _securityService.Fix(position);
             if (position.IsClosed)
             {
                 _closedPositions[position.Id] = position;
@@ -339,10 +258,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
         foreach (var asset in assets)
         {
-            if (!_securityService.Fix(asset))
-            {
-                continue;
-            }
+            _securityService.Fix(asset);
             asset.AccountId = _context.AccountId;
             if (isInitializing)
             {
@@ -508,15 +424,21 @@ public class PortfolioService : IPortfolioService, IDisposable
         position = Position.CreateOrApply(trade, position);
         if (position == null) throw Exceptions.Impossible();
 
+        _securityService.Fix(position);
+
         // update storage for position and position-record
         if (position.IsClosed)
         {
             _closedPositions[position.Id] = position;
             Portfolio.RemovePosition(position.Id);
         }
+        else
+        {
+            Portfolio.AddOrUpdate(position);
+        }
         _persistence.Insert(position);
         _persistence.Insert(position.CreateRecord());
-
+        _persistence.WaitAll();
         // invoke post-events
         if (isNew)
             PositionCreated?.Invoke(position!);
@@ -524,5 +446,31 @@ public class PortfolioService : IPortfolioService, IDisposable
             PositionUpdated?.Invoke(position!);
         if (position.IsClosed)
             PositionClosed?.Invoke(position!);
+    }
+
+    public Side GetOpenPositionSide(int securityId)
+    {
+        var position = GetPositionBySecurityId(securityId);
+        if (position == null) return Side.None;
+        return position.Side;
+    }
+
+    public void ClearCachedClosedPositions(bool isInitializing = false)
+    {
+        if (isInitializing)
+        {
+            Clear(InitialPortfolio);
+        }
+        Clear(Portfolio);
+
+        static void Clear(Portfolio portfolio)
+        {
+            var openPositions = portfolio.GetPositions().Where(p => !p.IsClosed);
+            portfolio.ClearPositions();
+            foreach (var position in openPositions)
+            {
+                portfolio.AddOrUpdate(position);
+            }
+        }
     }
 }

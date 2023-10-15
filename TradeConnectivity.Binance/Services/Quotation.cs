@@ -51,9 +51,6 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType)
     {
-        // TODO TEMP TEST
-        intervalType = IntervalType.OneSecond;
-
         if (intervalType == IntervalType.Unknown)
         {
             intervalType = IntervalType.OneMinute;
@@ -70,10 +67,16 @@ public class Quotation : IExternalQuotationManagement
         var broker = _messageBrokers.GetOrCreate((security.Id, intervalType), (k, v) => v.Run());
         broker.NewItem += price => NextOhlc?.Invoke(security.Id, price, isComplete); // broker.Dispose() will clear this up if needed
 
-        var webSocket = uri.Listen(OnReceivedString);
-        _webSockets[wsName] = webSocket;
+        string message = "";
+        uri.Listen(OnReceivedString, ws =>
+        {
+            message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
+            _log.Info(message);
+            _webSockets[wsName] = ws;
+        });
 
-        var message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
+        Threads.WaitUntil(() => _webSockets.ContainsKey(wsName));
+        
         _log.Info(message);
         return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeMarketData, message);
 

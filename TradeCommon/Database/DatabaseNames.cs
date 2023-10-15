@@ -16,6 +16,7 @@ public static class DatabaseNames
 {
     public const string DatabaseSuffix = "_data";
 
+    public const string AlgorithmData = "algorithm_data";
     public const string StaticData = "static_data";
     public const string MarketData = "market_data";
     public const string ExecutionData = "execution_data";
@@ -197,31 +198,57 @@ public static class DatabaseNames
         };
     }
 
-    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T? entry = null) where T : class
+    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(SecurityType securityType) where T : class
     {
         var type = typeof(T);
         var specificTable = "";
-        if (entry != null)
+        if (type == typeof(Order))
         {
-            if (entry is Order order)
-            {
-                specificTable = GetOrderTableName(order.Security?.Type ?? throw Exceptions.Invalid<Order>("Missing security in order."));
-            }
-            else if (entry is Trade trade)
-            {
-                specificTable = GetTradeTableName(trade.Security?.Type ?? throw Exceptions.Invalid<Trade>("Missing security in trade."));
-            }
-            else if (entry is Position position)
-            {
-                specificTable = GetPositionTableName(position.Security?.Type ?? throw Exceptions.Invalid<Position>("Missing security in position."));
-            }
+            specificTable = GetOrderTableName(securityType);
+        }
+        else if (type == typeof(Trade))
+        {
+            specificTable = GetTradeTableName(securityType);
+        }
+        else if (type == typeof(Position))
+        {
+            specificTable = GetPositionTableName(securityType);
         }
 
+        (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
+        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
+        return (specificTable, existing.databaseName);
+    }
+    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T entry) where T : class
+    {
+        var type = typeof(T);
+        var specificTable = "";
+        if (entry is Order order)
+        {
+            specificTable = GetOrderTableName(order.Security?.Type ?? throw Exceptions.Invalid<Order>("Missing security in order."));
+        }
+        else if (entry is Trade trade)
+        {
+            specificTable = GetTradeTableName(trade.Security?.Type ?? throw Exceptions.Invalid<Trade>("Missing security in trade."));
+        }
+        else if (entry is Position position)
+        {
+            specificTable = GetPositionTableName(position.Security?.Type ?? throw Exceptions.Invalid<Position>("Missing security in position."));
+        }
+
+        (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
+        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
+        return (specificTable, existing.databaseName);
+    }
+
+    public static (string tableName, string databaseName) GetTableAndDatabaseName<T>() where T : class
+    {
+        var type = typeof(T);
         (string tableName, string databaseName) existing;
         if (!_tableDatabaseNamesByType.TryGetValue(type, out existing))
         {
             var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
-            
+
             var table = storageAttr.TableName;
             var database = storageAttr.DatabaseName;
             if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
@@ -230,7 +257,6 @@ public static class DatabaseNames
             existing = (table, database);
             _tableDatabaseNamesByType[type] = existing;
         }
-        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
-        return (specificTable, existing.databaseName);
+        return existing;
     }
 }

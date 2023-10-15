@@ -1,5 +1,6 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Constants;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
@@ -115,7 +116,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
     /// <summary>
     /// The strategy used to generate this order.
     /// </summary>
-    public int StrategyId { get; set; } = 0;
+    public int StrategyId { get; set; } = Consts.DefaultStrategyId;
 
     public string? Comment { get; set; } = null;
 
@@ -143,28 +144,28 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
     public int CompareTo(Order? other)
     {
         var r = ExternalOrderId.CompareTo(other?.ExternalOrderId);
-        if (r != 0) r = SecurityId.CompareTo(other?.SecurityId);
-        if (r != 0) r = AccountId.CompareTo(other?.AccountId);
-        if (r != 0) r = ParentOrderId.CompareTo(other?.ParentOrderId);
-        if (r != 0) r = Type.CompareTo(other?.Type);
-        if (r != 0) r = Side.CompareTo(other?.Side);
-        if (r != 0) r = Price.CompareTo(other?.Price);
-        if (r != 0) r = StopPrice.CompareTo(other?.StopPrice);
-        if (r != 0) r = Quantity.CompareTo(other?.Quantity);
-        if (r != 0) r = FilledQuantity.CompareTo(other?.FilledQuantity);
-        if (r != 0) r = Status.CompareTo(other?.Status);
-        if (r != 0) r = CreateTime.CompareTo(other?.CreateTime);
-        if (r != 0) r = UpdateTime.CompareTo(other?.UpdateTime);
-        if (r != 0) r = ExternalCreateTime.CompareTo(other?.ExternalCreateTime);
-        if (r != 0) r = ExternalUpdateTime.CompareTo(other?.ExternalUpdateTime);
-        if (r != 0) r = TimeInForce.CompareTo(other?.TimeInForce);
-        if (r != 0) r = AccountId.CompareTo(other?.AccountId);
+        if (r == 0) r = SecurityId.CompareTo(other?.SecurityId);
+        if (r == 0) r = AccountId.CompareTo(other?.AccountId);
+        if (r == 0) r = ParentOrderId.CompareTo(other?.ParentOrderId);
+        if (r == 0) r = Type.CompareTo(other?.Type);
+        if (r == 0) r = Side.CompareTo(other?.Side);
+        if (r == 0) r = Price.CompareTo(other?.Price);
+        if (r == 0) r = StopPrice.CompareTo(other?.StopPrice);
+        if (r == 0) r = Quantity.CompareTo(other?.Quantity);
+        if (r == 0) r = FilledQuantity.CompareTo(other?.FilledQuantity);
+        if (r == 0) r = Status.CompareTo(other?.Status);
+        if (r == 0) r = CreateTime.CompareTo(other?.CreateTime);
+        if (r == 0) r = UpdateTime.CompareTo(other?.UpdateTime);
+        if (r == 0) r = ExternalCreateTime.CompareTo(other?.ExternalCreateTime);
+        if (r == 0) r = ExternalUpdateTime.CompareTo(other?.ExternalUpdateTime);
+        if (r == 0) r = TimeInForce.CompareTo(other?.TimeInForce);
+        if (r == 0) r = AccountId.CompareTo(other?.AccountId);
         if (AdvancedSettings != null)
         {
-            if (r != 0) r = AdvancedSettings.TimeInForceTime.CompareTo(other?.AdvancedSettings?.TimeInForceTime);
-            if (r != 0) r = AdvancedSettings.TrailingSpread.CompareTo(other?.AdvancedSettings?.TrailingSpread);
-            if (r != 0) r = AdvancedSettings.TrailingType.CompareTo(other?.AdvancedSettings?.TrailingType);
-            if (r != 0) r = AdvancedSettings.TrailingValue.CompareTo(other?.AdvancedSettings?.TrailingValue);
+            if (r == 0) r = AdvancedSettings.TimeInForceTime.CompareTo(other?.AdvancedSettings?.TimeInForceTime);
+            if (r == 0) r = AdvancedSettings.TrailingSpread.CompareTo(other?.AdvancedSettings?.TrailingSpread);
+            if (r == 0) r = AdvancedSettings.TrailingType.CompareTo(other?.AdvancedSettings?.TrailingType);
+            if (r == 0) r = AdvancedSettings.TrailingValue.CompareTo(other?.AdvancedSettings?.TrailingValue);
         }
         return r;
     }

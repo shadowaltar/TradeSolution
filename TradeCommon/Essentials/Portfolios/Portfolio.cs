@@ -18,6 +18,8 @@ public record Portfolio
 
     public int AccountId { get; } = 0;
 
+    public bool HasPosition => _positions.Count > 0;
+
     public Portfolio(int accountId,
                      List<Position> positions,
                      List<Asset> assets)

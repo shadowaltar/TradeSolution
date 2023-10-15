@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Algorithms;
+﻿using TradeCommon.Algorithms;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms.EnterExit;
@@ -11,31 +12,24 @@ public interface IAlgorithm
 {
     int Id { get; }
     int VersionId { get; }
-    IEnterPositionAlgoLogic Entering { get; }
-    IExitPositionAlgoLogic Exiting { get; }
-    ISecurityScreeningAlgoLogic Screening { get; }
-    IPositionSizingAlgoLogic Sizing { get; }
     decimal LongStopLossRatio { get; }
     decimal LongTakeProfitRatio { get; }
     decimal ShortStopLossRatio { get; }
     decimal ShortTakeProfitRatio { get; }
-}
+    AlgorithmParameters AlgorithmParameters { get; }
+    
+    IEnterPositionAlgoLogic Entering { get; }
+    IExitPositionAlgoLogic Exiting { get; }
+    ISecurityScreeningAlgoLogic Screening { get; }
+    IPositionSizingAlgoLogic Sizing { get; }
 
-public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables
-{
-    T CalculateVariables(decimal price, AlgoEntry<T>? last);
+    object CalculateVariables(decimal price, AlgoEntry? last);
+    
+    void NotifyPositionClosed(int securityId, long positionId) { }
 
-    bool IsOpenLongSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
+    void BeforeSignalDetection(AlgoEntry current, AlgoEntry? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
-    bool IsCloseLongSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
-
-    bool IsShortSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
-
-    bool IsCloseShortSignal(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { return false; }
-
-    void BeforeSignalDetection(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
-
-    void AfterSignalDetection(AlgoEntry<T> current, AlgoEntry<T>? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
+    void AfterSignalDetection(AlgoEntry current, AlgoEntry? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
     void BeforeAlgoExecution() { }
     void AfterAlgoExecution() { }
@@ -55,4 +49,11 @@ public interface IAlgorithm<T> : IAlgorithm where T : IAlgorithmVariables
     void AfterShortClosed(AlgoEntry entry) { }
     void BeforeStopLossShort(AlgoEntry entry) { }
     void AfterStopLossShort(AlgoEntry entry) { }
+
+    void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice);
+    bool CanOpenLong(AlgoEntry current);
+    bool CanOpenShort(AlgoEntry current);
+    bool CanCloseLong(AlgoEntry current);
+    bool CanCloseShort(AlgoEntry current);
+    bool CanCancel(AlgoEntry current);
 }

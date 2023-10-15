@@ -258,26 +258,26 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     {
         if (other == null) return 1;
         var r = base.CompareTo(other);
-        if (r != 0) r = CloseTime.CompareTo(other.CloseTime);
+        if (r == 0) r = CloseTime.CompareTo(other.CloseTime);
 
-        if (r != 0) r = Price.CompareTo(other.Price);
-        if (r != 0) r = Notional.CompareTo(other.Notional);
+        if (r == 0) r = Price.CompareTo(other.Price);
+        if (r == 0) r = Notional.CompareTo(other.Notional);
 
-        if (r != 0) r = LongQuantity.CompareTo(other.LongQuantity);
-        if (r != 0) r = LongPrice.CompareTo(other.LongPrice);
-        if (r != 0) r = LongNotional.CompareTo(other.LongNotional);
-        if (r != 0) r = ShortQuantity.CompareTo(other.ShortQuantity);
-        if (r != 0) r = ShortPrice.CompareTo(other.ShortPrice);
-        if (r != 0) r = ShortNotional.CompareTo(other.ShortNotional);
+        if (r == 0) r = LongQuantity.CompareTo(other.LongQuantity);
+        if (r == 0) r = LongPrice.CompareTo(other.LongPrice);
+        if (r == 0) r = LongNotional.CompareTo(other.LongNotional);
+        if (r == 0) r = ShortQuantity.CompareTo(other.ShortQuantity);
+        if (r == 0) r = ShortPrice.CompareTo(other.ShortPrice);
+        if (r == 0) r = ShortNotional.CompareTo(other.ShortNotional);
 
-        if (r != 0) r = StartOrderId.CompareTo(other.StartOrderId);
-        if (r != 0) r = EndOrderId.CompareTo(other.EndOrderId);
-        if (r != 0) r = StartTradeId.CompareTo(other.StartTradeId);
-        if (r != 0) r = EndTradeId.CompareTo(other.EndTradeId);
+        if (r == 0) r = StartOrderId.CompareTo(other.StartOrderId);
+        if (r == 0) r = EndOrderId.CompareTo(other.EndOrderId);
+        if (r == 0) r = StartTradeId.CompareTo(other.StartTradeId);
+        if (r == 0) r = EndTradeId.CompareTo(other.EndTradeId);
 
-        if (r != 0) r = TradeCount.CompareTo(other.TradeCount);
+        if (r == 0) r = TradeCount.CompareTo(other.TradeCount);
 
-        if (r != 0) r = AccumulatedFee.CompareTo(other.AccumulatedFee);
+        if (r == 0) r = AccumulatedFee.CompareTo(other.AccumulatedFee);
         return r;
     }
 
@@ -319,7 +319,7 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 
     public override string ToString()
     {
-        return $"[{Id}][{CreateTime:yyMMdd-HHmmss}][{(CloseTime == DateTime.MaxValue ? "" : CloseTime.ToString("yyMMdd-HHmmss"))}]" +
+        return $"[{Id}][{CreateTime:yyMMdd-HHmmss}->{(CloseTime == DateTime.MaxValue ? "NotYet" : CloseTime.ToString("yyMMdd-HHmmss"))}]" +
             $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
     }
 }

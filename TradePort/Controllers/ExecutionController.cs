@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Microsoft.AspNetCore.Mvc;
+using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -10,7 +11,6 @@ using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
-using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
 using TradePort.Utils;
@@ -226,13 +226,13 @@ public class ExecutionController : Controller
 
     [HttpPost("algos/stop")]
     public async Task<ActionResult> StopAlgorithm([FromQuery(Name = "admin-password")] string? adminPassword,
-                                                  [FromQuery(Name = "algo-guid")] string? algoSessionId)
+                                                  [FromQuery(Name = "algo-batch-id")] long algoBatchId)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
 
         var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
-        await core.StopAlgorithm(algoSessionId);
+        await core.StopAlgorithm(algoBatchId);
         return Ok();
     }
 

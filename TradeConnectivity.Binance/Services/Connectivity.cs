@@ -70,17 +70,25 @@ public class Connectivity : IExternalConnectivityManagement
     /// <returns></returns>
     public bool Ping()
     {
-        _stopwatch.Restart();
-        using var pingRequest = _requestBuilder.Build(HttpMethod.Get, _pingUrl);
-        var response = _httpClient.Send(pingRequest);
-        _stopwatch.Stop();
-        if (response.StatusCode != System.Net.HttpStatusCode.OK)
+        try
         {
-            _log.Error($"[{_stopwatch.Elapsed.TotalSeconds:F4}s][{(int)response.StatusCode} {response.ReasonPhrase}] Connection to external server is probably lost.");
+            _stopwatch.Restart();
+            using var pingRequest = _requestBuilder.Build(HttpMethod.Get, _pingUrl);
+            var response = _httpClient.Send(pingRequest);
+            _stopwatch.Stop();
+            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            {
+                _log.Error($"[{_stopwatch.Elapsed.TotalSeconds:F4}s][{(int)response.StatusCode} {response.ReasonPhrase}] Connection to external server is probably lost.");
+                return false;
+            }
+            if (_log.IsDebugEnabled)
+                _log.Debug($"[{_stopwatch.Elapsed.TotalSeconds:F4}s] Pinged external server.");
+            return true;
+        }
+        catch (Exception e)
+        {
+            _log.Error("Ping time out; please try again later.", e);
             return false;
         }
-        if (_log.IsDebugEnabled)
-            _log.Debug($"[{_stopwatch.Elapsed.TotalSeconds:F4}s] Pinged external server.");
-        return true;
     }
 }

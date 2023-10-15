@@ -2,6 +2,7 @@
 using Microsoft.Data.Sqlite;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Misc;
@@ -48,6 +49,14 @@ public partial class Storage
         else if (task.Type == typeof(FinancialStat))
         {
             count = await Insert<FinancialStat>(task);
+        }
+        else if (task.Type == typeof(AlgoEntry))
+        {
+            count = await Insert<AlgoEntry>(task);
+        }
+        else if (task.Type == typeof(AlgoBatch))
+        {
+            count = await Insert<AlgoBatch>(task);
         }
         else
             throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");

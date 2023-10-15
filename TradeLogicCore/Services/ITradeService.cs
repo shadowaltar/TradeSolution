@@ -1,4 +1,5 @@
 ﻿using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using static TradeCommon.Utils.Delegates;
 
@@ -29,7 +30,7 @@ public interface ITradeService
     Task<List<Trade>> GetMarketTrades(Security security);
 
     Task<List<Trade>> GetExternalTrades(Security security, DateTime? start = null, DateTime? end = null);
-    
+
     Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null);
 
     /// <summary>
@@ -38,9 +39,15 @@ public interface ITradeService
     /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
-    /// <param name="requestExternal"></param>
     /// <returns></returns>
     List<Trade> GetTrades(Security security, DateTime? start = null, DateTime? end = null);
+
+    /// <summary>
+    /// Get the executed trades by their order.
+    /// </summary>
+    /// <param name="orderId"></param>
+    /// <returns></returns>
+    List<Trade> GetTradesByOrderId(long orderId);
 
     /// <summary>
     /// Get the trades related to an order.
@@ -50,7 +57,7 @@ public interface ITradeService
     /// <param name="requestExternal"></param>
     /// <returns></returns>
     Task<List<Trade>> GetTrades(Security security, long orderId, bool requestExternal = false);
-    
+
     /// <summary>
     /// Get the cached trades related to an order.
     /// </summary>
@@ -64,4 +71,10 @@ public interface ITradeService
     /// <param name="trades"></param>
     /// <param name="security"></param>
     void Update(ICollection<Trade> trades, Security? security = null);
+
+    /// <summary>
+    /// Clear cached trades which their positions are closed.
+    /// Or specify a closed position and clear its related trades.
+    /// </summary>
+    void ClearCachedClosedPositionTrades(Position? position = null);
 }

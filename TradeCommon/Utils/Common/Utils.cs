@@ -42,4 +42,54 @@ public static class Utils
         if (!security.Id.IsValid() || security.Code.IsBlank()) return false;
         return true;
     }
+
+    public static CompareReport ReportComparison<T>(T a, T b)
+    {
+        var vg = ReflectionUtils.GetValueGetter<T>();
+        var aTuples = vg.GetNamesAndValues(a).ToList();
+        var bTuples = vg.GetNamesAndValues(b).ToList();
+        var report = new CompareReport(typeof(T));
+        if (aTuples.Count != bTuples.Count)
+        {
+            report.InvalidCount = true;
+            return report;
+        }
+        var results = new string[aTuples.Count];
+        for (int i = 0; i < aTuples.Count; i++)
+        {
+            var aTuple = aTuples[i];
+            var bTuple = bTuples[i];
+            if (!Equals(aTuple.Item1, bTuple.Item1))
+            {
+                report.AddInvalid(aTuple.Item1, bTuple.Item1, aTuple.Item2, bTuple.Item2);
+            }
+            else
+            {
+                report.Add(aTuple.Item1, aTuple.Item2, bTuple.Item2);
+            }
+        }
+        return report;
+    }
+}
+
+
+public class CompareReport
+{
+    public Type Type { get; }
+    public List<(string propertyName, bool isEqual, object value1, object value2)> Values { get; } = new();
+    public bool InvalidCount { get; internal set; }
+    public CompareReport(Type type)
+    {
+        Type = type;
+    }
+
+    public void AddInvalid(string propertyName1, string propertyName2, object value1, object value2)
+    {
+        Values.Add((propertyName1 + "|" + propertyName2, false, value1, value2));
+    }
+
+    public void Add(string propertyName, object value1, object value2)
+    {
+        Values.Add((propertyName, Equals(value1, value2), value1, value2));
+    }
 }

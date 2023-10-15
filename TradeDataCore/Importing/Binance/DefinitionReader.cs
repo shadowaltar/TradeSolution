@@ -37,6 +37,7 @@ public class DefinitionReader
             decimal? lotSize = null;
             decimal? maxLotSize = null;
             decimal? minNotional = null;
+            var priceFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "PRICE_FILTER")?.AsObject();
             var lotSizeFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "LOT_SIZE")?.AsObject();
             var notionalFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "NOTIONAL")?.AsObject();
             lotSize = lotSizeFilterObj?.GetDecimal("minQty");
@@ -50,6 +51,7 @@ public class DefinitionReader
                 Type = SecurityTypes.Fx,
                 SubType = SecurityTypes.Crypto,
                 LotSize = lotSize ?? 0,
+                TickSize = priceFilterObj.GetDecimal("tickSize"),
                 PricePrecision = symbolObj.GetInt("quotePrecision"),
                 QuantityPrecision = symbolObj.GetInt("baseAssetPrecision"),
                 Currency = "",

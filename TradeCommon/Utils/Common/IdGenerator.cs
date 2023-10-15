@@ -44,7 +44,7 @@ public class IdGenerator
                 _negativeSequentialSuffix--;
                 if (_negativeSequentialSuffix == 0)
                     _negativeSequentialSuffix = 10;
-                return DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
+                return - DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
             }
         }
     }

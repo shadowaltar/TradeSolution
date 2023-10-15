@@ -106,7 +106,7 @@ public static class OrderStatusConverter
         return statusStr switch
         {
             "NEW" => OrderStatus.Live,
-            "PARTIALLY_FILLED" or "TRADE" => OrderStatus.PartialFilled,
+            "PARTIAL_FILLED" or "PARTIALLY_FILLED" or "TRADE" => OrderStatus.PartialFilled,
             "FILLED" => OrderStatus.Filled,
             "CANCELED" => OrderStatus.Cancelled,
             "REJECTED" => OrderStatus.Rejected,

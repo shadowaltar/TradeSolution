@@ -9,7 +9,7 @@ using TradeCommon.Database;
 
 namespace Common.Database;
 
-public class SqliteSchemaHelper : IDatabaseSchemaHelper
+public class SqliteSqlBuilder : IDatabaseSqlBuilder
 {
     public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null) where T : class
     {
@@ -113,6 +113,7 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         table = tableNameOverride ?? table;
 
         var properties = ReflectionUtils.GetPropertyToName(type);
+        var storageAttribute = type.GetCustomAttribute<StorageAttribute>();
         var uniqueAttributes = type.GetDistinctAttributes<UniqueAttribute>().ToList();
         var indexAttributes = type.GetDistinctAttributes<IndexAttribute>().ToList();
         var primaryUniqueKeys = uniqueAttributes.FirstOrDefault()?.FieldNames;
@@ -140,14 +141,24 @@ public class SqliteSchemaHelper : IDatabaseSchemaHelper
         sb.Append($"CREATE TABLE IF NOT EXISTS ")
             .Append(table).AppendLine(" (");
 
-        var sortedProperties = properties.OrderBy(p => p.Key).ToList();
-        var idProperty = sortedProperties.FirstOrDefault(p => p.Key == "Id");
-        if (idProperty.Value != null)
+        // sort the properties
+        List<KeyValuePair<string, PropertyInfo>> propertyList;
+        if (storageAttribute == null || storageAttribute.SortProperties)
         {
-            sortedProperties.Remove(idProperty);
-            sortedProperties.Insert(0, idProperty);
+            var sortedProperties = properties.OrderBy(p => p.Key).ToList();
+            var idProperty = sortedProperties.FirstOrDefault(p => p.Key == "Id");
+            if (idProperty.Value != null)
+            {
+                sortedProperties.Move(idProperty, 0);
+            }
+            propertyList = sortedProperties;
         }
-        foreach (var (name, property) in sortedProperties)
+        else
+        {
+            propertyList = properties.ToList();
+        }
+
+        foreach (var (name, property) in propertyList)
         {
             var typeString = TypeConverter.ToSqliteType(property.PropertyType);
 

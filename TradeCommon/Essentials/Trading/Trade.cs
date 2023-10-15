@@ -99,12 +99,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     public int AccountId { get; set; } = 0;
 
     /// <summary>
-    /// If it is best match, returns 1, if unknown, returns 0, otherwise returns -1;
-    /// </summary>
-    [DatabaseIgnore]
-    public int BestMatch { get; set; } = 0;
-
-    /// <summary>
     /// Calculate weighted average price, quantity and notional amount to 
     /// </summary>
     /// <param name="entry"></param>
@@ -131,17 +125,17 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     public int CompareTo(Trade? trade)
     {
         var r = SecurityId.CompareTo(trade?.SecurityId);
-        if (r != 0) r = OrderId.CompareTo(trade?.OrderId);
-        if (r != 0) r = ExternalTradeId.CompareTo(trade?.ExternalTradeId);
-        if (r != 0) r = ExternalOrderId.CompareTo(trade?.ExternalOrderId);
-        if (r != 0) r = Time.CompareTo(trade?.Time);
-        if (r != 0) r = Side.CompareTo(trade?.Side);
-        if (r != 0) r = Price.CompareTo(trade?.Price);
-        if (r != 0) r = Quantity.CompareTo(trade?.Quantity);
-        if (r != 0) r = Fee.CompareTo(trade?.Fee);
-        if (r != 0) r = FeeAssetCode.SafeCompareTo(trade?.FeeAssetCode);
-        if (r != 0) r = AccountId.CompareTo(trade?.AccountId);
-        if (r != 0) r = BestMatch.CompareTo(trade?.BestMatch);
+        if (r == 0) r = OrderId.CompareTo(trade?.OrderId);
+        if (r == 0) r = ExternalTradeId.CompareTo(trade?.ExternalTradeId);
+        if (r == 0) r = ExternalOrderId.CompareTo(trade?.ExternalOrderId);
+        if (r == 0) r = PositionId.CompareTo(trade?.PositionId);
+        if (r == 0) r = Time.CompareTo(trade?.Time);
+        if (r == 0) r = Side.CompareTo(trade?.Side);
+        if (r == 0) r = Price.CompareTo(trade?.Price);
+        if (r == 0) r = Quantity.CompareTo(trade?.Quantity);
+        if (r == 0) r = Fee.CompareTo(trade?.Fee);
+        if (r == 0) r = FeeAssetCode.SafeCompareTo(trade?.FeeAssetCode);
+        if (r == 0) r = AccountId.CompareTo(trade?.AccountId);
         return r;
     }
 

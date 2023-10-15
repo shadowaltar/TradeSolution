@@ -1,9 +1,12 @@
 ﻿using Common;
 using log4net;
+using Microsoft.CodeAnalysis.CSharp;
+using OfficeOpenXml.Style;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
@@ -161,6 +164,23 @@ public class OrderService : IOrderService, IDisposable
             _orders.ThreadSafeSet(order.Id, order);
             Persist(order);
             var state = await _execution.SendOrder(order);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                Assertion.Shall(order.ExternalOrderId > 0);
+                _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+
+                if (order.Status == OrderStatus.PartialFilled)
+                    _openOrders.ThreadSafeSet(order.Id, order);
+
+                Persist(order);
+            }
+            else if (state.ResultCode != ResultCode.SendOrderOk)
+            {
+                order.Status = OrderStatus.Failed;
+                order.UpdateTime = DateTime.UtcNow;
+                order.Comment += " | error code: " + state.ResultCode;
+                Persist(order);
+            }
             return state;
         }
     }
@@ -173,8 +193,9 @@ public class OrderService : IOrderService, IDisposable
             order.UpdateTime = DateTime.UtcNow;
             order.Status = OrderStatus.Canceling;
 
-            _execution.CancelOrder(order);
             _log.Info("Canceling order: " + order);
+            var state = _execution.CancelOrder(order);
+            // TODO
             Persist(order);
         }
     }
@@ -241,7 +262,6 @@ public class OrderService : IOrderService, IDisposable
         // already cached the order in SENDING state
         if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
         {
-            // TODO
             throw Exceptions.Impossible("Before order is received it has been cached as a SENDING order");
         }
         else
@@ -254,7 +274,9 @@ public class OrderService : IOrderService, IDisposable
             {
                 if (existingOrder.IsClosed)
                 {
-
+                    // the incoming order is older than existing one
+                    _log.Warn($"Out of sequence copy of order is received, id: {order.Id}; it will be ignored.");
+                    return;
                 }
                 if (_log.IsDebugEnabled)
                     _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
@@ -262,9 +284,20 @@ public class OrderService : IOrderService, IDisposable
             _orders.ThreadSafeSet(oid, order);
         }
 
-        if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
+        switch (order.Status)
         {
-            _openOrders.ThreadSafeSet(order.Id, order);
+            case OrderStatus.Live or OrderStatus.PartialFilled:
+                _openOrders.ThreadSafeSet(order.Id, order);
+                break;
+            case OrderStatus.Cancelled:
+                _cancelledOrders.ThreadSafeSet(order.Id, order);
+                _openOrders.ThreadSafeRemove(order.Id);
+                break;
+            case OrderStatus.Filled or OrderStatus.Expired:
+                _openOrders.ThreadSafeRemove(order.Id);
+                break;
+            case OrderStatus.Unknown:
+                break;
         }
         _ordersByExternalId.ThreadSafeSet(eoid, order);
 
@@ -321,21 +354,17 @@ public class OrderService : IOrderService, IDisposable
             if (order.Id <= 0)
             {
                 // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
-                var possibleSameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
-                if (possibleSameOrder != null)
-                    order.Id = possibleSameOrder.Id;
+                var sameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
+                if (sameOrder != null)
+                    order.Id = sameOrder.Id;
                 else
                     order.Id = _orderIdGen.NewTimeBasedId;
             }
             order.AccountId = _context.AccountId;
 
-            if (!_securityService.Fix(order, security))
-            {
-                _log.Warn("Failed to fix security info for order: " + order);
-                continue;
-            }
+            _securityService.Fix(order, security);
 
-            if (order.Status == OrderStatus.Live)
+            if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
             {
                 _openOrders.ThreadSafeSet(order.Id, order);
             }
@@ -354,8 +383,7 @@ public class OrderService : IOrderService, IDisposable
 
     public void Persist(Order order)
     {
-        if (!_securityService.Fix(order))
-            throw Exceptions.Impossible();
+        _securityService.Fix(order);
         _persistence.Insert(order);
     }
 
@@ -378,6 +406,55 @@ public class OrderService : IOrderService, IDisposable
             if (order != null)
             {
                 Persist(order);
+            }
+        }
+    }
+
+    public void ClearCachedClosedPositionOrders(Position? position = null)
+    {
+        if (_orders.IsNullOrEmpty()) return;
+
+        if (position != null && position.IsClosed)
+        {
+            lock (_orders)
+            {
+                var orders = _orders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
+                if (orders.IsNullOrEmpty()) return;
+
+                var security = orders[0].Security;
+                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, orders[0].CreateTime, DateTime.MaxValue));
+                var closedOrderIds = trades.Where(t => position.Id == t.PositionId).Select(t => t.OrderId);
+                Clear(closedOrderIds);
+            }
+        }
+        else if (position == null)
+        {
+            var start = _orders.Values.Min(o => o.UpdateTime);
+            var positions = AsyncHelper.RunSync(() => _context.Storage.ReadPositions(_context.Account, start))
+                .Where(p => p.IsClosed).ToList();
+            var groupedOrders = _orders.Values.GroupBy(o => o.Security);
+            foreach (var group in groupedOrders)
+            {
+                var security = group.Key;
+                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, start, DateTime.MaxValue));
+                var closedOrderIds = trades.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.OrderId);
+                Clear(closedOrderIds);
+            }
+        }
+
+        void Clear(IEnumerable<long> closedOrderIds)
+        {
+            lock (_orders)
+            {
+                foreach (var id in closedOrderIds)
+                {
+                    var order = _orders.GetOrDefault(id);
+                    _orders.ThreadSafeRemove(id);
+                    if (order != null)
+                        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+                    _cancelledOrders.ThreadSafeRemove(id);
+                    _errorOrders.ThreadSafeRemove(id);
+                }
             }
         }
     }

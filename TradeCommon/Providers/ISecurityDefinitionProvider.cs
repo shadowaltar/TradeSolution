@@ -27,5 +27,5 @@ public interface ISecurityDefinitionProvider
     /// <param name="entry"></param>
     /// <param name="security"></param>
     /// <returns></returns>
-    bool Fix(SecurityRelatedEntry entry, Security? security = null);
+    void Fix(SecurityRelatedEntry entry, Security? security = null);
 }

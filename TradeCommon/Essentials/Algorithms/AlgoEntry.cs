@@ -10,27 +10,16 @@ namespace TradeCommon.Essentials.Algorithms;
 /// Class which records prop algo execution.
 /// </summary>
 [Storage("algorithm_entries", "algorithm")]
-[Unique(nameof(BatchId), nameof(AlgoId), nameof(VersionId), nameof(Time))]
-[Index(nameof(BatchId))]
+[Unique(nameof(AlgoBatchId), nameof(SequenceId), nameof(Time))]
+[Index(nameof(AlgoBatchId))]
 public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
 {
     /// <summary>
-    /// The id of batch of algorithm execution.
+    /// Index / serial number / sequence id of an algo entry in a batch.
     /// </summary>
-    [NotNull]
-    public int BatchId { get; set; } = 0;
-
-    /// <summary>
-    /// The algorithm's Id.
-    /// </summary>
-    [NotNull]
-    public int AlgoId { get; set; } = 0;
-
-    /// <summary>
-    /// The version id of this algorithm.
-    /// </summary>
-    [NotNull]
-    public int VersionId { get; set; } = 0;
+    public int SequenceId { get; set; }
+    
+    public long AlgoBatchId { get; set; }
 
     /// <summary>
     /// The id which indicates a position's existence over multiple algo-entries
@@ -67,15 +56,15 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// </summary>
     public SignalType ShortSignal { get; set; }
 
-    public bool IsLong { get; set; }
+    //public bool IsLong { get; set; }
     public CloseType LongCloseType { get; set; }
-    public bool IsShort { get; set; }
+    //public bool IsShort { get; set; }
     public CloseType ShortCloseType { get; set; }
 
-    /// <summary>
-    /// The open or close position order Id. If no order it equals to zero.
-    /// </summary>
-    public long OrderId { get; set; }
+    ///// <summary>
+    ///// The open or close position order Id. If no order it equals to zero.
+    ///// </summary>
+    //public long OrderId { get; set; }
 
     public decimal Quantity { get; set; }
 
@@ -85,8 +74,8 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public decimal Return { get; set; }
     public decimal? EnterPrice { get; set; }
     public decimal? ExitPrice { get; set; }
-    public decimal? StopLossPrice { get; set; }
-    public decimal? TakeProfitPrice { get; set; }
+    //public decimal? StopLossPrice { get; set; }
+    //public decimal? TakeProfitPrice { get; set; }
     public DateTime? EnterTime { get; set; }
     public TimeSpan? Elapsed { get; set; }
 
@@ -127,10 +116,10 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public decimal ShortQuantity { get; set; }
     public decimal ShortPrice { get; set; }
     public decimal ShortNotional { get; set; }
-}
+//}
 
-public record AlgoEntry<T> : AlgoEntry
-{
+//public record AlgoEntry<T> : AlgoEntry
+//{
     [NotNull, AsJson]
-    public T Variables { get; set; }
+    public object Variables { get; set; }
 }

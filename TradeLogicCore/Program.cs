@@ -5,6 +5,7 @@ using log4net.Config;
 using OfficeOpenXml;
 using System.Diagnostics;
 using System.Text;
+using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -22,7 +23,6 @@ using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
-using TradeLogicCore.Algorithms.Parameters;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
@@ -62,7 +62,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        //await ResetOrderTradePosition();
+        //await ResetTables();
         await RunMacMimicWebService();
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
@@ -70,17 +70,18 @@ public class Program
         //await Run();
     }
 
-    private static async Task ResetOrderTradePosition()
+    private static async Task ResetTables()
     {
         var storage = new Storage();
-        await storage.CreateTable<Order>("stock_orders");
-        await storage.CreateTable<Trade>("stock_trades");
-        await storage.CreateTable<Position>("stock_positions");
-        await storage.CreateTable<Order>("fx_orders");
-        await storage.CreateTable<Trade>("fx_trades");
-        await storage.CreateTable<Position>("fx_positions");
-        await storage.CreateTable<PositionRecord>();
-        await storage.CreateTable<AlgoEntry<object>>();
+        //await storage.CreateTable<Order>("stock_orders");
+        //await storage.CreateTable<Trade>("stock_trades");
+        //await storage.CreateTable<Position>("stock_positions");
+        //await storage.CreateTable<Order>("fx_orders");
+        //await storage.CreateTable<Trade>("fx_trades");
+        //await storage.CreateTable<Position>("fx_positions");
+        //await storage.CreateTable<PositionRecord>();
+        await storage.CreateTable<AlgoEntry>();
+        await storage.CreateTable<AlgoBatch>();
     }
 
     private static async Task RunMacMimicWebService()
@@ -165,14 +166,14 @@ public class Program
         _log.Info("Execute algorithm with parameters #2: " + algorithm);
 
         var isAssetSet = context.SetPreferredAssets("BUSD", "TUSD", "USDT");
-        var guid = await core.StartAlgorithm(parameters, algorithm);
-        
+        var algoBatchId = await core.StartAlgorithm(parameters, algorithm);
+
         while (true)
         {
             Thread.Sleep(5000);
         }
 
-        await core.StopAlgorithm(guid);
+        await core.StopAlgorithm(algoBatchId);
     }
 
     private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment, Security security)
@@ -418,12 +419,13 @@ public class Program
                     var screening = new SingleSecurityLogic(context, security);
                     algorithm.Screening = screening;
 
-                    var engine = new AlgorithmEngine<RumiVariables>(context);
-                    engine.Initialize(algorithm);
+                    var engineParameters = new EngineParameters(true, false, true);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
-                    await engine.Run(algoStartParams);
+                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange);
+                    var engine = new AlgorithmEngine(context, engineParameters);
+                    engine.Initialize(algorithm);
+                    await engine.Run(algoParameters);
 
                     var entries = engine.GetAllEntries(security.Id);
                     if (entries.IsNullOrEmpty())
@@ -558,7 +560,7 @@ public class Program
 
         var rootFolder = @"C:\Temp";
 
-        var columns = ColumnMappingReader.Read(typeof(AlgoEntry<MacVariables>));
+        var columns = ColumnMappingReader.Read(typeof(AlgoEntry));
 
         var folder = Path.Combine(rootFolder, $"MAC-{fast},{slow},{now:yyyyMMdd-HHmmss}");
         var zipFilePath = Path.Combine(folder, $"Result-MAC-{fast},{slow},{now:yyyyMMdd-HHmmss}.zip");
@@ -582,11 +584,11 @@ public class Program
                         var algorithm = new MovingAverageCrossing(context, fast, slow, stopLoss);
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
-                        var engine = new AlgorithmEngine<MacVariables>(context);
-                        engine.Initialize(algorithm);
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                         var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
-
+                        var engineParameters = new EngineParameters(true, false, true);
+                        var engine = new AlgorithmEngine(context, engineParameters);
+                        engine.Initialize(algorithm);
                         await engine.Run(algoStartParams);
 
                         var entries = engine.GetAllEntries(security.Id);

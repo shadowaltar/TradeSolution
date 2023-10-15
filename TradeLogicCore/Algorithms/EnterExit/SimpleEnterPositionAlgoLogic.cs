@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
@@ -34,6 +35,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
 
     public ITransactionFeeLogic? FeeLogic { get; set; }
 
+    public bool IsOpening { get; private set; }
+
     public SimpleEnterPositionAlgoLogic(Context context)
     {
         _orderIdGen = IdGenerators.Get<Order>();
@@ -48,59 +51,70 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                                                decimal stopLossPrice,
                                                decimal takeProfitPrice)
     {
-        if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
-
-        var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id)
-            ?? throw Exceptions.MissingAssetPosition(current.Security.QuoteSecurity.Code);
-
-        var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
-        var order = CreateOrder(OrderType.Limit, side, enterTime, enterPrice, size, current.Security, comment: Comments.AlgoEnter);
-
-        current.Quantity = size;
-        current.OrderId = order.Id;
-
-        var state = await _orderService.SendOrder(order);
-        state.SubStates = new();
-
-        if (stopLossPrice.IsValid() && stopLossPrice > 0)
+        try
         {
-            if (stopLossPrice >= enterPrice)
-            {
-                _log.Error($"Cannot create a stop loss limit order where its price {stopLossPrice} is larger than or equals to the parent order's limit price {enterPrice}.");
-            }
-            else
-            {
-                var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                var stopPrice = (stopLossPrice + enterPrice) / 2m; // trigger price at the mid
-                var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLoss);
-                var subState = await _orderService.SendOrder(slOrder);
-                state.SubStates.Add(subState);
-            }
-        }
+            IsOpening = true;
 
-        if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
-        {
-            if (takeProfitPrice <= enterPrice)
+            if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
+
+            var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id)
+                ?? throw Exceptions.MissingAssetPosition(current.Security.QuoteSecurity.Code);
+
+            var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
+            var order = CreateOrder(OrderType.Limit, side, enterTime, enterPrice, size, current.Security, comment: Comments.AlgoEnter);
+            var state = await _orderService.SendOrder(order);
+            if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                _log.Error($"Cannot create a take profit limit order where its price {takeProfitPrice} is smaller than or equals to the parent order's limit price {enterPrice}.");
+                state.SubStates = new();
+
+                if (stopLossPrice.IsValid() && stopLossPrice > 0)
+                {
+                    if (stopLossPrice >= enterPrice)
+                    {
+                        _log.Error($"Cannot create a stop loss limit order where its price {stopLossPrice} is larger than or equals to the parent order's limit price {enterPrice}.");
+                    }
+                    else
+                    {
+                        var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
+                        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopLossPrice, Comments.AlgoStopLoss);
+                        var subState = await _orderService.SendOrder(slOrder);
+                        if (subState.ResultCode == ResultCode.SendOrderFailed)
+                        {
+                            _log.Error("Failed to submit stop loss order! Must cancel the open order or close the open position immediately! SecurityCode: " + slOrder.SecurityCode);
+                        }
+                        state.SubStates.Add(subState);
+                    }
+                }
+
+                if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
+                {
+                    if (takeProfitPrice <= enterPrice)
+                    {
+                        _log.Error($"Cannot create a take profit limit order where its price {takeProfitPrice} is smaller than or equals to the parent order's limit price {enterPrice}.");
+                    }
+                    else
+                    {
+                        var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
+                        var stopPrice = (takeProfitPrice + enterPrice) / 2m; // trigger price at the mid
+                        var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfit);
+                        var subState = await _orderService.SendOrder(tpOrder);
+                        state.SubStates.Add(subState);
+                    }
+                }
             }
-            else
-            {
-                var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                var stopPrice = (takeProfitPrice + enterPrice) / 2m; // trigger price at the mid
-                var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfit);
-                var subState = await _orderService.SendOrder(tpOrder);
-                state.SubStates.Add(subState);
-            }
+            return state;
         }
-        return state;
+        finally
+        {
+            IsOpening = false;
+        }
     }
 
     private Order CreateOrder(OrderType type, Side side, DateTime time, decimal price, decimal quantity, Security security, decimal? stopPrice = null, string comment = "")
     {
         if (side == Side.None) throw Exceptions.Invalid<Side>(side);
         if (!time.IsValid()) throw Exceptions.Invalid<DateTime>(time);
-        if (!price.IsValid() || price <= 0) throw Exceptions.Invalid<decimal>(price);
+        if (type == OrderType.Limit && (!price.IsValid() || price <= 0)) throw Exceptions.Invalid<decimal>(price);
         if (!quantity.IsValid() || quantity <= 0) throw Exceptions.Invalid<decimal>(quantity);
         if (!security.IsValid()) throw Exceptions.Invalid<Security>(security);
         if (!security.QuoteSecurity.IsValid()) throw Exceptions.Invalid<Security>("Security's quote security is: " + security.QuoteSecurity);
@@ -150,7 +164,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
-        SyncOpenOrderToEntry(current, size, enterPrice, enterTime, stopLossPrice, takeProfitPrice);
+        SyncOpenOrderToEntry(current, size, enterPrice, enterTime);
 
         // apply fee when a new position is opened
         FeeLogic?.ApplyFee(current);
@@ -158,7 +172,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         _log.Info($"action=open|time0={current.EnterTime:yyMMdd-HHmm}|p0={current.EnterPrice}|q={current.Quantity}");
     }
 
-    public void SyncOpenOrderToEntry(AlgoEntry current, decimal size, decimal enterPrice, DateTime enterTime, decimal stopLossPrice, decimal takeProfitPrice)
+    public void SyncOpenOrderToEntry(AlgoEntry current, decimal size, decimal enterPrice, DateTime enterTime)
     {
         // this method should take care of multiple fills
         current.Quantity = size;
@@ -172,8 +186,6 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         current.RealizedPnl = 0;
         current.UnrealizedPnl = 0;
         current.RealizedReturn = 0;
-        current.StopLossPrice = stopLossPrice;
-        current.TakeProfitPrice = takeProfitPrice;
         current.Notional = size * enterPrice;
     }
 }

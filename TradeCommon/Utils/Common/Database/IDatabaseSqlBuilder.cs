@@ -2,7 +2,7 @@
 
 namespace Common.Database;
 
-public interface IDatabaseSchemaHelper
+public interface IDatabaseSqlBuilder
 {
     string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null) where T : class;
 

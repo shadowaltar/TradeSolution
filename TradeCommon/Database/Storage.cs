@@ -15,7 +15,7 @@ public partial class Storage : IStorage
     public event Action<object, string>? Success;
     public event Action<object, Exception, string>? Failed;
 
-    public IDatabaseSchemaHelper SchemaHelper { get; } = new SqliteSchemaHelper();
+    public IDatabaseSqlBuilder SqlHelper { get; } = new SqliteSqlBuilder();
 
     public Storage()
     {
@@ -49,7 +49,8 @@ public partial class Storage : IStorage
 
         for (int i = 0; i < r.FieldCount; i++)
         {
-            entries.Columns.Add(new DataColumn(r.GetName(i)));
+            var type = TypeConverter.FromTypeCode(typeCodes[i]);
+            entries.Columns.Add(new DataColumn(r.GetName(i), type));
         }
 
         int j = 0;

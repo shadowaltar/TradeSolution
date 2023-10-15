@@ -9,7 +9,10 @@ public enum ResultCode
     SubscriptionOk,
     UnsubscriptionOk,
     MultipleUnsubscriptionOk,
-    
+
+    StartEngineOk,
+    StopEngineOk,
+
     GetMiscOk,
     GetUserOk,
     GetAccountOk,
@@ -46,6 +49,9 @@ public enum ResultCode
     DisconnectionFailed,
     SubscriptionFailed,
     UnsubscriptionFailed,
+    
+    StartEngineFailed,
+    StopEngineFailed,
 
     GetMiscFailed,
     GetUserFailed,

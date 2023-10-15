@@ -39,8 +39,8 @@ CREATE UNIQUE INDEX idx_{tableName}_email_environment
 
     public async Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null) where T : class
     {
-        string dropSql = SchemaHelper.CreateDropTableAndIndexSql<T>(tableNameOverride);
-        string createSql = SchemaHelper.CreateCreateTableAndIndexSql<T>(tableNameOverride);
+        string dropSql = SqlHelper.CreateDropTableAndIndexSql<T>(tableNameOverride);
+        string createSql = SqlHelper.CreateCreateTableAndIndexSql<T>(tableNameOverride);
         var (tableName, databaseName) = DatabaseNames.GetTableAndDatabaseName<T>();
         tableName = tableNameOverride ?? tableName;
         await DropThenCreate(dropSql, createSql, tableName, databaseName);
@@ -87,7 +87,7 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_ownerId
 DROP TABLE IF EXISTS {DatabaseNames.BalanceTable};
 DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId;
 DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_assetId;
-{SchemaHelper.GetDropTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
+{SqlHelper.GetDropTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
 ";
         string createSql =
 @$"
@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
     LockedAmount REAL DEFAULT 0 NOT NULL,
     SettlingAmount REAL DEFAULT 0 NOT NULL,
     UpdateTime DATE
-    {SchemaHelper.GetCreateTableUniqueClause<Asset>()}
+    {SqlHelper.GetCreateTableUniqueClause<Asset>()}
 );
-{SchemaHelper.GetCreateTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
+{SqlHelper.GetCreateTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
 CREATE INDEX idx_{DatabaseNames.BalanceTable}_accountId
     ON {DatabaseNames.BalanceTable} (AccountId);
 CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
@@ -354,7 +354,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     OrderId INTEGER PRIMARY KEY,
     SecurityId INTEGER NOT NULL,
     SecurityType VARCHAR(100) NOT NULL
-    {SchemaHelper.GetCreateTableUniqueClause<OpenOrderId>()}
+    {SqlHelper.GetCreateTableUniqueClause<OpenOrderId>()}
 );
 CREATE UNIQUE INDEX idx_{tableName}_securityId
     ON {tableName} (SecurityId);

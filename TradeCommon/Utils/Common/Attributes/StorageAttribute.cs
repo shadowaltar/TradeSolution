@@ -9,6 +9,7 @@ public class StorageAttribute : Attribute
         SchemaName = schemaName;
         DatabaseName = databaseName;
     }
+
     public StorageAttribute(string tableName, string databaseName)
     {
         TableName = tableName;
@@ -19,4 +20,6 @@ public class StorageAttribute : Attribute
     public string TableName { get; }
     public string? SchemaName { get; }
     public string DatabaseName { get; }
+
+    public bool SortProperties { get; set; } = true;
 }

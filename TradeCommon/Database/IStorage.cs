@@ -19,7 +19,7 @@ public interface IStorage
     event Action<object, string> Success;
     event Action<object, Exception, string> Failed;
 
-    IDatabaseSchemaHelper SchemaHelper { get; }
+    IDatabaseSqlBuilder SqlHelper { get; }
 
     Task CreateAccountTable();
     Task CreateBalanceTable();
@@ -51,6 +51,7 @@ public interface IStorage
     Task<List<OpenOrderId>> ReadOpenOrderIds();
     Task<List<Order>> ReadOpenOrders(Security? security = null, SecurityType securityType = SecurityType.Unknown);
     Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end);
+    Task<List<Order>> ReadOrders(Security security, List<long> ids);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
     IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
@@ -58,7 +59,8 @@ public interface IStorage
     Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);
     Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end);
-    Task<List<Trade>> ReadTrades(Security security, long smallestPositionId);
+    Task<List<Trade>> ReadTrades(Security security, long positionId, OperatorType positionIdComparisonOperator = OperatorType.Equals);
+    Task<List<Trade>> ReadTrades(Security security, List<long> ids);
     Task<List<Trade>> ReadTradesByOrderId(Security security, long orderId);
     Task<List<Trade>> ReadTradesByPositionId(Security security, long positionId);
     Task<Position?> ReadPosition(Security security, long positionId);
@@ -73,6 +75,8 @@ public interface IStorage
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
+    Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new();
+    bool TryReadScalar<T>(string sql, string database, out T value);
     Task<int> RunOne(string sql, string database);
     Task<int> RunMany(List<string> sqls, string database);
     void PurgeDatabase();

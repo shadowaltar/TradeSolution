@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
 
@@ -21,8 +22,8 @@ public class Context : ApplicationContext
     {
         get
         {
-            if (_algorithmEngine?.Parameters == null) throw Exceptions.InvalidAlgorithmEngineState();
-            return _algorithmEngine.Parameters.IsBackTesting;
+            if (_algorithmEngine?.AlgoParameters == null) throw Exceptions.InvalidAlgorithmEngineState();
+            return _algorithmEngine.AlgoParameters.IsBackTesting;
         }
     }
 
@@ -41,7 +42,13 @@ public class Context : ApplicationContext
     public User? User
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _user;
-        internal set => _user = value;
+        internal set
+        {
+            if (value == null)
+                throw Exceptions.Invalid<User>("User missing or invalid.");
+            _user = value;
+            UserId = value.Id;
+        }
     }
 
     /// <summary>
@@ -59,7 +66,7 @@ public class Context : ApplicationContext
         }
     }
 
-    public void InitializeAlgorithmContext<T>(IAlgorithmEngine algorithmEngine, IAlgorithm<T> algorithm) where T : IAlgorithmVariables
+    public void InitializeAlgorithmContext(IAlgorithmEngine algorithmEngine, IAlgorithm algorithm)
     {
         _algorithmEngine = algorithmEngine;
         _algorithm = algorithm;
@@ -73,5 +80,26 @@ public class Context : ApplicationContext
     public IAlgorithmEngine GetEngine()
     {
         return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
+    }
+
+    public AlgoBatch SaveAlgoBatch()
+    {
+        if (_algorithm == null || _algorithmEngine == null) throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-batch entry.");
+
+        var algoBatch = new AlgoBatch
+        {
+            Id = AlgoBatchId,
+            AlgoId = _algorithm.Id,
+            AlgoName = _algorithm.GetType().Name,
+            AlgoVersionId = _algorithm.VersionId,
+            UserId = UserId,
+            AccountId = AccountId,
+            Environment = Environment,
+            AlgorithmParameters = _algorithm.AlgorithmParameters,
+            EngineParameters = _algorithmEngine.EngineParameters,
+            StartTime = DateTime.UtcNow,
+        };
+        Services.Persistence.Insert(algoBatch, isSynchronous: true);
+        return algoBatch;
     }
 }

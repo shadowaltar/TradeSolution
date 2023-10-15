@@ -1,4 +1,6 @@
-﻿namespace Common;
+﻿using TradeCommon.Runtime;
+
+namespace Common;
 public static class TypeConverter
 {
     public static TypeCode ToTypeCode(string typeString)
@@ -171,5 +173,46 @@ public static class TypeConverter
             return "VARCHAR";
 
         return "VARCHAR";
+    }
+
+    public static Type FromTypeCode(TypeCode typeCode)
+    {
+        switch (typeCode)
+        {
+            case TypeCode.Object:
+            case TypeCode.Empty:
+            case TypeCode.DBNull:
+                return typeof(object);
+            case TypeCode.Boolean:
+                return typeof(bool);
+            case TypeCode.Char:
+                return typeof(char);
+            case TypeCode.SByte:
+            case TypeCode.Byte:
+                return typeof(byte);
+            case TypeCode.Int16:
+                return typeof(short);
+            case TypeCode.UInt16:
+                return typeof(ushort);
+            case TypeCode.Int32:
+                return typeof(int);
+            case TypeCode.UInt32:
+                return typeof(uint);
+            case TypeCode.Int64:
+                return typeof(long);
+            case TypeCode.UInt64:
+                return typeof(ulong);
+            case TypeCode.Single:
+                return typeof(float);
+            case TypeCode.Double:
+                return typeof(double);
+            case TypeCode.Decimal:
+                return typeof(decimal);
+            case TypeCode.DateTime:
+                return typeof(DateTime);
+            case TypeCode.String:
+                return typeof(string);
+        };
+        throw Exceptions.Impossible();
     }
 }

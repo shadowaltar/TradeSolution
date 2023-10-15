@@ -1,11 +1,11 @@
 ﻿using Common;
-using Common.Attributes;
-using log4net;
+using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
@@ -14,13 +14,18 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
-public class MovingAverageCrossing : IAlgorithm<MacVariables>
+public class MovingAverageCrossing : IAlgorithm
 {
-    private static readonly ILog _log = Logger.New();
-
     private readonly SimpleMovingAverage _fastMa;
     private readonly SimpleMovingAverage _slowMa;
     private readonly Context _context;
+
+    /// <summary>
+    /// Indicates if the security is being traded.
+    /// </summary>
+    private readonly HashSet<int> _tradingSecurityIds = new();
+
+    public AlgorithmParameters AlgorithmParameters { get; set; }
 
     public int Id => 1;
     public int VersionId => 20230916;
@@ -34,6 +39,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
     public IEnterPositionAlgoLogic Entering { get; set; }
     public IExitPositionAlgoLogic Exiting { get; set; }
     public ISecurityScreeningAlgoLogic Screening { get; set; }
+
 
     private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
 
@@ -68,7 +74,7 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
     }
 
-    public void BeforeProcessingSecurity(IAlgorithmEngine<MacVariables> context, Security security)
+    public void BeforeProcessingSecurity(IAlgorithmEngine context, Security security)
     {
         if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
         {
@@ -81,10 +87,10 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         }
     }
 
-    public MacVariables CalculateVariables(decimal price, AlgoEntry<MacVariables>? last)
+    public object CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new MacVariables();
-        var lastVariables = last?.Variables;
+        var lv = last?.Variables as MacVariables;
 
         var fast = _fastMa.Next(price);
         var slow = _slowMa.Next(price);
@@ -93,73 +99,156 @@ public class MovingAverageCrossing : IAlgorithm<MacVariables>
         variables.Slow = slow;
 
         // these two flags need to be inherited
-        variables.PriceXFast = lastVariables?.PriceXFast ?? 0;
-        variables.PriceXSlow = lastVariables?.PriceXSlow ?? 0;
-        variables.FastXSlow = lastVariables?.FastXSlow ?? 0;
+        variables.PriceXFast = lv?.PriceXFast ?? 0;
+        variables.PriceXSlow = lv?.PriceXSlow ?? 0;
+        variables.FastXSlow = lv?.FastXSlow ?? 0;
 
         return variables;
     }
 
-    public bool IsOpenLongSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
     {
-        if (lastPrice == null)
+        ProcessSignal(current, last);
+
+        var cv = (MacVariables)current.Variables;
+
+        var shouldLong = cv.PriceXFast > 0
+               && cv.PriceXSlow > 0
+               && cv.FastXSlow > 0;
+
+        var shouldShort = cv.PriceXFast < 0
+               && cv.PriceXSlow < 0
+               && cv.FastXSlow < 0;
+
+        current.LongSignal = shouldLong ? SignalType.Open : shouldShort ? SignalType.Close : SignalType.Hold;
+        current.ShortSignal = shouldShort ? SignalType.Open : shouldLong ? SignalType.Close : SignalType.Hold;
+    }
+
+    public bool CanOpenLong(AlgoEntry current)
+    {
+        // prevent trading if trading is ongoing
+        if (!CanOpen(current))
             return false;
 
-        ProcessSignal(current, last);
-
-        return current.Variables.PriceXFast > 0
-               && current.Variables.PriceXSlow > 0
-               && current.Variables.FastXSlow > 0;
+        // check long signal
+        return current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
     }
 
-    public bool IsCloseLongSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
+    public void BeforeOpeningLong(AlgoEntry entry)
     {
-        if (lastPrice == null)
-            return true;
-
-        ProcessSignal(current, last);
-
-        return current.Variables.PriceXFast < 0
-               && current.Variables.PriceXSlow < 0
-               && current.Variables.FastXSlow < 0;
+        _tradingSecurityIds.ThreadSafeAdd(entry.SecurityId);
     }
 
-    public void AfterLongClosed(AlgoEntry<MacVariables> entry)
+    public void BeforeOpeningShort(AlgoEntry entry)
+    {
+        _tradingSecurityIds.ThreadSafeAdd(entry.SecurityId);
+    }
+
+    public bool CanOpenShort(AlgoEntry current)
+    {
+        // prevent trading if trading is ongoing
+        if (!CanOpen(current))
+            return false;
+
+        // check short signal
+        return current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
+    }
+
+    private bool CanOpen(AlgoEntry current)
+    {
+        // prevent trading if enter-logic is underway
+        if (Entering.IsOpening)
+            return false;
+
+        // prevent trading if security is marked as being traded
+        var isTrading = _tradingSecurityIds.ThreadSafeContains(current.SecurityId);
+        if (isTrading)
+            return false;
+
+        // prevent trading if has open orders
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        if (!openOrders.IsNullOrEmpty())
+            return false;
+
+        // prevent trading if has open positions
+        var hasOpenPosition = false;
+        var openPosition = _context.Services.Portfolio.GetPosition(current.SecurityId);
+        if (openPosition == null)
+            hasOpenPosition = false;
+        else if (openPosition.IsClosed && openPosition.EndTradeId > 0)
+            hasOpenPosition = false;
+
+        return !hasOpenPosition;
+    }
+
+    public bool CanCloseLong(AlgoEntry current)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+               && position.Side == Side.Buy
+               && current.LongCloseType == CloseType.None
+               && current.LongSignal == SignalType.Close;
+    }
+
+    public bool CanCloseShort(AlgoEntry current)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+               && position.Side == Side.Sell
+               && current.ShortCloseType == CloseType.None
+               && current.ShortSignal == SignalType.Close;
+    }
+
+    public bool CanCancel(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        return !openOrders.IsNullOrEmpty();
+    }
+
+    public void AfterLongClosed(AlgoEntry entry)
     {
         ResetInheritedVariables(entry);
     }
 
-    public void AfterStopLossLong(AlgoEntry<MacVariables> entry)
+    public void AfterStopLossLong(AlgoEntry entry)
     {
         ResetInheritedVariables(entry);
     }
 
-    private void ProcessSignal(AlgoEntry<MacVariables> current, AlgoEntry<MacVariables> last)
+    public void NotifyPositionClosed(int securityId, long positionId)
     {
-        if (TryCheck(last.Price, current.Price, last.Variables.Fast, current.Variables.Fast, out var pxf))
+        _tradingSecurityIds.ThreadSafeRemove(securityId);
+    }
+
+    private static void ProcessSignal(AlgoEntry current, AlgoEntry last)
+    {
+        var lv = (MacVariables)last.Variables;
+        var cv = (MacVariables)current.Variables;
+        if (CheckCrossing(last.Price, current.Price, lv.Fast, cv.Fast, out var pxf))
         {
-            current.Variables.PriceXFast = pxf;
+            cv.PriceXFast = pxf;
         }
 
-        if (TryCheck(last.Price, current.Price, last.Variables.Slow, current.Variables.Slow, out var pxs))
+        if (CheckCrossing(last.Price, current.Price, lv.Slow, cv.Slow, out var pxs))
         {
-            current.Variables.PriceXSlow = pxs;
+            cv.PriceXSlow = pxs;
         }
 
-        if (TryCheck(last.Variables.Fast, current.Variables.Fast, last.Variables.Slow, current.Variables.Slow, out var fxs))
+        if (CheckCrossing(lv.Fast, cv.Fast, lv.Slow, cv.Slow, out var fxs))
         {
-            current.Variables.FastXSlow = fxs;
+            cv.FastXSlow = fxs;
         }
     }
 
-    private static void ResetInheritedVariables(AlgoEntry<MacVariables> entry)
+    private static void ResetInheritedVariables(AlgoEntry current)
     {
-        entry.Variables.PriceXFast = 0;
-        entry.Variables.PriceXSlow = 0;
-        entry.Variables.FastXSlow = 0;
+        var cv = (MacVariables)current.Variables;
+        cv.PriceXFast = 0;
+        cv.PriceXSlow = 0;
+        cv.FastXSlow = 0;
     }
 
-    public static bool TryCheck(decimal last1, decimal current1, decimal last2, decimal current2, out int crossing)
+    private static bool CheckCrossing(decimal last1, decimal current1, decimal last2, decimal current2, out int crossing)
     {
         if (!last1.IsValid() || !last2.IsValid() || !current1.IsValid() || !current2.IsValid())
         {

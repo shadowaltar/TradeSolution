@@ -1,8 +1,7 @@
-﻿using Common;
-using log4net;
-using TradeCommon.Essentials;
+﻿using TradeCommon.Essentials;
+using Common;
 
-namespace TradeLogicCore.Algorithms.Parameters;
+namespace TradeCommon.Algorithms;
 
 public record AlgoEffectiveTimeRange
 {
@@ -59,11 +58,11 @@ public record AlgoEffectiveTimeRange
                     }
                     return DateTime.MinValue;
                 case AlgoStartTimeType.NextStartOfLocalDay:
-                {
-                    var now = DateTime.UtcNow;
-                    var localNow = now.ToLocalTime();
-                    return now.Add(TimeSpans.LocalUtcDiff);
-                }
+                    {
+                        var now = DateTime.UtcNow;
+                        var localNow = now.ToLocalTime();
+                        return now.Add(TimeSpans.LocalUtcDiff);
+                    }
                 case AlgoStartTimeType.NextMarketOpens:
                     // TODO, need market meta data
                     break;

@@ -34,10 +34,9 @@ public class SecurityService : ISecurityService
         if (!_context.IsInitialized) throw Exceptions.ContextNotInitialized();
         if (_isInitialized) return _securities.Values.ToList();
 
-        var secTypes = Enum.GetValues<SecurityType>();
         var exchangeTypes = Enum.GetValues<ExchangeType>();
         List<Security> securities = new();
-        foreach (var secType in secTypes)
+        foreach (var secType in Consts.SupportedSecurityTypes)
         {
             foreach (var exchangeType in exchangeTypes)
             {
@@ -174,15 +173,14 @@ public class SecurityService : ISecurityService
         return _securities.ThreadSafeGet(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);
     }
 
-    public bool Fix(SecurityRelatedEntry entry, Security? security = null)
+    public void Fix(SecurityRelatedEntry entry, Security? security = null)
     {
         if (entry.SecurityId > 0)
         {
             security ??= GetSecurity(entry.SecurityId);
             if (security == null)
             {
-                _log.Error("Failed to find security, id: " + entry.SecurityId);
-                return false;
+                throw Exceptions.InvalidSecurityId(entry.SecurityId);
             }
             entry.SecurityCode = security.Code;
             entry.Security = security;
@@ -192,8 +190,7 @@ public class SecurityService : ISecurityService
             security ??= GetSecurity(entry.SecurityCode);
             if (security == null)
             {
-                _log.Error("Failed to find security, code: " + entry.SecurityCode);
-                return false;
+                throw Exceptions.InvalidSecurityCode(entry.SecurityCode);
             }
             entry.SecurityId = security.Id;
             entry.Security = security;
@@ -208,10 +205,8 @@ public class SecurityService : ISecurityService
 
         if (entry.SecurityCode.IsBlank() || entry.SecurityId <= 0 || entry.Security == null)
         {
-            _log.Error("Failed to fix entry: " + entry);
-            return false;
+            throw Exceptions.InvalidSecurity("N/A", "no security information at all in this entry.");
         }
-        return true;
     }
 
     /// <summary>

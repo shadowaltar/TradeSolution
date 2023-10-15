@@ -1,7 +1,8 @@
 ﻿using Common;
 using log4net;
+using System.Security.Cryptography;
 using TradeCommon.Essentials.Algorithms;
-using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
@@ -99,18 +100,9 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         var enterPrice = current.EnterPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
 
-        if (current.IsLong)
-        {
-            Assertion.ShallNever(r < LongStopLossRatio * -1);
-            current.IsLong = false;
-            current.LongCloseType = CloseType.Normal;
-        }
-        if (current.IsShort)
-        {
-            Assertion.ShallNever(r < ShortStopLossRatio * -1);
-            current.IsShort = false;
-            current.ShortCloseType = CloseType.Normal;
-        }
+        current.LongCloseType = CloseType.Normal;
+        current.ShortCloseType = CloseType.Normal;
+
         current.ExitPrice = exitPrice;
         current.Elapsed = exitTime - current.EnterTime!.Value;
         current.RealizedPnl = (exitPrice - enterPrice) * current.Quantity;
@@ -126,18 +118,28 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
 
     public void BackTestStopLoss(AlgoEntry current, AlgoEntry last, DateTime exitTime)
     {
+        var side = _portfolioService.GetOpenPositionSide(current.SecurityId);
+        if (side == Side.None) return;
+
+        decimal slRatio = side switch
+        {
+            Side.Buy => LongStopLossRatio,
+            Side.Sell => -ShortStopLossRatio,
+            _ => throw Exceptions.InvalidSide(),
+        };
+        if (!slRatio.IsValid() && slRatio <= 0)
+            return;
+
         var enterPrice = current.EnterPrice!.Value;
-        var exitPrice = current.StopLossPrice!.Value;
+        var exitPrice = current.Security.GetStopLossPrice(enterPrice, slRatio);
         var r = (exitPrice - enterPrice) / enterPrice;
 
-        if (current.IsLong)
+        if (side == Side.Buy)
         {
-            current.IsLong = false;
             current.LongCloseType = CloseType.StopLoss;
         }
-        if (current.IsShort)
+        if (side == Side.Sell)
         {
-            current.IsShort = false;
             current.ShortCloseType = CloseType.StopLoss;
         }
         current.ExitPrice = exitPrice;
