@@ -97,6 +97,21 @@ public enum OrderStatus
 
 public static class OrderStatusConverter
 {
+    public static bool IsFinished(this OrderStatus status)
+    {
+        return status == OrderStatus.Filled || status.IsNoFillFinished();
+    }
+
+    public static bool IsNoFillFinished(this OrderStatus status)
+    {
+        return status == OrderStatus.Cancelled
+            || status == OrderStatus.Expired
+            || status == OrderStatus.Deleted
+            || status == OrderStatus.Failed
+            || status == OrderStatus.Prevented
+            || status == OrderStatus.Rejected;
+    }
+
     public static OrderStatus ParseBinance(string? statusStr)
     {
         if (statusStr == null)

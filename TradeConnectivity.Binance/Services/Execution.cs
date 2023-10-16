@@ -852,8 +852,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     {
         string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
 
-        _log.Info("Received JSON:" + Environment.NewLine + json);
-
         try
         {
             // expect { "stream": "...", "data": {...}}
@@ -904,13 +902,13 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     }
                     break;
                 case "executionReport": // order
-                    var sideString = jsonNode.GetString("S");
-                    var orderTypeString = jsonNode.GetString("o");
+                    _log.Info("Received streamed JSON for execution:" + Environment.NewLine + json);
 
+                    var sideString = jsonNode.GetString("S");
                     var code = jsonNode.GetString("s");
                     var orderId = jsonNode.GetLong("c");
                     var side = sideString == "BUY" ? Side.Buy : sideString == "SELL" ? Side.Sell : Side.None;
-                    var orderType = Enum.TryParse<OrderType>(orderTypeString, true, out var ot) ? ot : OrderType.Unknown;
+                    var orderType = jsonNode.GetString("o").ConvertDescriptionToEnum<OrderType>(OrderType.Unknown);
                     var timeInForce = jsonNode.GetString("f").ConvertDescriptionToEnum<TimeInForceType>(TimeInForceType.Unknown);
                     var orderQuantity = jsonNode.GetDecimal("q");
                     var orderPrice = jsonNode.GetDecimal("p");
@@ -967,6 +965,15 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         StopPrice = stopPrice,
                         StrategyId = strategyId,
                     };
+                    if (order.Status == OrderStatus.Unknown)
+                    {
+
+                    }
+                    if (order.Type == OrderType.Unknown)
+                    {
+
+                    }
+
                     Trade? trade = null;
                     // if a trade is generated
                     if (externalTradeId > 0)

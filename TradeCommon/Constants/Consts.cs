@@ -19,6 +19,8 @@ public static class Consts
 
     public const int EnumDatabaseTypeSize = 20;
 
+    public const decimal StopPriceRatio = 0.5m;
+
     public static readonly SecurityType[] SupportedSecurityTypes = new[] {
         SecurityType.Fx,
         SecurityType.Equity,

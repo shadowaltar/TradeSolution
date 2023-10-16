@@ -323,6 +323,6 @@ public record MacVariables : IAlgorithmVariables
 
     public override string ToString()
     {
-        return $"F:{Fast:G4}, S:{Slow:G4}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
+        return $"F:{(Fast.IsValid() ? Fast.ToString("F16") : "N/A")}, S:{(Slow.IsValid()?Slow.ToString("F16"):"N/A")}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
     }
 }

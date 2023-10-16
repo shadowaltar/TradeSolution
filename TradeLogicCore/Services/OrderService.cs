@@ -10,6 +10,7 @@ using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeConnectivity.Binance.Services;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
@@ -202,9 +203,17 @@ public class OrderService : IOrderService, IDisposable
 
     public async Task CancelAllOpenOrders(Security security)
     {
-        var state = await _execution.CancelAllOrders(security);
-        _log.Info("Canceled all open orders: " + state);
-        Persist(state);
+        var state = await _execution.GetOpenOrders(security);
+        if (state.ResultCode == ResultCode.GetOrderOk && !state.As<List<Order>>().IsNullOrEmpty())
+        {
+            state = await _execution.CancelAllOrders(security);
+            _log.Info("Canceled all open orders: " + state);
+            if (state.ResultCode == ResultCode.CancelOrderOk)
+            {
+                var cancelledOrders = state.As<List<Order>>();
+                _persistence.Insert(cancelledOrders);
+            }
+        }
     }
 
     public void Dispose()
@@ -253,8 +262,6 @@ public class OrderService : IOrderService, IDisposable
     /// <param name="order"></param>
     private void OnOrderReceived(Order order)
     {
-        _log.Info("TEST--------- " + order);
-
         _securityService.Fix(order);
 
         var eoid = order.ExternalOrderId;
@@ -262,7 +269,7 @@ public class OrderService : IOrderService, IDisposable
         // already cached the order in SENDING state
         if (!_orders.ThreadSafeTryGet(oid, out var existingOrder))
         {
-            throw Exceptions.Impossible("Before order is received it has been cached as a SENDING order");
+            throw Exceptions.Impossible("Before order is received it should been cached as a SENDING order");
         }
         else
         {
@@ -278,12 +285,18 @@ public class OrderService : IOrderService, IDisposable
                     _log.Warn($"Out of sequence copy of order is received, id: {order.Id}; it will be ignored.");
                     return;
                 }
+                if (order.Status == OrderStatus.Unknown && existingOrder.Status != OrderStatus.Unknown)
+                {
+                    // the incoming order is less 'valid'
+                    _log.Warn($"Unknown status order is received, id: {order.Id}; it will be ignored.");
+                    return;
+                }
                 if (_log.IsDebugEnabled)
                     _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
             _orders.ThreadSafeSet(oid, order);
         }
-
+        
         switch (order.Status)
         {
             case OrderStatus.Live or OrderStatus.PartialFilled:
@@ -293,15 +306,16 @@ public class OrderService : IOrderService, IDisposable
                 _cancelledOrders.ThreadSafeSet(order.Id, order);
                 _openOrders.ThreadSafeRemove(order.Id);
                 break;
-            case OrderStatus.Filled or OrderStatus.Expired:
-                _openOrders.ThreadSafeRemove(order.Id);
-                break;
-            case OrderStatus.Unknown:
-                break;
         }
+        if (order.Status.IsFinished())
+            _openOrders.ThreadSafeRemove(order.Id);
+
         _ordersByExternalId.ThreadSafeSet(eoid, order);
 
         Persist(order);
+
+        _log.Info($"O: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}]\n\t{order.Status},P:{order.Price},Q:{order.Quantity}");
+
         NextOrder?.Invoke(order);
     }
 

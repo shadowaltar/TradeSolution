@@ -1,5 +1,7 @@
 ﻿using Common;
 using log4net;
+using System.Diagnostics;
+using TradeCommon.Constants;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
@@ -75,8 +77,9 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     }
                     else
                     {
+                        var stopPrice = current.Security.RoundTickSize((enterPrice + stopLossPrice) * Consts.StopPriceRatio, enterPrice);
                         var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopLossPrice, Comments.AlgoStopLoss);
+                        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLoss);
                         var subState = await _orderService.SendOrder(slOrder);
                         if (subState.ResultCode == ResultCode.SendOrderFailed)
                         {
@@ -94,8 +97,8 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     }
                     else
                     {
+                        var stopPrice = current.Security.RoundTickSize((enterPrice + takeProfitPrice) * Consts.StopPriceRatio, enterPrice);
                         var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                        var stopPrice = (takeProfitPrice + enterPrice) / 2m; // trigger price at the mid
                         var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfit);
                         var subState = await _orderService.SendOrder(tpOrder);
                         state.SubStates.Add(subState);
@@ -110,7 +113,14 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         }
     }
 
-    private Order CreateOrder(OrderType type, Side side, DateTime time, decimal price, decimal quantity, Security security, decimal? stopPrice = null, string comment = "")
+    private Order CreateOrder(OrderType type,
+                              Side side,
+                              DateTime time,
+                              decimal price,
+                              decimal quantity,
+                              Security security,
+                              decimal? stopPrice = null,
+                              string comment = "")
     {
         if (side == Side.None) throw Exceptions.Invalid<Side>(side);
         if (!time.IsValid()) throw Exceptions.Invalid<DateTime>(time);

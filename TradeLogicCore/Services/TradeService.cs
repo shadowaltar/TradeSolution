@@ -107,16 +107,18 @@ public class TradeService : ITradeService, IDisposable
             InternalOnNextTrade(trade);
             newOnes.Add(trade);
         }
-        _portfolioService.Process(newOnes, isSameSecurity);
+        if (newOnes.Count == 0)
+            return;
 
+        _portfolioService.Process(newOnes, isSameSecurity);
         lock (_tradesByOrderId)
         {
-            foreach (var trade in trades)
+            foreach (var trade in newOnes)
                 UpdateTradeByOrderId(trade);
         }
 
-        NextTrades?.Invoke(trades, isSameSecurity);
-        _persistence.Insert(trades);
+        NextTrades?.Invoke(newOnes, isSameSecurity);
+        _persistence.Insert(newOnes);
     }
 
     //private UpdatePosition(Trade trade)

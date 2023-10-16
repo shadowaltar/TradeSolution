@@ -105,7 +105,8 @@ public static class HttpHelper
             swInner = Stopwatch.StartNew();
             var response = await client.SendAsync(request);
             swInner.Stop();
-            _log.Info($"[{swInner.Elapsed.Seconds:F4}s] Called REST API ({request.Method}): {request.RequestUri}");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"[{swInner.Elapsed.Seconds:F4}s] Called REST API ({request.Method}): {request.RequestUri}");
             return (response, swInner.ElapsedMilliseconds);
         }
         catch (Exception e)

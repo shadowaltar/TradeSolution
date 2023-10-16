@@ -293,16 +293,19 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         TotalPriceEventCount++;
 
-        _log.Info("Received price: " + ohlcPrice);
-
 #if DEBUG
         var threadId = Environment.CurrentManagedThreadId;
         Assertion.Shall(_engineThreadId != threadId);
 #endif
 
+        if (Screening.TryCheckIfChanged(out var securities) || _pickedSecurities == null)
+            _pickedSecurities = securities;
+
         // only allow an order to be alive for one time interval
         var security = _pickedSecurities?.GetOrDefault(securityId);
         //ExpireOpenOrders(security);
+
+        _log.Info($"P: [{ohlcPrice.T:HHmmss}][{security.Code}]\n\tH:{ohlcPrice.H:G16} L:{ohlcPrice.L:G16} C:{ohlcPrice.C:G16}");
 
         await Update(securityId, ohlcPrice);
     }
@@ -325,9 +328,6 @@ public class AlgorithmEngine : IAlgorithmEngine
     public async Task Update(int securityId, OhlcPrice ohlcPrice)
     {
         if (Algorithm == null || AlgoParameters == null || Screening == null || AlgoBatch == null) throw Exceptions.InvalidAlgorithmEngineState();
-
-        if (Screening.TryCheckIfChanged(out var securities) || _pickedSecurities == null)
-            _pickedSecurities = securities;
 
         if (!_pickedSecurities.TryGetValue(securityId, out var security))
             return;
@@ -387,7 +387,7 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         await TryCloseShort(current, ohlcPrice, _intervalType);
 
-        _log.Info(current);
+        _log.Info($"AE:[{current.Time:HHmmss}][{current.SecurityCode}]\n\t{current.Variables}");
         entries.Add(current);
 
 
@@ -639,8 +639,8 @@ public class AlgorithmEngine : IAlgorithmEngine
             return false;
 
         var time = DateTime.UtcNow;
-        var sl = GetStopLoss(price.C, Side.Buy, current.Security);
-        var tp = GetTakeProfit(price.C, Side.Buy, current.Security);
+        var sl = GetStopLossLimitPrice(price.C, Side.Buy, current.Security);
+        var tp = GetTakeProfitLimitPrice(price.C, Side.Buy, current.Security);
 
         Algorithm.BeforeOpeningLong(current);
 
@@ -657,6 +657,13 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private async Task<bool> TryCloseLong(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
     {
+        return false;
+
+
+
+
+
+
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
         if (!Algorithm.CanCloseLong(current))
@@ -687,14 +694,16 @@ public class AlgorithmEngine : IAlgorithmEngine
         Algorithm.BeforeOpeningShort(current);
 
         var time = DateTime.UtcNow;
-        var sl = GetStopLoss(price.C, Side.Sell, security);
-        var tp = GetTakeProfit(price.C, Side.Sell, security);
+        var enterSide = Side.Buy;
+        var exitSide = Side.Sell;
+        var sl = GetStopLossLimitPrice(price.C, enterSide, security);
+        var tp = GetTakeProfitLimitPrice(price.C, enterSide, security);
 
         _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
         if (IsBackTesting)
-            EnterLogic.BackTestOpen(current, last, price.C, Side.Sell, time, sl, tp);
+            EnterLogic.BackTestOpen(current, last, price.C, exitSide, time, sl, tp);
         else
-            await EnterLogic.Open(current, last, price.C, Side.Sell, time, sl, tp);
+            await EnterLogic.Open(current, last, price.C, exitSide, time, sl, tp);
 
         _persistence.Insert(current);
         Algorithm.AfterShortOpened(current);
@@ -727,7 +736,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
 
         var hasLongPosition = _services.Portfolio.GetOpenPositionSide(entry.SecurityId) == Side.Buy;
-        var stopLossPrice = GetStopLoss(entry.EnterPrice.Value, Side.Buy, entry.Security);
+        var stopLossPrice = GetStopLossLimitPrice(entry.EnterPrice.Value, Side.Buy, entry.Security);
         if (IsBackTesting && hasLongPosition && ohlcPrice.L <= stopLossPrice)
         {
             Algorithm.BeforeStopLossLong(entry);
@@ -748,7 +757,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (entry.EnterPrice == null) throw Exceptions.InvalidAlgorithmEngineState();
 
         var hasShortPosition = _services.Portfolio.GetOpenPositionSide(entry.SecurityId) == Side.Sell;
-        var stopLossPrice = GetStopLoss(entry.EnterPrice.Value, Side.Sell, entry.Security);
+        var stopLossPrice = GetStopLossLimitPrice(entry.EnterPrice.Value, Side.Sell, entry.Security);
         if (IsBackTesting && hasShortPosition && ohlcPrice.H >= stopLossPrice)
         {
             Algorithm.BeforeStopLossLong(entry);
@@ -763,7 +772,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         return false;
     }
 
-    private decimal GetStopLoss(decimal price, Side parentOrderSide, Security security)
+    private decimal GetStopLossLimitPrice(decimal price, Side parentOrderSide, Security security)
     {
         if (Algorithm == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -778,7 +787,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         return security.GetStopLossPrice(price, slRatio);
     }
 
-    private decimal GetTakeProfit(decimal price, Side parentOrderSide, Security security)
+    private decimal GetTakeProfitLimitPrice(decimal price, Side parentOrderSide, Security security)
     {
         if (Algorithm == null) throw Exceptions.InvalidAlgorithmEngineState();
 

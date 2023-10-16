@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using System.Data;
+using System.Linq;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -20,6 +21,7 @@ public class Core
     private readonly Dictionary<long, IAlgorithmEngine> _engines = new();
     private readonly IServices _services;
     private readonly IdGenerator _assetIdGenerator;
+    private readonly IdGenerator _tradeIdGenerator;
 
     public IReadOnlyDictionary<long, IAlgorithmEngine> Engines => _engines;
     public ExchangeType Exchange => Context.Exchange;
@@ -32,6 +34,7 @@ public class Core
         Context = context;
         _services = services;
         _assetIdGenerator = IdGenerators.Get<Asset>();
+        _tradeIdGenerator = IdGenerators.Get<Trade>();
     }
 
     /// <summary>
@@ -139,7 +142,8 @@ public class Core
             if (!toCreate.IsNullOrEmpty())
             {
                 _services.Order.Update(toCreate);
-                _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
+                _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are created from external to internal.");
+                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", toCreate.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                 foreach (var order in toCreate)
                 {
                     order.Comment = "Upserted by reconcilation.";
@@ -188,7 +192,8 @@ public class Core
                 {
                     orders = toUpdate.Values.OrderBy(o => o.Id).ToList();
                     _services.Order.Update(orders);
-                    _log.Info($"{orders.Count} recent orders for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
+                    _log.Info($"{orders.Count} recent orders for [{security.Id},{security.Code}] are updated from external to internal.");
+                    _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                     foreach (var order in orders)
                     {
                         order.Comment = "Updated by reconcilation.";
@@ -199,6 +204,9 @@ public class Core
             }
             if (!toDelete.IsNullOrEmpty())
             {
+                var orders = toDelete.Select(i => internalOrders[i]).ToList();
+                _log.Info($"{toDelete} recent orders for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                 foreach (var i in toDelete)
                 {
                     var order = internalResults.FirstOrDefault(o => o.ExternalOrderId == i);
@@ -246,7 +254,8 @@ public class Core
             if (!toCreate.IsNullOrEmpty())
             {
                 _services.Trade.Update(toCreate, security);
-                _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are in external but not internal system and need to be inserted into database.");
+                _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are created from external to internal.");
+                _log.Info($"Trades [ExternalTradeId][ExternalOrderId][InternalTradeId][InternalOrderId]:\n\t" + string.Join("\n\t", toCreate.Select(t => $"[{t.ExternalTradeId}][{t.ExternalOrderId}][{t.Id}][{t.OrderId}]")));
                 foreach (var trade in toCreate)
                 {
                     var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
@@ -255,9 +264,11 @@ public class Core
             }
             if (!toUpdate.IsNullOrEmpty())
             {
-                _services.Trade.Update(toUpdate.Values, security);
-                _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] in external are different from internal system and need to be updated into database.");
-                foreach (var trade in toUpdate.Values)
+                var trades = toUpdate.Values;
+                _services.Trade.Update(trades, security);
+                _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] are updated from external to internal.");
+                _log.Info($"Trades [ExternalTradeId][ExternalOrderId][InternalTradeId][InternalOrderId]:\n\t" + string.Join("\n\t", trades.Select(t => $"[{t.ExternalTradeId}][{t.ExternalOrderId}][{t.Id}][{t.OrderId}]")));
+                foreach (var trade in trades)
                 {
                     var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
                     await Context.Storage.InsertOne(trade, true, tableNameOverride: table);
@@ -265,9 +276,11 @@ public class Core
             }
             if (!toDelete.IsNullOrEmpty())
             {
-                foreach (var i in toDelete)
+                var trades = toDelete.Select(i => internalTrades[i]).ToList();
+                _log.Info($"{toDelete} recent trades for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info($"Trades [ExternalTradeId][ExternalOrderId][InternalTradeId][InternalOrderId]:\n\t" + string.Join("\n\t", trades.Select(t => $"[{t.ExternalTradeId}][{t.ExternalOrderId}][{t.Id}][{t.OrderId}]")));
+                foreach (var trade in trades)
                 {
-                    var trade = internalResults.FirstOrDefault(t => t.ExternalTradeId == i);
                     if (trade != null)
                     {
                         // malformed trade
@@ -302,6 +315,8 @@ public class Core
         var positions = new List<Position>();
         foreach (var security in securities)
         {
+            await FixOutOfOrderTrades(security, 7);
+
             var ps = await FixZeroPositionIds(security);
             if (ps != null)
                 positions.AddRange(ps);
@@ -320,6 +335,70 @@ public class Core
         _services.Persistence.WaitAll();
         return;
 
+
+        async Task FixOutOfOrderTrades(Security security, int lookbackDays)
+        {
+            var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
+            var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
+            if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
+
+            var earliestTradeTime = DateTime.UtcNow.AddDays(-lookbackDays);
+            var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {Context.AccountId} ORDER BY Time, ExternalTradeId, ExternalOrderId";
+            var trades = await Context.Storage.Read<Trade>(tradeTable, tradeDb, whereClause);
+            if (trades.Count <= 1) return;
+
+            // find out-of-order trade ids
+            // generate good trade ids for them, along with all other trades followed by the out-of-order trades
+            // remove the the old ones, insert the new ones
+            var oldIds = new List<long>();
+            var oldToNewIds = new Dictionary<long, long>(); // mapping in case need to fix positions' start/end tid
+            var shouldRegenerateId = false;
+            for (int i = 0; i < trades.Count - 1; i++)
+            {
+                var current = trades[i];
+                var next = trades[i + 1];
+                if (current.Id > next.Id)
+                {
+                    shouldRegenerateId = true; // once hit, all later trades' ids need to be regenerated
+                }
+                if (shouldRegenerateId)
+                {
+                    var newId = _tradeIdGenerator.NewTimeBasedId;
+                    oldToNewIds[next.Id] = newId;
+                    oldIds.Add(next.Id);
+                }
+            }
+            if (oldIds.IsNullOrEmpty())
+                return;
+
+            whereClause = $"SecurityId = {security.Id} AND ({Storage.GetInClause("StartTradeId", oldIds, false)} OR {Storage.GetInClause("EndTradeId", oldIds, false)})";
+            var affectedPositions = await Context.Storage.Read<Position>(posTable, posDb, whereClause);
+
+            var affectedTrades = new List<Trade>();
+            foreach (var oldId in oldIds)
+            {
+                var newId = oldToNewIds[oldId];
+                var affectedTrade = trades.First(t => t.Id == oldId);
+                affectedTrade.Id = newId;
+                affectedTrades.Add(affectedTrade);
+            }
+            await Context.Storage.DeleteMany(affectedTrades);
+            await Context.Storage.InsertMany(affectedTrades, false);
+            var updateSqls = new List<string>();
+            foreach (var ap in affectedPositions)
+            {
+                var newId = oldToNewIds.GetOrDefault(ap.StartTradeId, 0);
+                if (newId != 0)
+                    updateSqls.Add($"UPDATE {posTable} SET StartTradeId = {newId} WHERE StartTradeId = {ap.StartTradeId}");
+                newId = oldToNewIds.GetOrDefault(ap.EndTradeId, 0);
+                if (newId != 0)
+                    updateSqls.Add($"UPDATE {posTable} SET EndTradeId = {newId} WHERE EndTradeId = {ap.StartTradeId}");
+            }
+            if (!updateSqls.IsNullOrEmpty())
+            {
+                var r = await Context.Storage.RunMany(updateSqls, posDb);
+            }
+        }
 
         async Task<List<Position>?> FixZeroPositionIds(Security security)
         {
@@ -354,6 +433,9 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                 trades = await Context.Storage.Read<Trade>(tradeTable, tradeDb, whereClause);
                 if (trades.IsNullOrEmpty()) // highly impossible
                     return null; // no historical trades at all
+
+                // out of order trade id handling
+                // not only reconstruct the trade ids but also may need to update existing positions
 
                 var ps = await ProcessAndSavePositionAndRecord(security, trades)!;
                 _services.Persistence.WaitAll();
@@ -559,15 +641,48 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         }
         if (!toUpdate.IsNullOrEmpty())
         {
-            // to-update items do not have proper asset id yet
-            foreach (var (code, item) in toUpdate)
+            var assets = toUpdate.Values.OrderBy(a => a.SecurityCode).ToList();
+            var excludeUpdateCodes = new List<string>();
+            foreach (var code in toUpdate.Keys)
             {
-                var id = internalAssets?.GetOrDefault(code)?.Id;
-                if (id == null) throw Exceptions.Impossible();
-                item.Id = id.Value;
+                var ic = internalAssets[code];
+                var ec = externalAssets[code];
+                var isQuantityEquals = false;
+                var isLockedQuantityEquals = false;
+                var report = Utils.ReportComparison(ic, ec);
+                foreach (var reportEntry in report.Values)
+                {
+                    switch (reportEntry.propertyName)
+                    {
+                        case nameof(Asset.Quantity):
+                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                                isQuantityEquals = true;
+                            break;
+                        case nameof(Asset.LockedQuantity):
+                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                                isLockedQuantityEquals = true;
+                            break;
+                    }
+                }
+                if (isQuantityEquals && isLockedQuantityEquals)
+                    excludeUpdateCodes.Add(code);
             }
-            var i = await Context.Storage.InsertMany(toUpdate.Values.ToList(), true);
-            _log.Info($"{i} recent assets for account {account.Name} from external are different from which in internal system and are updated into database.");
+            foreach (var code in excludeUpdateCodes)
+            {
+                toUpdate.Remove(code);
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                // to-update items do not have proper asset id yet
+                foreach (var (code, item) in toUpdate)
+                {
+                    var id = internalAssets?.GetOrDefault(code)?.Id;
+                    if (id == null) throw Exceptions.Impossible();
+                    item.Id = id.Value;
+                }
+                var i = await Context.Storage.InsertMany(toUpdate.Values.ToList(), true);
+                _log.Info($"{i} recent assets for account {account.Name} from external are different from which in internal system and are updated into database.");
+            }
         }
         // update the cache if anything is saved from external
         if (toCreate.Count != 0 || toUpdate.Count != 0)
@@ -575,64 +690,5 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
             internalResults = await _services.Portfolio.GetStorageAssets(account);
             _services.Portfolio.UpdatePortfolio(internalResults, true);
         }
-    }
-
-    /// <summary>
-    /// Find out differences of open orders between external vs internal system.
-    /// </summary>
-    /// <returns></returns>
-    private async Task ReconcileOpenOrders()
-    {
-        _log.Info($"Reconciling internal vs external open orders for account {Context.Account?.Name} for broker {Context.Broker} in environment {Context.Environment}.");
-        var externalOpenOrders = await _services.Order.GetExternalOpenOrders();
-        var internalOpenOrders = await _services.Order.GetStoredOpenOrders();
-        if (externalOpenOrders.IsNullOrEmpty() && internalOpenOrders.IsNullOrEmpty())
-            return;
-
-        var externals = externalOpenOrders.ToDictionary(o => o.ExternalOrderId, o => o);
-        var internals = internalOpenOrders.ToDictionary(o => o.ExternalOrderId, o => o);
-
-        var (toCreate, toUpdate, toDelete) = Common.CollectionExtensions.FindDifferences(externals, internals, (e, i) => e.EqualsIgnoreId(i));
-        if (!toCreate.IsNullOrEmpty())
-        {
-            _services.Order.Update(toCreate);
-            _log.Info($"{toCreate.Count} open orders are in external but not internal system and need to be inserted into database.");
-            foreach (var order in toCreate)
-            {
-                order.Comment = "Upserted by reconcilation.";
-                var table = DatabaseNames.GetOrderTableName(order.Security.Type);
-                // use upsert, because it is possible for an external order which has the same id vs internal, but with different values
-                await Context.Storage.InsertOne(order, true, tableNameOverride: table);
-            }
-        }
-        if (!toUpdate.IsNullOrEmpty())
-        {
-            var orders = toUpdate.Values.OrderBy(o => o.Id).ToList();
-            _services.Order.Update(orders);
-            _log.Info($"{orders.Count} open orders in external are different from internal system and need to be updated into database.");
-            foreach (var order in orders)
-            {
-                order.Comment = "Updated by reconcilation.";
-            }
-            foreach (var os in orders.GroupBy(o => o.Security.SecurityType))
-            {
-                var table = DatabaseNames.GetOrderTableName(os.Key);
-                await Context.Storage.InsertMany(os.ToList(), true, tableNameOverride: table);
-            }
-        }
-        if (!toDelete.IsNullOrEmpty())
-        {
-            foreach (var i in toDelete)
-            {
-                var order = internalOpenOrders.FirstOrDefault(o => o.ExternalOrderId == i);
-                if (order != null)
-                {
-                    // order is not successfully sent, we should move it to error orders table
-                    await Context.Storage.MoveToError(order);
-                }
-            }
-        }
-
-        _services.Persistence.WaitAll();
     }
 }

@@ -205,18 +205,18 @@ public class PortfolioService : IPortfolioService, IDisposable
         var positions = Portfolio.GetPositions();
         if (positions.IsNullOrEmpty()) return;
 
+        _log.Info($"Closing {positions.Count} opened positions.");
         foreach (var position in positions)
         {
             if (position.IsClosed) continue;
 
             var order = CreateCloseOrder(position, orderComment);
             await _orderService.SendOrder(order);
-            // need to wait for a while to 
-            Threads.WaitUntil(() =>
-            {
-                var cp = _closedPositions.ThreadSafeGet(position.Id);
-                return cp != null;
-            }, pollingMs: 1000);
+            // need to wait for a while
+            if (Threads.WaitUntil(() => _closedPositions.ThreadSafeContains(position.Id)))
+                _log.Info("Closed position, id: " + position.Id);
+            else
+                _log.Error("Failed to close position (timed-out), id: " + position.Id);
         }
     }
 

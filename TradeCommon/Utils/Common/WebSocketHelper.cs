@@ -76,12 +76,14 @@ public static class WebSocketHelper
                 }
                 catch (WebSocketException e)
                 {
-                    _log.Error("Web socket is faulted. Exception message: " + e.Message, e);
+                    _log.Error("Web socket is faulted. Exception message: " + e.Message);
                 }
                 finally
                 {
                     ws?.Dispose();
                 }
+
+                _log.Info("Trying to reconnect web socket.");
             } while (true);
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
     }

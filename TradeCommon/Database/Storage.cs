@@ -76,8 +76,8 @@ public partial class Storage : IStorage
 
             j++;
         }
-
-        _log.Info($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
         return entries;
     }
 
@@ -113,7 +113,8 @@ public partial class Storage : IStorage
             j++;
         }
 
-        _log.Info($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {entries.Rows.Count} entries in {database}. SQL: {sql}");
         return entries;
     }
 
@@ -131,7 +132,8 @@ public partial class Storage : IStorage
 
         var i = await command.ExecuteNonQueryAsync();
 
-        _log.Info($"Executed command in {database}. SQL: {sql}");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Executed command in {database}. SQL: {sql}");
         return i;
     }
 
@@ -156,8 +158,8 @@ public partial class Storage : IStorage
             _log.Error("Failed to run many sqls. ", e);
             transaction.Rollback();
         }
-
-        _log.Info($"Executed multiple commands in {database}. SQLs:{Environment.NewLine}{string.Join(Environment.NewLine, sqls)}");
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Executed multiple commands in {database}. SQLs:{Environment.NewLine}{string.Join(Environment.NewLine, sqls)}");
         return count;
     }
 
