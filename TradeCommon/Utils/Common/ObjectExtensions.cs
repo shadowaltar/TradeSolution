@@ -19,6 +19,12 @@ public static class ObjectExtensions
         return o1!.CompareTo(o2);
     }
 
+    /// <summary>
+    /// Unsafe cast to type <typeparamref name="T"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="o"></param>
+    /// <returns></returns>
     public static T As<T>(this object o)
     {
         return Unsafe.As<object, T>(ref o);

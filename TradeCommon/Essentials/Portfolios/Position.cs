@@ -2,7 +2,6 @@
 using Common.Attributes;
 using TradeCommon.Calculations;
 using TradeCommon.Database;
-using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -113,6 +112,23 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     [DatabaseIgnore]
     public bool IsClosed => Quantity == 0;
 
+    [DatabaseIgnore]
+    public decimal Return
+    {
+        get
+        {
+            if (Side == Side.Buy)
+            {
+                return Maths.ZeroDivision((ShortPrice - LongPrice), LongPrice);
+            }
+            else if (Side == Side.Sell)
+            {
+                return Maths.ZeroDivision((LongPrice - ShortPrice), ShortPrice);
+            }
+            return 0;
+        }
+    }
+
     /// <summary>
     /// Apply a trade to this position.
     /// If the position is closed after applied, returns true.
@@ -162,29 +178,18 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 
             Side = trade.Side,
 
-            Quantity = trade.Quantity,
-            Price = trade.Price,
-            Notional = trade.Quantity * trade.Price,
-
-            LongQuantity = trade.Side == Side.Buy ? trade.Quantity : 0,
-            LongPrice = trade.Side == Side.Buy ? trade.Price : 0,
-            LongNotional = trade.Side == Side.Buy ? trade.Quantity * trade.Price : 0,
-
-            ShortQuantity = trade.Side == Side.Sell ? trade.Quantity : 0,
-            ShortPrice = trade.Side == Side.Sell ? trade.Price : 0,
-            ShortNotional = trade.Side == Side.Sell ? trade.Quantity * trade.Price : 0,
-
             LockedQuantity = 0,
 
             StartOrderId = trade.OrderId,
             StartTradeId = trade.Id,
             EndOrderId = 0,
             EndTradeId = 0,
-
-            TradeCount = 1,
+            Price = 0, // should be handled by Apply()
+            Quantity = 0, // should be handled by Apply()
+            TradeCount = 0, // should be handled by Apply()
             AccumulatedFee = trade.Fee,
         };
-
+        position.Apply(trade);
         return position;
     }
 
@@ -240,18 +245,6 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
         }
         trade.PositionId = position.Id;
         return position;
-    }
-
-    public PositionRecord CreateRecord()
-    {
-        return new PositionRecord
-        {
-            EndTime = UpdateTime,
-            PositionId = Id,
-            SecurityId = SecurityId,
-            TradeCount = TradeCount,
-            IsClosed = IsClosed,
-        };
     }
 
     public int CompareTo(Position? other)
@@ -322,4 +315,11 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
         return $"[{Id}][{CreateTime:yyMMdd-HHmmss}->{(CloseTime == DateTime.MaxValue ? "NotYet" : CloseTime.ToString("yyMMdd-HHmmss"))}]" +
             $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
     }
+}
+
+public enum OpenClose
+{
+    All,
+    OpenOnly,
+    ClosedOnly
 }

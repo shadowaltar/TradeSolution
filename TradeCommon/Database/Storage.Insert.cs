@@ -5,7 +5,6 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
@@ -37,10 +36,6 @@ public partial class Storage
         else if (task.Type == typeof(Account))
         {
             count = await Insert<Account>(task);
-        }
-        else if (task.Type == typeof(PositionRecord))
-        {
-            count = await Insert<PositionRecord>(task);
         }
         else if (task.Type == typeof(Security))
         {
@@ -74,7 +69,8 @@ public partial class Storage
         if (entry != null)
         {
             var count = await InsertOne(entry, task.Action == DatabaseActionType.Upsert);
-            _log.Info($"Persisted {count} entry into database: {typeof(T).Name}");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Persisted {count} entry into database: {typeof(T).Name}");
             return count;
         }
 
@@ -82,7 +78,8 @@ public partial class Storage
         if (!entries.IsNullOrEmpty())
         {
             var count = await InsertMany(entries, task.Action == DatabaseActionType.Upsert);
-            _log.Info($"Persisted {count} entries into database: {typeof(T).Name}");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Persisted {count} entries into database: {typeof(T).Name}");
             return count;
         }
         throw Exceptions.Impossible();

@@ -122,15 +122,15 @@ public interface IOrderService
     Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false);
 
     /// <summary>
-    /// Cancel an order without waiting for the result.
+    /// Cancel an order.
     /// </summary>
-    /// <param name="orderId"></param>
-    void CancelOrder(long orderId);
+    /// <param name="order"></param>
+    Task<bool> CancelOrder(Order order);
 
     /// <summary>
     /// Cancel all open orders.
     /// </summary>
-    Task CancelAllOpenOrders(Security security);
+    Task<bool> CancelAllOpenOrders(Security security);
 
     /// <summary>
     /// Create an order without any validation.
@@ -153,7 +153,12 @@ public interface IOrderService
                             OrderType orderType = OrderType.Limit,
                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel,
                             string comment = "manual");
-
+    
+    /// <summary>
+    /// Reset all caches in this service.
+    /// </summary>
+    void Reset();
+    
     /// <summary>
     /// Update the internal state.
     /// </summary>

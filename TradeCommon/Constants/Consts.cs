@@ -13,13 +13,15 @@ public static class Consts
 
     public const int ManualTradingStrategyId = 1;
 
+    public const int LookbackDayCount = 14;
+
     public const char SqlCommandPlaceholderPrefix = '$';
 
     public static readonly string DatabaseFolder = @"C:\Temp\Data";
 
     public const int EnumDatabaseTypeSize = 20;
 
-    public const decimal StopPriceRatio = 0.5m;
+    public const decimal StopPriceRatio = 0.4m;
 
     public static readonly SecurityType[] SupportedSecurityTypes = new[] {
         SecurityType.Fx,

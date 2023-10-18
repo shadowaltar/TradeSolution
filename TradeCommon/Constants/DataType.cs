@@ -18,8 +18,6 @@ public enum DataType
     Order,
     Trade,
     Position,
-    OpenOrderId,
-    //TradeOrderPositionRelationship,
 
     Account,
     Asset,

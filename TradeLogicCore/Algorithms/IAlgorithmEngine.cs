@@ -45,13 +45,13 @@ public interface IAlgorithmEngine
     AlgoStopTimeType WhenToStopOrHalt { get; }
 
     AlgorithmParameters? AlgoParameters { get; }
-    
+
     EngineParameters? EngineParameters { get; }
 
     Task<int> Run(AlgorithmParameters parameters);
 
     Task Stop();
-    
+
     AlgoBatch AlgoBatch { get; }
 
     IAlgorithm? Algorithm { get; }

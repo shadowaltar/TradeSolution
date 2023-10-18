@@ -11,8 +11,8 @@ public class TimeSpans
     public static readonly TimeSpan OneDay = TimeSpan.FromDays(1);
     public static readonly TimeSpan OneWeek = TimeSpan.FromDays(7);
 
-
     public static readonly TimeSpan LocalUtcDiff;
+
     static TimeSpans()
     {
         var utcNow = DateTime.UtcNow;

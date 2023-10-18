@@ -77,7 +77,6 @@ public class Quotation : IExternalQuotationManagement
 
         Threads.WaitUntil(() => _webSockets.ContainsKey(wsName));
         
-        _log.Info(message);
         return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeMarketData, message);
 
 
@@ -97,11 +96,11 @@ public class Quotation : IExternalQuotationManagement
 
                 isComplete = kLineNode.GetBoolean("x");
 
-                var o = kLineNode["o"]!.GetValue<string>().ParseDecimal();
-                var h = kLineNode["h"]!.GetValue<string>().ParseDecimal();
-                var l = kLineNode["l"]!.GetValue<string>().ParseDecimal();
-                var c = kLineNode["c"]!.GetValue<string>().ParseDecimal();
-                var v = kLineNode["v"]!.GetValue<string>().ParseDecimal();
+                var o = kLineNode.GetDecimal("o");
+                var h = kLineNode.GetDecimal("h");
+                var l = kLineNode.GetDecimal("l");
+                var c = kLineNode.GetDecimal("c");
+                var v = kLineNode.GetDecimal("v");
                 if (price == null)
                 {
                     price = new OhlcPrice(o, h, l, c, v, start);

@@ -3,6 +3,7 @@
 public enum ResultCode
 {
     Unknown,
+    NoAction,
 
     ConnectionOk,
     DisconnectionOk,

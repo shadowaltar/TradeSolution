@@ -140,15 +140,17 @@ public interface IPortfolioService
     /// <param name="account"></param>
     /// <param name="start"></param>
     /// <returns></returns>
-    Task<List<Position>> GetStoragePositions(Account? account = null, DateTime? start = null);
+    Task<List<Position>> GetStoragePositions(DateTime? start = null);
 
-    Task<List<Asset>> GetExternalAssets(Account? account = null);
+    Task<List<Asset>> GetExternalAssets();
 
-    Task<List<Asset>> GetStorageAssets(Account? account = null);
+    Task<List<Asset>> GetStorageAssets();
 
-    void UpdatePortfolio(List<Asset> assets, bool isInitializing = false);
+    void Update(List<Asset> assets, bool isInitializing = false);
 
-    void UpdatePortfolio(List<Position> positions, bool isInitializing = false);
-    
+    void Update(List<Position> positions, bool isInitializing = false);
+
+    void Reset(bool isResetPositions = true, bool isResetAssets = true, bool isInitializing = true);
+
     void ClearCachedClosedPositions(bool isInitializing = false);
 }

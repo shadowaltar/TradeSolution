@@ -10,6 +10,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeDataCore.Essentials;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Services;
 
@@ -57,7 +58,7 @@ public class Core
     /// <param name="algorithm"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task<long> StartAlgorithm(AlgorithmParameters parameters, IAlgorithm algorithm)
+    public async Task<long> Run(AlgorithmParameters parameters, IAlgorithm algorithm)
     {
         _log.Info($"Starting algorithm: {algorithm.GetType().Name}, Id [{algorithm.Id}], VerId [{algorithm.VersionId}]");
         var user = _services.Admin.CurrentUser;
@@ -69,8 +70,7 @@ public class Core
         var isExternalAvailable = await _services.Admin.Ping();
 
         await ReconcileAccount(user);
-        await ReconcileAssets(Context.Account);
-        //await ReconcileOpenOrders();
+        await ReconcileAssets();
 
         // check one week's historical order / trade only
         var previousDay = startTime.AddMonths(-1);
@@ -80,9 +80,10 @@ public class Core
 
         // load all open positions, related trades and orders
         // plus all open orders
-        Context.Services.Order.ClearCachedClosedPositionOrders();
-        Context.Services.Trade.ClearCachedClosedPositionTrades();
-        Context.Services.Portfolio.ClearCachedClosedPositions(true);
+        await PrepareCaches();
+        //Context.Services.Order.ClearCachedClosedPositionOrders();
+        //Context.Services.Trade.ClearCachedClosedPositionTrades();
+        //Context.Services.Portfolio.ClearCachedClosedPositions(true);
 
         var uniqueId = Context.AlgoBatchId;
         _ = Task.Factory.StartNew(async () =>
@@ -98,6 +99,37 @@ public class Core
 
         // the engine execution is a blocking call
         return uniqueId;
+    }
+
+    private async Task PrepareCaches()
+    {
+        _services.Order.Reset();
+        _services.Trade.Reset();
+        _services.Portfolio.Reset(true, true, true);
+
+        var positions = await Context.Storage.ReadPositions(DateUtils.TMinus(Consts.LookbackDayCount), OpenClose.OpenOnly);
+        _services.Security.Fix(positions);
+        var assets = await Context.Storage.ReadAssets();
+        _services.Security.Fix(assets);
+
+        List<Trade> trades = new();
+        foreach (var position in positions)
+        {
+            trades.AddRange(await Context.Storage.ReadTradesByPositionId(position.Security, position.Id, OperatorType.Equals));
+        }
+        _services.Security.Fix(trades);
+
+        List<Order> orders = new();
+        foreach (var group in trades.GroupBy(t => t.Security))
+        {
+            orders.AddRange(await Context.Storage.ReadOrders(group.Key, group.Select(t => t.OrderId).ToList()));
+        }
+        _services.Security.Fix(orders);
+
+        _services.Order.Update(orders);
+        _services.Trade.Update(trades);
+        _services.Portfolio.Update(assets, true);
+        _services.Portfolio.Update(positions, true);
     }
 
     public async Task<ResultCode> StopAlgorithm(long algoSessionId)
@@ -148,6 +180,12 @@ public class Core
                 {
                     order.Comment = "Upserted by reconcilation.";
                     var table = DatabaseNames.GetOrderTableName(order.Security.Type);
+
+                    if (internalOrders.TryGetValue(order.ExternalOrderId, out var conflict))
+                    {
+                        // an order with the same eoid but different id exists; delete it first
+                    }
+
                     // use upsert, because it is possible for an external order which has the same id vs internal, but with different values
                     await Context.Storage.InsertOne(order, true, tableNameOverride: table);
                 }
@@ -168,8 +206,14 @@ public class Core
                             switch (reportEntry.propertyName)
                             {
                                 case nameof(Order.CreateTime):
-                                    if ((DateTime)reportEntry.value2! > (DateTime)reportEntry.value1!)
-                                        e.CreateTime = (DateTime)reportEntry.value1;
+                                    var minCreateTime = DateUtils.Min((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    i.CreateTime = minCreateTime;
+                                    e.CreateTime = minCreateTime;
+                                    break;
+                                case nameof(Order.UpdateTime):
+                                    var maxUpdateTime = DateUtils.Max((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    i.UpdateTime = maxUpdateTime;
+                                    e.UpdateTime = maxUpdateTime;
                                     break;
                                 case nameof(Order.Price):
                                     if (reportEntry.value2.Equals(0m) && !reportEntry.value1.Equals(0m))
@@ -197,15 +241,20 @@ public class Core
                     foreach (var order in orders)
                     {
                         order.Comment = "Updated by reconcilation.";
+
+                        if (internalOrders.TryGetValue(order.ExternalOrderId, out var conflict) && conflict.Id != order.Id)
+                        {
+                            // an order with the same eoid but different id exists; move to error
+                            await Context.Storage.MoveToError(conflict);
+                        }
                     }
-                    var table = DatabaseNames.GetOrderTableName(orders[0].Security.Type);
-                    await Context.Storage.InsertMany(orders, true, tableNameOverride: table);
+                    _services.Persistence.Insert(orders);
                 }
             }
             if (!toDelete.IsNullOrEmpty())
             {
                 var orders = toDelete.Select(i => internalOrders[i]).ToList();
-                _log.Info($"{toDelete} recent orders for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info($"{toDelete.Count} recent orders for [{security.Id},{security.Code}] are moved to error table.");
                 _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                 foreach (var i in toDelete)
                 {
@@ -219,13 +268,6 @@ public class Core
             }
 
             _services.Persistence.WaitAll();
-
-            // read again if necessary and cache them
-            if (!toCreate.IsNullOrEmpty() || !toUpdate.IsNullOrEmpty() || !toDelete.IsNullOrEmpty())
-            {
-                var orders = await _services.Order.GetStorageOrders(security, start);
-                _services.Order.Update(orders);
-            }
         }
     }
 
@@ -291,13 +333,6 @@ public class Core
             }
 
             _services.Persistence.WaitAll();
-
-            // read again if necessary and cache them
-            if (!toCreate.IsNullOrEmpty() || !toUpdate.IsNullOrEmpty() || !toDelete.IsNullOrEmpty())
-            {
-                var trades = _services.Trade.GetTrades(security, start);
-                _services.Trade.Update(trades, security);
-            }
         }
     }
 
@@ -315,7 +350,7 @@ public class Core
         var positions = new List<Position>();
         foreach (var security in securities)
         {
-            await FixOutOfOrderTrades(security, 7);
+            await FixOutOfOrderTrades(security, Consts.LookbackDayCount);
 
             var ps = await FixZeroPositionIds(security);
             if (ps != null)
@@ -324,14 +359,10 @@ public class Core
 
             // case 2 trades without valid pid (aka position record is somehow missing)
             // have to specify a retrospective date range
-            ps = await FixInvalidPositionIdInTrades(security, 7);
+            ps = await FixInvalidPositionIdInTrades(security, Consts.LookbackDayCount);
             if (ps != null)
                 positions.AddRange(ps);
         }
-
-        if (!positions.IsNullOrEmpty())
-            _services.Portfolio.UpdatePortfolio(positions, true);
-
         _services.Persistence.WaitAll();
         return;
 
@@ -342,7 +373,7 @@ public class Core
             var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
             if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
-            var earliestTradeTime = DateTime.UtcNow.AddDays(-lookbackDays);
+            var earliestTradeTime = DateUtils.TMinus(lookbackDays);
             var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {Context.AccountId} ORDER BY Time, ExternalTradeId, ExternalOrderId";
             var trades = await Context.Storage.Read<Trade>(tradeTable, tradeDb, whereClause);
             if (trades.Count <= 1) return;
@@ -380,9 +411,10 @@ public class Core
                 var newId = oldToNewIds[oldId];
                 var affectedTrade = trades.First(t => t.Id == oldId);
                 affectedTrade.Id = newId;
+                _services.Security.Fix(affectedTrade);
                 affectedTrades.Add(affectedTrade);
             }
-            await Context.Storage.DeleteMany(affectedTrades);
+            await Context.Storage.RunOne($"DELETE FROM {tradeTable} WHERE {Storage.GetInClause("Id", oldIds, false)}", tradeDb);
             await Context.Storage.InsertMany(affectedTrades, false);
             var updateSqls = new List<string>();
             foreach (var ap in affectedPositions)
@@ -436,10 +468,9 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
 
                 // out of order trade id handling
                 // not only reconstruct the trade ids but also may need to update existing positions
-
                 var ps = await ProcessAndSavePositionAndRecord(security, trades)!;
                 _services.Persistence.WaitAll();
-                _log.Info($"Position Reconciliation for {security.Code}, trades exist, position record not exist: reconstruct all {ps.Count} positions.");
+                _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
                 return ps;
             }
             return null;
@@ -451,7 +482,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
             var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
             if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
-            var earliestTradeTime = DateTime.UtcNow.AddDays(-lookbackDays);
+            var earliestTradeTime = DateUtils.TMinus(lookbackDays);
             var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {Context.AccountId}";
             var trades = await Context.Storage.Read<Trade>(tradeTable, tradeDb, whereClause);
             var positionIds = trades.Select(t => t.PositionId).Distinct().ToList(); // we don't expect zero pid here anymore
@@ -473,7 +504,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
 
                 var ps = await ProcessAndSavePositionAndRecord(security, trades)!;
                 _services.Persistence.WaitAll();
-                _log.Info($"Position Reconciliation for {security.Code}, trades exist, position record not exist: reconstruct all {ps.Count} positions.");
+                _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
                 return ps;
             }
             return null;
@@ -506,10 +537,6 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
             // save positions
             var pCnt = await Context.Storage.InsertMany(positions, true);
             LogPositionUpsert(pCnt, security.Code, positions[0].Id, last.Id);
-
-            // save position record
-            var rCnt = await Context.Storage.InsertOne(last.CreateRecord(), true);
-            LogRecordUpsert(rCnt, security.Code, last.Id);
 
             // update trades if there is any without position id
             await UpdateTrades(trades);
@@ -569,18 +596,6 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                 _log.Error($"Failed to upsert one or more positions for security {securityCode}.");
             }
         }
-
-        void LogRecordUpsert(int insertedCount, string securityCode, long positionId)
-        {
-            if (insertedCount > 0)
-            {
-                _log.Info($"Upsert a position record for security {securityCode}, id {positionId}.");
-            }
-            else
-            {
-                _log.Error($"Failed to upsert a position record for security {securityCode}, id {positionId}.");
-            }
-        }
     }
 
     /// <summary>
@@ -608,10 +623,10 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         }
     }
 
-    private async Task ReconcileAssets(Account account)
+    private async Task ReconcileAssets()
     {
-        var internalResults = await _services.Portfolio.GetStorageAssets(account);
-        var externalResults = await _services.Portfolio.GetExternalAssets(account);
+        var internalResults = await _services.Portfolio.GetStorageAssets();
+        var externalResults = await _services.Portfolio.GetExternalAssets();
 
         // fill in missing fields before comparison
         var assetsNotRegistered = new List<Asset>();
@@ -637,7 +652,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                 asset.Id = _assetIdGenerator.NewTimeBasedId;
             }
             var i = await Context.Storage.InsertMany(toCreate, false);
-            _log.Info($"{i} recent assets for account {account.Name} are in external but not internal system and are inserted into database.");
+            _log.Info($"{i} recent assets for account {Context.Account.Name} are in external but not internal system and are inserted into database.");
         }
         if (!toUpdate.IsNullOrEmpty())
         {
@@ -681,14 +696,8 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                     item.Id = id.Value;
                 }
                 var i = await Context.Storage.InsertMany(toUpdate.Values.ToList(), true);
-                _log.Info($"{i} recent assets for account {account.Name} from external are different from which in internal system and are updated into database.");
+                _log.Info($"{i} recent assets for account {Context.Account.Name} from external are different from which in internal system and are updated into database.");
             }
-        }
-        // update the cache if anything is saved from external
-        if (toCreate.Count != 0 || toUpdate.Count != 0)
-        {
-            internalResults = await _services.Portfolio.GetStorageAssets(account);
-            _services.Portfolio.UpdatePortfolio(internalResults, true);
         }
     }
 }

@@ -3,6 +3,7 @@ using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeLogicCore.Algorithms.EnterExit;
@@ -43,7 +44,9 @@ public class Rumi : IAlgorithm
 
     public decimal ShortTakeProfitRatio { get; set; }
 
-    public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio)
+    public bool IsShortSellAllowed { get; }
+
+    public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio, bool isShortSellAllowed = false)
     {
         _context = context;
         Sizing = new SimplePositionSizingLogic();
@@ -54,6 +57,7 @@ public class Rumi : IAlgorithm
         SlowParam = slow;
         RumiParam = rumi;
         LongStopLossRatio = stopLossRatio;
+        IsShortSellAllowed = isShortSellAllowed;
         ShortStopLossRatio = stopLossRatio;
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
@@ -66,7 +70,7 @@ public class Rumi : IAlgorithm
         return Sizing.GetSize(availableCash, current, last, price, time);
     }
 
-    public object CalculateVariables(decimal price, AlgoEntry? last)
+    public IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new RumiVariables();
         var lastVariables = last?.Variables;
@@ -166,4 +170,19 @@ public record RumiVariables : IAlgorithmVariables
     public decimal Slow { get; set; } = decimal.MinValue;
     public decimal Rumi { get; set; } = decimal.MinValue;
     public decimal LastRumi { get; set; } = decimal.MinValue;
+
+    public string Format(Security security)
+    {
+        return $"F:{FormatPrice(Fast, security)}, S:{FormatPrice(Slow, security)}, Rumi:{FormatPrice(Rumi, security)}";
+
+        static string FormatPrice(decimal price, Security security)
+        {
+            return price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
+        }
+    }
+
+    public override string ToString()
+    {
+        return $"F:{Fast.NAIfInvalid("F16")}, S:{Slow.NAIfInvalid("F16")}, Rumi:{Rumi.NAIfInvalid("F16")}";
+    }
 }

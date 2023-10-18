@@ -98,7 +98,14 @@ public record Portfolio
     public bool RemovePosition(long id)
     {
         lock (_lock)
-            return _positions.Remove(id);
+        {
+            var p = _positions.GetOrDefault(id);
+            if (p == null)
+                return false;
+            _positionsBySecurityId.Remove(p.SecurityId);
+            _positions.Remove(id);
+            return true;
+        }
     }
 
     public void Clear()

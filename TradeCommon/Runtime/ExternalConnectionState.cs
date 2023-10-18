@@ -48,6 +48,11 @@ public record ExternalQueryState : INetworkTimeState
 
     public long TotalTime { get; set; }
 
+    /// <summary>
+    /// Get this state's content and cast to <typeparamref name="T"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
     public T? Get<T>() => Content is T typed ? typed : default;
 
     public List<T>? GetAll<T>()
@@ -155,6 +160,18 @@ public static class ExternalQueryStates
     public static int EnvironmentId { get; set; }
     public static BrokerType Broker { get; set; }
     public static int BrokerId { get; set; }
+    public static ExternalQueryState Null(ActionType action)
+    {
+        return new ExternalQueryState
+        {
+            Content = default,
+            ResponsePayload = null,
+            Action = action,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.NoAction,
+            Description = $"No action is done.",
+        };
+    }
 
     public static ExternalQueryState InvalidSecurity(ActionType action)
     {

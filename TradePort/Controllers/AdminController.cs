@@ -354,7 +354,6 @@ public class AdminController : Controller
             results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Equity));
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Fx));
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
-            results.AddRange(await CreateTables(storage, DataType.OpenOrderId));
         }
         return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.") : Ok(results);
     }
@@ -379,10 +378,6 @@ public class AdminController : Controller
             case DataType.User:
                 await storage.CreateUserTable();
                 resultTableNames.Add(DatabaseNames.UserTable);
-                break;
-            case DataType.OpenOrderId:
-                await storage.CreateOpenOrderIdTable();
-                resultTableNames.Add(DatabaseNames.OpenOrderIdTable);
                 break;
             case DataType.AlgoEntry:
                 var (table, database) = await storage.CreateTable<AlgoEntry>();

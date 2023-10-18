@@ -267,6 +267,15 @@ public static class CollectionExtensions
             return dictionary!.ContainsKey(key);
         }
     }
+    
+    public static void ThreadSafeClear<T, Tv>(this Dictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
+        {
+            dictionary!.Clear();
+        }
+    }
 
     public static bool ThreadSafeRemove<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {

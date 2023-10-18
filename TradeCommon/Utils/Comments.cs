@@ -6,6 +6,8 @@ public static class Comments
     public const string CloseAllBeforeStop = "Close position before algo engine stops.";
     public const string AlgoEnter = "Algo enter.";
     public const string AlgoExit = "Algo exit.";
-    public const string AlgoStopLoss= "Algo stop loss.";
-    public const string AlgoTakeProfit = "Algo take profit.";
+    public const string AlgoStopLossLimit = "Algo stop loss (limit).";
+    public const string AlgoStopLossMarket = "Algo stop loss (market).";
+    public const string AlgoTakeProfitLimit = "Algo take profit (limit).";
+    public const string AlgoTakeProfitMarket = "Algo take profit (market).";
 }

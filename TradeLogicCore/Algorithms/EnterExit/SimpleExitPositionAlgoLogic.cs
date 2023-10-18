@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac.Core;
+using Common;
 using log4net;
 using System.Security.Cryptography;
 using TradeCommon.Essentials.Algorithms;
@@ -59,7 +60,11 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
-        var position = _portfolioService.GetPosition(current.SecurityId);
+        // cancel any partial filled, SL or TP orders
+        await _orderService.CancelAllOpenOrders(current.Security);
+
+        // now close the position using algorithm only
+        var position = _portfolioService.GetPositionBySecurityId(current.SecurityId);
         if (position == null)
         {
             var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.";
@@ -69,9 +74,11 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
+            ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
             AccountId = _context.AccountId,
             CreateTime = exitTime,
-            Quantity = position.Quantity,
+            UpdateTime = exitTime,
+            Quantity = Math.Abs(position.Quantity),
             Side = Side.Sell,
             Status = OrderStatus.Sending,
             TimeInForce = TimeInForceType.GoodTillCancel,
@@ -82,6 +89,11 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             SecurityCode = current.Security.Code,
             Comment = Comments.AlgoExit,
         };
+        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
+            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}");
+        else
+            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}");
+
         return await _orderService.SendOrder(order);
     }
 

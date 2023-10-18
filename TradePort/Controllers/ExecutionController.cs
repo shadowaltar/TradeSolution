@@ -156,7 +156,10 @@ public class ExecutionController : Controller
         orderService.OrderCancelled += OnOrderCancelled;
         if (orderId != null)
         {
-            Task.Run(() => orderService.CancelOrder(orderId.Value));
+            var order = orderService.GetOrder(orderId.Value);
+            if (order == null)
+                return BadRequest("Order is not found, id: " + orderId);
+            await orderService.CancelOrder(order);
             a.WaitOne();
         }
 
@@ -220,7 +223,7 @@ public class ExecutionController : Controller
         var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         algorithm.Screening = screening;
-        var guid = await core.StartAlgorithm(parameters, algorithm);
+        var guid = await core.Run(parameters, algorithm);
         return Ok(guid);
     }
 

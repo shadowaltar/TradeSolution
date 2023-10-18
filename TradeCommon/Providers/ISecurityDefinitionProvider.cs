@@ -28,4 +28,6 @@ public interface ISecurityDefinitionProvider
     /// <param name="security"></param>
     /// <returns></returns>
     void Fix(SecurityRelatedEntry entry, Security? security = null);
+    
+    void Fix<T>(IList<T> entries, Security? security = null) where T: SecurityRelatedEntry;
 }

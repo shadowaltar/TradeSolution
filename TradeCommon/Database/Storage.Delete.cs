@@ -3,7 +3,6 @@ using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -35,10 +34,6 @@ public partial class Storage
         else if (task.Type == typeof(Account))
         {
             count = await Insert<Account>(task);
-        }
-        else if (task.Type == typeof(PositionRecord))
-        {
-            count = await Insert<PositionRecord>(task);
         }
         else if (task.Type == typeof(Security))
         {

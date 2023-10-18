@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using System.Diagnostics;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Algorithms;
@@ -77,15 +78,24 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     }
                     else
                     {
-                        var stopPrice = current.Security.RoundTickSize((enterPrice + stopLossPrice) * Consts.StopPriceRatio, enterPrice);
+                        var stopPrice = current.Security.RoundTickSize((enterPrice - stopLossPrice) * Consts.StopPriceRatio + stopLossPrice, enterPrice);
                         var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLoss);
+                        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLossLimit);
+                        slOrder.ParentOrderId = order.Id;
                         var subState = await _orderService.SendOrder(slOrder);
+                        state.SubStates.Add(subState);
                         if (subState.ResultCode == ResultCode.SendOrderFailed)
                         {
-                            _log.Error("Failed to submit stop loss order! Must cancel the open order or close the open position immediately! SecurityCode: " + slOrder.SecurityCode);
+                            _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
+                            var slOrder2 = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security, stopLossPrice, comment: Comments.AlgoStopLossMarket);
+                            slOrder2.ParentOrderId = order.Id;
+                            var subState2 = await _orderService.SendOrder(slOrder2);
+                            if (subState2.ResultCode == ResultCode.SendOrderFailed)
+                            {
+                                _log.Error($"Failed to submit stop loss market order! [{slOrder2.Id}][{slOrder2.SecurityCode}] SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
+                            }
+                            state.SubStates.Add(subState2);
                         }
-                        state.SubStates.Add(subState);
                     }
                 }
 
@@ -97,10 +107,15 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                     }
                     else
                     {
-                        var stopPrice = current.Security.RoundTickSize((enterPrice + takeProfitPrice) * Consts.StopPriceRatio, enterPrice);
+                        var stopPrice = (enterPrice - takeProfitPrice) * Consts.StopPriceRatio + takeProfitPrice;
                         var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
-                        var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfit);
+                        var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfitLimit);
+                        tpOrder.ParentOrderId = order.Id;
                         var subState = await _orderService.SendOrder(tpOrder);
+                        if (subState.ResultCode == ResultCode.SendOrderFailed)
+                        {
+                            _log.Error("Failed to submit take profit order! Must cancel the open order or close the open position immediately! SecurityCode: " + tpOrder.SecurityCode);
+                        }
                         state.SubStates.Add(subState);
                     }
                 }
@@ -124,16 +139,20 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
     {
         if (side == Side.None) throw Exceptions.Invalid<Side>(side);
         if (!time.IsValid()) throw Exceptions.Invalid<DateTime>(time);
-        if (type == OrderType.Limit && (!price.IsValid() || price <= 0)) throw Exceptions.Invalid<decimal>(price);
+        if (type == OrderType.Limit && (!price.IsValid() || price == 0)) throw Exceptions.Invalid<decimal>("Limit order must specify a valid price.");
+        if (type == OrderType.StopLimit && (!price.IsValid() || price == 0)) throw Exceptions.Invalid<decimal>("Stop loss limit order must specify a valid price.");
+        if (type == OrderType.TakeProfitLimit && (!price.IsValid() || price == 0)) throw Exceptions.Invalid<decimal>("Take profit limit order must specify a valid price.");
         if (!quantity.IsValid() || quantity <= 0) throw Exceptions.Invalid<decimal>(quantity);
         if (!security.IsValid()) throw Exceptions.Invalid<Security>(security);
         if (!security.QuoteSecurity.IsValid()) throw Exceptions.Invalid<Security>("Security's quote security is: " + security.QuoteSecurity);
         if (stopPrice != null && (!stopPrice.IsValid() || stopPrice <= 0)) throw Exceptions.Invalid<decimal>(stopPrice);
-
+        ;
         var assetPosition = _context.Services.Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
         if (assetPosition == null || !assetPosition.Security.IsValid()) throw Exceptions.Invalid<Security>("asset position security is: " + assetPosition?.Security);
-        if (assetPosition.Quantity < quantity)
+        if (assetPosition.Quantity < quantity) 
             throw Exceptions.InvalidOrder($"Insufficient quote asset to be traded. Existing: {assetPosition.Quantity}; desired: {quantity}");
+        if (type == OrderType.Market || type == OrderType.Stop || type == OrderType.TakeProfit)
+            price = 0;
 
         var order = new Order
         {
@@ -157,6 +176,10 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         {
             order.StopPrice = stopPrice.Value;
         }
+        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
+            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}");
+        else
+            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}");
         return order;
     }
 

@@ -196,4 +196,14 @@ public static class DateUtils
             end = start;
         } while (true);
     }
+
+    /// <summary>
+    /// Returns T-x date time (in UTC).
+    /// </summary>
+    /// <param name="x"></param>
+    /// <returns></returns>
+    public static DateTime TMinus(int x)
+    {
+        return DateTime.UtcNow.AddDays(-x);
+    }
 }

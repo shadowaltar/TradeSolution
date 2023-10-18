@@ -124,7 +124,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         }
         if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
         {
-            parameters.Add(("price", order.Price != 0 ? order.Price.ToString() : order.StopPrice.ToString()));
+            parameters.Add(("price", order.Price.ToString()));
             parameters.Add(("stopPrice", order.StopPrice.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
         }
@@ -142,12 +142,16 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var trades = new List<Trade>();
 
         Parse(jsonNode, order, trades); // will change the order status accordingly
+        if (order.Status == OrderStatus.Unknown)
+        { 
+
+        }
         var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
 
         // raise events, and prevent other places to invoke events
         _broker.Enqueue(new EventInvokerTask(() =>
         {
-            OrderPlaced?.Invoke(order.IsSuccessful, state);
+            OrderPlaced?.Invoke(order.IsGood, state);
             if (!trades.IsNullOrEmpty())
                 TradesReceived?.Invoke(trades, true);
         }));
@@ -957,7 +961,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         Status = OrderStatusConverter.ParseBinance(status),
                         Type = orderType,
                         TimeInForce = timeInForce,
-                        Price = orderType == OrderType.Market ? orderPrice : 0,
+                        Price = orderPrice,
                         Quantity = orderQuantity,
                         SecurityCode = code,
                         SecurityId = 0, // need to be filled later

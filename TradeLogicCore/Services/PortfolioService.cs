@@ -106,29 +106,27 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.GetAssetBySecurityId(securityId);
     }
 
-    public async Task<List<Position>> GetStoragePositions(Account? account = null, DateTime? start = null)
+    public async Task<List<Position>> GetStoragePositions(DateTime? start = null)
     {
-        account ??= _context.Account;
         start ??= DateTime.MinValue;
-        return await _context.Storage.ReadPositions(account, start.Value, false);
+        return await _context.Storage.ReadPositions(start.Value, OpenClose.All);
     }
 
-    public async Task<List<Asset>> GetExternalAssets(Account? account = null)
+    public async Task<List<Asset>> GetExternalAssets()
     {
-        account ??= _context.Account;
-        var state = await _execution.GetAssetPositions(account.ExternalAccount);
-        var assets = state.Get<List<Asset>>()!;
-        foreach (var asset in assets)
+        var state = await _execution.GetAssetPositions(_context.Account.ExternalAccount);
+        var assets = state.Get<List<Asset>>();
+        if (assets == null)
         {
-            _securityService.Fix(asset);
+            throw Exceptions.Invalid<Asset>("Failed to retrieve assets from external!");
         }
+        _securityService.Fix(assets);
         return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
 
-    public async Task<List<Asset>> GetStorageAssets(Account? account = null)
+    public async Task<List<Asset>> GetStorageAssets()
     {
-        account ??= _context.Account;
-        var assets = await _storage.ReadAssets(account.Id);
+        var assets = await _storage.ReadAssets();
         foreach (var asset in assets)
         {
             _securityService.Fix(asset);
@@ -146,13 +144,13 @@ public class PortfolioService : IPortfolioService, IDisposable
             return false;
         }
 
-        var positions = await _context.Storage.ReadPositions(_context.Account, DateTime.MinValue, true);
+        var positions = await _context.Storage.ReadPositions(DateTime.MinValue, OpenClose.OpenOnly);
         foreach (var position in positions)
         {
             _securityService.Fix(position);
         }
 
-        var assets = await _context.Storage.ReadAssets(_context.AccountId);
+        var assets = await _context.Storage.ReadAssets();
         foreach (var asset in assets)
         {
             _securityService.Fix(asset);
@@ -183,7 +181,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             Status = OrderStatus.Sending,
 
             AccountId = _context.AccountId,
-            ExternalOrderId = 0, // this is a temp one, should be updated later
+            ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId,
             FilledQuantity = 0,
             ExternalCreateTime = DateTime.MinValue,
             ExternalUpdateTime = DateTime.MinValue,
@@ -211,16 +209,17 @@ public class PortfolioService : IPortfolioService, IDisposable
             if (position.IsClosed) continue;
 
             var order = CreateCloseOrder(position, orderComment);
-            await _orderService.SendOrder(order);
+            var state = await _orderService.SendOrder(order);
             // need to wait for a while
             if (Threads.WaitUntil(() => _closedPositions.ThreadSafeContains(position.Id)))
                 _log.Info("Closed position, id: " + position.Id);
             else
                 _log.Error("Failed to close position (timed-out), id: " + position.Id);
         }
+        _persistence.WaitAll();
     }
 
-    public void UpdatePortfolio(List<Position> positions, bool isInitializing = false)
+    public void Update(List<Position> positions, bool isInitializing = false)
     {
         if (isInitializing)
         {
@@ -249,7 +248,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
     }
 
-    public void UpdatePortfolio(List<Asset> assets, bool isInitializing = false)
+    public void Update(List<Asset> assets, bool isInitializing = false)
     {
         if (isInitializing)
         {
@@ -308,7 +307,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             asset.Quantity += quantity;
             // TODO external logic
-            var assets = await _storage.ReadAssets(Portfolio.AccountId);
+            var assets = await _storage.ReadAssets();
             asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
             return asset;
         }
@@ -318,7 +317,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     public async Task<Asset?> Deposit(int accountId, int assetId, decimal quantity)
     {
         // TODO external logic!
-        var assets = await _storage.ReadAssets(accountId);
+        var assets = await _storage.ReadAssets();
         var asset = assets.FirstOrDefault(b => b.SecurityId == assetId);
         if (asset == null)
         {
@@ -373,7 +372,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             }
             asset.Quantity -= quantity;
             _log.Info($"Withdrew {quantity} quantity from current account. Remaining free amount: {asset.Quantity}.");
-            var assets = await _storage.ReadAssets(Portfolio.AccountId);
+            var assets = await _storage.ReadAssets();
             asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
             asset.Quantity -= quantity;
             return asset;
@@ -381,39 +380,30 @@ public class PortfolioService : IPortfolioService, IDisposable
         throw Exceptions.MissingAsset(assetId);
     }
 
+    public void Reset(bool isResetPositions = true, bool isResetAssets = true, bool isInitializing = true)
+    {
+        if (isResetPositions)
+        {
+            if (isInitializing)
+                InitialPortfolio.ClearPositions();
+            Portfolio.ClearPositions();
+        }
+        if (isResetAssets)
+        {
+            if (isInitializing)
+                InitialPortfolio.ClearAssets();
+            Portfolio.ClearAssets();
+        }
+    }
+
     public void Process(List<Trade> trades, bool isSameSecurity)
     {
         if (trades.IsNullOrEmpty())
             return;
 
-        if (isSameSecurity)
+        foreach (var trade in trades)
         {
-            var lastTrade = trades.Last();
-            var position = GetPositionBySecurityId(lastTrade.SecurityId);
-            var isNew = position == null;
-            var positions = Position.CreateOrApply(trades, position).ToList();
-            if (positions.IsNullOrEmpty()) throw Exceptions.Impossible();
-
-            foreach (var p in positions)
-            {
-                if (p.IsClosed)
-                {
-                    _closedPositions[p.Id] = p;
-                    Portfolio.RemovePosition(p.Id);
-                }
-            }
-            _persistence.Insert(positions);
-            _persistence.Insert(positions[^1].CreateRecord());
-
-            // invoke post-events
-            PositionsUpdated?.Invoke(positions);
-        }
-        else
-        {
-            foreach (var grouped in trades.GroupBy(t => t.SecurityId))
-            {
-                Process(grouped.ToList(), true);
-            }
+            Process(trade);
         }
     }
 
@@ -431,14 +421,21 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             _closedPositions[position.Id] = position;
             Portfolio.RemovePosition(position.Id);
+
+            _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}");
         }
         else
         {
             Portfolio.AddOrUpdate(position);
+
+            if (!isNew)
+                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Updated]\n\t\tID:{position.Id}, TID:{trade.Id}, R:{position.Return:P4}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
+            else
+                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Opened]\n\t\tID:{position.Id}, TID:{trade.Id}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
         }
+
         _persistence.Insert(position);
-        _persistence.Insert(position.CreateRecord());
-        _persistence.WaitAll();
+
         // invoke post-events
         if (isNew)
             PositionCreated?.Invoke(position!);

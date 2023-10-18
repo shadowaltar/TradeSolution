@@ -1,4 +1,5 @@
-﻿using Common.Attributes;
+﻿using Common;
+using Common.Attributes;
 using Microsoft.Diagnostics.Runtime.Utilities;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
@@ -52,6 +53,7 @@ public class Security
 
     public decimal RoundLotSize(decimal proposedQuantity)
     {
+        if (!proposedQuantity.IsValid()) return proposedQuantity;
         var lotSizeReciprocal = 1 / LotSize;
         var result = Math.Ceiling(proposedQuantity * lotSizeReciprocal) / lotSizeReciprocal;
         if (result > proposedQuantity)
@@ -68,6 +70,9 @@ public class Security
     /// <returns></returns>
     public decimal RoundTickSize(decimal proposedPrice, decimal roundingHint = 0)
     {
+        if (!proposedPrice.IsValid())
+            return proposedPrice;
+
         var tickSizeReciprocal = 1 / TickSize;
         decimal result;
         if (proposedPrice > roundingHint)

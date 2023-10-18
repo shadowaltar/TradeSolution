@@ -12,6 +12,7 @@ public class PersistenceTask
     public Type? Type { get; set; }
     public string? TableNameOverride { get; set; }
     public DatabaseActionType Action { get; set; } = DatabaseActionType.Unknown;
+    public string CallerInfo { get; set; } = "";
 
     public PersistenceTask()
     {
@@ -47,5 +48,6 @@ public class PersistenceTask
         _entries = null;
         Type = null;
         Action = DatabaseActionType.Unknown;
+        CallerInfo = "";
     }
 }

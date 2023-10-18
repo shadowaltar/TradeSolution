@@ -1,9 +1,12 @@
-﻿using Common;
+﻿using Autofac.Core;
+using Common;
+using Microsoft.SqlServer.Server;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeLogicCore.Algorithms.EnterExit;
@@ -40,6 +43,7 @@ public class MovingAverageCrossing : IAlgorithm
     public IExitPositionAlgoLogic Exiting { get; set; }
     public ISecurityScreeningAlgoLogic Screening { get; set; }
 
+    public bool IsShortSellAllowed { get; private set; }
 
     private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
 
@@ -50,6 +54,7 @@ public class MovingAverageCrossing : IAlgorithm
                                  decimal longTakeProfitRatio = decimal.MinValue,
                                  decimal shortStopLossRatio = decimal.MinValue,
                                  decimal shortTakeProfitRatio = decimal.MinValue,
+                                 bool isShortSellAllowed = false,
                                  IPositionSizingAlgoLogic? sizing = null,
                                  ISecurityScreeningAlgoLogic? screening = null,
                                  IEnterPositionAlgoLogic? entering = null,
@@ -57,6 +62,7 @@ public class MovingAverageCrossing : IAlgorithm
     {
         FastParam = fast;
         SlowParam = slow;
+        IsShortSellAllowed = isShortSellAllowed;
         LongStopLossRatio = longStopLossRatio <= 0 ? decimal.MinValue : longStopLossRatio;
         LongTakeProfitRatio = longTakeProfitRatio <= 0 ? decimal.MinValue : longTakeProfitRatio;
         ShortStopLossRatio = shortStopLossRatio <= 0 ? decimal.MinValue : shortStopLossRatio;
@@ -87,7 +93,7 @@ public class MovingAverageCrossing : IAlgorithm
         }
     }
 
-    public object CalculateVariables(decimal price, AlgoEntry? last)
+    public IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new MacVariables();
         var lv = last?.Variables as MacVariables;
@@ -104,6 +110,12 @@ public class MovingAverageCrossing : IAlgorithm
         variables.FastXSlow = lv?.FastXSlow ?? 0;
 
         return variables;
+    }
+
+    public List<Order> PickOpenOrdersToCleanUp(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        return openOrders;
     }
 
     public void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
@@ -146,6 +158,9 @@ public class MovingAverageCrossing : IAlgorithm
 
     public bool CanOpenShort(AlgoEntry current)
     {
+        if (!IsShortSellAllowed)
+            return false;
+
         // prevent trading if trading is ongoing
         if (!CanOpen(current))
             return false;
@@ -192,6 +207,9 @@ public class MovingAverageCrossing : IAlgorithm
 
     public bool CanCloseShort(AlgoEntry current)
     {
+        if (!IsShortSellAllowed)
+            return false;
+
         var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
         return position != null
                && position.Side == Side.Sell
@@ -215,9 +233,12 @@ public class MovingAverageCrossing : IAlgorithm
         ResetInheritedVariables(entry);
     }
 
-    public void NotifyPositionClosed(int securityId, long positionId)
+    public void NotifyPositionChanged(Position position)
     {
-        _tradingSecurityIds.ThreadSafeRemove(securityId);
+        if (position.IsClosed)
+        {
+            _tradingSecurityIds.ThreadSafeRemove(position.SecurityId);
+        }
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)
@@ -291,8 +312,8 @@ public class MovingAverageCrossing : IAlgorithm
     public override string ToString()
     {
         return $"Algo - Moving Average Crossing: Fast [{_fastMa.GetType().Name}:{FastParam}], Slow [{_slowMa.GetType().Name}:{SlowParam}]," +
-            $" LongSL% [{LongStopLossRatio}], LongTP% [{LongTakeProfitRatio}]," +
-            $" ShortSL% [{ShortStopLossRatio}], ShortTP% [{ShortTakeProfitRatio}]";
+            $" LongSL% [{LongStopLossRatio.NAIfInvalid()}], LongTP% [{LongTakeProfitRatio.NAIfInvalid()}]," +
+            $" ShortSL% [{ShortStopLossRatio.NAIfInvalid()}], ShortTP% [{ShortTakeProfitRatio.NAIfInvalid()}]";
     }
 }
 
@@ -321,8 +342,18 @@ public record MacVariables : IAlgorithmVariables
     /// </summary>
     public int FastXSlow { get; set; } = 0;
 
+    public string Format(Security security)
+    {
+        return $"F:{FormatPrice(Fast, security)}, S:{FormatPrice(Slow, security)}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
+
+        static string FormatPrice(decimal price, Security security)
+        {
+            return price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
+        }
+    }
+
     public override string ToString()
     {
-        return $"F:{(Fast.IsValid() ? Fast.ToString("F16") : "N/A")}, S:{(Slow.IsValid()?Slow.ToString("F16"):"N/A")}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
+        return $"F:{Fast.NAIfInvalid("F16")}, S:{Slow.NAIfInvalid("F16")}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
     }
 }

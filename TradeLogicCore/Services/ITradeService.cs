@@ -66,6 +66,11 @@ public interface ITradeService
     List<Trade> GetTrades(long orderId);
 
     /// <summary>
+    /// Reset all caches in this service.
+    /// </summary>
+    void Reset();
+
+    /// <summary>
     /// Update the internal state.
     /// </summary>
     /// <param name="trades"></param>

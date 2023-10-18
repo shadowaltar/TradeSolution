@@ -1,25 +1,66 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Database;
 using log4net;
 using Microsoft.Data.Sqlite;
 using System.Data;
 using TradeCommon.Constants;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 
 public partial class Storage : IStorage
 {
-    private readonly ILog _log = Logger.New();
+    private static readonly ILog _log = Logger.New();
+    private readonly IComponentContext _container;
     private readonly SqlWriters _writers;
+    private readonly Lazy<ApplicationContext> _lazyContext;
+
+    private int AccountId => _lazyContext.Value.AccountId;
+
+    private SqliteConnection? _globalConnection;
+    private SqliteTransaction? _globalTransaction;
 
     public event Action<object, string>? Success;
     public event Action<object, Exception, string>? Failed;
 
     public IDatabaseSqlBuilder SqlHelper { get; } = new SqliteSqlBuilder();
 
-    public Storage()
+    public Storage(IComponentContext container)
     {
         _writers = new SqlWriters(this);
+        _container = container;
+        _lazyContext = new Lazy<ApplicationContext>(() => _container.Resolve<ApplicationContext>());
+    }
+
+    public async Task BeginGlobalTransaction(params string[] databaseNames)
+    {
+        if (databaseNames.Length == 0)
+            throw Exceptions.Invalid("At least one database must be specified");
+        var connection = await Connect(databaseNames[0]);
+        if (databaseNames.Length > 1)
+        {
+            using var cmd = connection.CreateCommand();
+            for (int i = 1; i < databaseNames.Length; i++)
+            {
+                cmd.CommandText = $"ATTACH DATABASE \'{databaseNames[i]}\'";
+                cmd.ExecuteNonQuery();
+            }
+        }
+        _globalConnection = connection;
+        _globalTransaction = (SqliteTransaction?)await connection.BeginTransactionAsync();
+    }
+
+    public async Task<bool> CommitGlobalTransaction()
+    {
+        if (_globalConnection == null || _globalTransaction == null) return false;
+        await _globalTransaction.CommitAsync();
+        await _globalConnection.CloseAsync();
+        await _globalTransaction.DisposeAsync();
+        await _globalConnection.DisposeAsync();
+        _globalTransaction = null;
+        _globalConnection = null;
+        return true;
     }
 
     /// <summary>

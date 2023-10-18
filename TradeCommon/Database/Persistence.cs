@@ -1,5 +1,6 @@
 ﻿using Common;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
@@ -14,6 +15,8 @@ public class Persistence : IDisposable
     private bool _isEmpty = true;
     private bool _isRunning;
 
+    public bool IsEmpty => _isEmpty;
+
     public Persistence(IStorage storage)
     {
         Task.Factory.StartNew(async (t) =>
@@ -26,7 +29,7 @@ public class Persistence : IDisposable
         _storage = storage;
     }
 
-    public int Insert<T>(T entry, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false)
+    public int Insert<T>(T entry, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false, [CallerMemberName] string callerInfo = "")
     {
         if (entry == null)
             return 0;
@@ -41,6 +44,7 @@ public class Persistence : IDisposable
         task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
         task.Type = typeof(T);
         task.TableNameOverride = tableNameOverride;
+        task.CallerInfo = callerInfo;
         if (!isSynchronous)
             _tasks.Enqueue(task);
         else
@@ -48,7 +52,7 @@ public class Persistence : IDisposable
         return int.MinValue;
     }
 
-    public int Insert<T>(List<T> entries, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false)
+    public int Insert<T>(List<T> entries, string? tableNameOverride = null, bool isUpsert = true, bool isSynchronous = false, [CallerMemberName] string callerInfo = "")
     {
         if (entries.IsNullOrEmpty())
             return 0;
@@ -66,6 +70,7 @@ public class Persistence : IDisposable
         task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
         task.Type = typeof(T);
         task.TableNameOverride = tableNameOverride;
+        task.CallerInfo = callerInfo;
         if (!isSynchronous)
             _tasks.Enqueue(task);
         else

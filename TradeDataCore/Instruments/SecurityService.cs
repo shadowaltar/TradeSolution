@@ -209,6 +209,14 @@ public class SecurityService : ISecurityService
         }
     }
 
+    public void Fix<T>(IList<T> entries, Security? security = null) where T : SecurityRelatedEntry
+    {
+        foreach (var entry in entries)
+        {
+            Fix(entry, security);
+        }
+    }
+
     /// <summary>
     /// Replace old entries and update the reference objects.
     /// </summary>

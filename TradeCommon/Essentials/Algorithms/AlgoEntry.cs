@@ -1,5 +1,6 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -116,10 +117,12 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public decimal ShortQuantity { get; set; }
     public decimal ShortPrice { get; set; }
     public decimal ShortNotional { get; set; }
-//}
 
-//public record AlgoEntry<T> : AlgoEntry
-//{
     [NotNull, AsJson]
-    public object Variables { get; set; }
+    public IAlgorithmVariables Variables { get; set; }
+}
+
+public interface IAlgorithmVariables
+{
+    string Format(Security security);
 }

@@ -29,7 +29,7 @@ public static class NumericExtensions
         return reverse;
     }
 
-    public static int GetDecimalPlaces(decimal n)
+    public static int GetDecimalPlaces(this decimal n)
     {
         n = Math.Abs(n); //make sure it is positive.
         n -= (int)n;     //remove the integer part of the number.
@@ -74,4 +74,6 @@ public static class NumericExtensions
     }
 
     public static double ToDouble(this decimal value) => decimal.ToDouble(value);
+
+    public static string NAIfInvalid(this decimal value, string? format = null) => value.IsValid() ? (format != null ? value.ToString(format) : value.ToString()) : "N/A";
 }

@@ -1,4 +1,5 @@
-﻿using Common.Attributes;
+﻿using Common;
+using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
@@ -127,19 +128,38 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
     public AdvancedOrderSettings? AdvancedSettings { get; set; }
 
     /// <summary>
-    /// Gets if the order is successfully placed (either it is still alive or filled).
+    /// Gets if the order is in good state: live, filled or partially filled.
     /// </summary>
     [DatabaseIgnore]
-    public bool IsSuccessful => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
+    public bool IsGood => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
+    
 
     /// <summary>
-    /// Gets if the order is successfully placed (either it is still alive or filled).
+    /// Gets if the order is in alive state: live or partially filled.
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsActive => Status is OrderStatus.Live or OrderStatus.PartialFilled;
+
+    /// <summary>
+    /// Gets if the order is completed: either filled, or cancelled, or failed / rejected.
     /// </summary>
     [DatabaseIgnore]
     public bool IsClosed => Status is OrderStatus.Failed
         or OrderStatus.Filled or OrderStatus.Cancelled or OrderStatus.Rejected
         or OrderStatus.Rejected or OrderStatus.Deleted or OrderStatus.Expired
         or OrderStatus.Prevented;
+
+    [DatabaseIgnore]
+    public decimal FormattedPrice => Security.RoundTickSize(Price);
+
+    [DatabaseIgnore]
+    public decimal FormattedStopPrice => Security.RoundTickSize(Price);
+
+    [DatabaseIgnore]
+    public decimal FormattedQuantity => Security.RoundLotSize(Quantity);
+
+    [DatabaseIgnore]
+    public decimal FormattedFilledQuantity => Security.RoundLotSize(FilledQuantity);
 
     public int CompareTo(Order? other)
     {
@@ -178,7 +198,8 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}], {Side} p*q:{Price:G29}*{Quantity:G29},";
+        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}]," +
+            $" {Side} p*q:{Price.ToString("F" + Security.TickSize.GetDecimalPlaces())}*{Quantity.ToString("F" + Security.LotSize.GetDecimalPlaces())}";
     }
 }
 

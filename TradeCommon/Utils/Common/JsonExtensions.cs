@@ -59,7 +59,7 @@ public static class JsonExtensions
         }
     }
 
-    public static decimal GetDecimal(this JsonNode? node, string? fieldName = null, decimal defaultValue = decimal.MinValue)
+    public static decimal GetDecimal(this JsonNode? node, string? fieldName = null, decimal defaultValue = 0)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
         if (kind == JsonValueKind.Undefined || jsonValue == null)

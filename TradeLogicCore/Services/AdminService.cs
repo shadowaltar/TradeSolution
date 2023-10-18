@@ -16,12 +16,12 @@ namespace TradeLogicCore.Services;
 public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
+
     private readonly IComponentContext _container;
     private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly ITradeService _tradeService;
     private readonly IPortfolioService _portfolioService;
-    private readonly Persistence _persistence;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
 
@@ -33,7 +33,6 @@ public class AdminService : IAdminService
 
     public AdminService(IComponentContext container,
                         Context context,
-                        Persistence persistence,
                         ISecurityService securityService,
                         IPortfolioService portfolioService,
                         ITradeService tradeService,
@@ -46,14 +45,13 @@ public class AdminService : IAdminService
         _securityService = securityService;
         _tradeService = tradeService;
         _portfolioService = portfolioService;
-        _persistence = persistence;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        _log.Info($"Initializing admin-service: {environment}, {exchange}, {broker}");
+        _log.Info($"Initializing admin-service, Env:{environment}, Exch:{exchange}, Broker:{broker}.");
         Context.Initialize(_container, environment, exchange, broker);
         _connectivity.SetEnvironment(environment);
 

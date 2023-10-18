@@ -13,8 +13,6 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Misc;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Reporting;
@@ -72,7 +70,7 @@ public class Program
 
     private static async Task ResetTables()
     {
-        var storage = new Storage();
+        //var storage = new Storage();
         //await storage.CreateTable<Order>("stock_orders");
         //await storage.CreateTable<Trade>("stock_trades");
         //await storage.CreateTable<Position>("stock_positions");
@@ -80,8 +78,8 @@ public class Program
         //await storage.CreateTable<Trade>("fx_trades");
         //await storage.CreateTable<Position>("fx_positions");
         //await storage.CreateTable<PositionRecord>();
-        await storage.CreateTable<AlgoEntry>();
-        await storage.CreateTable<AlgoBatch>();
+        //await storage.CreateTable<AlgoEntry>();
+        //await storage.CreateTable<AlgoBatch>();
     }
 
     private static async Task RunMacMimicWebService()
@@ -110,7 +108,7 @@ public class Program
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
         var slowMa = 7;
-        var stopLoss = 0.0005m;
+        var stopLoss = 0.0002m;
         var takeProfit = 0m;// 0.0005m;
         var initialFixedQuantity = 100;
 
@@ -166,7 +164,7 @@ public class Program
         _log.Info("Execute algorithm with parameters #2: " + algorithm);
 
         var isAssetSet = context.SetPreferredAssets("BUSD", "TUSD", "USDT");
-        var algoBatchId = await core.StartAlgorithm(parameters, algorithm);
+        var algoBatchId = await core.Run(parameters, algorithm);
 
         while (true)
         {
@@ -354,7 +352,7 @@ public class Program
                 _log.Info("Existing Open Order: " + openOrder);
             }
 
-            orderService.CancelOrder(order.Id);
+            await orderService.CancelOrder(order);
         }
 
         static void OnNewTradesReceived(List<Trade> trades, bool isSameSecurity)
