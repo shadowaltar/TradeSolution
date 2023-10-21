@@ -11,7 +11,7 @@ public class Context : ApplicationContext
     private User? _user;
     private Account? _account;
     private IServices? _services;
-    private IAlgorithm? _algorithm;
+    private Algorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
 
     public Context(IStorage storage) : base(storage)
@@ -66,15 +66,15 @@ public class Context : ApplicationContext
         }
     }
 
-    public void InitializeAlgorithmContext(IAlgorithmEngine algorithmEngine, IAlgorithm algorithm)
+    public void InitializeAlgorithmContext(IAlgorithmEngine algorithmEngine, Algorithm algorithm)
     {
         _algorithmEngine = algorithmEngine;
         _algorithm = algorithm;
     }
 
-    public IAlgorithm GetAlgorithm()
+    public Algorithm GetAlgorithm()
     {
-        return _algorithm is IAlgorithm result ? result : throw Exceptions.MissingAlgorithm();
+        return _algorithm is Algorithm result ? result : throw Exceptions.MissingAlgorithm();
     }
 
     public IAlgorithmEngine GetEngine()

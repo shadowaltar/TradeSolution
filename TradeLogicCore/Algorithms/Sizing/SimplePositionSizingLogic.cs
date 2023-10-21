@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Runtime;
+using TradeLogicCore.Algorithms.Abnormality;
 using TradeLogicCore.Algorithms.Sizing;
 
 namespace TradeLogicCore.Algorithms;
@@ -9,6 +10,8 @@ namespace TradeLogicCore.Algorithms;
 public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
 {
     private static readonly ILog _log = Logger.New();
+
+    public AverageAbnormalityDetector SizeAbnormalityDetector { get; } = new(5);
 
     public PositionSizingMethod SizingMethod { get; }
     public decimal RelativeMin { get; }
@@ -68,8 +71,16 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
     public decimal GetSize(decimal freeAmount, AlgoEntry current, AlgoEntry? last, decimal price, DateTime time)
     {
         if (current.Security == null) throw Exceptions.MissingSecurity();
-        var quantity = GetTradingAmount(freeAmount) / price;
-        return current.Security.RoundLotSize(quantity);
+        if (price == 0) return 0;
+
+        var size = GetTradingAmount(freeAmount) / price;
+        var actualSize = current.Security.RoundLotSize(size);
+        if (SizeAbnormalityDetector.CheckAbnormality(actualSize))
+        {
+            _log.Error($"Erroneous trading size: {actualSize}; previous {SizeAbnormalityDetector.Count} items' average is {SizeAbnormalityDetector.LastAverage}");
+            return 0;
+        }
+        return actualSize;
     }
 
     private decimal GetTradingAmount(decimal freeAmount)

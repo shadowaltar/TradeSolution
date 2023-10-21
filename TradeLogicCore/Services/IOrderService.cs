@@ -115,7 +115,11 @@ public interface IOrderService
     Order? GetOrderByExternalId(long externalOrderId);
 
     /// <summary>
-    /// Place an order without waiting for the result.
+    /// Send an order.
+    /// Before sent it will be stored with <see cref="OrderStatus.Sending"/>.
+    /// After sent, depending on the result, the state may contain <see cref="ResultCode.SendOrderOk"/>
+    /// or <see cref="ResultCode.SendOrderFailed"/>.
+    /// The order will also be stored after sent.
     /// </summary>
     /// <param name="order"></param>
     /// <param name="isFakeOrder"></param>
@@ -137,7 +141,6 @@ public interface IOrderService
     /// To execute, use <see cref="SendOrder"/>.
     /// </summary>
     /// <param name="security"></param>
-    /// <param name="account"></param>
     /// <param name="orderType"></param>
     /// <param name="price"></param>
     /// <param name="quantity"></param>
@@ -146,14 +149,18 @@ public interface IOrderService
     /// <param name="comment"></param>
     /// <returns></returns>
     Order CreateManualOrder(Security security,
-                            int account,
                             decimal price,
                             decimal quantity,
                             Side side,
                             OrderType orderType = OrderType.Limit,
-                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel,
-                            string comment = "manual");
-    
+                            string comment = "manual",
+                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+
+    Task<bool> SendLongLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    Task<bool> SendLongMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    Task<bool> SendShortLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    Task<bool> SendShortMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+
     /// <summary>
     /// Reset all caches in this service.
     /// </summary>

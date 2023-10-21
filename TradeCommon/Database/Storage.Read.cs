@@ -372,7 +372,6 @@ WHERE
                 QuoteCurrency = quoteCcy,
                 IsMarginTradingAllowed = isMarginTradingAllowed,
                 MaxLotSize = maxLotSize,
-                MinNotional = minNotional,
             };
             return fxInfo;
         }

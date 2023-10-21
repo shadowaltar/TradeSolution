@@ -3,12 +3,14 @@ using Iced.Intel;
 using log4net;
 using Microsoft.Identity.Client.Extensions.Msal;
 using SQLitePCL;
+using System.Collections.Generic;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 
@@ -269,6 +271,9 @@ public class SecurityService : ISecurityService
                         // no base asset
                         security.FxInfo.BaseAsset = null;
                         security.FxInfo.QuoteAsset = security;
+                        // avoid circular reference which breaks serialization
+                        //var simplified = new Security { Id = security.Id, Code = security.Code, SecurityType = SecurityType.Fx };
+                        //security.QuoteSecurity = simplified;
                         security.QuoteSecurity = security;
                         security.Currency = security.Code;
                     }

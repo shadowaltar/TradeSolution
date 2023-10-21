@@ -1,14 +1,15 @@
-﻿using Autofac.Core;
-using Common;
-using Microsoft.SqlServer.Server;
+﻿using Common;
+using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
@@ -17,37 +18,39 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
-public class MovingAverageCrossing : IAlgorithm
+public class MovingAverageCrossing : Algorithm
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly SimpleMovingAverage _fastMa;
     private readonly SimpleMovingAverage _slowMa;
+    private readonly TimeSpan _openOrderTimeout;
     private readonly Context _context;
 
-    /// <summary>
-    /// Indicates if the security is being traded.
-    /// </summary>
-    private readonly HashSet<int> _tradingSecurityIds = new();
+    private readonly Dictionary<int, decimal> _stopLossPrices = new();
+    private readonly Dictionary<int, decimal> _takeProfitPrices = new();
 
-    public AlgorithmParameters AlgorithmParameters { get; set; }
+    public override AlgorithmParameters AlgorithmParameters { get; }
 
     public int Id => 1;
     public int VersionId => 20230916;
     public int FastParam { get; } = 2;
     public int SlowParam { get; } = 5;
-    public decimal LongStopLossRatio { get; } = 0.02m;
-    public decimal LongTakeProfitRatio { get; }
-    public decimal ShortStopLossRatio { get; }
-    public decimal ShortTakeProfitRatio { get; }
-    public IPositionSizingAlgoLogic Sizing { get; set; }
-    public IEnterPositionAlgoLogic Entering { get; set; }
-    public IExitPositionAlgoLogic Exiting { get; set; }
-    public ISecurityScreeningAlgoLogic Screening { get; set; }
+    public override decimal LongStopLossRatio { get; } = 0.02m;
+    public override decimal LongTakeProfitRatio { get; }
+    public override decimal ShortStopLossRatio { get; }
+    public override decimal ShortTakeProfitRatio { get; }
+    public override IPositionSizingAlgoLogic Sizing { get; set; }
+    public override IEnterPositionAlgoLogic Entering { get; set; }
+    public override IExitPositionAlgoLogic Exiting { get; set; }
+    public override ISecurityScreeningAlgoLogic Screening { get; set; }
 
     public bool IsShortSellAllowed { get; private set; }
 
     private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
 
     public MovingAverageCrossing(Context context,
+                                 AlgorithmParameters parameters,
                                  int fast,
                                  int slow,
                                  decimal longStopLossRatio = decimal.MinValue,
@@ -60,6 +63,8 @@ public class MovingAverageCrossing : IAlgorithm
                                  IEnterPositionAlgoLogic? entering = null,
                                  IExitPositionAlgoLogic? exiting = null)
     {
+        _context = context;
+
         FastParam = fast;
         SlowParam = slow;
         IsShortSellAllowed = isShortSellAllowed;
@@ -67,8 +72,7 @@ public class MovingAverageCrossing : IAlgorithm
         LongTakeProfitRatio = longTakeProfitRatio <= 0 ? decimal.MinValue : longTakeProfitRatio;
         ShortStopLossRatio = shortStopLossRatio <= 0 ? decimal.MinValue : shortStopLossRatio;
         ShortTakeProfitRatio = shortTakeProfitRatio <= 0 ? decimal.MinValue : shortTakeProfitRatio;
-
-        _context = context;
+        AlgorithmParameters = parameters;
 
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
         Sizing = sizing ?? new SimplePositionSizingLogic();
@@ -78,6 +82,8 @@ public class MovingAverageCrossing : IAlgorithm
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
         _slowMa = new SimpleMovingAverage(SlowParam, "SLOW SMA");
+
+        _openOrderTimeout = IntervalTypeConverter.ToTimeSpan(AlgorithmParameters.Interval) * 2;
     }
 
     public void BeforeProcessingSecurity(IAlgorithmEngine context, Security security)
@@ -93,7 +99,7 @@ public class MovingAverageCrossing : IAlgorithm
         }
     }
 
-    public IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
+    public override IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new MacVariables();
         var lv = last?.Variables as MacVariables;
@@ -112,13 +118,21 @@ public class MovingAverageCrossing : IAlgorithm
         return variables;
     }
 
-    public List<Order> PickOpenOrdersToCleanUp(AlgoEntry current)
+    /// <summary>
+    /// Cancel any live or partial-filled orders which is older than
+    /// two cycles.
+    /// </summary>
+    /// <param name="current"></param>
+    /// <returns></returns>
+    public override List<Order> PickOpenOrdersToCleanUp(AlgoEntry current)
     {
-        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security)
+            .Where(o => o.Status is OrderStatus.Live or OrderStatus.PartialFilled
+            && DateTime.UtcNow - o.CreateTime > _openOrderTimeout).ToList();
         return openOrders;
     }
 
-    public void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
+    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
     {
         ProcessSignal(current, last);
 
@@ -136,7 +150,7 @@ public class MovingAverageCrossing : IAlgorithm
         current.ShortSignal = shouldShort ? SignalType.Open : shouldLong ? SignalType.Close : SignalType.Hold;
     }
 
-    public bool CanOpenLong(AlgoEntry current)
+    public override bool CanOpenLong(AlgoEntry current)
     {
         // prevent trading if trading is ongoing
         if (!CanOpen(current))
@@ -146,17 +160,7 @@ public class MovingAverageCrossing : IAlgorithm
         return current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
     }
 
-    public void BeforeOpeningLong(AlgoEntry entry)
-    {
-        _tradingSecurityIds.ThreadSafeAdd(entry.SecurityId);
-    }
-
-    public void BeforeOpeningShort(AlgoEntry entry)
-    {
-        _tradingSecurityIds.ThreadSafeAdd(entry.SecurityId);
-    }
-
-    public bool CanOpenShort(AlgoEntry current)
+    public override bool CanOpenShort(AlgoEntry current)
     {
         if (!IsShortSellAllowed)
             return false;
@@ -169,15 +173,134 @@ public class MovingAverageCrossing : IAlgorithm
         return current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
     }
 
+    public override async Task<ExternalQueryState> Open(AlgoEntry current, AlgoEntry last, decimal price, Side enterSide, DateTime time)
+    {
+        var state = await base.Open(current, last, price, enterSide, time);
+        if (state.ResultCode == ResultCode.SendOrderOk)
+        {
+            var order = state.Get<Order>();
+
+            var sl = GetStopLossPrice(price, enterSide, current.Security);
+            _stopLossPrices.ThreadSafeSet(current.SecurityId, sl);
+
+            var tp = GetTakeProfitPrice(price, enterSide, current.Security);
+            _takeProfitPrices.ThreadSafeSet(current.SecurityId, tp);
+
+            _log.Info($"\n\tALGO:[SETUP][{time:HHmmss}][{current.SecurityCode}]\n\t\tSLPRX:{current.Security.FormatPrice(sl)}, TPPRX:{current.Security.FormatPrice(tp)}");
+        }
+        return state;
+    }
+
+    public override bool ShallStopLoss(int securityId, Tick tick)
+    {
+        if (Exiting.IsClosing) return false;
+
+        var sl = _stopLossPrices.ThreadSafeGet(securityId);
+        if (sl == 0) return false; // no position or no sl is setup
+
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(securityId);
+        if (position == null || position.IsClosed) return false;
+
+        var side = position.Side;
+        if (side == Side.Buy && sl >= tick.Mid && !Exiting.IsClosing)
+        {
+            _log.Info($"\n\tALGO:[ALGO SL][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            return true;
+        }
+        if (side == Side.Sell && sl <= tick.Mid && !Exiting.IsClosing)
+        {
+            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            return true;
+        }
+        return false;
+    }
+
+    public override bool ShallTakeProfit(int securityId, Tick tick)
+    {
+        if (Exiting.IsClosing) return false;
+
+        var tp = _takeProfitPrices.ThreadSafeGet(securityId);
+        if (tp == 0) return false; // no position or no tp is setup
+
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(securityId);
+        if (position == null || position.IsClosed) return false;
+
+        var side = position.Side;
+        if (side == Side.Buy && tp <= tick.Mid && !Exiting.IsClosing)
+        {
+            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            return true;
+        }
+        if (side == Side.Sell && tp >= tick.Mid && !Exiting.IsClosing)
+        {
+            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            return true;
+        }
+        return false;
+    }
+
+    public override bool CanCloseLong(AlgoEntry current)
+    {
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+        && !Exiting.IsClosing
+        && position.Side == Side.Buy
+        && current.LongCloseType == CloseType.None
+        && current.LongSignal == SignalType.Close;
+    }
+
+    public override bool CanCloseShort(AlgoEntry current)
+    {
+        if (!IsShortSellAllowed)
+            return false;
+        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        return position != null
+               && !Exiting.IsClosing
+               && position.Side == Side.Sell
+               && current.ShortCloseType == CloseType.None
+               && current.ShortSignal == SignalType.Close;
+    }
+
+    public override bool CanCancel(AlgoEntry current)
+    {
+        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+        return !openOrders.IsNullOrEmpty();
+    }
+
+    public override async Task<ExternalQueryState> CloseByTickStopLoss(Position position)
+    {
+        return await CloseByTick(position);
+    }
+
+    public override async Task<ExternalQueryState> CloseByTickTakeProfit(Position position)
+    {
+        return await CloseByTick(position);
+    }
+
+    public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime)
+    {
+        if (Exiting.IsClosing)
+        {
+            _log.Warn("Algo-stop-loss is trying to close the position for security " + security.Code);
+            return ExternalQueryStates.CloseConflict(security.Code);
+        }
+        return await Exiting.Close(current, security, exitSide, exitTime);
+    }
+
+    public override void AfterLongClosed(AlgoEntry entry)
+    {
+        ResetInheritedVariables(entry);
+    }
+
+    public override void AfterStopLossLong(AlgoEntry entry)
+    {
+        ResetInheritedVariables(entry);
+    }
+
     private bool CanOpen(AlgoEntry current)
     {
         // prevent trading if enter-logic is underway
         if (Entering.IsOpening)
-            return false;
-
-        // prevent trading if security is marked as being traded
-        var isTrading = _tradingSecurityIds.ThreadSafeContains(current.SecurityId);
-        if (isTrading)
             return false;
 
         // prevent trading if has open orders
@@ -187,58 +310,21 @@ public class MovingAverageCrossing : IAlgorithm
 
         // prevent trading if has open positions
         var hasOpenPosition = false;
-        var openPosition = _context.Services.Portfolio.GetPosition(current.SecurityId);
-        if (openPosition == null)
-            hasOpenPosition = false;
-        else if (openPosition.IsClosed && openPosition.EndTradeId > 0)
-            hasOpenPosition = false;
+        var openPosition = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        if (openPosition != null && !openPosition.IsClosed && openPosition.EndTradeId == 0)
+            hasOpenPosition = true;
 
         return !hasOpenPosition;
     }
 
-    public bool CanCloseLong(AlgoEntry current)
+    private async Task<ExternalQueryState> CloseByTick(Position position)
     {
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
-        return position != null
-               && position.Side == Side.Buy
-               && current.LongCloseType == CloseType.None
-               && current.LongSignal == SignalType.Close;
-    }
-
-    public bool CanCloseShort(AlgoEntry current)
-    {
-        if (!IsShortSellAllowed)
-            return false;
-
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
-        return position != null
-               && position.Side == Side.Sell
-               && current.ShortCloseType == CloseType.None
-               && current.ShortSignal == SignalType.Close;
-    }
-
-    public bool CanCancel(AlgoEntry current)
-    {
-        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
-        return !openOrders.IsNullOrEmpty();
-    }
-
-    public void AfterLongClosed(AlgoEntry entry)
-    {
-        ResetInheritedVariables(entry);
-    }
-
-    public void AfterStopLossLong(AlgoEntry entry)
-    {
-        ResetInheritedVariables(entry);
-    }
-
-    public void NotifyPositionChanged(Position position)
-    {
-        if (position.IsClosed)
+        if (Exiting.IsClosing)
         {
-            _tradingSecurityIds.ThreadSafeRemove(position.SecurityId);
+            _log.Warn("Algo-exit is trying to close the position for security " + position.SecurityCode);
+            return ExternalQueryStates.CloseConflict(position.SecurityCode);
         }
+        return await Exiting.Close(null, position.Security, position.CloseSide, DateTime.UtcNow);
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)

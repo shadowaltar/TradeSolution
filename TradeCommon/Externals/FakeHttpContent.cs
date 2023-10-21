@@ -26,7 +26,7 @@ public class FakeHttpContent : HttpContent
         return true;
     }
 
-    public async Task<string> ReadAsStringAsync()
+    public new async Task<string> ReadAsStringAsync()
     {
         return HardcodeContent;
     }

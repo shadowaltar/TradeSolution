@@ -16,7 +16,7 @@ public static class CollectionExtensions
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static Tv GetOrCreate<Tk, Tv>(this Dictionary<Tk, Tv> map, Tk key, Func<Tv> createAction, Action<Tk, Tv>? afterCreated = null)
+    public static Tv GetOrCreate<Tk, Tv>(this IDictionary<Tk, Tv> map, Tk key, Func<Tv> createAction, Action<Tk, Tv>? afterCreated = null)
         where Tk : notnull
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
@@ -38,7 +38,7 @@ public static class CollectionExtensions
     /// <param name="key"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static Tv GetOrCreate<Tk, Tv>(this Dictionary<Tk, Tv> map, Tk key, Action<Tk, Tv>? afterCreated = null)
+    public static Tv GetOrCreate<Tk, Tv>(this IDictionary<Tk, Tv> map, Tk key, Action<Tk, Tv>? afterCreated = null)
         where Tv : new()
         where Tk : notnull
     {
@@ -171,8 +171,30 @@ public static class CollectionExtensions
         return value;
     }
 
-    public static (List<TV>, Dictionary<TK, TV>, List<TK>) FindDifferences<TK, TV>(
-        Dictionary<TK, TV> primary, Dictionary<TK, TV> secondary, Func<TV, TV, bool>? comparisonFunc = null)
+    public static Tv? GetOrDefault<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Tv? defaultValue = default) where T : notnull
+    {
+        if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
+
+        if (!dictionary.TryGetValue(key, out var value))
+        {
+            value = defaultValue;
+        }
+        return value;
+    }
+
+    public static Tv? GetOrDefault<T, Tv>(this Dictionary<T, Tv> dictionary, T key, Tv? defaultValue = default) where T : notnull
+    {
+        if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
+
+        if (!dictionary.TryGetValue(key, out var value))
+        {
+            value = defaultValue;
+        }
+        return value;
+    }
+
+    public static (List<TV>, IDictionary<TK, TV>, List<TK>) FindDifferences<TK, TV>(
+        IDictionary<TK, TV> primary, IDictionary<TK, TV> secondary, Func<TV, TV, bool>? comparisonFunc = null)
     {
         var toCreate = new List<TV>();
         var toUpdate = new Dictionary<TK, TV>();
@@ -236,7 +258,7 @@ public static class CollectionExtensions
         return (primaryOnly, secondaryOnly);
     }
 
-    public static Dictionary<T, Tv> ShallowCopy<T, Tv>(this IDictionary<T, Tv> dictionary) where T : notnull
+    public static IDictionary<T, Tv> ShallowCopy<T, Tv>(this IDictionary<T, Tv> dictionary) where T : notnull
     {
         return dictionary.ToDictionary(p => p.Key, p => p.Value);
     }
@@ -250,7 +272,7 @@ public static class CollectionExtensions
     /// <param name="key"></param>
     /// <param name="lock"></param>
     /// <returns></returns>
-    public static Tv? ThreadSafeGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
+    public static Tv? ThreadSafeGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -258,8 +280,8 @@ public static class CollectionExtensions
             return dictionary!.GetOrDefault(key);
         }
     }
-    
-    public static bool ThreadSafeContains<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
+
+    public static bool ThreadSafeContains<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -267,8 +289,8 @@ public static class CollectionExtensions
             return dictionary!.ContainsKey(key);
         }
     }
-    
-    public static void ThreadSafeClear<T, Tv>(this Dictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
+
+    public static void ThreadSafeClear<T, Tv>(this IDictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -277,12 +299,23 @@ public static class CollectionExtensions
         }
     }
 
-    public static bool ThreadSafeRemove<T, Tv>(this Dictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
+    public static bool ThreadSafeRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
         {
             return dictionary!.Remove(key);
+        }
+    }
+
+    public static Tv? ThreadSafeGetAndRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
+        {
+            var value = dictionary.GetOrDefault(key, default);
+            dictionary.Remove(key);
+            return value;
         }
     }
 
@@ -295,7 +328,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static bool ThreadSafeTryGet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
+    public static bool ThreadSafeTryGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -305,7 +338,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static void ThreadSafeSet<T, Tv>(this Dictionary<T, Tv> dictionary, T key, Tv y, object? @lock = null) where T : notnull
+    public static void ThreadSafeSet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Tv y, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -314,7 +347,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static List<Tv> ThreadSafeValues<T, Tv>(this Dictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
+    public static List<Tv> ThreadSafeValues<T, Tv>(this IDictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
         lock (lockObject)
@@ -371,7 +404,7 @@ public static class CollectionExtensions
         }
     }
 
-    public static Dictionary<TKey, TElement> SafeToDictionary<TSource, TKey, TElement>(this List<TSource> source,
+    public static IDictionary<TKey, TElement> SafeToDictionary<TSource, TKey, TElement>(this List<TSource> source,
                                                                                        Func<TSource, TKey> keySelector,
                                                                                        Func<TSource, TElement> elementSelector,
                                                                                        out List<TSource>? failedItems)

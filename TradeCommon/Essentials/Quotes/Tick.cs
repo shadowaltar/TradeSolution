@@ -1,12 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Essentials.Quotes;
-public class Tick
+﻿namespace TradeCommon.Essentials.Quotes;
+public record Tick
 {
-    public decimal Price { get; set; }
-    public decimal Time { get; set; }
+    public decimal Bid { get; set; }
+    public decimal BidSize { get; set; }
+    public decimal Ask { get; set; }
+    public decimal AskSize { get; set; }
+
+    public decimal Mid => (Bid + Ask) / 2;
+    public decimal Spread => Ask - Bid;
+
+    public override string ToString()
+    {
+        return $"{Bid} / {Mid} / {Ask}; Spread: {Spread}; Sizes: {BidSize} / {AskSize}";
+    }
 }

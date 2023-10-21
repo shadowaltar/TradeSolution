@@ -20,11 +20,11 @@ public class OrderService : IOrderService, IDisposable
     private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<long, Order> _orders = new();
-    private readonly Dictionary<long, Order> _openOrders = new();
-    private readonly Dictionary<long, Order> _ordersByExternalId = new();
-    private readonly Dictionary<long, Order> _cancelledOrders = new();
-    private readonly Dictionary<long, Order> _errorOrders = new();
+    private readonly Dictionary<long, Order> _orders = new(); // all sending, live, partial filled orders
+    private readonly Dictionary<long, Order> _openOrders = new(); // all live, partial filled orders
+    private readonly Dictionary<long, Order> _ordersByExternalId = new(); // same as _orders
+    private readonly Dictionary<long, Order> _cancelledOrders = new(); // all cancelled, expired orders
+    private readonly Dictionary<long, Order> _errorOrders = new(); // all error, rejected orders
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
 
@@ -160,6 +160,7 @@ public class OrderService : IOrderService, IDisposable
             // persistence probably happens twice: one is before send (status = Sending)
             // the other is if order is accepted by external execution logic
             // and its new status (like Live / Filled) piggy-backed in the response
+            // or the order failed to be sent, status = Failed.
             _orders.ThreadSafeSet(order.Id, order);
             _persistence.Insert(order);
 
@@ -169,10 +170,8 @@ public class OrderService : IOrderService, IDisposable
                 Assertion.Shall(order.ExternalOrderId > 0);
                 _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
 
-                if (order.Status == OrderStatus.PartialFilled)
+                if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
                     _openOrders.ThreadSafeSet(order.Id, order);
-
-                _persistence.Insert(order);
             }
             else if (state.ResultCode != ResultCode.SendOrderOk)
             {
@@ -180,8 +179,10 @@ public class OrderService : IOrderService, IDisposable
                 order.UpdateTime = DateTime.UtcNow;
                 order.Comment += " | error code: " + state.ResultCode;
 
-                _persistence.Insert(order);
+                _orders.ThreadSafeRemove(order.Id);
+                _errorOrders.ThreadSafeSet(order.Id, order);
             }
+            _persistence.Insert(order);
             return state;
         }
     }
@@ -202,12 +203,21 @@ public class OrderService : IOrderService, IDisposable
 
             await FixOrderIdByExternalId(order);
 
+            _openOrders.ThreadSafeRemove(order.Id);
+            _cancelledOrders.ThreadSafeSet(order.Id, order);
+            _orders.ThreadSafeRemove(order.Id);
+            _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
             _persistence.Insert(order);
+
             return true;
         }
         else
         {
             _log.Error($"Failed to cancel order {order.Id}! ResultCode: {state.ResultCode}; description: {state.Description}");
+
+            order.Status = OrderStatus.Failed;
+            order.UpdateTime = DateTime.UtcNow;
+            order.Comment += " | error code: " + state.ResultCode;
             _persistence.Insert(order);
             return false;
         }
@@ -237,7 +247,7 @@ public class OrderService : IOrderService, IDisposable
             var cancelledOrders = state.Get<List<Order>>();
             if (state.ResultCode == ResultCode.CancelOrderOk && !cancelledOrders.IsNullOrEmpty())
             {
-                _log.Info($"Canceled {cancelledOrders.Count} open orders.");
+                _log.Info($"Cancelled {cancelledOrders.Count} open orders.");
                 _securityService.Fix(cancelledOrders);
                 foreach (var order in cancelledOrders)
                 {
@@ -297,19 +307,18 @@ public class OrderService : IOrderService, IDisposable
     }
 
     public Order CreateManualOrder(Security security,
-                                   int accountId,
                                    decimal price,
                                    decimal quantity,
                                    Side side,
                                    OrderType orderType = OrderType.Limit,
-                                   TimeInForceType timeInForce = TimeInForceType.GoodTillCancel,
-                                   string comment = "manual")
+                                   string comment = "manual",
+                                   TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
     {
         var now = DateTime.UtcNow;
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
-            AccountId = accountId,
+            AccountId = _context.AccountId,
             CreateTime = now,
             UpdateTime = now,
             ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
@@ -333,6 +342,55 @@ public class OrderService : IOrderService, IDisposable
         return order;
     }
 
+    public async Task<bool> SendLongMarketOrder(string securityCode,
+                                                decimal quantity,
+                                                string comment = "",
+                                                TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    {
+        var security = _securityService.GetSecurity(securityCode);
+        if (security == null) return false;
+        var order = CreateManualOrder(security, 0, quantity, Side.Buy, OrderType.Market, comment, timeInForce);
+        var state = await SendOrder(order);
+        return state.ResultCode == ResultCode.SendOrderOk;
+    }
+
+    public async Task<bool> SendShortMarketOrder(string securityCode,
+                                                 decimal quantity,
+                                                 string comment = "",
+                                                 TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    {
+        var security = _securityService.GetSecurity(securityCode);
+        if (security == null) return false;
+        var order = CreateManualOrder(security, 0, quantity, Side.Sell, OrderType.Market, comment, timeInForce);
+        var state = await SendOrder(order);
+        return state.ResultCode == ResultCode.SendOrderOk;
+    }
+
+    public async Task<bool> SendLongLimitOrder(string securityCode,
+                                               decimal price,
+                                               decimal quantity,
+                                               string comment = "",
+                                               TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    {
+        var security = _securityService.GetSecurity(securityCode);
+        if (security == null) return false;
+        var order = CreateManualOrder(security, price, quantity, Side.Buy, OrderType.Limit, comment, timeInForce);
+        var state = await SendOrder(order);
+        return state.ResultCode == ResultCode.SendOrderOk;
+    }
+
+    public async Task<bool> SendShortLimitOrder(string securityCode,
+                                                decimal price,
+                                                decimal quantity,
+                                                string comment = "",
+                                                TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    {
+        var security = _securityService.GetSecurity(securityCode);
+        if (security == null) return false;
+        var order = CreateManualOrder(security, price, quantity, Side.Sell, OrderType.Limit, comment, timeInForce);
+        var state = await SendOrder(order);
+        return state.ResultCode == ResultCode.SendOrderOk;
+    }
 
     /// <summary>
     /// Receive an order message from external.
@@ -344,6 +402,8 @@ public class OrderService : IOrderService, IDisposable
 
         var eoid = order.ExternalOrderId;
         var oid = order.Id;
+
+        var receivedOnce = false;
         // already cached the order in SENDING state
         if (!_orders.ThreadSafeTryGet(oid, out var existingOrder) && !_ordersByExternalId.ThreadSafeTryGet(eoid, out existingOrder))
         {
@@ -351,16 +411,20 @@ public class OrderService : IOrderService, IDisposable
             _log.Warn("Received an order which was not cached.");
 
             await FixOrderIdByExternalId(order);
-
-            throw Exceptions.Impossible("Before order is received it should been cached as a SENDING order");
         }
         else
         {
+            if (order.Status == existingOrder.Status && order.FilledQuantity == existingOrder.FilledQuantity)
+            {
+                receivedOnce = true;
+            }
+
             order.Id = existingOrder.Id;
             order.AccountId = existingOrder.AccountId;
             order.CreateTime = existingOrder.CreateTime;
             order.Comment = existingOrder.Comment;
             order.ParentOrderId = existingOrder.ParentOrderId;
+
             if (!order.Price.IsValid() || order.Price == 0)
             {
                 if (existingOrder.Price != 0)
@@ -385,8 +449,9 @@ public class OrderService : IOrderService, IDisposable
                 if (_log.IsDebugEnabled)
                     _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
-            _orders.ThreadSafeSet(oid, order);
         }
+
+        _orders.ThreadSafeSet(order.Id, order);
 
         switch (order.Status)
         {
@@ -404,12 +469,29 @@ public class OrderService : IOrderService, IDisposable
         _ordersByExternalId.ThreadSafeSet(eoid, order);
         _persistence.Insert(order);
 
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}");
-        else
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}");
+        _log.Info(PrintOrder(order));
 
         NextOrder?.Invoke(order);
+    }
+
+    private string PrintOrder(Order order)
+    {
+        var filledQtyStr = "";
+        var stateStr = "";
+        if (order.Status == OrderStatus.PartialFilled)
+        {
+            filledQtyStr = ", FILLQTY:" + order.FormattedFilledQuantity;
+            stateStr = "OnUpdate";
+        }
+        else if (order.Status.IsFinished())
+        {
+            stateStr = "Done";
+        }
+
+        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
+            return $"\n\tORD: [{stateStr}][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
+        else
+            return $"\n\tORD: [{stateStr}][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
     }
 
     private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState state)

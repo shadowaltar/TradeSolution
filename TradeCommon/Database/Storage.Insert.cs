@@ -210,7 +210,7 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$IsEnabled", true);
                 command.Parameters.AddWithValue("$IsMarginTradingAllowed", entry.FxInfo!.IsMarginTradingAllowed);
                 command.Parameters.AddWithValue("$MaxLotSize", entry.FxInfo!.MaxLotSize ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("$MinNotional", entry.FxInfo!.MinNotional ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("$MinNotional", entry.MinNotional);
                 command.Parameters.AddWithValue("$LocalStartDate", 0);
                 command.Parameters.AddWithValue("$LocalEndDate", DateTime.MaxValue.ToString("yyyy-MM-dd HH:mm:ss"));
 

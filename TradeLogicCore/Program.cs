@@ -109,7 +109,7 @@ public class Program
         var fastMa = 3;
         var slowMa = 7;
         var stopLoss = 0.0002m;
-        var takeProfit = 0m;// 0.0005m;
+        var takeProfit = 0.0005m;
         var initialFixedQuantity = 100;
 
         _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";
@@ -154,7 +154,7 @@ public class Program
         if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCode} asset quantity < {initialFixedQuantity}");
 
         var parameters = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
-        var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
+        var algorithm = new MovingAverageCrossing(context, parameters, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed, lockedAmount: lockedAmount);
         algorithm.Screening = screening;
@@ -579,11 +579,11 @@ public class Program
                         var assetPosition = services.Portfolio.GetAsset(asset.Id);
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
-                        var algorithm = new MovingAverageCrossing(context, fast, slow, stopLoss);
-                        var screening = new SingleSecurityLogic(context, security);
-                        algorithm.Screening = screening;
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                         var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
+                        var algorithm = new MovingAverageCrossing(context, algoStartParams, fast, slow, stopLoss);
+                        var screening = new SingleSecurityLogic(context, security);
+                        algorithm.Screening = screening;
                         var engineParameters = new EngineParameters(true, false, true);
                         var engine = new AlgorithmEngine(context, engineParameters);
                         engine.Initialize(algorithm);

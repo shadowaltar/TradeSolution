@@ -1,4 +1,6 @@
-﻿namespace Common.Attributes;
+﻿using System.Text.Json.Serialization;
+
+namespace Common.Attributes;
 public class DatabaseIgnoreAttribute : Attribute, IStorageRelatedAttribute
 {
     public DatabaseIgnoreAttribute(bool ignoreInsert = true, bool ignoreUpsert = true, bool ignoreSelect = true)

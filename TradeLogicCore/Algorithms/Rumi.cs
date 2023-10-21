@@ -1,11 +1,12 @@
 ﻿using Common;
-using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
@@ -13,14 +14,14 @@ using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
-public class Rumi : IAlgorithm
+public class Rumi : Algorithm
 {
     private readonly SimpleMovingAverage _fastMa;
     private readonly ExponentialMovingAverageV2 _slowMa;
     private readonly SimpleMovingAverage _rumiMa;
     private readonly Context _context;
 
-    public AlgorithmParameters AlgorithmParameters { get; set; }
+    public override AlgorithmParameters AlgorithmParameters { get; }
 
     public int Id => 2;
 
@@ -31,20 +32,20 @@ public class Rumi : IAlgorithm
     public int RumiParam { get; } = 1;
     public bool AllowMultipleOpenOrders => false;
 
-    public IPositionSizingAlgoLogic Sizing { get; }
-    public IEnterPositionAlgoLogic Entering { get; }
-    public IExitPositionAlgoLogic Exiting { get; }
-    public ISecurityScreeningAlgoLogic Screening { get; set; }
+    public override IPositionSizingAlgoLogic Sizing { get; set; }
+    public override IEnterPositionAlgoLogic Entering { get; set; }
+    public override IExitPositionAlgoLogic Exiting { get; set; }
+    public override ISecurityScreeningAlgoLogic Screening { get; set; }
 
-    public decimal LongStopLossRatio { get; set; }
+    public override decimal LongStopLossRatio { get; }
 
-    public decimal LongTakeProfitRatio { get; set; }
+    public override decimal LongTakeProfitRatio { get; }
 
-    public decimal ShortStopLossRatio { get; set; }
+    public override decimal ShortStopLossRatio { get; }
 
-    public decimal ShortTakeProfitRatio { get; set; }
+    public override decimal ShortTakeProfitRatio { get; }
 
-    public bool IsShortSellAllowed { get; }
+    public override bool IsShortSellAllowed { get; }
 
     public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio, bool isShortSellAllowed = false)
     {
@@ -70,7 +71,7 @@ public class Rumi : IAlgorithm
         return Sizing.GetSize(availableCash, current, last, price, time);
     }
 
-    public IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
+    public override IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
     {
         var variables = new RumiVariables();
         var lastVariables = last?.Variables;
@@ -115,7 +116,7 @@ public class Rumi : IAlgorithm
         Assertion.ShallNever(signal1 == -1 && signal2 == -1);
     }
 
-    public void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
+    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
     {
         var lastRumi = ((RumiVariables)last.Variables).Rumi;
         var rumi = ((RumiVariables)current.Variables).Rumi;
@@ -123,7 +124,7 @@ public class Rumi : IAlgorithm
         current.LongSignal = isSignal ? SignalType.Open : SignalType.None;
     }
 
-    public bool CanOpenLong(AlgoEntry current)
+    public override bool CanOpenLong(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
         if (openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open)
@@ -131,7 +132,7 @@ public class Rumi : IAlgorithm
         return false;
     }
 
-    public bool CanOpenShort(AlgoEntry current)
+    public override bool CanOpenShort(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
         if (openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open)
@@ -139,7 +140,7 @@ public class Rumi : IAlgorithm
         return false;
     }
 
-    public bool CanCloseLong(AlgoEntry current)
+    public override bool CanCloseLong(AlgoEntry current)
     {
         var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
         return position != null
@@ -148,7 +149,7 @@ public class Rumi : IAlgorithm
                && current.LongSignal == SignalType.Close;
     }
 
-    public bool CanCloseShort(AlgoEntry current)
+    public override bool CanCloseShort(AlgoEntry current)
     {
         var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
         return position != null
@@ -157,10 +158,35 @@ public class Rumi : IAlgorithm
                && current.ShortSignal == SignalType.Close;
     }
 
-    public bool CanCancel(AlgoEntry current)
+    public override bool CanCancel(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
         return !openOrders.IsNullOrEmpty();
+    }
+
+    public override bool ShallStopLoss(int securityId, Tick tick)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override bool ShallTakeProfit(int securityId, Tick tick)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task<ExternalQueryState> CloseByTickStopLoss(Position position)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task<ExternalQueryState> CloseByTickTakeProfit(Position position)
+    {
+        throw new NotImplementedException();
     }
 }
 

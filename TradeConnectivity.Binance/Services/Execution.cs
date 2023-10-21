@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Web;
 using log4net;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -33,7 +34,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     private readonly RequestBuilder _requestBuilder;
     private readonly IdGenerator _cancelIdGenerator;
     private readonly IdGenerator _tradeIdGenerator;
-    private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
+    private readonly ConcurrentDictionary<string, ExtendedWebSocket> _webSockets = new();
 
     private readonly MessageBroker<EventInvokerTask> _broker = new();
 
@@ -109,7 +110,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     {
         var isOk = false;
         var swTotal = Stopwatch.StartNew();
-        var parameters = new List<(string, string)>(7 + 3)
+        var parameters = new List<(string, string)>(16)
         {
             ("symbol", order.SecurityCode),
             ("side", order.Side.ToString().ToUpperInvariant()),
@@ -122,11 +123,15 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             parameters.Add(("price", order.Price.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
         }
-        if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
+        else if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
         {
             parameters.Add(("price", order.Price.ToString()));
             parameters.Add(("stopPrice", order.StopPrice.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
+        }
+        else if (order.Type is OrderType.Stop or OrderType.TakeProfit)
+        {
+            parameters.Add(("stopPrice", order.StopPrice.ToString()));
         }
         using var request = _requestBuilder.BuildSigned(HttpMethod.Post, url, parameters);
 
@@ -135,7 +140,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         if (!response.ParseJsonObject(out var content, out var jsonNode, out var errorMessage, _log))
         {
             order.Status = OrderStatus.UnknownResponse;
-            return ExternalQueryStates.Error(ActionType.SendOrder, ResultCode.SendOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.SendOrder, ResultCode.SendOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         }
         isOk = true;
         // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
@@ -143,8 +148,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
         Parse(jsonNode, order, trades); // will change the order status accordingly
         if (order.Status == OrderStatus.Unknown)
-        { 
-
+        {
+            // binance's stop-loss-limit order when sent it returns without status
+            if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
+                order.Status = OrderStatus.Sending;
         }
         var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
 
@@ -234,7 +241,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.CancelOrder, ResultCode.CancelOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.CancelOrder, ResultCode.CancelOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
 
         var state = ExternalQueryStates.CancelOrders(order.SecurityCode, content, connId, order: order).RecordTimes(rtt, swTotal);
         if (state.ResultCode == ResultCode.CancelOrderOk)
@@ -268,7 +275,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonArray(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.CancelOrder, ResultCode.CancelOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.CancelOrder, ResultCode.CancelOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         var orders = ParseOrders(json, security);
         return ExternalQueryStates.CancelOrders(security.Code, content, connId, orders).RecordTimes(rtt, swTotal);
     }
@@ -292,7 +299,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonObject(out var content, out var jsonNode, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetTrade, ResultCode.GetTradeFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetTrade, ResultCode.GetTradeFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
 
         var trades = Parse(jsonNode, security);
         return ExternalQueryStates.QueryTrades(content, connId, security.Code, trades).RecordTimes(rtt, swOuter);
@@ -374,7 +381,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var connId = response.CheckHeaders();
         // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""externalOrderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
         if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         var order = ParseOrder(json, security.Id);
         return ExternalQueryStates.QueryOrder(order, content, connId).RecordTimes(rtt, swOuter);
     }
@@ -405,7 +412,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var connId = response.CheckHeaders();
         // example JSON: var content = @"{ ""symbol"": ""LTCBTC"", ""externalOrderId"": 1, ""orderListId"": -1, ""clientOrderId"": ""myOrder1"", ""price"": ""0.1"", ""origQty"": ""1.0"", ""executedQty"": ""0.0"", ""cummulativeQuoteQty"": ""0.0"", ""status"": ""NEW"", ""timeInForce"": ""GTC"", ""type"": ""LIMIT"", ""side"": ""BUY"", ""stopPrice"": ""0.0"", ""icebergQty"": ""0.0"", ""time"": 1499827319559, ""updateTime"": 1499827319559, ""isWorking"": true, ""workingTime"":1499827319559, ""origQuoteOrderQty"": ""0.000000"", ""selfTradePreventionMode"": ""NONE"" }";
         if (!response.ParseJsonArray(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         var orders = ParseOrders(json, security);
         return ExternalQueryStates.QueryOrders(security?.Code, content, connId, orders: orders).RecordTimes(rtt, swOuter);
     }
@@ -477,7 +484,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonArray(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetOrder, ResultCode.GetOrderFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
 
         var orders = ParseOrders(json, security);
         return ExternalQueryStates.QueryOrders(security?.Code, content, connId, orders).RecordTimes(rtt, swOuter);
@@ -511,7 +518,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         return !response.ParseJsonArray(out var content, out var json, out var errorMessage)
-            ? ExternalQueryStates.Error(ActionType.GetFrequencyRestriction, ResultCode.GetMiscFailed, content, connId, errorMessage)
+            ? ExternalQueryStates.Error(ActionType.GetFrequencyRestriction, ResultCode.GetMiscFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage)
             : new ExternalQueryState
             {
                 Content = Parse(json),
@@ -631,8 +638,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonArray(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetTrade, ResultCode.GetTradeFailed, content, connId, errorMessage);
-
+        {
+            var subCode = Errors.ProcessErrorMessage(errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetTrade, ResultCode.GetTradeFailed, subCode, content, connId, errorMessage);
+        }
         var trades = ParseTrades(json, security);
         return ExternalQueryStates.QueryTrades(content, connId, security.Code, trades).RecordTimes(rtt, swOuter);
     }
@@ -651,8 +660,10 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage);
-
+        {
+            var subCode = Errors.ProcessErrorMessage(errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, subCode, content, connId, errorMessage);
+        }
         // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""assets"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
         var assets = new List<Asset>();
         var balanceArray = json["balances"]?.AsArray();
@@ -706,16 +717,19 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={_listenKey}");
 
             string message = "";
-            uri.Listen(OnStreamingDataReceived, ws =>
+            var ws = new ExtendedWebSocket(_log);
+            ws.Listen(uri, OnStreamingDataReceived, OnWebSocketCreated);
+            Threads.WaitUntil(() => _webSockets.ThreadSafeContains(_listenKey));
+
+            return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeExecutionData, message);
+
+
+            void OnWebSocketCreated()
             {
                 message = $"Subscribed to user streaming data, listen-key: {_listenKey}";
                 _log.Info(message);
-                _webSockets[_listenKey] = ws;
-            });
-
-            Threads.WaitUntil(() => _webSockets.ContainsKey(_listenKey));
-
-            return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeExecutionData, message);
+                _webSockets.ThreadSafeSet(_listenKey, ws);
+            }
         }
         catch (Exception e)
         {
@@ -906,7 +920,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                     }
                     break;
                 case "executionReport": // order
-                    _log.Info("Received streamed JSON for execution:" + Environment.NewLine + json);
+                    if (_log.IsDebugEnabled)
+                        _log.Debug("Received streamed JSON for execution:" + Environment.NewLine + json);
 
                     var sideString = jsonNode.GetString("S");
                     var code = jsonNode.GetString("s");

@@ -52,6 +52,7 @@ public class DefinitionReader
                 SubType = SecurityTypes.Crypto,
                 LotSize = lotSize ?? 0,
                 TickSize = priceFilterObj.GetDecimal("tickSize"),
+                MinNotional = notionalFilterObj?.GetDecimal("minNotional") ?? 0,
                 PricePrecision = symbolObj.GetInt("quotePrecision"),
                 QuantityPrecision = symbolObj.GetInt("baseAssetPrecision"),
                 Currency = "",
@@ -60,7 +61,6 @@ public class DefinitionReader
                     BaseCurrency = symbolObj.GetString("baseAsset").ToUpperInvariant(),
                     QuoteCurrency = symbolObj.GetString("quoteAsset").ToUpperInvariant(),
                     MaxLotSize = maxLotSize,
-                    MinNotional = minNotional,
                     IsMarginTradingAllowed = symbolObj.GetBoolean("isMarginTradingAllowed"),
                 }
             };
@@ -90,7 +90,6 @@ public class DefinitionReader
                     BaseCurrency = assetName,
                     QuoteCurrency = "",
                     MaxLotSize = null,
-                    MinNotional = null,
                     IsMarginTradingAllowed = false,
                 }
             };

@@ -87,7 +87,7 @@ public class ExecutionController : Controller
         if (context.Account == null || context.Account.Name.IsBlank())
             return BadRequest("Must login first.");
 
-        var order = orderService.CreateManualOrder(security, context.Account.Id, price, quantity, side, orderType);
+        var order = orderService.CreateManualOrder(security, price, quantity, side, orderType);
         // TODO validate the remaining asset by rules defined from portfolio service only
         if (!portfolioService.Validate(order))
             return BadRequest("Invalid order price or quantity.");
@@ -220,7 +220,7 @@ public class ExecutionController : Controller
                 return BadRequest("Invalid environment.");
         }
         var parameters = new AlgorithmParameters(core.Environment == EnvironmentType.Test, interval, new List<Security> { security }, algoTimeRange);
-        var algorithm = new MovingAverageCrossing(context, fastMa, slowMa, stopLoss, takeProfit);
+        var algorithm = new MovingAverageCrossing(context, parameters, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         algorithm.Screening = screening;
         var guid = await core.Run(parameters, algorithm);

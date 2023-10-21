@@ -1,13 +1,11 @@
-﻿using BenchmarkDotNet.Running;
-using Common;
-using System.Collections.Concurrent;
-using TradeCommon.Constants;
+﻿using Common;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
+using TradeConnectivity.Binance.Services;
 using TradeDataCore.Instruments;
 using static TradeCommon.Utils.Delegates;
 
@@ -21,7 +19,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     public IExternalQuotationManagement External => _external;
 
     public event OhlcPriceReceivedCallback? NextOhlc;
-    public event Action<int, Tick>? NextTick;
+    public event TickPriceReceivedCallback? NextTick;
     public event Action<int>? HistoricalPriceEnd;
 
     private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = new();
@@ -36,6 +34,8 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         _securityService = securityService;
         _external.NextOhlc -= OnNextOhlc;
         _external.NextOhlc += OnNextOhlc;
+        _external.NextTick -= OnNextTick;
+        _external.NextTick += OnNextTick;
     }
 
     private void OnNextOhlc(int securityId, OhlcPrice price, bool isComplete)
@@ -43,9 +43,24 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         NextOhlc?.Invoke(securityId, price, isComplete);
     }
 
+    private void OnNextTick(ExtendedTick tick)
+    {
+        NextTick?.Invoke(tick.SecurityId, tick.SecurityCode, tick);
+    }
+
     public async Task Initialize()
     {
         await _external.Initialize();
+    }
+
+    public async Task<Dictionary<string, decimal>?> GetPrices(List<Security> securities)
+    {
+        var state = await _external.GetPrices(securities.Select(s => s.Code).ToArray());
+        if (state.ResultCode == ResultCode.GetPriceOk)
+        {
+            return state.Get<Dictionary<string, decimal>>();
+        }
+        return null;
     }
 
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null)
@@ -60,9 +75,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
             errorDescription = "If end time is specified it must be smaller than utc now to trigger back-test prices";
         }
         if (!errorDescription.IsBlank())
-        {
             return ExternalConnectionStates.SubscribedOhlcFailed(security, errorDescription);
-        }
 
         if (Conditions.AllNotNull(start, end) && end < DateTime.UtcNow && start < end)
         {
@@ -126,9 +139,9 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> SubscribeTick(Security security)
+    public async Task<ExternalConnectionState> SubscribeTick(Security security)
     {
-        throw new NotImplementedException();
+        return await _external.SubscribeTick(security);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()

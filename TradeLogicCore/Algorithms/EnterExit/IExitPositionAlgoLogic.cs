@@ -1,10 +1,14 @@
 ﻿using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;
 
 namespace TradeLogicCore.Algorithms.EnterExit;
 public interface IExitPositionAlgoLogic
 {
+    bool IsClosing { get; }
+
     decimal LongStopLossRatio { get; }
 
     decimal LongTakeProfitRatio { get; }
@@ -15,7 +19,7 @@ public interface IExitPositionAlgoLogic
 
     ITransactionFeeLogic? FeeLogic { get; set; }
 
-    Task<ExternalQueryState> Close(AlgoEntry current, decimal exitPrice, DateTime exitTime);
+    Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime);
 
     void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime);
 

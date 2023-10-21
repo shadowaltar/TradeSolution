@@ -1,13 +1,14 @@
 ﻿using Common;
 using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
 using TradeCommon.Essentials.Instruments;
 
 namespace TradeCommon.Runtime;
 
 public record SecurityRelatedEntry
 {
-    [DatabaseIgnore]
+    [DatabaseIgnore, JsonIgnore]
     public Security Security { get; set; }
 
     [NotNull, Positive]
@@ -16,8 +17,6 @@ public record SecurityRelatedEntry
     [DatabaseIgnore]
     public string SecurityCode { get; set; } = "";
 
-
-    [DatabaseIgnore]
     public bool IsSecurityInvalid()
     {
         return Security == null || SecurityId <= 0 || SecurityCode.IsBlank();

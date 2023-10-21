@@ -54,7 +54,7 @@ public interface IAlgorithmEngine
 
     AlgoBatch AlgoBatch { get; }
 
-    IAlgorithm? Algorithm { get; }
+    Algorithm? Algorithm { get; }
 
     /// <summary>
     /// Gets all the algo entries created during engine execution.

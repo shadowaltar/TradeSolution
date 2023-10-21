@@ -1,11 +1,8 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using log4net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeConnectivity.Binance.Utils;
@@ -56,8 +53,10 @@ public class AccountManager : IExternalAccountManagement
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
-            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage);
-
+        {
+            var subCode = Errors.ProcessErrorMessage(errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, subCode, content, connId, errorMessage);
+        }
         // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""assets"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
         var account = new Account
         {
@@ -88,9 +87,7 @@ public class AccountManager : IExternalAccountManagement
         var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
         var connId = response.CheckHeaders();
         if (!response.ParseJsonObject(out var content, out var rootObj, out var errorMessage, _log))
-        {
-            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage).RecordTimes(rtt, swTotal);
-        }
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage).RecordTimes(rtt, swTotal);
 
         var account = Parse(rootObj);
         if (account != null)
@@ -101,7 +98,7 @@ public class AccountManager : IExternalAccountManagement
         else
         {
             _log.Error($"Failed to get or parse account (type: {accountType}) response.");
-            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, content, connId, errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         }
 
         Account Parse(JsonObject rootObj)

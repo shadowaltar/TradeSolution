@@ -20,4 +20,5 @@ public static class Delegates
     public delegate void TransferredCallback(TransferAction transferAction);
 
     public delegate void OhlcPriceReceivedCallback(int securityId, OhlcPrice price, bool isComplete);
+    public delegate void TickPriceReceivedCallback(int securityId, string securityCode, Tick tick);
 }

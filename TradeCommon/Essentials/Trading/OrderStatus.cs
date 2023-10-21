@@ -99,10 +99,10 @@ public static class OrderStatusConverter
 {
     public static bool IsFinished(this OrderStatus status)
     {
-        return status == OrderStatus.Filled || status.IsNoFillFinished();
+        return status == OrderStatus.Filled || status.IsFinishedWithoutFilled();
     }
 
-    public static bool IsNoFillFinished(this OrderStatus status)
+    public static bool IsFinishedWithoutFilled(this OrderStatus status)
     {
         return status == OrderStatus.Cancelled
             || status == OrderStatus.Expired

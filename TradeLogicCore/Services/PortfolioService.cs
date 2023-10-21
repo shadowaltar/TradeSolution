@@ -115,6 +115,11 @@ public class PortfolioService : IPortfolioService, IDisposable
     public async Task<List<Asset>> GetExternalAssets()
     {
         var state = await _execution.GetAssetPositions(_context.Account.ExternalAccount);
+        if (state.ResultCode == ResultCode.GetAccountFailed)
+        {
+            _log.Error("Failed to get assets.");
+            return new();
+        }
         var assets = state.Get<List<Asset>>();
         if (assets == null)
         {

@@ -1,38 +1,51 @@
 using Common;
+using Common.Web;
 using log4net;
 using System.Collections.Concurrent;
-using System.Net.WebSockets;
+using System.Diagnostics;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeConnectivity.Binance.Utils;
 
 namespace TradeConnectivity.Binance.Services;
 public class Quotation : IExternalQuotationManagement
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalConnectivityManagement _connectivity;
+    private readonly RequestBuilder _requestBuilder;
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
-    private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _messageBrokers = new();
+    private readonly ConcurrentDictionary<string, ExtendedWebSocket> _webSockets = new();
+
+    private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _ohlcPriceBrokers = new();
     private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = new();
-    private readonly ConcurrentDictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
+    private readonly Dictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
+
+    private readonly Dictionary<int, MessageBroker<ExtendedTick>> _tickBrokers = new();
+    private readonly Pool<ExtendedTick> _tickPool = new();
+    private readonly Dictionary<int, ExtendedTick> _lastTicks = new();
 
     public string Name => ExternalNames.Binance;
 
     public event Action<int, OhlcPrice, bool>? NextOhlc;
     public event Action<int, OrderBook>? NextOrderBook;
+    public event Action<ExtendedTick>? NextTick;
 
     public Quotation(IExternalConnectivityManagement connectivity,
                      HttpClient httpClient,
-                     ApplicationContext context)
+                     ApplicationContext context,
+                     KeyManager keyManager)
     {
         _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
+        _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
     }
 
     public async Task<ExternalConnectionState> Initialize()
@@ -46,39 +59,136 @@ public class Quotation : IExternalQuotationManagement
         {
             await CloseWebSocket(ws, name);
         }
-        return null;
+        return ExternalConnectionStates.UnsubscribedAll();
     }
 
-    public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType)
+    public async Task<ExternalQueryState> GetPrices(params string[] symbols)
     {
-        if (intervalType == IntervalType.Unknown)
+        var swOuter = Stopwatch.StartNew();
+        var url = $"{_connectivity.RootUrl}/api/v3/ticker/price";
+        List<(string, string)>? parameters = symbols.IsNullOrEmpty() ? null : new(1);
+
+        if (symbols.Length == 1)
+            parameters!.Add(("symbol", symbols[0]));
+        else
+            parameters!.Add(("symbols", Uri.EscapeDataString(Json.Serialize(symbols))));
+
+        using var request = _requestBuilder.Build(HttpMethod.Get, url, parameters);
+        var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
+        var connId = response.CheckHeaders();
+        // example:
+        //        var json = @"
+        //[
+        //    {
+        //        ""symbol"": ""BTCUSDT"",
+        //        ""price"": ""29783.88000000""
+        //    },
+        //    {
+        //        ""symbol"": ""BNBUSDT"",
+        //        ""price"": ""213.20000000""
+        //    }
+        //]";
+        var prices = new Dictionary<string, decimal>();
+        string content = "";
+        string errorMessage = "";
+        if (symbols.Length == 1)
         {
-            intervalType = IntervalType.OneMinute;
+            if (!response.ParseJsonObject(out content, out var json, out errorMessage, _log))
+            {
+                return GetErrorState();
+            }
+
+            var (s, p) = ParsePrice(json);
+            prices[s] = p;
+        }
+        else
+        {
+            if (!response.ParseJsonArray(out content, out var json, out errorMessage, _log))
+            {
+                return GetErrorState();
+            }
+
+            for (int i = 0; i < json.Count; i++)
+            {
+                JsonNode? node = json[i];
+                var obj = node?.AsObject();
+                if (obj == null)
+                    continue;
+
+                var (s, p) = ParsePrice(obj);
+                prices[s] = p;
+            }
         }
 
-        var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(intervalType).ToLowerInvariant()}";
-        Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={wsName}");
+        return ExternalQueryStates.QueryPrices(prices, content, connId, true).RecordTimes(rtt, swOuter);
 
+        static (string symbol, decimal price) ParsePrice(JsonObject json)
+        {
+            return (json.GetString("symbol"), json.GetDecimal("price"));
+        }
 
-        var intervals = _registeredIntervals.GetOrCreate(security.Id);
-        intervals.Add(intervalType);
+        ExternalQueryState GetErrorState()
+        {
+            return ExternalQueryStates.QueryPrices(prices, content, connId, false, errorMessage, Errors.ProcessErrorMessage(errorMessage));
+        }
+    }
+
+    public async Task<ExternalQueryState> GetAccount()
+    {
+        var swOuter = Stopwatch.StartNew();
+        var url = $"{_connectivity.RootUrl}/api/v3/account";
+        using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
+
+        var (response, rtt) = await _httpClient.TimedSendAsync(request, log: _log);
+        var connId = response.CheckHeaders();
+        if (!response.ParseJsonObject(out var content, out var json, out var errorMessage, _log))
+        {
+            var subCode = Errors.ProcessErrorMessage(errorMessage);
+            return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, subCode, content, connId, errorMessage);
+        }
+        // example json: responseJson = @"{ ""makerCommission"": 0, ""takerCommission"": 0, ""buyerCommission"": 0, ""sellerCommission"": 0, ""commissionRates"": { ""maker"": ""0.00000000"", ""taker"": ""0.00000000"", ""buyer"": ""0.00000000"", ""seller"": ""0.00000000"" }, ""canTrade"": true, ""canWithdraw"": false, ""canDeposit"": false, ""brokered"": false, ""requireSelfTradePrevention"": false, ""preventSor"": false, ""updateTime"": 1690995029309, ""accountType"": ""SPOT"", ""assets"": [ { ""asset"": ""BNB"", ""free"": ""1000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BTC"", ""free"": ""1.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""BUSD"", ""free"": ""10000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""ETH"", ""free"": ""100.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""LTC"", ""free"": ""500.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""TRX"", ""free"": ""500000.00000000"", ""locked"": ""0.00000000"" }, { ""asset"": ""USDT"", ""free"": ""8400.00000000"", ""locked"": ""1600.00000000"" }, { ""asset"": ""XRP"", ""free"": ""50000.00000000"", ""locked"": ""0.00000000"" } ], ""permissions"": [ ""SPOT"" ], ""uid"": 1688996631782681271 }";
+        var account = new Account
+        {
+            Type = json.GetString("accountType"),
+            ExternalAccount = json.GetLong("uid").ToString(),
+            UpdateTime = json.GetLong("updateTime").FromUnixMs(),
+        };
+        return ExternalQueryStates.QueryAccount(content, connId, account).RecordTimes(rtt, swOuter);
+    }
+
+    public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval)
+    {
+        if (interval == IntervalType.Unknown)
+            interval = IntervalType.OneMinute;
+
+        var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
+        var streamName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(interval).ToLowerInvariant()}";
+        Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={streamName}");
+
+        lock (_registeredIntervals)
+            _registeredIntervals.GetOrCreate(security.Id).Add(interval);
+
+        _lastOhlcPrices[(security.Id, interval)] = new OhlcPrice(); // pre-create to avoid threading issue
 
         bool isComplete = false;
-        var broker = _messageBrokers.GetOrCreate((security.Id, intervalType), (k, v) => v.Run());
+        var broker = _ohlcPriceBrokers.GetOrCreate((security.Id, interval),
+            () => new MessageBroker<OhlcPrice>(security.Id),
+            (k, v) => v.Run());
         broker.NewItem += price => NextOhlc?.Invoke(security.Id, price, isComplete); // broker.Dispose() will clear this up if needed
 
         string message = "";
-        uri.Listen(OnReceivedString, ws =>
-        {
-            message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {intervalType}";
-            _log.Info(message);
-            _webSockets[wsName] = ws;
-        });
-
-        Threads.WaitUntil(() => _webSockets.ContainsKey(wsName));
-        
+        var webSocket = new ExtendedWebSocket(_log);
+        webSocket.Listen(uri, OnReceivedString, OnWebSocketCreated);
+        Threads.WaitUntil(() => _webSockets.ThreadSafeContains(wsName));
         return ExternalConnectionStates.Subscribed(SubscriptionType.RealTimeMarketData, message);
 
+
+        void OnWebSocketCreated()
+        {
+            message = $"Subscribed to OHLC price for {security.Code} on {security.Exchange} every {interval}";
+            _log.Info(message);
+            _webSockets.ThreadSafeSet(wsName, webSocket);
+        }
 
         void OnReceivedString(byte[] bytes)
         {
@@ -88,7 +198,7 @@ public class Quotation : IExternalQuotationManagement
             {
                 //var example = @"{""stream"":""btctusd@kline_1m"",""data"":{""e"":""kline"",""E"":1693333305611,""s"":""BTCTUSD"",""k"":{""t"":1693333260000,""T"":1693333319999,""s"":""BTCTUSD"",""i"":""1m"",""f"":349256438,""L"":349258039,""o"":""27951.39000000"",""c"":""27935.49000000"",""h"":""27952.00000000"",""l"":""27923.03000000"",""v"":""57.60304000"",""n"":1602,""x"":false,""q"":""1609180.77265510"",""V"":""24.67172000"",""Q"":""689202.76346730"",""B"":""0""}}}";
                 var dataNode = node.AsObject()["data"]!.AsObject();
-                _lastOhlcPrices.TryGetValue((security.Id, intervalType), out var price);
+                var price = _lastOhlcPrices[(security.Id, interval)];
 
                 //var asOfTime = DateUtils.FromUnixMs(dataNode["E"]!.GetValue<long>());
                 var kLineNode = dataNode["k"]!.AsObject();
@@ -114,7 +224,7 @@ public class Quotation : IExternalQuotationManagement
                     price.V = v;
                     price.T = start;
                 }
-                _lastOhlcPrices[(security.Id, intervalType)] = price;
+                _lastOhlcPrices[(security.Id, interval)] = price;
                 broker!.Enqueue(price);
             }
         }
@@ -127,43 +237,20 @@ public class Quotation : IExternalQuotationManagement
     /// <param name="security"></param>
     /// <param name="interval"></param>
     /// <returns></returns>
-    public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval = IntervalType.Unknown)
+    public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval)
     {
-        // single interval
-        if (interval != IntervalType.Unknown)
-        {
-            return await InternalUnsubscribe(this, security, interval);
-        }
+        if (!security.IsFrom(ExternalNames.Binance))
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Unsubscribe);
 
-        // all subscribed intervals
-        var subStates = new List<ExternalConnectionState>();
-        if (_registeredIntervals.TryGetValue(security.Id, out var intervals))
+        var broker = _ohlcPriceBrokers.ThreadSafeGetAndRemove((security.Id, interval));
+        broker?.Dispose();
+        var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
+        var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
+        if (ws != null && await CloseWebSocket(ws, wsName))
         {
-            foreach (var i in intervals)
-            {
-                subStates.Add(await InternalUnsubscribe(this, security, i));
-            }
+            return ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security, interval);
         }
-        return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(subStates);
-
-
-        // unsubscribe the webSocket, and dispose the message broker
-        static async Task<ExternalConnectionState> InternalUnsubscribe(Quotation quotation, Security security, IntervalType interval)
-        {
-            if (quotation._messageBrokers.TryGetValue((security.Id, interval), out var broker))
-            {
-                broker.Dispose();
-            }
-            var wsName = $"{security.Code}@kline_{IntervalTypeConverter.ToIntervalString(interval)}".ToLowerInvariant();
-            if (quotation._webSockets.TryGetValue(wsName, out var ws))
-            {
-                var result = await CloseWebSocket(ws, wsName);
-                quotation._webSockets.TryRemove(wsName, out _);
-                if (result)
-                    return ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security, interval);
-            }
-            return ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
-        }
+        return ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
@@ -208,17 +295,111 @@ public class Quotation : IExternalQuotationManagement
         return orderBook;
     }
 
+    public async Task<ExternalConnectionState> SubscribeTick(Security security)
+    {
+        if (!security.IsFrom(ExternalNames.Binance))
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Subscribe);
+
+        var wsName = $"{nameof(ExtendedTick)}_{security.Id}";
+        var streamName = $"{security.Code.ToLowerInvariant()}@bookTicker";
+        Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={streamName}");
+
+        _lastTicks[security.Id] = new ExtendedTick { SecurityId = security.Id };
+        var broker = _tickBrokers.GetOrCreate(security.Id, () => new MessageBroker<ExtendedTick>(security.Id), (k, v) => v.Run());
+        broker.NewItem += OnNextTick; // broker.Dispose() will clear this up if needed
+
+        string message = "";
+        var webSocket = new ExtendedWebSocket(_log);
+        webSocket.Listen(uri, OnReceivedString, OnWebSocketCreated);
+        Threads.WaitUntil(() => _webSockets.ThreadSafeContains(wsName));
+        return ExternalConnectionStates.Subscribed(SubscriptionType.TickData, message);
+
+
+        void OnWebSocketCreated()
+        {
+            message = $"Subscribed to real time tick data for {security.Code} on {security.Exchange}";
+            _log.Info(message);
+            _webSockets.ThreadSafeSet(wsName, webSocket);
+        };
+
+        void OnReceivedString(byte[] bytes)
+        {
+            var now = DateTime.UtcNow;
+            string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+            var node = JsonNode.Parse(json)?.AsObject()["data"]?.AsObject();
+            if (node != null)
+            {
+                //var example = @"{
+                //  ""u"":400900217,     // order book updateId
+                //  ""s"":""BNBUSDT"",     // symbol
+                //  ""b"":""25.35190000"", // best bid price
+                //  ""B"":""31.21000000"", // best bid qty
+                //  ""a"":""25.36520000"", // best ask price
+                //  ""A"":""40.66000000""  // best ask qty
+                //}";
+                var tick = _tickPool.Lease();
+                var s = node.GetString("s"); // symbol
+                var b = node.GetDecimal("b");
+                var bq = node.GetDecimal("B");
+                var a = node.GetDecimal("a");
+                var aq = node.GetDecimal("A");
+                tick.Bid = b;
+                tick.BidSize = bq;
+                tick.Ask = a;
+                tick.AskSize = aq;
+                tick.SecurityCode = s;
+                tick.SecurityId = security.Id;
+                tick.Time = now;
+                broker!.Enqueue(tick);
+            }
+        }
+    }
+
+    private void OnNextTick(ExtendedTick tick)
+    {
+        _log.Info(tick);
+        NextTick?.Invoke(tick);
+        _tickPool.Return(tick);
+    }
+
+    public async Task<ExternalConnectionState> UnsubscribeTick(Security security)
+    {
+        if (!security.IsFrom(ExternalNames.Binance))
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Unsubscribe);
+
+        // do not clear the lastTick cache, only the broker cache
+        var broker = _tickBrokers.ThreadSafeGetAndRemove(security.Id);
+        broker?.Dispose();
+        var wsName = $"{nameof(ExtendedTick)}_{security.Id}";
+        var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
+        if (ws != null && await CloseWebSocket(ws, wsName))
+        {
+            return ExternalConnectionStates.UnsubscribedTickOk(security);
+        }
+        return ExternalConnectionStates.UnsubscribedTickFailed(security);
+    }
+
+    public Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security, IntervalType intervalType)
+    {
+        throw new NotImplementedException();
+    }
+
     /// <summary>
     /// Close a web socket.
     /// </summary>
     /// <param name="name"></param>
     /// <param name="ws"></param>
     /// <returns></returns>
-    private static async Task<bool> CloseWebSocket(ClientWebSocket ws, string name)
+    private static async Task<bool> CloseWebSocket(ExtendedWebSocket ws, string name)
     {
         try
         {
-            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client Closed", default);
+            await ws.Close();
             ws.Dispose();
             _log.Info($"Gracefully closed webSocket {name}.");
             return true;
@@ -237,15 +418,5 @@ public class Quotation : IExternalQuotationManagement
             }
             return false;
         }
-    }
-
-    public Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security, IntervalType intervalType = IntervalType.Unknown)
-    {
-        throw new NotImplementedException();
     }
 }

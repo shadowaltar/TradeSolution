@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using System.Text.Json.Serialization;
 
 namespace TradeCommon.Essentials.Instruments;
 
@@ -16,12 +17,11 @@ public class FxSecurityInfo
     public string? QuoteCurrency { get; set; }
 
     public decimal? MaxLotSize { get; set; }
-    public decimal? MinNotional { get; set; }
 
-    [DatabaseIgnore]
+    [DatabaseIgnore, JsonIgnore]
     public Security? BaseAsset { get; set; }
 
-    [DatabaseIgnore]
+    [DatabaseIgnore, JsonIgnore]
     public Security? QuoteAsset { get; set; }
 
     public override bool Equals(object? obj)
@@ -30,13 +30,12 @@ public class FxSecurityInfo
                IsMarginTradingAllowed == info.IsMarginTradingAllowed &&
                BaseCurrency == info.BaseCurrency &&
                QuoteCurrency == info.QuoteCurrency &&
-               MaxLotSize == info.MaxLotSize &&
-               MinNotional == info.MinNotional;
+               MaxLotSize == info.MaxLotSize;
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(IsMarginTradingAllowed, BaseCurrency, QuoteCurrency, MaxLotSize, MinNotional);
+        return HashCode.Combine(IsMarginTradingAllowed, BaseCurrency, QuoteCurrency, MaxLotSize);
     }
 
     public override string ToString()

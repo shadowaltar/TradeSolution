@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using System.Text.Json.Serialization;
 using TradeCommon.Calculations;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Trading;
@@ -47,6 +48,9 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     /// The intended entering side.
     /// </summary>
     public Side Side { get; set; }
+
+    [DatabaseIgnore, JsonIgnore]
+    public Side CloseSide => Side == Side.Buy ? Side.Sell : Side == Side.Sell ? Side.Buy : Side.None;
 
     /// <summary>
     /// All the long trades' sum of quantity.
@@ -108,9 +112,11 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     /// <summary>
     /// Whether it is a closed position.
     /// Usually it means (remaining) quantity equals to zero.
+    /// If <see cref="TradeCommon.Essentials.Instruments.Security.MinNotional"/> is defined (!= 0),
+    /// then when quantity <= minNotional it will also be considered as closed.
     /// </summary>
     [DatabaseIgnore]
-    public bool IsClosed => Quantity == 0;
+    public bool IsClosed => (Security == null || Security.MinQuantity == 0) ? Quantity == 0 : Quantity <= Security.MinQuantity;
 
     [DatabaseIgnore]
     public decimal Return
@@ -239,9 +245,13 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
         {
             position = Create(trade);
         }
-        else
+        else if (!position.IsClosed)
         {
             position.Apply(trade);
+        }
+        else
+        {
+            position = Create(trade); // case that given position is actually closed; should create a new one here
         }
         trade.PositionId = position.Id;
         return position;
@@ -315,11 +325,4 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
         return $"[{Id}][{CreateTime:yyMMdd-HHmmss}->{(CloseTime == DateTime.MaxValue ? "NotYet" : CloseTime.ToString("yyMMdd-HHmmss"))}]" +
             $" secId:{SecurityId}, p:{Price}, q:{Quantity}";
     }
-}
-
-public enum OpenClose
-{
-    All,
-    OpenOnly,
-    ClosedOnly
 }

@@ -16,8 +16,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
     private static readonly ILog _log = Logger.New();
 
     private readonly string[] _targetFieldNames;
-    private readonly Dictionary<string, string> _targetFieldNamePlaceHolders;
-    private readonly Dictionary<string, PropertyInfo> _properties;
+    private readonly IDictionary<string, string> _targetFieldNamePlaceHolders;
+    private readonly IDictionary<string, PropertyInfo> _properties;
     private readonly string[] _uniqueKeyNames;
     private readonly ValueGetter<T> _valueGetter;
 

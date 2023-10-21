@@ -1,6 +1,7 @@
 ﻿using Microsoft.Identity.Client;
 using System;
 using System.Runtime.CompilerServices;
+using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 
@@ -165,5 +166,10 @@ public static class Exceptions
     public static Exception NotImplemented(string message)
     {
         return new NotImplementedException(message);
+    }
+
+    public static Exception Unreachable(BrokerType broker)
+    {
+        return new InvalidOperationException($"Broker {broker} is unreachable.");
     }
 }

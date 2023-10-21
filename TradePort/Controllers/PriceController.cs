@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Web;
 using log4net;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
@@ -235,7 +236,7 @@ public class PriceController : Controller
 
         var wsName = $"{security.Code.ToLowerInvariant()}@kline_{IntervalTypeConverter.ToIntervalString(interval).ToLowerInvariant()}";
         var url = isTest ? $"wss://testnet.binance.vision/stream?streams={wsName}" : $"wss://stream.binance.com:9443/stream?streams={wsName}";
-        var result = await WebSocketHelper.ListenOne(url);
+        var result = await ExtendedWebSocket.ListenOne(url);
 
         return Ok(result);
     }

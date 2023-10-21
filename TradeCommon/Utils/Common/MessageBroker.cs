@@ -10,6 +10,17 @@ public class MessageBroker<T> : IDisposable
 
     public event Action<T>? NewItem;
 
+    public event Action<T>? ItemDone;
+
+    public MessageBroker() { }
+
+    public MessageBroker(int id)
+    {
+        Id = id;
+    }
+
+    public int Id { get; }
+
     public void Enqueue(T item)
     {
         _queue.Enqueue(item);

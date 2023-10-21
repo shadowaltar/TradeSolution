@@ -5,6 +5,10 @@ public enum ResultCode
     Unknown,
     NoAction,
 
+    Ok,
+    Conflict,
+    Failed,
+
     ConnectionOk,
     DisconnectionOk,
     SubscriptionOk,
@@ -18,6 +22,7 @@ public enum ResultCode
     GetUserOk,
     GetAccountOk,
     GetBalanceOk,
+    GetPriceOk,
     LoginUserOk,
     LoginAccountOk,
     LoginUserAndAccountOk,
@@ -59,6 +64,7 @@ public enum ResultCode
     GetAccountFailed,
     GetBalanceFailed,
     GetSomeAccountsFailed,
+    GetPriceFailed,
     AccountNotOwnedByUser,    
     LoginUserFailed,
     LoginAccountFailed,
@@ -76,4 +82,9 @@ public enum ResultCode
 
     GetSecretFailed,
     SecretMalformed,
+
+
+    ClockOutOfSync,
+    MessageResponseOutOfTimeWindow,
+    InvalidAssetQuantity,
 }

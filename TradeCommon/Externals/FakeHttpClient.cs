@@ -16,7 +16,7 @@ public class FakeHttpClient : HttpClient
         return (response, swInner.ElapsedMilliseconds);
     }
 
-    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request)
+    public new async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK);
         foreach (var header in Headers)

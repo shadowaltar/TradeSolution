@@ -1,9 +1,7 @@
-﻿using Autofac.Core;
-using Common;
+﻿using Common;
 using log4net;
-using System.Security.Cryptography;
 using TradeCommon.Essentials.Algorithms;
-using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
@@ -20,6 +18,10 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     private readonly IOrderService _orderService;
     private readonly IPortfolioService _portfolioService;
     private readonly IdGenerator _orderIdGen;
+
+    public readonly object _closeFlagLock = new();
+
+    public bool IsClosing { get; private set; }
 
     public ITransactionFeeLogic? FeeLogic { get; set; }
 
@@ -56,45 +58,76 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public async Task<ExternalQueryState> Close(AlgoEntry current, decimal exitPrice, DateTime exitTime)
+    public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
-        // cancel any partial filled, SL or TP orders
-        await _orderService.CancelAllOpenOrders(current.Security);
-
-        // now close the position using algorithm only
-        var position = _portfolioService.GetPositionBySecurityId(current.SecurityId);
-        if (position == null)
+        try
         {
-            var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position {current.PositionId} but it was not found / already closed.";
-            _log.Error(message);
-            return ExternalQueryStates.InvalidPosition(message);
+            lock (_closeFlagLock)
+            {
+                if (IsClosing)
+                    return ExternalQueryStates.CloseConflict(security.Code);
+                IsClosing = true;
+            }
+
+            // cancel any partial filled, SL or TP orders
+            await _orderService.CancelAllOpenOrders(security);
+
+            // now close the position using algorithm only
+            var position = _portfolioService.GetPositionBySecurityId(security.Id);
+            if (position == null || position.IsClosed)
+            {
+                var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
+                _log.Warn(message);
+                return ExternalQueryStates.InvalidPosition(message);
+            }
+            var order = new Order
+            {
+                Id = _orderIdGen.NewTimeBasedId,
+                ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
+                AccountId = _context.AccountId,
+                CreateTime = exitTime,
+                UpdateTime = exitTime,
+                Quantity = Math.Abs(position.Quantity),
+                Side = exitSide,
+                Status = OrderStatus.Sending,
+                TimeInForce = TimeInForceType.GoodTillCancel,
+                Price = 0,
+                Type = OrderType.Market,
+                Security = security,
+                SecurityId = security.Id,
+                SecurityCode = security.Code,
+                Comment = Comments.AlgoExit,
+            };
+
+            _log.Info(PrintOrder(order));
+            var state = await _orderService.SendOrder(order);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+            }
+            else if (state.ResultCode == ResultCode.SendOrderFailed)
+            {
+
+            }
+            return state;
         }
-        var order = new Order
+        finally
         {
-            Id = _orderIdGen.NewTimeBasedId,
-            ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
-            AccountId = _context.AccountId,
-            CreateTime = exitTime,
-            UpdateTime = exitTime,
-            Quantity = Math.Abs(position.Quantity),
-            Side = Side.Sell,
-            Status = OrderStatus.Sending,
-            TimeInForce = TimeInForceType.GoodTillCancel,
-            Price = exitPrice,
-            Type = OrderType.Limit,
-            Security = current.Security,
-            SecurityId = current.Security.Id,
-            SecurityCode = current.Security.Code,
-            Comment = Comments.AlgoExit,
-        };
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}");
-        else
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}");
+            lock (_closeFlagLock)
+                IsClosing = false;
+        }
+    }
 
-        return await _orderService.SendOrder(order);
+    private string PrintOrder(Order order)
+    {
+        var filledQtyStr = "";
+        if (order.Status == OrderStatus.PartialFilled)
+            filledQtyStr = ", FILLQTY:" + order.FormattedFilledQuantity;
+        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
+            return $"\n\tORD: [AlgoExit][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
+        else
+            return $"\n\tORD: [AlgoExit][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
     }
 
     public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)
