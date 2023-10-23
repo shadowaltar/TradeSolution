@@ -1,11 +1,11 @@
-﻿using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
+﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeLogicCore.Services;
 public interface IPortfolioService
 {
+    event Action<Position, Trade>? PositionProcessed;
     event Action<Position>? PositionCreated;
     event Action<Position>? PositionUpdated;
     event Action<Position>? PositionClosed;
@@ -116,31 +116,31 @@ public interface IPortfolioService
     Task<Asset?> Withdraw(int assetId, decimal quantity);
 
     /// <summary>
-    /// Create an opposite side order from a known position.
-    /// Since the quote/currency asset may not be the same as before,
-    /// an overriding security can be provided.
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="comment"></param>
-    /// <param name="security"></param>
-    /// <returns></returns>
-    Order CreateCloseOrder(Asset position, string comment, Security? security = null);
-
-    /// <summary>
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
     Task CloseAllOpenPositions(string orderComment);
+
+    Task CleanUpNonCashAssets(string orderComment);
+
+    /// <summary>
+    /// Create a position by a trade, or apply the trade into the given position.
+    /// If the trade is operational, it will not be processed
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    Position? CreateOrApply(Trade trade, Position? position = null);
 
     /// <summary>
     /// Get positions from storage.
     /// Optionally can specify the account which the positions belong to, and
     /// the lower bound (inclusive) of position update time.
     /// </summary>
-    /// <param name="account"></param>
     /// <param name="start"></param>
+    /// <param name="isOpenOrClose"></param>
     /// <returns></returns>
-    Task<List<Position>> GetStoragePositions(DateTime? start = null);
+    Task<List<Position>> GetStoragePositions(DateTime? start = null, OpenClose isOpenOrClose = OpenClose.All);
 
     Task<List<Asset>> GetExternalAssets();
 
@@ -153,4 +153,6 @@ public interface IPortfolioService
     void Reset(bool isResetPositions = true, bool isResetAssets = true, bool isInitializing = true);
 
     void ClearCachedClosedPositions(bool isInitializing = false);
+
+    decimal GetAssetPositionResidual(int assetSecurityId);
 }

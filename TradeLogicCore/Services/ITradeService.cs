@@ -10,7 +10,7 @@ public interface ITradeService
     /// <summary>
     /// Event invoked when a single trade is received.
     /// </summary>
-    event TradeReceivedCallback? NextTrade;
+    event TradeReceivedCallback? TradeProcessed;
 
     /// <summary>
     /// Event invoked when a list of trades are received simultaneously.

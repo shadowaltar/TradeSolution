@@ -58,7 +58,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime)
+    public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
@@ -72,7 +72,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             }
 
             // cancel any partial filled, SL or TP orders
-            await _orderService.CancelAllOpenOrders(security);
+            await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
 
             // now close the position using algorithm only
             var position = _portfolioService.GetPositionBySecurityId(security.Id);
@@ -82,6 +82,15 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
                 _log.Warn(message);
                 return ExternalQueryStates.InvalidPosition(message);
             }
+            var quantity = Math.Abs(position.Quantity);
+            var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseAsset?.Id ?? 0);
+            var residualSign = Math.Sign(residualQuantity);
+            if (residualSign == -(int)exitSide)
+            {
+                // if residual is the opposite side of exit-side, it is time to close the residual
+                quantity += Math.Abs(residualQuantity);
+                _log.Info($"Discovered residual quantity for asset {security.FxInfo?.BaseAsset?.Code}, value is {residualQuantity}; we will {exitSide} them in this close order.");
+            }
             var order = new Order
             {
                 Id = _orderIdGen.NewTimeBasedId,
@@ -89,7 +98,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
                 AccountId = _context.AccountId,
                 CreateTime = exitTime,
                 UpdateTime = exitTime,
-                Quantity = Math.Abs(position.Quantity),
+                Quantity = quantity,
                 Side = exitSide,
                 Status = OrderStatus.Sending,
                 TimeInForce = TimeInForceType.GoodTillCancel,
@@ -98,36 +107,17 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
                 Security = security,
                 SecurityId = security.Id,
                 SecurityCode = security.Code,
+                Action = actionType,
                 Comment = Comments.AlgoExit,
             };
 
-            _log.Info(PrintOrder(order));
-            var state = await _orderService.SendOrder(order);
-            if (state.ResultCode == ResultCode.SendOrderOk)
-            {
-            }
-            else if (state.ResultCode == ResultCode.SendOrderFailed)
-            {
-
-            }
-            return state;
+            return await _orderService.SendOrder(order);
         }
         finally
         {
             lock (_closeFlagLock)
                 IsClosing = false;
         }
-    }
-
-    private string PrintOrder(Order order)
-    {
-        var filledQtyStr = "";
-        if (order.Status == OrderStatus.PartialFilled)
-            filledQtyStr = ", FILLQTY:" + order.FormattedFilledQuantity;
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            return $"\n\tORD: [AlgoExit][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
-        else
-            return $"\n\tORD: [AlgoExit][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
     }
 
     public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)
@@ -151,7 +141,6 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         current.ExitPrice = exitPrice;
         current.Elapsed = exitTime - current.EnterTime!.Value;
         current.RealizedPnl = (exitPrice - enterPrice) * current.Quantity;
-        current.UnrealizedPnl = 0;
         current.RealizedReturn = r;
         current.Notional = current.Quantity * exitPrice;
 
@@ -189,7 +178,6 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         }
         current.ExitPrice = exitPrice;
         current.Elapsed = exitTime - current.EnterTime!.Value;
-        current.UnrealizedPnl = 0;
         current.RealizedPnl = (exitPrice - enterPrice) * current.Quantity;
         current.RealizedReturn = r;
         current.Notional = current.Quantity * exitPrice;

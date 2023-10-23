@@ -30,9 +30,7 @@ public class TradeService : ITradeService, IDisposable
     private readonly Dictionary<string, Security> _assetsByCode = new();
     private readonly Dictionary<int, Security> _assetsById = new();
 
-    private readonly HashSet<long> _processedExternalTradeIds = new();
-
-    public event TradeReceivedCallback? NextTrade;
+    public event TradeReceivedCallback? TradeProcessed;
 
     public event TradesReceivedCallback? NextTrades;
 
@@ -53,9 +51,7 @@ public class TradeService : ITradeService, IDisposable
         _tradeIdGen = IdGenerators.Get<Trade>();
 
         _execution.TradeReceived -= OnTradeReceived;
-        _execution.TradesReceived -= OnTradesReceived;
         _execution.TradeReceived += OnTradeReceived;
-        _execution.TradesReceived += OnTradesReceived;
     }
 
     public void Initialize()
@@ -81,51 +77,41 @@ public class TradeService : ITradeService, IDisposable
 
     private void OnTradeReceived(Trade trade)
     {
-        if (_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalOrderId))
-            return;
-
         InternalOnNextTrade(trade);
-
-        lock (_tradesByOrderId)
-        {
-            UpdateTradeByOrderId(trade);
-        }
-        _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P:{trade.Price}, Q:{trade.Quantity}");
+        UpdateTradeByOrderId(trade);
 
         _persistence.Insert(trade);
-        NextTrade?.Invoke(trade);
+        TradeProcessed?.Invoke(trade);
 
         _portfolioService.Process(trade);
     }
 
-    private void OnTradesReceived(List<Trade> trades, bool isSameSecurity)
-    {
-        if (trades.IsNullOrEmpty()) return;
-        var newOnes = new List<Trade>();
-        foreach (var trade in trades)
-        {
-            if (_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalOrderId))
-                continue;
-            InternalOnNextTrade(trade);
-            newOnes.Add(trade);
-        }
-        if (newOnes.Count == 0)
-            return;
+    //private void OnTradesReceived(List<Trade> trades, bool isSameSecurity)
+    //{
+    //    if (trades.IsNullOrEmpty()) return;
+    //    var newOnes = new List<Trade>();
+    //    foreach (var trade in trades)
+    //    {
+    //        InternalOnNextTrade(trade);
+    //        newOnes.Add(trade);
+    //    }
+    //    if (newOnes.Count == 0)
+    //        return;
 
-        lock (_tradesByOrderId)
-        {
-            foreach (var trade in newOnes)
-            {
-                UpdateTradeByOrderId(trade);
-                _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P:{trade.Price}, Q:{trade.Quantity}");
-            }
-        }
+    //    lock (_tradesByOrderId)
+    //    {
+    //        foreach (var trade in newOnes)
+    //        {
+    //            UpdateTradeByOrderId(trade);
+    //            _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P:{trade.Price}, Q:{trade.Quantity}");
+    //        }
+    //    }
 
-        NextTrades?.Invoke(newOnes, isSameSecurity);
-        _persistence.Insert(newOnes);
+    //    NextTrades?.Invoke(newOnes, isSameSecurity);
+    //    _persistence.Insert(newOnes);
 
-        _portfolioService.Process(newOnes, isSameSecurity);
-    }
+    //    _portfolioService.Process(newOnes, isSameSecurity);
+    //}
 
     private void InternalOnNextTrade(Trade trade)
     {
@@ -151,6 +137,9 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
+        // operational trades should not affect positions
+        var isOperational = _orderService.IsOperational(order.Id);
+
         // resolve fee asset id here
         if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
         {
@@ -163,16 +152,20 @@ public class TradeService : ITradeService, IDisposable
 
         _securityService.Fix(trade);
 
+        trade.IsOperational = isOperational;
         trade.SecurityId = order.SecurityId;
         trade.Security = order.Security;
         trade.OrderId = order.Id;
         _trades.ThreadSafeSet(trade.Id, trade);
         _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
 
-        if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var ts))
+        lock (_tradesByOrderId)
         {
-            ts = _tradesByOrderId.GetOrCreate(order.Id);
-            ts.Add(trade);
+            if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var ts))
+            {
+                ts = _tradesByOrderId.GetOrCreate(order.Id);
+                ts.Add(trade);
+            }
         }
     }
 
@@ -299,21 +292,22 @@ public class TradeService : ITradeService, IDisposable
             _trades.ThreadSafeSet(trade.Id, trade);
             _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
         }
-        lock (_tradesByOrderId)
-        {
-            foreach (var trade in trades)
-                UpdateTradeByOrderId(trade);
-        }
+
+        foreach (var trade in trades)
+            UpdateTradeByOrderId(trade);
     }
 
     private void UpdateTradeByOrderId(Trade trade)
     {
-        var ts = _tradesByOrderId.GetOrCreate(trade.OrderId);
-        var existingIndex = ts.FindIndex(t => t.Id == trade.Id);
-        if (existingIndex != -1)
-            ts[existingIndex] = trade;
-        else
-            ts.Add(trade);
+        lock (_tradesByOrderId)
+        {
+            var trades = _tradesByOrderId.GetOrCreate(trade.OrderId);
+            var existingIndex = trades.FindIndex(t => t.Id == trade.Id);
+            if (existingIndex != -1)
+                trades[existingIndex] = trade;
+            else
+                trades.Add(trade);
+        }
     }
 
     public void ClearCachedClosedPositionTrades(Position? position = null)
@@ -334,7 +328,7 @@ public class TradeService : ITradeService, IDisposable
         {
             var allTrades = _trades.ThreadSafeValues();
             var start = allTrades.Min(t => t.Time);
-            var positions = AsyncHelper.RunSync(() => _context.Storage.ReadPositions(start, OpenClose.ClosedOnly));
+            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly));
             var groupedTrades = allTrades.GroupBy(t => t.Security);
             foreach (var group in groupedTrades)
             {

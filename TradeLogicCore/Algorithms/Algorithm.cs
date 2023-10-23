@@ -32,8 +32,6 @@ public abstract class Algorithm
 
     public abstract IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last);
 
-    public virtual void NotifyPositionChanged(Position position) { }
-
     public virtual void BeforeSignalDetection(AlgoEntry current, AlgoEntry? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
 
     public virtual void AfterSignalDetection(AlgoEntry current, AlgoEntry? last, OhlcPrice currentPrice, OhlcPrice? lastPrice) { }
@@ -42,20 +40,10 @@ public abstract class Algorithm
     public virtual void AfterAlgoExecution() { }
     public virtual void BeforeProcessingSecurity(Security security) { }
     public virtual void AfterProcessingSecurity(Security security) { }
-    public virtual void BeforeOpeningLong(AlgoEntry entry) { }
-    public virtual void AfterLongOpened(AlgoEntry entry) { }
-    public virtual void BeforeClosingLong(AlgoEntry entry) { }
-    public virtual void AfterLongClosed(AlgoEntry entry) { }
-    public virtual void BeforeStopLossLong(AlgoEntry entry) { }
-    public virtual void AfterStopLossLong(AlgoEntry entry) { }
+    public abstract void AfterPositionClosed(AlgoEntry entry);
+    public abstract void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide);
+    public abstract void AfterTookProfit(AlgoEntry entry, Side takeProfitSide);
 
-
-    public virtual void BeforeOpeningShort(AlgoEntry entry) { }
-    public virtual void AfterShortOpened(AlgoEntry entry) { }
-    public virtual void BeforeClosingShort(AlgoEntry entry) { }
-    public virtual void AfterShortClosed(AlgoEntry entry) { }
-    public virtual void BeforeStopLossShort(AlgoEntry entry) { }
-    public virtual void AfterStopLossShort(AlgoEntry entry) { }
     public virtual List<Order> PickOpenOrdersToCleanUp(AlgoEntry current) { return new(); }
     public abstract void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice);
     public abstract bool CanOpenLong(AlgoEntry current);
@@ -99,7 +87,7 @@ public abstract class Algorithm
         return await Entering.Open(current, last, price, enterSide, time, sl, tp);
     }
 
-    public abstract Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime);
+    public abstract Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType);
 
     public abstract Task<ExternalQueryState> CloseByTickStopLoss(Position position);
 

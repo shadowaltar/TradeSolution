@@ -170,6 +170,15 @@ public class SecurityService : ISecurityService
         return _securitiesByCode.ThreadSafeGet(code);
     }
 
+    public Security? GetFxSecurity(string baseCurrency, string quoteCurrency)
+    {
+        if (baseCurrency.IsBlank() || quoteCurrency.IsBlank()) return null;
+        lock (_securities)
+        {
+            return _securities.Values.FirstOrDefault(s => s.FxInfo?.BaseCurrency == baseCurrency && s.FxInfo?.QuoteCurrency == quoteCurrency);
+        }
+    }
+
     public Security GetSecurity(int securityId)
     {
         return _securities.ThreadSafeGet(securityId) ?? throw Exceptions.InvalidSecurityId(securityId);

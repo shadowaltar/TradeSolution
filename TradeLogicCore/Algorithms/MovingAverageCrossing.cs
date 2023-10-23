@@ -178,8 +178,6 @@ public class MovingAverageCrossing : Algorithm
         var state = await base.Open(current, last, price, enterSide, time);
         if (state.ResultCode == ResultCode.SendOrderOk)
         {
-            var order = state.Get<Order>();
-
             var sl = GetStopLossPrice(price, enterSide, current.Security);
             _stopLossPrices.ThreadSafeSet(current.SecurityId, sl);
 
@@ -269,33 +267,29 @@ public class MovingAverageCrossing : Algorithm
 
     public override async Task<ExternalQueryState> CloseByTickStopLoss(Position position)
     {
-        return await CloseByTick(position);
+        return await CloseByTick(position, OrderActionType.AlgoCloseAsStopLoss);
     }
 
     public override async Task<ExternalQueryState> CloseByTickTakeProfit(Position position)
     {
-        return await CloseByTick(position);
+        return await CloseByTick(position, OrderActionType.AlgoCloseAsTakeProfit);
     }
 
-    public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime)
+    public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
         if (Exiting.IsClosing)
         {
             _log.Warn("Algo-stop-loss is trying to close the position for security " + security.Code);
             return ExternalQueryStates.CloseConflict(security.Code);
         }
-        return await Exiting.Close(current, security, exitSide, exitTime);
+        return await Exiting.Close(current, security, exitSide, exitTime, actionType);
     }
 
-    public override void AfterLongClosed(AlgoEntry entry)
-    {
-        ResetInheritedVariables(entry);
-    }
+    public override void AfterPositionClosed(AlgoEntry entry) => ResetInheritedVariables(entry);
 
-    public override void AfterStopLossLong(AlgoEntry entry)
-    {
-        ResetInheritedVariables(entry);
-    }
+    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide) => ResetInheritedVariables(entry);
+
+    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide) => ResetInheritedVariables(entry);
 
     private bool CanOpen(AlgoEntry current)
     {
@@ -317,14 +311,14 @@ public class MovingAverageCrossing : Algorithm
         return !hasOpenPosition;
     }
 
-    private async Task<ExternalQueryState> CloseByTick(Position position)
+    private async Task<ExternalQueryState> CloseByTick(Position position, OrderActionType actionType)
     {
         if (Exiting.IsClosing)
         {
             _log.Warn("Algo-exit is trying to close the position for security " + position.SecurityCode);
             return ExternalQueryStates.CloseConflict(position.SecurityCode);
         }
-        return await Exiting.Close(null, position.Security, position.CloseSide, DateTime.UtcNow);
+        return await Exiting.Close(null, position.Security, position.CloseSide, DateTime.UtcNow, actionType);
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)

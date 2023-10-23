@@ -2,6 +2,7 @@
 using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
@@ -127,6 +128,8 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
     [AsJson]
     public AdvancedOrderSettings? AdvancedSettings { get; set; }
 
+    public OrderActionType Action { get; set; }
+
     /// <summary>
     /// Gets if the order is in good state: live, filled or partially filled.
     /// </summary>
@@ -198,8 +201,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[Id:{Id}][EOId:{ExternalOrderId}][{UpdateTime:yyMMdd-HHmmss}][SecId:{SecurityId}][{Status}][{Type}]," +
-            $" {Side} p*q:{Price.ToString("F" + Security.TickSize.GetDecimalPlaces())}*{Quantity.ToString("F" + Security.LotSize.GetDecimalPlaces())}";
+        return $"ID:{Id}, EOID:{ExternalOrderId}, TYPE:{Type}, Time:{{C:{CreateTime:yyMMdd-HHmmss}, U:{UpdateTime:yyMMdd-HHmmss}}}, SEC:{SecurityCode}, STATUS:{Status}, DETAILS:{{ SIDE:,{Side}, P:{Security.FormatPrice(Price)}, Q:{Security.FormatQuantity(Quantity)}}}";
     }
 }
 

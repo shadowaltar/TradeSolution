@@ -39,6 +39,15 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
     /// </summary>
     public decimal LockedQuantity { get; set; }
 
+    /// <summary>
+    /// Whether it is an empty asset without tradeable quantity.
+    /// Usually it means (remaining) quantity equals to zero.
+    /// If <see cref="Security.MinNotional"/> is defined (!= 0),
+    /// then when quantity <= minNotional it will also be considered as closed.
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsEmpty => (Security == null || Security.MinQuantity == 0) ? Quantity == 0 : Math.Abs(Quantity) <= Security.MinQuantity;
+
     public override string ToString()
     {
         return $"[{Id}] Security[{SecurityId},{SecurityCode}], {Quantity}, {UpdateTime:yyyyMMdd-HHmmss}";

@@ -11,7 +11,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
 {
     private static readonly ILog _log = Logger.New();
 
-    public AverageAbnormalityDetector SizeAbnormalityDetector { get; } = new(5);
+    public AverageAbnormalityDetector SizeAbnormalityDetector { get; } = new(0.2M, 5);
 
     public PositionSizingMethod SizingMethod { get; }
     public decimal RelativeMin { get; }
@@ -75,7 +75,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
 
         var size = GetTradingAmount(freeAmount) / price;
         var actualSize = current.Security.RoundLotSize(size);
-        if (SizeAbnormalityDetector.CheckAbnormality(actualSize))
+        if (!SizeAbnormalityDetector.IsNormal(actualSize))
         {
             _log.Error($"Erroneous trading size: {actualSize}; previous {SizeAbnormalityDetector.Count} items' average is {SizeAbnormalityDetector.LastAverage}");
             return 0;

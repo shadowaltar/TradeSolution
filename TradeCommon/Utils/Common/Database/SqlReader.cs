@@ -51,6 +51,7 @@ public class SqlReader<T> : IDisposable where T : new()
                 var type = pi.PropertyType;
                 var isAsJson = _valueSetter.AttributeInfo.IsAsJson(name);
                 var value = isAsJson ? GetFromJson(type, name) : Get(type, name);
+
                 _valueSetter.Set(entry, name, value);
             }
         }

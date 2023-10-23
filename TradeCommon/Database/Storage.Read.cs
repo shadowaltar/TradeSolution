@@ -159,7 +159,7 @@ WHERE
     {
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND Time >= $StartTime AND Time <= $EndTime ORDER BY Id";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND IsOperational = 0 AND Time >= $StartTime AND Time <= $EndTime ORDER BY Id";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id), ("$StartTime", start), ("$EndTime", end));
     }
 
@@ -168,7 +168,7 @@ WHERE
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
         var @operator = OperatorTypeConverter.ConvertToSqlString(positionIdComparisonOperator);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND PositionId {@operator} $PositionId ORDER BY Id";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND IsOperational = 0 AND PositionId {@operator} $PositionId ORDER BY Id";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id), ("$PositionId", positionId));
     }
 
@@ -177,7 +177,7 @@ WHERE
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
         var inClause = GetInClause("Id", ids, false);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND {inClause}";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND IsOperational = 0 AND {inClause}";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id));
     }
 
@@ -185,7 +185,7 @@ WHERE
     {
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND OrderId = $OrderId";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND OrderId = $OrderId AND IsOperational = 0";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id), ("$OrderId", orderId));
     }
 
@@ -195,7 +195,7 @@ WHERE
         foreach (var secType in Consts.SupportedSecurityTypes)
         {
             var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(secType);
-            var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND ExternalOrderId = $ExternalOrderId";
+            var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND ExternalOrderId = $ExternalOrderId AND IsOperational = 0";
             var trade = await SqlReader.ReadOne<Trade>(tableName, dbName, sql, ("$AccountId", AccountId), ("$ExternalOrderId", externalTradeId));
             if (trade != null)
                 return trade;
@@ -217,7 +217,7 @@ WHERE
         foreach (var secType in Consts.SupportedSecurityTypes)
         {
             var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>(secType);
-            var openClosePart = isOpenOrClose == OpenClose.All ? "" : isOpenOrClose == OpenClose.OpenOnly ? "AND Quantity <> 0 " : "AND Quantity = 0";
+            var openClosePart = isOpenOrClose == OpenClose.All ? "" : isOpenOrClose == OpenClose.OpenOnly ? "AND EndTradeId = 0 " : "AND EndTradeId <> 0";
             var sqlPart = SqlReader<Position>.GetSelectClause();
             var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND UpdateTime >= $StartTime {openClosePart}ORDER BY Id";
             var positions = await SqlReader.ReadMany<Position>(tableName, dbName, sql, ("$AccountId", AccountId), ("$StartTime", start));

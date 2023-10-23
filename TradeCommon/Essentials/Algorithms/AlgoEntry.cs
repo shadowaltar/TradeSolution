@@ -38,16 +38,6 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public decimal Price { get; set; }
 
     /// <summary>
-    /// Current OHLC price object's high price.
-    /// </summary>
-    public decimal? HighPrice { get; set; }
-
-    /// <summary>
-    /// Current OHLC price object's low price.
-    /// </summary>
-    public decimal? LowPrice { get; set; }
-
-    /// <summary>
     /// 1 -> open signal; -1 -> close signal; 0 -> undetermined or just hold position.
     /// </summary>
     public SignalType LongSignal { get; set; }
@@ -57,9 +47,8 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// </summary>
     public SignalType ShortSignal { get; set; }
 
-    //public bool IsLong { get; set; }
     public CloseType LongCloseType { get; set; }
-    //public bool IsShort { get; set; }
+
     public CloseType ShortCloseType { get; set; }
 
     ///// <summary>
@@ -95,27 +84,22 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// </summary>
     public decimal RealizedPnl { get; set; }
 
-
-    /// <summary>
-    /// Unrealized PNL of this entry which is still opened. (Current Price - Enter Price) * Quantity held.
-    /// </summary>
-    public decimal UnrealizedPnl { get; set; }
-
     /// <summary>
     /// Fee incurred when enter and/or exit a position.
     /// </summary>
     public decimal Fee { get; set; }
 
-    [Positive]
-    public decimal FeeAssetId { get; set; }
-
-    public decimal FilledQuantity { get; set; }
-
+    [DatabaseIgnore]
     public decimal LongPrice { get; set; }
+    [DatabaseIgnore]
     public decimal LongNotional { get; set; }
+    [DatabaseIgnore]
     public decimal LongQuantity { get; set; }
+    [DatabaseIgnore]
     public decimal ShortQuantity { get; set; }
+    [DatabaseIgnore]
     public decimal ShortPrice { get; set; }
+    [DatabaseIgnore]
     public decimal ShortNotional { get; set; }
 
     [NotNull, AsJson]

@@ -1,13 +1,8 @@
-﻿using Autofac.Core;
-using Common;
+﻿using Common;
 using log4net;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TradeCommon.Constants;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -20,19 +15,29 @@ namespace TradeLogicCore.Maintenance;
 public class Reconcilation
 {
     private static readonly ILog _log = Logger.New();
+    private readonly Context _context;
     private readonly Persistence _persistence;
     private readonly IStorage _storage;
-    private readonly int _accountId;
     private readonly ISecurityService _securityService;
+    private readonly IOrderService _orderService;
+    private readonly ITradeService _tradeService;
+    private readonly IAdminService _adminService;
+    private readonly IPortfolioService _portfolioService;
     private readonly IdGenerator _tradeIdGenerator;
+    private readonly IdGenerator _assetIdGenerator;
 
     public Reconcilation(Context context)
     {
+        _context = context;
         _persistence = context.Services.Persistence;
         _storage = context.Storage;
-        _accountId = context.AccountId;
         _securityService = context.Services.Security;
+        _orderService = context.Services.Order;
+        _tradeService = context.Services.Trade;
+        _adminService = context.Services.Admin;
+        _portfolioService = context.Services.Portfolio;
         _tradeIdGenerator = IdGenerators.Get<Trade>();
+        _assetIdGenerator = IdGenerators.Get<Asset>();
     }
 
     /// <summary>
@@ -69,12 +74,329 @@ public class Reconcilation
             // assuming all trades have their positions inserted
 
             // case 4 positions do not align with trades
-            // validate each position, it may not exist
+            // validate each position, it may not be a valid one
             await FixInvalidPositions(security, Consts.LookbackDayCount);
+
+            // case 5 positions are manually removed from storage
+            // validate each trade, it may not have position
+            //await FixMissingPositions(security, Consts.LookbackDayCount);
         }
         _persistence.WaitAll();
         return;
 
+    }
+
+    public async Task ReconcileOrders(DateTime start, List<Security> securities)
+    {
+        if (securities.IsNullOrEmpty() || start > DateTime.UtcNow) return;
+
+        // sync external to internal
+        foreach (var security in securities)
+        {
+            var internalResults = await _orderService.GetStorageOrders(security, start);
+            var externalResults = await _orderService.GetExternalOrders(security, start);
+            var externalOrders = externalResults.ToDictionary(o => o.ExternalOrderId, o => o);
+            var internalOrders = internalResults.ToDictionary(o => o.ExternalOrderId, o => o);
+
+            var (toCreate, toUpdate, toDelete) = Common.CollectionExtensions.FindDifferences(externalOrders, internalOrders, (e, i) => e.EqualsIgnoreId(i));
+            if (!toCreate.IsNullOrEmpty())
+            {
+                _orderService.Update(toCreate);
+                _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are created from external to internal.");
+                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", toCreate.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
+                foreach (var order in toCreate)
+                {
+                    order.Comment = "Upserted by reconcilation.";
+                    var table = DatabaseNames.GetOrderTableName(order.Security.Type);
+
+                    if (internalOrders.TryGetValue(order.ExternalOrderId, out var conflict))
+                    {
+                        // an order with the same eoid but different id exists; delete it first
+                    }
+
+                    // use upsert, because it is possible for an external order which has the same id vs internal, but with different values
+                    await _storage.InsertOne(order, true, tableNameOverride: table);
+                }
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                var orders = toUpdate.Values.OrderBy(o => o.Id).ToList();
+                var excludeUpdateEOIds = new List<string>();
+                foreach (var eoid in toUpdate.Keys)
+                {
+                    var i = internalOrders[eoid];
+                    var e = externalOrders[eoid];
+                    var report = Utils.ReportComparison(i, e);
+                    foreach (var reportEntry in report.Values)
+                    {
+                        if (!reportEntry.isEqual)
+                        {
+                            switch (reportEntry.propertyName)
+                            {
+                                case nameof(Order.CreateTime):
+                                    var minCreateTime = DateUtils.Min((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    i.CreateTime = minCreateTime;
+                                    e.CreateTime = minCreateTime;
+                                    break;
+                                case nameof(Order.UpdateTime):
+                                    var maxUpdateTime = DateUtils.Max((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    i.UpdateTime = maxUpdateTime;
+                                    e.UpdateTime = maxUpdateTime;
+                                    break;
+                                case nameof(Order.Price):
+                                    if (reportEntry.value2.Equals(0m) && !reportEntry.value1.Equals(0m))
+                                        e.Price = (decimal)reportEntry.value1;
+                                    break;
+                                case nameof(Order.Comment):
+                                    if (((string)reportEntry.value2).IsBlank() && !((string)reportEntry.value1).IsBlank())
+                                        e.Comment = (string)reportEntry.value1; // orders' comment only appears internally
+                                    break;
+                                case nameof(Order.Action):
+                                    if ((OrderActionType)reportEntry.value2 != (OrderActionType)reportEntry.value1)
+                                        e.Action = (OrderActionType)reportEntry.value1; // orders' action type only appears internally
+                                    break;
+                                case nameof(Order.AdvancedSettings):
+                                    if (reportEntry.value2 == null && reportEntry.value1 != null)
+                                        e.AdvancedSettings = (AdvancedOrderSettings)reportEntry.value1;
+                                    // orders' adv settings only appears internally
+                                    break;
+                            }
+                        }
+                    }
+                }
+                (_, toUpdate, _) = Common.CollectionExtensions.FindDifferences(externalOrders, internalOrders, (e, i) => e.EqualsIgnoreId(i));
+                if (!toUpdate.IsNullOrEmpty())
+                {
+                    orders = toUpdate.Values.OrderBy(o => o.Id).ToList();
+                    _orderService.Update(orders);
+                    _log.Info($"{orders.Count} recent orders for [{security.Id},{security.Code}] are updated from external to internal.");
+                    _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
+                    foreach (var order in orders)
+                    {
+                        order.Comment = "Updated by reconcilation.";
+
+                        if (internalOrders.TryGetValue(order.ExternalOrderId, out var conflict) && conflict.Id != order.Id)
+                        {
+                            // an order with the same eoid but different id exists; move to error
+                            await _storage.MoveToError(conflict);
+                        }
+                    }
+                    _persistence.Insert(orders);
+                }
+            }
+            if (!toDelete.IsNullOrEmpty())
+            {
+                var orders = toDelete.Select(i => internalOrders[i]).ToList();
+                _log.Info($"{toDelete.Count} recent orders for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
+                foreach (var i in toDelete)
+                {
+                    var order = internalResults.FirstOrDefault(o => o.ExternalOrderId == i);
+                    if (order != null)
+                    {
+                        // order is not successfully sent, we should move it to error orders table
+                        await _storage.MoveToError(order);
+                    }
+                }
+            }
+
+            _persistence.WaitAll();
+        }
+    }
+
+    public async Task ReconcileTrades(DateTime start, List<Security> securities)
+    {
+        _log.Info($"Reconciling internal vs external recent trades for account {_context.Account.Name} for broker {_context.Broker} in environment {_context.Environment}.");
+
+        if (securities.IsNullOrEmpty() || start > DateTime.UtcNow) return;
+        foreach (var security in securities)
+        {
+            // must get internal first then external: the external ones will have the corresponding trade id assigned
+            var internalResults = await _tradeService.GetStorageTrades(security, start);
+            var externalResults = await _tradeService.GetExternalTrades(security, start);
+            var externalTrades = externalResults.ToDictionary(o => o.ExternalTradeId, o => o);
+            var internalTrades = internalResults.ToDictionary(o => o.ExternalTradeId, o => o);
+
+            var missingPositionIdTrades = internalResults.Where(t => t.PositionId <= 0).ToList();
+            foreach (var trade in missingPositionIdTrades)
+            {
+                _log.Warn($"Trade {trade.Id} has no position id, will be fixed in position reconcilation step.");
+            }
+
+            // sync external to internal
+            var (toCreate, toUpdate, toDelete) = Common.CollectionExtensions.FindDifferences(externalTrades, internalTrades, (e, i) => e.EqualsIgnoreId(i));
+
+            if (!toCreate.IsNullOrEmpty())
+            {
+                // there may be correct order which already exist
+                // so reassign the order id in these trades
+                foreach (var group in toCreate.GroupBy(t => t.ExternalOrderId))
+                {
+                    var referenceOrder = _orderService.GetOrderByExternalId(group.Key);
+                    if (referenceOrder != null)
+                    {
+                        foreach (var trade in group)
+                        {
+                            trade.OrderId = referenceOrder.Id;
+                            if (referenceOrder.Action == OrderActionType.Operational)
+                                trade.IsOperational = true;
+                        }
+                    }
+                }
+                // there may be the same existing trade categorized as 'to-create' but actually just some fields are different
+                // use external id to find them
+                var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
+                foreach (var trade in toCreate)
+                {
+                    var existings = await _storage.Read<Trade>(tradeTable, tradeDb, "ExternalTradeId = " + trade.ExternalTradeId);
+                    if (!existings.IsNullOrEmpty())
+                    {
+                        var existing = existings[0];
+                        if (trade.Id != existing.Id)
+                        {
+                            trade.Id = existing.Id;
+                        }
+                    }
+                }
+                _tradeService.Update(toCreate, security);
+                _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are created from external to internal.");
+                _log.Info(string.Join("\n\t", toCreate.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+
+                await _storage.InsertMany(toCreate, false);
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                var trades = toUpdate.Values;
+                _tradeService.Update(trades, security);
+                _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] are updated from external to internal.");
+                _log.Info(string.Join("\n\t", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+                foreach (var trade in trades)
+                {
+                    var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
+                    await _storage.InsertOne(trade, true, tableNameOverride: table);
+                }
+            }
+            if (!toDelete.IsNullOrEmpty())
+            {
+                var trades = toDelete.Select(i => internalTrades[i]).ToList();
+                _log.Info($"{toDelete.Count} recent trades for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info(string.Join("\n\t", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+                foreach (var trade in trades)
+                {
+                    if (trade != null)
+                    {
+                        // malformed trade
+                        var tableName = DatabaseNames.GetOrderTableName(trade.Security.SecurityType, true);
+                        var r = await _storage.MoveToError(trade);
+                    }
+                }
+            }
+
+            _persistence.WaitAll();
+        }
+    }
+
+    /// <summary>
+    /// Find out differences of account and asset asset information between external vs internal system.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <returns></returns>
+    public async Task ReconcileAccount(User user)
+    {
+        _log.Info($"Reconciling internal vs external accounts and asset assets for account {_context.Account?.Name} for broker {_context.Broker} in environment {_context.Environment}.");
+        foreach (var account in user.Accounts)
+        {
+            var externalAccount = await _adminService.GetAccount(account.Name, account.Environment, true);
+            if (account == null && externalAccount != null)
+            {
+                _log.Warn("Internally stored account is missing; will sync with external one.");
+                await _storage.InsertOne(externalAccount, true);
+
+            }
+            else if (externalAccount != null && !externalAccount.Equals(account))
+            {
+                _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
+                await _storage.InsertOne(externalAccount, true);
+            }
+        }
+    }
+
+    public async Task ReconcileAssets()
+    {
+        var internalResults = await _portfolioService.GetStorageAssets();
+        var externalResults = await _portfolioService.GetExternalAssets();
+
+        // fill in missing fields before comparison
+        var assetsNotRegistered = new List<Asset>();
+        foreach (var a in externalResults)
+        {
+            _securityService.Fix(a);
+            a.AccountId = _context.AccountId;
+        }
+        foreach (var a in internalResults)
+        {
+            _securityService.Fix(a);
+            a.AccountId = _context.AccountId;
+        }
+
+        var externalAssets = externalResults.ToDictionary(a => a.SecurityCode!);
+        var internalAssets = internalResults.ToDictionary(a => a.SecurityCode!);
+        var (toCreate, toUpdate, toDelete) = Common.CollectionExtensions.FindDifferences(externalAssets, internalAssets,
+           (e, i) => e.EqualsIgnoreId(i));
+        if (!toCreate.IsNullOrEmpty())
+        {
+            foreach (var asset in toCreate)
+            {
+                asset.Id = _assetIdGenerator.NewTimeBasedId;
+            }
+            var i = await _storage.InsertMany(toCreate, false);
+            _log.Info($"{i} recent assets for account {_context.Account.Name} are in external but not internal system and are inserted into database.");
+        }
+        if (!toUpdate.IsNullOrEmpty())
+        {
+            var assets = toUpdate.Values.OrderBy(a => a.SecurityCode).ToList();
+            var excludeUpdateCodes = new List<string>();
+            foreach (var code in toUpdate.Keys)
+            {
+                var ic = internalAssets[code];
+                var ec = externalAssets[code];
+                var isQuantityEquals = false;
+                var isLockedQuantityEquals = false;
+                var report = Utils.ReportComparison(ic, ec);
+                foreach (var reportEntry in report.Values)
+                {
+                    switch (reportEntry.propertyName)
+                    {
+                        case nameof(Asset.Quantity):
+                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                                isQuantityEquals = true;
+                            break;
+                        case nameof(Asset.LockedQuantity):
+                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                                isLockedQuantityEquals = true;
+                            break;
+                    }
+                }
+                if (isQuantityEquals && isLockedQuantityEquals)
+                    excludeUpdateCodes.Add(code);
+            }
+            foreach (var code in excludeUpdateCodes)
+            {
+                toUpdate.Remove(code);
+            }
+            if (!toUpdate.IsNullOrEmpty())
+            {
+                // to-update items do not have proper asset id yet
+                foreach (var (code, item) in toUpdate)
+                {
+                    var id = internalAssets?.GetOrDefault(code)?.Id;
+                    if (id == null) throw Exceptions.Impossible();
+                    item.Id = id.Value;
+                }
+                var i = await _storage.InsertMany(toUpdate.Values.ToList(), true);
+                _log.Info($"{i} recent assets for account {_context.Account.Name} from external are different from which in internal system and are updated into database.");
+            }
+        }
     }
 
     private async Task FixOutOfOrderTrades(Security security, int lookbackDays)
@@ -84,7 +406,7 @@ public class Reconcilation
         if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
         var earliestTradeTime = DateUtils.TMinus(lookbackDays);
-        var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {_accountId} ORDER BY Time, ExternalTradeId, ExternalOrderId";
+        var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {_context.AccountId} AND IsOperational = 0 ORDER BY Time, ExternalTradeId, ExternalOrderId";
         var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
         if (trades.Count <= 1) return;
 
@@ -149,11 +471,11 @@ public class Reconcilation
         if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
         var earliestTradeTime = DateUtils.TMinus(lookbackDays);
-        var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {_accountId}";
+        var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {_context.AccountId} AND IsOperational = 0";
         var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
         var positionIds = trades.Select(t => t.PositionId).Distinct().ToList(); // we don't expect zero pid here anymore
         var positionInClause = Storage.GetInClause("Id", positionIds, false);
-        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_accountId} AND {positionInClause}");
+        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND {positionInClause}");
         var missingPIds = new List<long>();
         foreach (var pidInTrade in positionIds)
         {
@@ -165,9 +487,9 @@ public class Reconcilation
         {
             var smallestMissingPId = missingPIds.Min();
             var tradeWithSmallestId = trades.Where(t => t.PositionId == smallestMissingPId).MinBy(t => t.Id);
-            whereClause = $"SecurityId = {security.Id} AND Id >= {tradeWithSmallestId!.Id} AND AccountId = {_accountId}";
+            whereClause = $"SecurityId = {security.Id} AND Id >= {tradeWithSmallestId!.Id} AND AccountId = {_context.AccountId} AND IsOperational = 0";
             trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
-
+            _securityService.Fix(trades);
             var ps = await ProcessAndSavePosition(security, trades)!;
             _persistence.WaitAll();
             _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
@@ -183,7 +505,7 @@ public class Reconcilation
         if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
         // #1 fix missing pid trades
-        var whereClause = $"SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_accountId}";
+        var whereClause = $"SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId} AND IsOperational = 0";
         var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
         if (trades.Count > 0)
         {
@@ -195,7 +517,7 @@ public class Reconcilation
 SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
 	SELECT PositionId FROM (
 		SELECT Max(Id), PositionId FROM fx_trades WHERE Id < (
-			SELECT MIN(Id) FROM fx_trades WHERE SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_accountId}
+			SELECT MIN(Id) FROM fx_trades WHERE SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId}
 		)
 	)
 )";
@@ -205,7 +527,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                 minId = trades.Min(t => t.Id);
             }
 
-            whereClause = $"SecurityId = {security.Id} AND Id >= {minId} AND AccountId = {_accountId}";
+            whereClause = $"SecurityId = {security.Id} AND Id >= {minId} AND AccountId = {_context.AccountId} AND IsOperational = 0";
             trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
             if (trades.IsNullOrEmpty()) // highly impossible
                 return null; // no historical trades at all
@@ -220,18 +542,19 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         return null;
     }
 
-    private async Task FixInvalidPositions(Security security, int lookbackDayCount)
+    private async Task FixInvalidPositions(Security security, int lookbackDays)
     {
         var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
         if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
-        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_accountId}");
+        var earliestPositionStartTime = DateUtils.TMinus(lookbackDays);
+        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND CreateTime >= '{earliestPositionStartTime:yyyy-MM-dd HH:mm:ss}'");
         var errorCount = 0;
         var movedErrorCount = 0;
         foreach (var position in positions)
         {
-            var relatedTrades = await _storage.Read<Trade>(tradeTable, tradeDb, $"SecurityId = {security.Id} AND AccountId = {_accountId} AND PositionId = {position.Id}");
+            var relatedTrades = await _storage.Read<Trade>(tradeTable, tradeDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND PositionId = {position.Id} AND IsOperational = 0");
             if (relatedTrades.Count == 0)
             {
                 errorCount++;
@@ -244,14 +567,46 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         _log.Warn($"Found {errorCount} positions with issues and moved {movedErrorCount} entries to error table.");
     }
 
+    //private async Task FixInvalidPositions(Security security, int lookbackDays)
+    //{
+    //    var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
+    //    var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
+    //    if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
+
+    //    var earliestTradeTime = DateUtils.TMinus(lookbackDays);
+    //    var trades = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND Time >= '{earliestPositionStartTime:yyyy-MM-dd HH:mm:ss}'");
+    //    var errorCount = 0;
+    //    var movedErrorCount = 0;
+    //    foreach (var position in positions)
+    //    {
+    //        var relatedTrades = await _storage.Read<Trade>(tradeTable, tradeDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND PositionId = {position.Id}");
+    //        if (relatedTrades.Count == 0)
+    //        {
+    //            errorCount++;
+    //            _securityService.Fix(position);
+    //            var r = await _storage.MoveToError(position);
+    //            if (r != 0)
+    //                movedErrorCount++;
+    //        }
+    //    }
+    //    _log.Warn($"Found {errorCount} positions with issues and moved {movedErrorCount} entries to error table.");
+    //}
+
     private async Task<List<Position>> ProcessAndSavePosition(Security security, List<Trade> trades)
     {
         // trades may generate more than one position
         List<Position> positions = new();
-        foreach (var position in Position.CreateOrApply(trades))
+        Position? lastPosition = null;
+        for (int i = 0; i < trades.Count; i++)
         {
-            _securityService.Fix(position, security);
-            positions.Add(position);
+            Trade? trade = trades[i];
+            if (trade.IsOperational) continue;
+            lastPosition = _portfolioService.CreateOrApply(trade, lastPosition);
+            if (lastPosition != null && (lastPosition.IsClosed || i == trades.Count - 1))
+            {
+                positions.Add(lastPosition);
+                lastPosition = null;
+            }
         }
 
         if (positions.IsNullOrEmpty()) throw Exceptions.Impossible("Non-empty list of trades must generate at least one new position.");
@@ -273,6 +628,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         LogPositionUpsert(pCnt, security.Code, positions[0].Id, last.Id);
 
         // update trades if there is any without position id
+        _securityService.Fix(trades);
         await UpdateTrades(trades);
         return positions;
 

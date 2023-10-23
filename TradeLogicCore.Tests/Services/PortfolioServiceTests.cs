@@ -47,10 +47,11 @@ public class PortfolioServiceTests
             trades.Add(trade);
         }
 
-        var position = Position.Create(trades[0]);
+        var position = Position.Create(trades[0], 0);
         for (int i = 1; i < trades.Count; i++)
         {
-            position.Apply(trades[i]);
+            if (trades[i].IsOperational) continue;
+            position.Apply(trades[i], 0);
         }
     }
 }

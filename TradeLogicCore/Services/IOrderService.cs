@@ -42,7 +42,7 @@ public interface IOrderService
     /// <summary>
     /// Invoked when any order changes are received.
     /// </summary>
-    event Action<Order>? NextOrder;
+    event Action<Order>? OrderProcessed;
 
     /// <summary>
     /// Get an order from cache by its id.
@@ -133,8 +133,9 @@ public interface IOrderService
 
     /// <summary>
     /// Cancel all open orders.
+    /// Need to specify whether sync with external to get the most precise status of open orders.
     /// </summary>
-    Task<bool> CancelAllOpenOrders(Security security);
+    Task<bool> CancelAllOpenOrders(Security security, OrderActionType action, bool syncExternal);
 
     /// <summary>
     /// Create an order without any validation.
@@ -179,6 +180,7 @@ public interface IOrderService
     /// </summary>
     /// <param name="position"></param>
     void ClearCachedClosedPositionOrders(Position? position = null);
+    bool IsOperational(long orderId);
 
     ///// <summary>
     ///// Persist an order to data storage.

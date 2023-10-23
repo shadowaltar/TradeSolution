@@ -24,6 +24,8 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly ISecurityDefinitionProvider _securityService;
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Position> _closedPositions = new();
+    private readonly Dictionary<int, decimal> _residualByAssetSecurityId = new();
+
     private readonly object _lock = new();
 
     public Portfolio InitialPortfolio { get; private set; }
@@ -32,6 +34,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public bool HasPosition => Portfolio.HasPosition;
 
+    public event Action<Position, Trade>? PositionProcessed;
     public event Action<Position>? PositionCreated;
     public event Action<Position>? PositionUpdated;
     public event Action<List<Position>>? PositionsUpdated;
@@ -54,24 +57,6 @@ public class PortfolioService : IPortfolioService, IDisposable
 
         _orderIdGenerator = IdGenerators.Get<Order>();
         _assetIdGenerator = IdGenerators.Get<Asset>();
-    }
-
-    private void OnAssetsChanged(List<Asset> assets)
-    {
-        var account = _context.Account ?? throw Exceptions.MustLogin();
-        foreach (var asset in assets)
-        {
-            _securityService.Fix(asset);
-            var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
-            if (existingAsset != null)
-                asset.Id = existingAsset.Id;
-            else
-                asset.Id = _assetIdGenerator.NewTimeBasedId;
-
-            asset.AccountId = account.Id;
-            asset.UpdateTime = DateTime.UtcNow;
-        }
-        _persistence.Insert(assets, isUpsert: true);
     }
 
     public List<Position> GetPositions()
@@ -106,10 +91,12 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.GetAssetBySecurityId(securityId);
     }
 
-    public async Task<List<Position>> GetStoragePositions(DateTime? start = null)
+    public async Task<List<Position>> GetStoragePositions(DateTime? start = null, OpenClose isOpenOrClose = OpenClose.All)
     {
         start ??= DateTime.MinValue;
-        return await _context.Storage.ReadPositions(start.Value, OpenClose.All);
+        var positions = await _context.Storage.ReadPositions(start.Value, isOpenOrClose);
+        _securityService.Fix(positions);
+        return positions;
     }
 
     public async Task<List<Asset>> GetExternalAssets()
@@ -149,11 +136,8 @@ public class PortfolioService : IPortfolioService, IDisposable
             return false;
         }
 
-        var positions = await _context.Storage.ReadPositions(DateTime.MinValue, OpenClose.OpenOnly);
-        foreach (var position in positions)
-        {
-            _securityService.Fix(position);
-        }
+        var positions = await _context.Services.Portfolio.GetStoragePositions(DateTime.MinValue, OpenClose.OpenOnly);
+        _securityService.Fix(positions);
 
         var assets = await _context.Storage.ReadAssets();
         foreach (var asset in assets)
@@ -169,9 +153,8 @@ public class PortfolioService : IPortfolioService, IDisposable
         return true;
     }
 
-    public Order CreateCloseOrder(Asset position, string comment, Security? securityOverride = null)
+    private Order CreateCloseOrder(decimal quantity, Security security, string comment)
     {
-        if (position.SecurityCode.IsBlank()) throw Exceptions.InvalidPosition(position.Id, "missing security code");
         if (_context.Account == null) throw Exceptions.MustLogin();
 
         return new Order
@@ -179,8 +162,8 @@ public class PortfolioService : IPortfolioService, IDisposable
             Id = _orderIdGenerator.NewTimeBasedId,
             CreateTime = DateTime.UtcNow,
             UpdateTime = DateTime.UtcNow,
-            Quantity = Math.Abs(position.Quantity),
-            Side = position.Quantity > 0 ? Side.Sell : Side.Buy,
+            Quantity = Math.Abs(quantity),
+            Side = quantity > 0 ? Side.Sell : Side.Buy,
             Type = OrderType.Market,
             TimeInForce = TimeInForceType.GoodTillCancel,
             Status = OrderStatus.Sending,
@@ -193,11 +176,9 @@ public class PortfolioService : IPortfolioService, IDisposable
             ParentOrderId = 0,
             Price = 0,
             StopPrice = 0,
-
-            Security = position.Security,
-            SecurityId = position.SecurityId,
-            SecurityCode = position.SecurityCode,
-
+            Security = security,
+            SecurityId = security.Id,
+            SecurityCode = security.Code,
             Comment = comment,
         };
     }
@@ -213,7 +194,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             if (position.IsClosed) continue;
 
-            var order = CreateCloseOrder(position, orderComment);
+            var order = CreateCloseOrder(position.Quantity, position.Security, orderComment);
             var state = await _orderService.SendOrder(order);
             // need to wait for a while
             if (Threads.WaitUntil(() => _closedPositions.ThreadSafeContains(position.Id)))
@@ -222,6 +203,132 @@ public class PortfolioService : IPortfolioService, IDisposable
                 _log.Error("Failed to close position (timed-out), id: " + position.Id);
         }
         _persistence.WaitAll();
+    }
+
+    public async Task CleanUpNonCashAssets(string orderComment)
+    {
+        // sell any assets which is not cash / fiat
+        var assets = Portfolio.GetAssets();
+        if (assets.IsNullOrEmpty()) return;
+
+        var preferredQuoteCurrency = _context.PreferredQuoteCurrencies.FirstOrDefault();
+        if (preferredQuoteCurrency == null)
+        {
+            _log.Error("Failed to get preferred quote currency.");
+            return;
+        }
+        // fx only logic
+        List<Asset> assetsToBeCleanedUp;
+        if (_context.GlobalCurrencyFilter.IsNullOrEmpty())
+        {
+            assetsToBeCleanedUp = assets;
+        }
+        else
+        {
+            assetsToBeCleanedUp = assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.SecurityCode)).ToList();
+        }
+        if (assetsToBeCleanedUp.IsNullOrEmpty())
+            return;
+
+        _log.Info($"Cleaning up {assetsToBeCleanedUp.Count} assets.");
+        foreach (var asset in assetsToBeCleanedUp)
+        {
+            if (asset.SecurityCode == preferredQuoteCurrency) continue;
+            var oldQuoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => a.SecurityCode == preferredQuoteCurrency)?.Quantity ?? 0;
+            var currencyPair = _securityService.GetFxSecurity(asset.SecurityCode, preferredQuoteCurrency);
+            if (currencyPair == null)
+            {
+                _log.Warn($"Unable to clean up asset position for currency pair (base:{asset.SecurityCode}, quote:{preferredQuoteCurrency}).");
+                continue;
+            }
+            if (asset.IsEmpty)
+                continue;
+
+            var oldQuantity = asset.Quantity;
+            var order = CreateCloseOrder(oldQuantity, currencyPair, orderComment);
+            order.Action = OrderActionType.Operational;
+            var state = await _orderService.SendOrder(order);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                var r = Threads.WaitUntil(() =>
+                {
+                    _persistence.WaitAll();
+                    var recentAssets = AsyncHelper.RunSync(() => GetStorageAssets());
+                    var a = recentAssets.FirstOrDefault(a => a.SecurityCode == asset.SecurityCode);
+                    return a?.IsEmpty ?? true; // meaning that the asset is cleaned up
+                }, pollingMs: 1000);
+
+                if (r)
+                {
+                    var quoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => a.SecurityCode == preferredQuoteCurrency)?.Quantity ?? 0;
+
+                    _log.Info($"Cleaned up asset {asset.SecurityCode} by selling {currencyPair.Code} with quantity {oldQuantity};" +
+                        $" quote currency {preferredQuoteCurrency} quantity {oldQuoteCurrencyQuantity}->{quoteCurrencyQuantity}");
+                }
+                else
+                {
+                    _log.Error($"Failed to clean up asset {asset.SecurityCode} (timed-out).");
+                }
+            }
+            else
+            {
+                _log.Error($"Failed to clean up asset {asset.SecurityCode} (sell order failed).");
+            }
+        }
+    }
+
+    //public IEnumerable<Position> CreateOrApply(List<Trade> trades, Position? position = null)
+    //{
+    //    if (trades.IsNullOrEmpty())
+    //    {
+    //        if (position != null)
+    //        {
+    //            yield return position;
+    //        }
+    //        yield break;
+    //    }
+
+    //    foreach (var trade in trades)
+    //    {
+    //        if (position == null)
+    //        {
+    //            position = Position.Create(trade);
+    //            trade.PositionId = position.Id;
+    //        }
+    //        else
+    //        {
+    //            var isClosed = position.Apply(trade);
+    //            trade.PositionId = position.Id;
+    //            if (isClosed)
+    //            {
+    //                yield return position;
+    //                position = null;
+    //            }
+    //        }
+    //    }
+    //    if (position != null)
+    //        yield return position;
+    //}
+
+    public Position? CreateOrApply(Trade trade, Position? position = null)
+    {
+        if (trade.IsOperational) return position;
+
+        if (position == null)
+        {
+            var residual = _residualByAssetSecurityId.ThreadSafeGet(trade.Security.FxInfo?.BaseAsset?.Id ?? 0);
+            position = Position.Create(trade, residual);
+            _securityService.Fix(position); // must call this for min-notional consideration
+            if (residual != 0)
+                _log.Info($"[{trade.SecurityCode}] has residual quantity {residual} which is merged into a new position with Id: {position.Id}");
+        }
+        else
+        {
+            _securityService.Fix(position); // must call this for min-notional consideration
+            position.Apply(trade, 0); // residual if exists, only applied during position creation and also placing a close order
+        }
+        trade.PositionId = position.Id;
+        return position;
     }
 
     public void Update(List<Position> positions, bool isInitializing = false)
@@ -414,9 +521,11 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public void Process(Trade trade)
     {
+        if (trade.IsOperational) return;
+
         var position = GetPositionBySecurityId(trade.SecurityId);
         var isNew = position == null;
-        position = Position.CreateOrApply(trade, position);
+        position = CreateOrApply(trade, position);
         if (position == null) throw Exceptions.Impossible();
 
         _securityService.Fix(position);
@@ -426,6 +535,21 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             _closedPositions[position.Id] = position;
             Portfolio.RemovePosition(position.Id);
+
+            if (position.Quantity != 0)
+            {
+                // has residual, which will be traded in future orders
+                var residual = position.Quantity;
+                var assetSecId = position.Security.FxInfo?.BaseAsset?.Id ?? 0;
+                if (assetSecId != 0)
+                {
+                    _residualByAssetSecurityId.ThreadSafeSet(position.SecurityId, residual);
+                }
+                else
+                {
+                    _log.Warn("Cannot find base asset security Id! Position's security is: " + position.SecurityCode);
+                }
+            }
 
             _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}");
         }
@@ -443,11 +567,15 @@ public class PortfolioService : IPortfolioService, IDisposable
 
         // invoke post-events
         if (isNew)
-            PositionCreated?.Invoke(position!);
+            PositionCreated?.Invoke(position);
         else
-            PositionUpdated?.Invoke(position!);
+            PositionUpdated?.Invoke(position);
+
         if (position.IsClosed)
-            PositionClosed?.Invoke(position!);
+        {
+            PositionClosed?.Invoke(position);
+        }
+        PositionProcessed?.Invoke(position, trade);
     }
 
     public Side GetOpenPositionSide(int securityId)
@@ -455,6 +583,11 @@ public class PortfolioService : IPortfolioService, IDisposable
         var position = GetPositionBySecurityId(securityId);
         if (position == null) return Side.None;
         return position.Side;
+    }
+
+    public decimal GetAssetPositionResidual(int assetSecurityId)
+    {
+        return _residualByAssetSecurityId.ThreadSafeGet(assetSecurityId);
     }
 
     public void ClearCachedClosedPositions(bool isInitializing = false)
@@ -475,4 +608,23 @@ public class PortfolioService : IPortfolioService, IDisposable
             }
         }
     }
+
+    private void OnAssetsChanged(List<Asset> assets)
+    {
+        var account = _context.Account ?? throw Exceptions.MustLogin();
+        foreach (var asset in assets)
+        {
+            _securityService.Fix(asset);
+            var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
+            if (existingAsset != null)
+                asset.Id = existingAsset.Id;
+            else
+                asset.Id = _assetIdGenerator.NewTimeBasedId;
+
+            asset.AccountId = account.Id;
+            asset.UpdateTime = DateTime.UtcNow;
+        }
+        _persistence.Insert(assets, isUpsert: true);
+    }
+
 }

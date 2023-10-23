@@ -163,7 +163,6 @@ public class Program
         _log.Info("Execute algorithm with parameters #1: " + parameters);
         _log.Info("Execute algorithm with parameters #2: " + algorithm);
 
-        var isAssetSet = context.SetPreferredAssets("BUSD", "TUSD", "USDT");
         var algoBatchId = await core.Run(parameters, algorithm);
 
         while (true)
@@ -317,7 +316,7 @@ public class Program
         if (security == null)
             return;
 
-        await orderService.CancelAllOpenOrders(security);
+        await orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, true);
 
         var order = new Order
         {
@@ -417,12 +416,13 @@ public class Program
                     var screening = new SingleSecurityLogic(context, security);
                     algorithm.Screening = screening;
 
-                    var engineParameters = new EngineParameters(true, false, true);
+                    var engineParameters = new EngineParameters(new List<string> { "USDT" },
+                                                                true, true, true, true,
+                                                                new List<string> { "BTC", "USDT" });
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange);
-                    var engine = new AlgorithmEngine(context, engineParameters);
-                    engine.Initialize(algorithm);
+                    var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                     await engine.Run(algoParameters);
 
                     var entries = engine.GetAllEntries(security.Id);
@@ -584,9 +584,10 @@ public class Program
                         var algorithm = new MovingAverageCrossing(context, algoStartParams, fast, slow, stopLoss);
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
-                        var engineParameters = new EngineParameters(true, false, true);
-                        var engine = new AlgorithmEngine(context, engineParameters);
-                        engine.Initialize(algorithm);
+                        var engineParameters = new EngineParameters(new List<string> { "USDT" },
+                                                                    true, true, true, true,
+                                                                    new List<string> { "BTC", "USDT" });
+                        var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                         await engine.Run(algoStartParams);
 
                         var entries = engine.GetAllEntries(security.Id);

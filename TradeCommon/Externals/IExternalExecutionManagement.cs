@@ -15,7 +15,6 @@ public interface IExternalExecutionManagement
     event AllOrderCancelledCallback? AllOrderCancelled;
     event OrderReceivedCallback? OrderReceived;
     event TradeReceivedCallback? TradeReceived;
-    event TradesReceivedCallback? TradesReceived;
 
     event AssetsChangedCallback? AssetsChanged;
     event TransferredCallback? Transferred;

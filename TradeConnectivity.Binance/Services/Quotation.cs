@@ -357,7 +357,6 @@ public class Quotation : IExternalQuotationManagement
 
     private void OnNextTick(ExtendedTick tick)
     {
-        _log.Info(tick);
         NextTick?.Invoke(tick);
         _tickPool.Return(tick);
     }

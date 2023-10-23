@@ -6,14 +6,15 @@ public class AverageAbnormalityDetector
     public int Count { get; }
     public decimal LastAverage { get; private set; }
     public decimal Average { get; private set; }
-    public decimal Threshold { get; private set; }
+    public decimal ThresholdPercentage { get; private set; }
 
-    public AverageAbnormalityDetector(int itemCount)
+    public AverageAbnormalityDetector(decimal thresholdPercentage, int itemCount)
     {
+        ThresholdPercentage = thresholdPercentage;
         Count = itemCount;
     }
 
-    public bool CheckAbnormality(decimal value)
+    public bool IsNormal(decimal value)
     {
         lock (_values)
         {
@@ -22,9 +23,12 @@ public class AverageAbnormalityDetector
                 _values.RemoveFirst();
 
             Average = _values.Average();
+            if (LastAverage == 0 && Average != 0)
+                LastAverage = Average;
             var diff = LastAverage - value;
+            var pct = Math.Abs(LastAverage == 0 ? 0 : diff / LastAverage);
             LastAverage = Average;
-            return Math.Abs(diff) > Threshold;
+            return pct < ThresholdPercentage;
         }
     }
 }

@@ -192,7 +192,7 @@ public class Security
         hash.Add(TickSize);
         hash.Add(MinNotional);
         hash.Add(Currency);
-        hash.Add(QuoteSecurity);
+        hash.Add(QuoteSecurity?.Id);
         hash.Add(Cusip);
         hash.Add(Isin);
         hash.Add(YahooTicker);

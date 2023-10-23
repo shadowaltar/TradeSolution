@@ -12,7 +12,8 @@ public class ApplicationContext
     protected static readonly ILog _log = Logger.New();
     protected IComponentContext? _container;
 
-    private readonly List<string> _preferredAssetCodes = new();
+    private readonly List<string> _preferredQuoteCurrencies = new();
+    private readonly List<string> _globalCurrencyFilter = new();
     private EnvironmentType _environment;
     private ExchangeType _exchange;
     private int _exchangeId;
@@ -27,7 +28,15 @@ public class ApplicationContext
 
     public IStorage Storage { get; }
 
-    public IReadOnlyList<string> PreferredAssetCodes => _preferredAssetCodes;
+    /// <summary>
+    /// The preferred quote currencies used by the engine for features like auto-closing.
+    /// </summary>
+    public IReadOnlyList<string> PreferredQuoteCurrencies => _preferredQuoteCurrencies;
+
+    /// <summary>
+    /// If this is set, any assets with currencies not in this filter will be ignored.
+    /// </summary>
+    public IReadOnlyList<string> GlobalCurrencyFilter => _globalCurrencyFilter;
 
     public ApplicationContext(IStorage storage)
     {
@@ -112,18 +121,29 @@ public class ApplicationContext
         ExternalConnectionStates.BrokerId = BrokerId;
     }
 
-    public bool SetPreferredAssets(params string[] assetCodes)
+    public bool SetPreferredQuoteCurrencies(List<string>? currencies)
     {
-        _log.Info($"Set preferred assets: " + string.Join(", ", assetCodes));
-        _preferredAssetCodes.Clear();
-        _preferredAssetCodes.AddRange(assetCodes);
-        if (_preferredAssetCodes.IsNullOrEmpty())
+        _preferredQuoteCurrencies.Clear();
+        if (currencies.IsNullOrEmpty())
         {
-            _preferredAssetCodes.Add("TUSD");
-            _preferredAssetCodes.Add("USDT");
-            _preferredAssetCodes.Add("BUSD");
-            _preferredAssetCodes.Add("USD");
+            _log.Warn("No preferred quote currencies are set!");
+            return false;
         }
+        _log.Info($"Set preferred assets: " + string.Join(", ", currencies));
+        _preferredQuoteCurrencies.AddRange(currencies);
+        return true;
+    }
+
+    public bool SetGlobalCurrencyFilter(List<string>? currencies)
+    {
+        _globalCurrencyFilter.Clear();
+        if (currencies.IsNullOrEmpty())
+        {
+            _log.Info("No global currency filter is set.");
+            return false;
+        }
+        _log.Info($"Set global currency filter: " + string.Join(", ", currencies));
+        _globalCurrencyFilter.AddRange(currencies);
         return true;
     }
 }

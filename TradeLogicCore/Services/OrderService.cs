@@ -25,6 +25,7 @@ public class OrderService : IOrderService, IDisposable
     private readonly Dictionary<long, Order> _ordersByExternalId = new(); // same as _orders
     private readonly Dictionary<long, Order> _cancelledOrders = new(); // all cancelled, expired orders
     private readonly Dictionary<long, Order> _errorOrders = new(); // all error, rejected orders
+    private readonly Dictionary<long, Order> _operationalOrders = new(); // orders which should not be considered affecting any positions
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
 
@@ -32,11 +33,12 @@ public class OrderService : IOrderService, IDisposable
 
     public event Action<Order>? AfterOrderSent;
     public event Action<Order>? OrderCancelled;
-    public event Action<Order>? NextOrder;
     public event Action? OrderClosed;
     public event Action? OrderStoppedLost;
     public event Action? OrderTookProfit;
     public event Action? OrderSendingFailed;
+
+    public event Action<Order>? OrderProcessed;
 
     public OrderService(IExternalExecutionManagement execution,
                         Context context,
@@ -164,9 +166,13 @@ public class OrderService : IOrderService, IDisposable
             _orders.ThreadSafeSet(order.Id, order);
             _persistence.Insert(order);
 
+            var isOperational = order.Action == OrderActionType.Operational;
+            if (isOperational)
+                _operationalOrders.ThreadSafeSet(order.Id, order);
             var state = await _execution.SendOrder(order);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
+                order = state.Get<Order>()!;
                 Assertion.Shall(order.ExternalOrderId > 0);
                 _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
 
@@ -185,6 +191,11 @@ public class OrderService : IOrderService, IDisposable
             _persistence.Insert(order);
             return state;
         }
+    }
+
+    public bool IsOperational(long orderId)
+    {
+        return _operationalOrders.ThreadSafeContains(orderId);
     }
 
     public async Task<bool> CancelOrder(Order order)
@@ -223,16 +234,23 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public async Task<bool> CancelAllOpenOrders(Security security)
+    public async Task<bool> CancelAllOpenOrders(Security security, OrderActionType action, bool syncExternal)
     {
-        var state = await _execution.GetOpenOrders(security);
-        if (state.ResultCode != ResultCode.GetOrderOk)
+        List<Order>? openOrders = null;
+        if (syncExternal)
         {
-            _log.Error("Failed to query opened orders for security " + security.Code);
-            return false;
+            var state = await _execution.GetOpenOrders(security);
+            if (state.ResultCode != ResultCode.GetOrderOk)
+            {
+                _log.Error("Failed to query opened orders for security " + security.Code);
+                return false;
+            }
+            openOrders = state.Get<List<Order>>();
         }
-
-        var openOrders = state.Get<List<Order>>();
+        else
+        {
+            openOrders = _openOrders.ThreadSafeValues();
+        }
         if (!openOrders.IsNullOrEmpty())
         {
             _securityService.Fix(openOrders);
@@ -242,8 +260,7 @@ public class OrderService : IOrderService, IDisposable
                 await FixOrderIdByExternalId(order);
             }
 
-            state = await _execution.CancelAllOrders(security);
-
+            var state = await _execution.CancelAllOrders(security);
             var cancelledOrders = state.Get<List<Order>>();
             if (state.ResultCode == ResultCode.CancelOrderOk && !cancelledOrders.IsNullOrEmpty())
             {
@@ -251,6 +268,7 @@ public class OrderService : IOrderService, IDisposable
                 _securityService.Fix(cancelledOrders);
                 foreach (var order in cancelledOrders)
                 {
+                    order.Action = action;
                     await FixOrderIdByExternalId(order);
                 }
                 _persistence.Insert(cancelledOrders);
@@ -335,10 +353,6 @@ public class OrderService : IOrderService, IDisposable
             TimeInForce = timeInForce,
             Comment = comment,
         };
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}");
-        else
-            _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}");
         return order;
     }
 
@@ -469,29 +483,7 @@ public class OrderService : IOrderService, IDisposable
         _ordersByExternalId.ThreadSafeSet(eoid, order);
         _persistence.Insert(order);
 
-        _log.Info(PrintOrder(order));
-
-        NextOrder?.Invoke(order);
-    }
-
-    private string PrintOrder(Order order)
-    {
-        var filledQtyStr = "";
-        var stateStr = "";
-        if (order.Status == OrderStatus.PartialFilled)
-        {
-            filledQtyStr = ", FILLQTY:" + order.FormattedFilledQuantity;
-            stateStr = "OnUpdate";
-        }
-        else if (order.Status.IsFinished())
-        {
-            stateStr = "Done";
-        }
-
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            return $"\n\tORD: [{stateStr}][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
-        else
-            return $"\n\tORD: [{stateStr}][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
+        OrderProcessed?.Invoke(order);
     }
 
     private void OnSentOrderAccepted(bool isSuccessful, ExternalQueryState state)
@@ -599,7 +591,7 @@ public class OrderService : IOrderService, IDisposable
         else if (position == null)
         {
             var start = _orders.Values.Min(o => o.UpdateTime);
-            var positions = AsyncHelper.RunSync(() => _context.Storage.ReadPositions(start, OpenClose.ClosedOnly)).ToList();
+            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
             var groupedOrders = _orders.Values.GroupBy(o => o.Security);
             foreach (var group in groupedOrders)
             {

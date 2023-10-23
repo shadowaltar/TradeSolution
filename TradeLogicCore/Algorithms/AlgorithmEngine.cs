@@ -1,8 +1,8 @@
 ﻿using Common;
 using log4net;
-using System.Collections.Generic;
-using System.Diagnostics;
+using System.Security.Cryptography;
 using TradeCommon.Algorithms;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -13,6 +13,7 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
+using TradeDataCore.Essentials;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
@@ -34,12 +35,17 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private IReadOnlyDictionary<int, Security>? _pickedSecurities;
 
-
     /// <summary>
     /// Caches algo-entries related to last time frame.
     /// Key is securityId.
     /// </summary>
     private readonly Dictionary<int, AlgoEntry?> _lastEntriesBySecurityId = new();
+
+    /// <summary>
+    /// Caches algo-entries related to last time frame.
+    /// Key is securityId.
+    /// </summary>
+    private readonly Dictionary<int, AlgoEntry?> _currentEntriesBySecurityId = new();
 
     /// <summary>
     /// Caches last OHLC price. Key is securityId.
@@ -56,15 +62,15 @@ public class AlgorithmEngine : IAlgorithmEngine
     /// </summary>
     private readonly Dictionary<int, List<AlgoEntry>> _executionEntriesBySecurityIds = new();
 
+    private readonly IdGenerator _algoEntryIdGen;
+
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
 
     public event Action? ReachedDesignatedEndTime;
 
-    public EngineParameters EngineParameters { get; private set; }
-
-    private readonly IdGenerator _algoEntryIdGen;
-
     public bool IsBackTesting { get; private set; } = true;
+
+    public EngineParameters EngineParameters { get; private set; }
 
     public IPositionSizingAlgoLogic? Sizing { get; protected set; }
 
@@ -104,7 +110,7 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     public int AlgoBatchId { get; private set; }
 
-    public AlgorithmEngine(Context context, EngineParameters engineParameters)
+    public AlgorithmEngine(Context context, Algorithm algorithm, EngineParameters engineParameters)
     {
         _context = context;
         _services = context.Services;
@@ -112,13 +118,16 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         EngineParameters = engineParameters;
 
+        _context.SetPreferredQuoteCurrencies(EngineParameters.PreferredQuoteCurrencies);
+        _context.SetGlobalCurrencyFilter(EngineParameters.GlobalCurrencyFilter);
+        _context.InitializeAlgorithmContext(this, algorithm);
+
         _algoEntryIdGen = IdGenerators.Get<AlgoEntry>();
         _engineThreadId = Environment.CurrentManagedThreadId;
-    }
 
-    public void Initialize(Algorithm algorithm)
-    {
-        _context.InitializeAlgorithmContext(this, algorithm);
+        _services.Order.OrderProcessed += OnOrderProcessed;
+        _services.Trade.TradeProcessed += OnTradeProcessed;
+        _services.Portfolio.PositionProcessed += OnPositionProcessed;
 
         AlgoBatch = _context.SaveAlgoBatch();
 
@@ -169,10 +178,6 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (User == null || Account == null)
             return 0;
 
-        // close positions need these events
-        _services.Portfolio.PositionClosed -= OnPositionClosed;
-        _services.Portfolio.PositionClosed += OnPositionClosed;
-
         // pick security to trade
         // check associated asset's position, and map any existing position into algo entry
         // then register market quote feed if all good
@@ -184,14 +189,22 @@ public class AlgorithmEngine : IAlgorithmEngine
             var securities = AlgoParameters.SecurityPool;
             foreach (var security in securities)
             {
-                await _services.Order.CancelAllOpenOrders(security);
+                await _services.Order.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, true);
             }
         }
+
         // close open positions
         if (EngineParameters.CloseOpenPositionsOnStart)
         {
             await _services.Portfolio.CloseAllOpenPositions(Comments.CloseAllBeforeStart);
         }
+        // sell non-cash assets
+        if (EngineParameters.CleanUpNonCashOnStart)
+        {
+            await _services.Portfolio.CleanUpNonCashAssets("Clean up assets before engine starts.");
+        }
+
+        await InitializeCaches();
 
         // subscribe to events
         _services.MarketData.NextOhlc -= OnNextOhlcPrice;
@@ -225,10 +238,83 @@ public class AlgorithmEngine : IAlgorithmEngine
         return TotalPriceEventCount;
     }
 
-    private void OnPositionClosed(Position position)
+    private async Task InitializeCaches()
     {
-        Algorithm.NotifyPositionChanged(position);
-        _log.Info("------- TEST MSG: now should be ok to trade again.");
+        _services.Order.Reset();
+        _services.Trade.Reset();
+        _services.Portfolio.Reset(true, true, true);
+
+        var positions = await _services.Portfolio.GetStoragePositions(DateUtils.TMinus(Consts.LookbackDayCount), OpenClose.OpenOnly);
+        _services.Security.Fix(positions);
+        var assets = await _context.Storage.ReadAssets();
+        _services.Security.Fix(assets);
+
+        List<Trade> trades = new();
+        foreach (var position in positions)
+        {
+            trades.AddRange(await _context.Storage.ReadTradesByPositionId(position.Security, position.Id, OperatorType.Equals));
+        }
+        _services.Security.Fix(trades);
+
+        List<Order> orders = new();
+        foreach (var group in trades.GroupBy(t => t.SecurityId))
+        {
+            var security = await _services.Security.GetSecurity(group.Key);
+            orders.AddRange(await _context.Storage.ReadOrders(security!, group.Select(t => t.OrderId).ToList()));
+        }
+        _services.Security.Fix(orders);
+
+        _services.Order.Update(orders);
+        _services.Trade.Update(trades);
+        _services.Portfolio.Update(assets, true);
+        _services.Portfolio.Update(positions, true);
+    }
+
+    private void OnOrderProcessed(Order order)
+    {
+        var filledQtyStr = order.Status == OrderStatus.PartialFilled ? ", FILLQTY:" + order.FormattedFilledQuantity : "";
+        var orderTypeStr = "";
+        var orderPriceStr = "";
+        if (order.Type is OrderType.StopLimit or OrderType.Stop)
+        {
+            orderTypeStr = "SL";
+            orderPriceStr = order.FormattedStopPrice.ToString();
+        }
+        else if (order.Type is OrderType.TakeProfitLimit or OrderType.TakeProfit)
+        {
+            orderTypeStr = "TP";
+            orderPriceStr = order.FormattedStopPrice.ToString();
+        }
+        else
+        {
+            orderPriceStr = order.FormattedPrice.ToString();
+        }
+        _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}]\n\t\tID:{order.Id}, {orderTypeStr}P:{orderPriceStr}, Q:{order.FormattedQuantity}{filledQtyStr}");
+    }
+
+    private void OnTradeProcessed(Trade trade)
+    {
+        _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P:{trade.Price}, Q:{trade.Quantity}");
+    }
+
+    private void OnPositionProcessed(Position position, Trade trade)
+    {
+        if (_runningState == AlgoRunningState.NotYetStarted)
+            return;
+
+        if (position.IsClosed)
+        {
+            _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}");
+            var current = _currentEntriesBySecurityId.ThreadSafeGet(position.SecurityId)!;
+            Algorithm.AfterPositionClosed(current);
+        }
+        else
+        {
+            if (!position.IsNew)
+                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Updated]\n\t\tID:{position.Id}, TID:{trade.Id}, R:{position.Return:P4}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
+            else
+                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Opened]\n\t\tID:{position.Id}, TID:{trade.Id}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
+        }
     }
 
     public async Task Stop()
@@ -331,13 +417,13 @@ public class AlgorithmEngine : IAlgorithmEngine
     {
         if (Algorithm == null || AlgoParameters == null || Screening == null || AlgoBatch == null) throw Exceptions.InvalidAlgorithmEngineState();
 
-        if (!_pickedSecurities.TryGetValue(securityId, out var security))
+        if (_pickedSecurities == null || !_pickedSecurities.TryGetValue(securityId, out var security))
             return;
 
         Algorithm.BeforeProcessingSecurity(security);
 
         var entries = _allEntriesBySecurityIds.GetOrCreate(security.Id);
-        var last = _lastEntriesBySecurityId.GetValueOrDefault(security.Id);
+        var last = _lastEntriesBySecurityId.ThreadSafeGet(security.Id);
         var price = ohlcPrice.C;
 
         var current = new AlgoEntry
@@ -350,13 +436,15 @@ public class AlgorithmEngine : IAlgorithmEngine
             Variables = Algorithm.CalculateVariables(price, last),
             Price = price,
         };
+        _currentEntriesBySecurityId.ThreadSafeSet(securityId, current);
         _services.Security.Fix(current, security);
 
         if (last == null)
         {
             last = current;
-            _lastOhlcPricesBySecurityId[securityId] = ohlcPrice;
-            _lastEntriesBySecurityId[securityId] = last;
+            _lastOhlcPricesBySecurityId.ThreadSafeSet(securityId, ohlcPrice);
+            _lastEntriesBySecurityId.ThreadSafeSet(securityId, last);
+            // current entry dict will be updated later
             entries.Add(current);
             return;
         }
@@ -369,9 +457,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             CopyEntry(current, last, security, price);
         }
 
-        _lastEntriesBySecurityId[security.Id] = current;
-        _lastOhlcPricesBySecurityId[securityId] = ohlcPrice;
-
         if (IsBackTesting)
         {
             BackTestCheckLongStopLoss(current, last, security, ohlcPrice, _intervalType);
@@ -381,7 +466,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         var lastOhlcPrice = _lastOhlcPricesBySecurityId[securityId];
         Algorithm.Analyze(current, last, ohlcPrice, lastOhlcPrice);
 
-        // determine whethet to cancel partially filled or live orders (limit orders may live for a very long time)
+        // determine whether to cancel partially filled or live orders (limit orders may live for a very long time)
         if (await TryCleanUpOpenOrders(current))
         {
             _log.Info($"\n\tORD: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][CloseOpened]");
@@ -390,28 +475,35 @@ public class AlgorithmEngine : IAlgorithmEngine
         // try to open or close long or short
         if (await TryOpenLong(current, last, ohlcPrice, lastOhlcPrice))
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][OpenedLong]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            LogAlgoEntry(current, OrderActionType.AlgoOpen, Side.Buy);
         }
         else if (await TryCloseLong(current, ohlcPrice, _intervalType))
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][ClosedLong]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            LogAlgoEntry(current, OrderActionType.AlgoClose, Side.Sell);
         }
         else if (await TryOpenShort(current, last, ohlcPrice, lastOhlcPrice))
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][OpenedShort]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            LogAlgoEntry(current, OrderActionType.AlgoOpen, Side.Sell);
         }
         else if (await TryCloseShort(current, ohlcPrice, _intervalType))
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][ClosedShort]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            LogAlgoEntry(current, OrderActionType.AlgoClose, Side.Buy);
         }
         else
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            LogAlgoEntry(current, null, null);
         }
         entries.Add(current);
 
-
         Algorithm.AfterProcessingSecurity(security);
+
+        _lastEntriesBySecurityId.ThreadSafeSet(securityId, current);
+        _lastOhlcPricesBySecurityId.ThreadSafeSet(securityId, ohlcPrice);
+    }
+
+    private void LogAlgoEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
+    {
+        _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][{actionType}][{side}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
     }
 
     private async Task ClosePositionIfNeeded()
@@ -584,20 +676,10 @@ public class AlgorithmEngine : IAlgorithmEngine
             return false;
 
         // cancel any partial filled, SL or TP orders
-        await _services.Order.CancelAllOpenOrders(current.Security);
-        var position = _services.Portfolio.GetPositionBySecurityId(security.Id);
-        if (position != null)
-        {
-            if (position.Notional != 0)
-            {
-
-            }
-        }
+        await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
 
         var time = DateTime.UtcNow;
         var enterSide = Side.Buy;
-
-        Algorithm.BeforeOpeningLong(current);
 
         _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
         if (IsBackTesting)
@@ -614,32 +696,7 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         current.SequenceId = _algoEntryIdGen.NewInt;
         _persistence.Insert(current);
-        Algorithm.AfterLongOpened(current);
-        return true;
-    }
 
-    private async Task<bool> TryCloseLong(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
-    {
-        if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-
-        if (!Algorithm.CanCloseLong(current))
-            return false;
-
-        Algorithm.BeforeClosingLong(current);
-        var security = current.Security;
-
-        _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
-        if (IsBackTesting)
-        {
-            ExitLogic.BackTestClose(current, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
-        }
-        else
-        {
-            await Algorithm.Close(current, current.Security, Side.Sell, GetOhlcEndTime(ohlcPrice, intervalType));
-        }
-
-        _persistence.Insert(current);
-        Algorithm.AfterLongClosed(current);
         return true;
     }
 
@@ -650,8 +707,6 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         if (!Algorithm.CanOpenShort(current))
             return false;
-
-        Algorithm.BeforeOpeningShort(current);
 
         var time = DateTime.UtcNow;
         var enterSide = Side.Sell;
@@ -670,7 +725,27 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         current.SequenceId = _algoEntryIdGen.NewInt;
         _persistence.Insert(current);
-        Algorithm.AfterShortOpened(current);
+
+        return true;
+    }
+
+    private async Task<bool> TryCloseLong(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
+    {
+        if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
+
+        if (!Algorithm.CanCloseLong(current))
+            return false;
+
+        var security = current.Security;
+
+        _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
+        if (IsBackTesting)
+            ExitLogic.BackTestClose(current, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
+        else
+            await Algorithm.Close(current, current.Security, Side.Sell, GetOhlcEndTime(ohlcPrice, intervalType), OrderActionType.AlgoClose);
+
+        _persistence.Insert(current);
+
         return true;
     }
 
@@ -682,16 +757,14 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.CanCloseShort(current))
             return false;
 
-        Algorithm.BeforeClosingShort(current);
-
         _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(current);
         if (IsBackTesting)
             ExitLogic.BackTestClose(current, ohlcPrice.C, GetOhlcEndTime(ohlcPrice, intervalType));
         else
-            await ExitLogic.Close(current, current.Security, Side.Buy, GetOhlcEndTime(ohlcPrice, intervalType));
+            await Algorithm.Close(current, current.Security, Side.Buy, GetOhlcEndTime(ohlcPrice, intervalType), OrderActionType.AlgoClose);
 
         _persistence.Insert(current);
-        Algorithm.AfterShortClosed(current);
+
         return true;
     }
 
@@ -704,7 +777,12 @@ public class AlgorithmEngine : IAlgorithmEngine
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
-            await Algorithm.CloseByTickStopLoss(position);
+            var state = await Algorithm.CloseByTickStopLoss(position);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+                Algorithm.AfterStoppedLoss(algoEntry!, position.CloseSide);
+            }
         }
     }
 
@@ -718,7 +796,12 @@ public class AlgorithmEngine : IAlgorithmEngine
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
-            await Algorithm.CloseByTickStopLoss(position);
+            var state = await Algorithm.CloseByTickTakeProfit(position);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+                Algorithm.AfterTookProfit(algoEntry!, position.CloseSide);
+            }
         }
     }
 
@@ -730,13 +813,9 @@ public class AlgorithmEngine : IAlgorithmEngine
         var stopLossPrice = Algorithm.GetStopLossPrice(entry.EnterPrice.Value, Side.Buy, entry.Security);
         if (IsBackTesting && hasLongPosition && ohlcPrice.L <= stopLossPrice)
         {
-            Algorithm.BeforeStopLossLong(entry);
-
             // assuming always stopped loss at the stopLossPrice
             ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-
-            Algorithm.AfterStopLossLong(entry);
             return true;
         }
         return false;
@@ -751,13 +830,9 @@ public class AlgorithmEngine : IAlgorithmEngine
         var stopLossPrice = Algorithm.GetStopLossPrice(entry.EnterPrice.Value, Side.Sell, entry.Security);
         if (IsBackTesting && hasShortPosition && ohlcPrice.H >= stopLossPrice)
         {
-            Algorithm.BeforeStopLossLong(entry);
-
             // assuming always stopped loss at the stopLossPrice
             ExitLogic.BackTestStopLoss(entry, lastEntry, GetOhlcEndTime(ohlcPrice, intervalType));
             _executionEntriesBySecurityIds.GetOrCreate(security.Id).Add(entry);
-
-            Algorithm.AfterStopLossLong(entry);
             return true;
         }
         return false;
@@ -790,7 +865,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             current.EnterTime = null;
             current.ExitPrice = null;
             current.Elapsed = null;
-            current.UnrealizedPnl = 0;
             current.Fee = 0;
         }
 

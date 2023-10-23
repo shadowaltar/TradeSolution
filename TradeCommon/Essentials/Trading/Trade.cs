@@ -99,27 +99,43 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
     public int AccountId { get; set; } = 0;
 
     /// <summary>
+    /// If true, the trade does not participate in position building.
+    /// </summary>
+    public bool IsOperational { get; set; } = false;
+
+    /// <summary>
     /// Calculate weighted average price, quantity and notional amount to 
     /// </summary>
     /// <param name="entry"></param>
-    public void ApplyTo(ILongShortEntry entry)
+    public void ApplyTo(ILongShortEntry entry, decimal residualQuantity)
     {
+        // we always assume quantity >= 0, and its sign is determined by Side
+        Assertion.Shall(Quantity >= 0);
+
         var sign = Side == Side.Sell ? -1 : Side == Side.Buy ? 1 : 0;
+        // residual quantity is only applied if it is the same sign of the signed-quantity.
+        var signedQuantity = sign * Quantity;
+        var quantity = Quantity;
+        if (sign == Math.Sign(residualQuantity))
+        {
+            signedQuantity += residualQuantity;
+            quantity = Math.Abs(signedQuantity);
+        }
         if (Side == Side.Buy)
         {
-            entry.LongNotional += Price * Quantity;
-            entry.LongQuantity += Quantity;
+            entry.LongNotional += Price * quantity;
+            entry.LongQuantity += quantity; // always +ve
             entry.LongPrice = entry.LongNotional.ZeroDivision(entry.LongQuantity);
         }
         else if (Side == Side.Sell)
         {
-            entry.ShortNotional += Price * Quantity;
-            entry.ShortQuantity += Quantity;
+            entry.ShortNotional += Price * quantity;
+            entry.ShortQuantity += quantity; // always +ve
             entry.ShortPrice = entry.ShortNotional.ZeroDivision(entry.ShortQuantity);
         }
         entry.Notional = entry.ShortNotional - entry.LongNotional;
-        entry.Quantity += sign * Quantity;
-        entry.Price = entry.Notional.ZeroDivision(entry.Quantity);
+        entry.Quantity += signedQuantity; // this is signed
+        entry.Price = Math.Abs(entry.Notional.ZeroDivision(quantity));
     }
 
     public int CompareTo(Trade? trade)
@@ -147,6 +163,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
 
     public override string ToString()
     {
-        return $"[Id:{Id}][ETId:{ExternalTradeId}][{Time:yyMMdd-HHmmss}][SecId:{SecurityId}][PId:{PositionId}], {Side} p*q:{Price:G29}*{Quantity:G29}, [OId:{OrderId}][EOId:{ExternalOrderId}]";
+        return $"ID:{Id}, ETID:{ExternalTradeId}, T:{Time:yyMMdd-HHmmss}, SEC:{SecurityCode}, PID:{PositionId}, DETAILS:{{ SIDE:,{Side}, P:{Security.FormatPrice(Price)}, Q:{Security.FormatQuantity(Quantity)}}}, OID:{OrderId}, EOID:{ExternalOrderId}";
     }
 }

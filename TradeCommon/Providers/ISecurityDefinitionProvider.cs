@@ -15,6 +15,15 @@ public interface ISecurityDefinitionProvider
     Security? GetSecurity(string? code);
 
     /// <summary>
+    /// Gets an FX security by its base and quote currencies.
+    /// It is possible to return null when not found.
+    /// </summary>
+    /// <param name="baseCurrency"></param>
+    /// <param name="quoteCurrency"></param>
+    /// <returns></returns>
+    Security? GetFxSecurity(string baseCurrency, string quoteCurrency);
+
+    /// <summary>
     /// Gets a security by its unique id. Throws exception if not found.
     /// </summary>
     /// <param name="securityId"></param>

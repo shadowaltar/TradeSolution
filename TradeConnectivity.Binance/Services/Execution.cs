@@ -36,6 +36,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     private readonly IdGenerator _tradeIdGenerator;
     private readonly ConcurrentDictionary<string, ExtendedWebSocket> _webSockets = new();
 
+    private readonly HashSet<long> _processedExternalTradeIds = new();
+
     private readonly MessageBroker<EventInvokerTask> _broker = new();
 
     private static readonly Dictionary<OrderType, string> _orderTypeToParameters = new()
@@ -56,7 +58,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     public event AllOrderCancelledCallback? AllOrderCancelled;
     public event OrderReceivedCallback? OrderReceived;
     public event TradeReceivedCallback? TradeReceived;
-    public event TradesReceivedCallback? TradesReceived;
 
     public event AssetsChangedCallback? AssetsChanged;
     public event TransferredCallback? Transferred;
@@ -146,21 +147,45 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
         var trades = new List<Trade>();
 
-        Parse(jsonNode, order, trades); // will change the order status accordingly
-        if (order.Status == OrderStatus.Unknown)
+        var receivedOrder = new Order
+        {
+            Id = order.Id,
+            Action = order.Action,
+            AccountId = _context.AccountId,
+            CreateTime = order.CreateTime,
+            
+            Side = order.Side,
+            Price = order.Price,
+            Quantity = order.Quantity,
+
+            Security = order.Security,
+            SecurityCode = order.SecurityCode,
+            SecurityId = order.SecurityId,
+        };
+
+        Parse(jsonNode, receivedOrder, trades); // will change the order status accordingly
+        if (receivedOrder.Status == OrderStatus.Unknown)
         {
             // binance's stop-loss-limit order when sent it returns without status
-            if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
-                order.Status = OrderStatus.Sending;
+            if (receivedOrder.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
+                receivedOrder.Status = OrderStatus.Sending;
         }
-        var state = ExternalQueryStates.SendOrder(order, content, connId, isOk).RecordTimes(rtt, swTotal);
+        var state = ExternalQueryStates.SendOrder(receivedOrder, content, connId, isOk).RecordTimes(rtt, swTotal);
 
         // raise events, and prevent other places to invoke events
         _broker.Enqueue(new EventInvokerTask(() =>
         {
-            OrderPlaced?.Invoke(order.IsGood, state);
+            OrderPlaced?.Invoke(receivedOrder.IsGood, state);
             if (!trades.IsNullOrEmpty())
-                TradesReceived?.Invoke(trades, true);
+            {
+                foreach (var trade in trades)
+                {
+                    if (!_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
+                    {
+                        TradeReceived?.Invoke(trade);
+                    }
+                }
+            }
         }));
         return state;
 
@@ -179,6 +204,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             order.ExternalUpdateTime = json.GetUtcFromUnixMs("workingTime");
             order.Price = json.GetDecimal("price"); // need trades to get the price if type = MARKET
             order.UpdateTime = DateUtils.Max(order.ExternalCreateTime, order.ExternalUpdateTime);
+            var isOperational = order.Action == OrderActionType.Operational;
 
             var fillsObj = json["fills"]?.AsArray();
             if (fillsObj != null && fillsObj.Count != 0)
@@ -207,7 +233,8 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         FeeAssetCode = item.GetString("commissionAsset"),
                         FeeAssetId = 0, // cannot be determined until executing in service layer logic
                         Time = order.ExternalUpdateTime,
-                        PositionId = 0 // TODO
+                        PositionId = 0, // to be filled in later
+                        IsOperational = isOperational,
                     };
                     trades.Add(trade);
                     averagePrice = (averagePrice * tradedQuantity + trade.Price * trade.Quantity) / (tradedQuantity + trade.Quantity);
@@ -591,6 +618,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
         if (start != null && end != null && end <= start)
             return ExternalQueryStates.InvalidArgument(ActionType.GetTrade, "Start time must be smaller than end time.");
 
+        end ??= DateTime.UtcNow;
         if (end != null && start != null && end - start > TimeSpans.OneDay)
         {
             // Binance allows 24h retrieval only
@@ -1010,17 +1038,17 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                             FeeAssetCode = feeAssetCode,
                             FeeAssetId = 0, // need to be filled later
                             OrderId = 0, // need to be filled later
-                            Price = lastExecutedPrice, // TODO
-                            Quantity = lastExecutedQuantity, // TODO
-                            Time = updateTime, // TODO
-                            PositionId = 0, // TODO
+                            Price = lastExecutedPrice,
+                            Quantity = lastExecutedQuantity,
+                            Time = updateTime,
+                            PositionId = 0, // need to be filled later
                         };
                     }
 
                     _broker.Enqueue(new EventInvokerTask(() =>
                     {
                         OrderReceived?.Invoke(order);
-                        if (trade != null)
+                        if (trade != null && !_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
                             TradeReceived?.Invoke(trade);
                     }));
 

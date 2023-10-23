@@ -63,34 +63,37 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                 ?? throw Exceptions.MissingAssetPosition(current.Security.QuoteSecurity.Code);
 
             var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
-            var order = CreateOrder(OrderType.Market, side, enterTime, 0, size, current.Security, comment: Comments.AlgoEnter);
-            //var order = CreateOrder(OrderType.Limit, side, enterTime, enterPrice, size, current.Security, comment: Comments.AlgoEnter);
+            var order = CreateOrder(OrderType.Market, side, enterTime, 0, size, current.Security,
+                OrderActionType.AlgoOpen, comment: Comments.AlgoEnterMarket);
             var state = await _orderService.SendOrder(order);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                //if (stopLossPrice.IsValid() && stopLossPrice > 0)
-                //{
-                //    if (stopLossPrice >= enterPrice)
-                //    {
-                //        _log.Error($"Cannot create a stop loss limit order where its price {stopLossPrice} is larger than or equals to the parent order's limit price {enterPrice}.");
-                //    }
-                //    else
-                //    {
-                //        await OpenStopLossOrder(current, enterPrice, side, enterTime, stopLossPrice, size, order, state);
-                //    }
-                //}
+                if (false) // unused logic
+                {
+                    if (stopLossPrice.IsValid() && stopLossPrice > 0)
+                    {
+                        if (stopLossPrice >= enterPrice)
+                        {
+                            _log.Error($"Cannot create a stop loss limit order where its price {stopLossPrice} is larger than or equals to the parent order's limit price {enterPrice}.");
+                        }
+                        else
+                        {
+                            await OpenStopLossOrder(current, enterPrice, side, enterTime, stopLossPrice, size, order, state);
+                        }
+                    }
 
-                //if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
-                //{
-                //    if (takeProfitPrice <= enterPrice)
-                //    {
-                //        _log.Error($"Cannot create a take profit limit order where its price {takeProfitPrice} is smaller than or equals to the parent order's limit price {enterPrice}.");
-                //    }
-                //    else
-                //    {
-                //        await OpenTakeProfitOrder(current, enterPrice, side, enterTime, takeProfitPrice, size, order, state);
-                //    }
-                //}
+                    if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
+                    {
+                        if (takeProfitPrice <= enterPrice)
+                        {
+                            _log.Error($"Cannot create a take profit limit order where its price {takeProfitPrice} is smaller than or equals to the parent order's limit price {enterPrice}.");
+                        }
+                        else
+                        {
+                            await OpenTakeProfitOrder(current, enterPrice, side, enterTime, takeProfitPrice, size, order, state);
+                        }
+                    }
+                }
             }
             return state;
         }
@@ -111,47 +114,41 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
     {
         var stopPrice = current.Security.RoundTickSize((enterPrice - stopLossPrice) * Consts.StopPriceRatio + stopLossPrice, enterPrice);
         var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
-
-        //var slOrder = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security, stopLossPrice, comment: Comments.AlgoStopLossMarket);
-
-        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security, stopPrice, Comments.AlgoStopLossLimit);
+        var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security,
+            OrderActionType.AlgoPlacedStopLoss, stopPrice, Comments.AlgoStopLossLimit);
         slOrder.ParentOrderId = parentOrder.Id;
         var subState = await _orderService.SendOrder(slOrder);
         parentState.SubStates ??= new();
         parentState.SubStates.Add(subState);
         if (subState.ResultCode == ResultCode.SendOrderFailed)
         {
-            // case 1, supports Stop Loss order
-            _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
-            var slOrder2 = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security, stopLossPrice, comment: Comments.AlgoStopLossMarket);
+            _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_P:{stopPrice}, LIMITP:{stopLossPrice}, CURRENT_P:{enterPrice}");
+            var slOrder2 = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security,
+                OrderActionType.AlgoPlacedStopLoss, stopLossPrice, comment: Comments.AlgoStopLossMarket);
             slOrder2.ParentOrderId = parentOrder.Id;
             var subState2 = await _orderService.SendOrder(slOrder2);
             if (subState2.ResultCode == ResultCode.SendOrderFailed)
             {
-                _log.Error($"Failed to submit stop loss market order! [{slOrder2.Id}][{slOrder2.SecurityCode}] SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
+                _log.Error($"Failed to submit stop loss market order! [{slOrder2.Id}][{slOrder2.SecurityCode}] SL_PRX:{stopLossPrice}, CURRENT_P:{enterPrice}");
             }
             parentState.SubStates.Add(subState2);
-
-            // case 2, do not support Stop Loss order; immediately close position
-            // cancel any open order due to partial fills
-            // then create market order to close position
-            //_log.Error($"Failed to submit stop loss limit order! Now close the position immediately: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
         }
     }
 
 
     private async Task OpenTakeProfitOrder(AlgoEntry current,
-                                         decimal enterPrice,
-                                         Side side,
-                                         DateTime enterTime,
-                                         decimal takeProfitPrice,
-                                         decimal size,
-                                         Order parentOrder,
-                                         ExternalQueryState parentState)
+                                           decimal enterPrice,
+                                           Side side,
+                                           DateTime enterTime,
+                                           decimal takeProfitPrice,
+                                           decimal size,
+                                           Order parentOrder,
+                                           ExternalQueryState parentState)
     {
         var stopPrice = (enterPrice - takeProfitPrice) * Consts.StopPriceRatio + takeProfitPrice;
         var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
-        var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security, stopPrice, Comments.AlgoTakeProfitLimit);
+        var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security,
+            OrderActionType.AlgoPlacedTakeProfit, stopPrice, Comments.AlgoTakeProfitLimit);
         tpOrder.ParentOrderId = parentOrder.Id;
         var subState = await _orderService.SendOrder(tpOrder);
         if (subState.ResultCode == ResultCode.SendOrderFailed)
@@ -163,21 +160,16 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
 
         if (subState.ResultCode == ResultCode.SendOrderFailed)
         {
-            // case 1, supports Stop Loss order
-            _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{tpOrder.Id}][{tpOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{takeProfitPrice}, CURRENT_PRX:{enterPrice}");
-            var slOrder2 = CreateOrder(OrderType.Stop, tpSide, enterTime, 0, size, current.Security, takeProfitPrice, comment: Comments.AlgoStopLossMarket);
-            slOrder2.ParentOrderId = parentOrder.Id;
-            var subState2 = await _orderService.SendOrder(slOrder2);
+            _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{tpOrder.Id}][{tpOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{takeProfitPrice}, CURRENT_P:{enterPrice}");
+            var tpOrder2 = CreateOrder(OrderType.Stop, tpSide, enterTime, 0, size, current.Security,
+                OrderActionType.AlgoPlacedTakeProfit, takeProfitPrice, comment: Comments.AlgoTakeProfitMarket);
+            tpOrder2.ParentOrderId = parentOrder.Id;
+            var subState2 = await _orderService.SendOrder(tpOrder2);
             if (subState2.ResultCode == ResultCode.SendOrderFailed)
             {
-                _log.Error($"Failed to submit stop loss market order! [{slOrder2.Id}][{slOrder2.SecurityCode}] SL_PRX:{takeProfitPrice}, CURRENT_PRX:{enterPrice}");
+                _log.Error($"Failed to submit stop loss market order! [{tpOrder2.Id}][{tpOrder2.SecurityCode}] SL_PRX:{takeProfitPrice}, CURRENT_P:{enterPrice}");
             }
             parentState.SubStates.Add(subState2);
-
-            // case 2, do not support Stop Loss order; immediately close position
-            // cancel any open order due to partial fills
-            // then create market order to close position
-            //_log.Error($"Failed to submit stop loss limit order! Now close the position immediately: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{stopLossPrice}, CURRENT_PRX:{enterPrice}");
         }
     }
 
@@ -187,6 +179,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                               decimal price,
                               decimal quantity,
                               Security security,
+                              OrderActionType actionType,
                               decimal? stopPrice = null,
                               string comment = "")
     {
@@ -223,26 +216,14 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             SecurityCode = security.Code,
             Status = OrderStatus.Sending,
             TimeInForce = TimeInForceType.GoodTillCancel,
+            Action = actionType,
             Comment = comment,
         };
         if (stopPrice != null)
         {
             order.StopPrice = stopPrice.Value;
         }
-
-        _log.Info(PrintOrder(order));
         return order;
-    }
-
-    private string PrintOrder(Order order)
-    {
-        var filledQtyStr = "";
-        if (order.Status == OrderStatus.PartialFilled)
-            filledQtyStr = ", FILLQTY:" + order.FormattedFilledQuantity;
-        if (order.Type == OrderType.StopLimit || order.Type == OrderType.TakeProfitLimit)
-            return $"\n\tORD: [AlgoEnter][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, SLPRX:{order.FormattedStopPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
-        else
-            return $"\n\tORD: [AlgoEnter][{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Side}][{order.Status}]\n\t\tID:{order.Id}, PRX:{order.FormattedPrice}, QTY:{order.FormattedQuantity}{filledQtyStr}";
     }
 
     public void BackTestOpen(AlgoEntry current,
@@ -279,7 +260,6 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         else if (current.EnterTime != null)
             current.Elapsed = enterTime - current.EnterTime; // happens at 2nd or later fills
         current.RealizedPnl = 0;
-        current.UnrealizedPnl = 0;
         current.RealizedReturn = 0;
         current.Notional = size * enterPrice;
     }

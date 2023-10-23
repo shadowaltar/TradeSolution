@@ -1,11 +1,6 @@
-﻿using Azure;
-using BenchmarkDotNet.Running;
-using Common;
-using Iced.Intel;
+﻿using Common;
 using Microsoft.IdentityModel.Tokens;
-using OfficeOpenXml.Style;
 using System.Diagnostics;
-using System.Security;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -114,44 +109,6 @@ public interface INetworkTimeState
 {
     long NetworkRoundtripTime { get; set; }
     long TotalTime { get; set; }
-}
-
-public enum SubscriptionType
-{
-    Unknown,
-    All,
-    TickData,
-    MarketData,
-    RealTimeMarketData,
-    HistoricalMarketData,
-    RealTimeExecutionData,
-}
-
-public enum ActionType
-{
-    Unknown,
-    Connect,
-    Disconnect,
-    Subscribe,
-    Unsubscribe,
-
-    SendOrder,
-    CancelOrder,
-    UpdateOrder,
-
-    GetAccount,
-    GetTrade,
-    GetOrder,
-    GetPosition,
-    GetPrice,
-
-    GetMisc,
-    GetSubscription,
-    GetFrequencyRestriction,
-
-    Deposit,
-    Withdraw,
-    ManualStopLoss,
 }
 
 

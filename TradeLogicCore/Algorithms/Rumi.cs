@@ -164,6 +164,21 @@ public class Rumi : Algorithm
         return !openOrders.IsNullOrEmpty();
     }
 
+    public override void AfterPositionClosed(AlgoEntry entry)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide)
+    {
+        throw new NotImplementedException();
+    }
+
     public override bool ShallStopLoss(int securityId, Tick tick)
     {
         throw new NotImplementedException();
@@ -174,7 +189,7 @@ public class Rumi : Algorithm
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime)
+    public override Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
         throw new NotImplementedException();
     }
