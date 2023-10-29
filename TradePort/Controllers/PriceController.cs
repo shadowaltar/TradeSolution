@@ -28,22 +28,22 @@ public class PriceController : Controller
 
     [HttpGet("order-books/recorder/start")]
     public async Task<ActionResult> StartOrderBookRecorder([FromServices] ISecurityService securityService,
-
-        [FromForm(Name = "admin-password")] string adminPassword,
-        [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
-        [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-        [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
-        [FromQuery(Name = "level")] int level = 5)
+                                                           [FromForm(Name = "admin-password")] string adminPassword,
+                                                           [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
+                                                           [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+                                                           [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
+                                                           [FromQuery(Name = "level")] int level = 5)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (level < 1 || level > 10) return BadRequest("Level must be within 1-10.");
         if (environment == EnvironmentType.Unknown) return BadRequest("Invalid environment");
 
-        var security = securityService.GetSecurity(securityCode, exchange );
+        var security = securityService.GetSecurity(securityCode, exchange);
         if (security == null) return BadRequest("Invalid security.");
 
         var uniqueProcessName = $"ORDER_BOOK_RECORDER_{securityCode.ToUpperInvariant()}_{exchange.ToString().ToUpperInvariant()}_{level}";
-        if (Processes.IsExistsInSystem(uniqueProcessName)) {
+        if (Processes.IsExistsInSystem(uniqueProcessName))
+        {
             return Ok($"Process {uniqueProcessName} already exists.");
         }
 
@@ -281,7 +281,7 @@ public class PriceController : Controller
     [HttpGet("{exchangeStr}/get-and-save-one")]
     public async Task<ActionResult> GetAndSaveHongKongOne([FromServices] ISecurityService securityService,
                                                           [FromServices] IStorage storage,
-                                                          [FromQuery(Name = "exchangeStr")] string exchangeStr = ExternalNames.Hkex,
+                                                          [FromQuery(Name = "exchange")] string exchangeStr = ExternalNames.Hkex,
                                                           string code = "00001",
                                                           [FromQuery(Name = "sec-type")] string secTypeStr = "equity",
                                                           [FromQuery(Name = "interval")] string intervalStr = "1h",

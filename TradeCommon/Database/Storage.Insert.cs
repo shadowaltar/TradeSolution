@@ -130,11 +130,13 @@ public partial class Storage
             }
             askPart = askPart[..^2];
             askValuePart = askValuePart[..^2];
-            command.CommandText = $"UPDATE {tableName} ({bidPart}{askPart}) VALUES ({bidValuePart}{askValuePart})";
+            command.CommandText = $"INSERT INTO {tableName} (SecurityId, Time, {bidPart}{askPart}) VALUES ($SecId, $Time, {bidValuePart}{askValuePart})";
 
             foreach (var orderBook in orderBooks)
             {
                 command.Parameters.Clear();
+                command.Parameters.AddWithValue("$SecId", orderBook.SecurityId);
+                command.Parameters.AddWithValue("$Time", orderBook.Time);
                 for (int i = 0; i < level; i++)
                 {
                     var idx = i + 1;

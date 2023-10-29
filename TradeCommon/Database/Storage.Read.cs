@@ -226,6 +226,16 @@ WHERE
 
     public async Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type)
     {
+        if (type == SecurityType.Unknown)
+        {
+            foreach (var secType in Consts.SupportedSecurityTypes)
+            {
+                var s = await ReadSecurity(exchange, code, secType);
+                if (s != null) return s;
+            }
+            return null;
+        }
+
         var tableName = DatabaseNames.GetDefinitionTableName(type);
         if (tableName.IsBlank())
             return null;

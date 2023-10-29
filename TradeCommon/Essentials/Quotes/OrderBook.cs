@@ -3,8 +3,8 @@
 namespace TradeCommon.Essentials.Quotes;
 public record OrderBook
 {
-    public List<OrderBookLevel> Bids { get; } = new();
-    public List<OrderBookLevel> Asks { get; } = new();
+    public List<OrderBookLevel> Bids { get; set; } = new();
+    public List<OrderBookLevel> Asks { get; set; } = new();
     public decimal BestBid => Bids.Count == 0 ? 0 : Bids[0].Price;
     public decimal BestBidSize => Bids.Count == 0 ? 0 : Bids[0].Size;
     public decimal BestAsk => Asks.Count == 0 ? 0 : Asks[0].Price;

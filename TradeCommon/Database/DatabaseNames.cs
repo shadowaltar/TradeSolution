@@ -191,7 +191,7 @@ public static class DatabaseNames
 
     public static string GetOrderBookTableName(string securityCode, ExchangeType exchange, int level)
     {
-        return $"{securityCode.ToLower()}-{exchange.ToString().ToLower()}-{level}-order_book";
+        return $"order_book_{level}_{exchange.ToString().ToLower()}_{securityCode.ToLower()}";
     }
 
     public static string GetTradeOrderPositionIdTable(SecurityType type)

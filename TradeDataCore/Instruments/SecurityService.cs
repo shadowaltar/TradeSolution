@@ -121,14 +121,14 @@ public class SecurityService : ISecurityService
     public async Task<Security?> GetSecurity(string code, string exchange, bool requestExternal = false)
     {
         var exchangeType = ExchangeTypeConverter.Parse(exchange);
-        return await GetSecurity(code, exchangeType, requestExternal);
+        return await GetSecurity(code, exchangeType, SecurityType.Unknown, requestExternal);
     }
 
-    public async Task<Security?> GetSecurity(string code, ExchangeType exchange, bool requestExternal = false)
+    public async Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType = SecurityType.Unknown, bool requestExternal = false)
     {
         if (requestExternal)
         {
-            var security = await _storage.ReadSecurity(exchange, code, SecurityType.Unknown);
+            var security = await _storage.ReadSecurity(exchange, code, securityType);
             return security;
         }
         else
