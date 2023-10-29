@@ -5,7 +5,6 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
-using TradeConnectivity.Binance.Services;
 using TradeDataCore.Instruments;
 using static TradeCommon.Utils.Delegates;
 
@@ -20,6 +19,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public event OhlcPriceReceivedCallback? NextOhlc;
     public event TickPriceReceivedCallback? NextTick;
+    public event OrderBookReceivedCallback? NextOrderBook;
     public event Action<int>? HistoricalPriceEnd;
 
     private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = new();
@@ -36,6 +36,8 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         _external.NextOhlc += OnNextOhlc;
         _external.NextTick -= OnNextTick;
         _external.NextTick += OnNextTick;
+        _external.NextOrderBook -= OnNextOrderBook;
+        _external.NextOrderBook += OnNextOrderBook;
     }
 
     private void OnNextOhlc(int securityId, OhlcPrice price, bool isComplete)
@@ -46,6 +48,11 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     private void OnNextTick(ExtendedTick tick)
     {
         NextTick?.Invoke(tick.SecurityId, tick.SecurityCode, tick);
+    }
+
+    private void OnNextOrderBook(ExtendedOrderBook orderBook)
+    {
+        NextOrderBook?.Invoke(orderBook);
     }
 
     public async Task Initialize()
@@ -99,7 +106,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
             if (c == 1)
             {
                 // need to subscribe
-                return await _external.SubscribeOhlc(security, interval);
+                return _external.SubscribeOhlc(security, interval);
             }
             else
             {
@@ -141,7 +148,12 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public async Task<ExternalConnectionState> SubscribeTick(Security security)
     {
-        return await _external.SubscribeTick(security);
+        return _external.SubscribeTick(security);
+    }
+
+    public async Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null)
+    {
+        return _external.SubscribeOrderBook(security, 5);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
@@ -164,6 +176,11 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     }
 
     public Task<ExternalConnectionState> UnsubscribeAllTicks()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
     {
         throw new NotImplementedException();
     }

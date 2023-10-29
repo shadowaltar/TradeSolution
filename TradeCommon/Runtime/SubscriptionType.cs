@@ -4,7 +4,8 @@ public enum SubscriptionType
 {
     Unknown,
     All,
-    TickData,
+    TickPrice,
+    OrderBook,
     MarketData,
     RealTimeMarketData,
     HistoricalMarketData,

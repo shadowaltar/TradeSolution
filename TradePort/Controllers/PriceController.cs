@@ -9,6 +9,8 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
+using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeDataCore.Essentials;
 using TradeDataCore.Instruments;
 using TradePort.Utils;
@@ -23,6 +25,30 @@ namespace TradePort.Controllers;
 public class PriceController : Controller
 {
     private static readonly ILog _log = Logger.New();
+
+    [HttpGet("order-books/recorder/start")]
+    public async Task<ActionResult> StartOrderBookRecorder([FromServices] ISecurityService securityService,
+
+        [FromForm(Name = "admin-password")] string adminPassword,
+        [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
+        [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+        [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
+        [FromQuery(Name = "level")] int level = 5)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (level < 1 || level > 10) return BadRequest("Level must be within 1-10.");
+        if (environment == EnvironmentType.Unknown) return BadRequest("Invalid environment");
+
+        var security = securityService.GetSecurity(securityCode, exchange );
+        if (security == null) return BadRequest("Invalid security.");
+
+        var uniqueProcessName = $"ORDER_BOOK_RECORDER_{securityCode.ToUpperInvariant()}_{exchange.ToString().ToUpperInvariant()}_{level}";
+        if (Processes.IsExistsInSystem(uniqueProcessName)) {
+            return Ok($"Process {uniqueProcessName} already exists.");
+        }
+
+        return Ok($"Process {uniqueProcessName} is just started.");
+    }
 
     /// <summary>
     /// Get prices given exchangeStr, code, interval and start time.
@@ -291,7 +317,7 @@ public class PriceController : Controller
     /// <param name="concatenatedSymbols">Optional security code filter, case-insensitive, comma-delimited: 00001,00002 or BTCUSDT,BTCTUSD, etc.</param>
     /// <param name="rangeStr">Case-insensitive, 1mo, 1y, 6mo etc.</param>
     /// <returns></returns>
-    [HttpGet("{exchangeStr}/download-json")]
+    [HttpGet("{exchangeStr}/download-ohlc-as-json")]
     public async Task<ActionResult> DownloadAll([FromServices] ISecurityService securityService,
                                                 [FromRoute(Name = "exchangeStr")] string exchangeStr = "binance",
                                                 [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
@@ -347,7 +373,7 @@ public class PriceController : Controller
     /// <param name="intervalStr"></param>
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
-    [HttpGet("metrics/all-row-count")]
+    [HttpGet("metrics/ohlc-entry-count")]
     public async Task<ActionResult> Count([FromServices] IStorage storage,
                                           [FromQuery(Name = "interval")] string intervalStr = "1h",
                                           [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
@@ -363,7 +389,7 @@ public class PriceController : Controller
     /// Get the count of price entries for each ticker in database.
     /// </summary>
     /// <returns></returns>
-    [HttpGet("metrics/per-security-row-count")]
+    [HttpGet("metrics/ohlc-entry-count-per-security")]
     public async Task<ActionResult> ReportPriceCount([FromServices] IStorage storage,
                                                      [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                      [FromQuery(Name = "sec-type")] string secTypeStr = "equity")
@@ -401,7 +427,7 @@ public class PriceController : Controller
     /// <param name="intervalStr"></param>
     /// <param name="secTypeStr"></param>
     /// <returns></returns>
-    [HttpGet("metrics/daily-price-count")]
+    [HttpGet("metrics/ohlc-entry-count-per-day")]
     public async Task<ActionResult> ReportDailyPriceEntryCount([FromServices] IStorage storage,
                                                                [FromQuery(Name = "interval")] string intervalStr = "1h",
                                                                [FromQuery(Name = "sec-type")] string secTypeStr = "equity")

@@ -521,7 +521,8 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
 		)
 	)
 )";
-            if (!_storage.TryReadScalar<long>(sql, tradeDb, out var minId))
+            var (isGood, minId) = await _storage.TryReadScalar<long>(sql, tradeDb);
+            if (!isGood)
             {
                 // it means the very first trade in trades table has zero pid
                 minId = trades.Min(t => t.Id);

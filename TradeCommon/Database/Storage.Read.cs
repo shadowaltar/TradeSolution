@@ -26,18 +26,16 @@ public partial class Storage
         return await SqlReader.ReadMany<T>(tableName, database, sql);
     }
 
-    public bool TryReadScalar<T>(string sql, string database, out T value)
+    public async Task<(bool, T)> TryReadScalar<T>(string sql, string database)
     {
-        value = default;
         var typeCode = TypeConverter.ToTypeCode(typeof(T));
-        var dt = AsyncHelper.RunSync(() => Query(sql, database, typeCode));
-        if (dt.Rows.Count == 0) return false;
-        if (dt.Rows[0][0] is T value1)
+        var dt = await Query(sql, database, typeCode);
+        if (dt.Rows.Count == 0) return (false, default);
+        if (dt.Rows[0][0] is T value)
         {
-            value = value1;
-            return true;
+            return (true, value);
         }
-        return false;
+        return (false, default);
     }
 
     public async Task<User?> ReadUser(string userName, string email, EnvironmentType environment)

@@ -1,6 +1,5 @@
 ﻿using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using static TradeCommon.Utils.Delegates;
@@ -9,14 +8,17 @@ namespace TradeDataCore.MarketData;
 public interface IMarketDataService
 {
     /// <summary>
-    /// Event when next OHLC price is fetched. Returns security Id and the price instance.
-    /// Parameters: securityId, price, is the price at end of bar.
+    /// Event when next OHLC price is fetched. Returns security Id and the OHLC price instance.
     /// </summary>
     event OhlcPriceReceivedCallback? NextOhlc;
     /// <summary>
-    /// Event when next tick price is fetched. Returns security Id and the price instance.
+    /// Event when next tick price is fetched. Returns security Id and the tick price instance.
     /// </summary>
     event TickPriceReceivedCallback? NextTick;
+    /// <summary>
+    /// Event when next order book is fetched. Returns security Id and the order book instance.
+    /// </summary>
+    event OrderBookReceivedCallback? NextOrderBook;
     /// <summary>
     /// Event when no more historical price would be output. Returns total price count.
     /// </summary>
@@ -29,6 +31,8 @@ public interface IMarketDataService
     Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null);
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval);
     Task<ExternalConnectionState> UnsubscribeAllOhlcs();
+    Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null);
+    Task<ExternalConnectionState> UnsubscribeOrderBook(Security security);
 
     Task<ExternalConnectionState> SubscribeTick(Security security);
     Task<ExternalConnectionState> UnsubscribeTick(Security security);

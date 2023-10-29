@@ -2,6 +2,7 @@
 using Common.Attributes;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
+using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
@@ -22,7 +23,7 @@ public static class DatabaseNames
     public const string ExecutionData = "execution_data";
 
     public const string AccountTable = "accounts";
-    public const string BalanceTable = "assets";
+    public const string AssetTable = "assets";
     public const string UserTable = "users";
 
     public const string StockDefinitionTable = "stock_definitions";
@@ -188,6 +189,11 @@ public static class DatabaseNames
         return tableName;
     }
 
+    public static string GetOrderBookTableName(string securityCode, ExchangeType exchange, int level)
+    {
+        return $"{securityCode.ToLower()}-{exchange.ToString().ToLower()}-{level}-order_book";
+    }
+
     public static string GetTradeOrderPositionIdTable(SecurityType type)
     {
         return type switch
@@ -219,6 +225,7 @@ public static class DatabaseNames
         specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
         return (specificTable, existing.databaseName);
     }
+
     public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T entry) where T : class
     {
         var type = typeof(T);

@@ -163,7 +163,7 @@ public static class Exceptions
         return new InvalidOperationException("Trades must with the same security.");
     }
 
-    public static Exception NotImplemented(string message)
+    public static Exception NotImplemented(string message = "")
     {
         return new NotImplementedException(message);
     }

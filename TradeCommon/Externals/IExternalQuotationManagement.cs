@@ -12,25 +12,25 @@ public interface IExternalQuotationManagement
 
     public event Action<ExtendedTick>? NextTick;
 
-    public event Action<int, OrderBook>? NextOrderBook;
+    public event Action<ExtendedOrderBook>? NextOrderBook;
 
     Task<ExternalConnectionState> Initialize();
 
     Task<ExternalQueryState> GetPrices(params string[] symbols);
 
-    Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType intervalType);
+    ExternalConnectionState SubscribeTick(Security security);
+
+    ExternalConnectionState SubscribeOrderBook(Security security, int? level = null);
+
+    ExternalConnectionState SubscribeOhlc(Security security, IntervalType intervalType);
+
+    Task<ExternalConnectionState> UnsubscribeTick(Security security);
+
+    Task<ExternalConnectionState> UnsubscribeOrderBook(Security security);
 
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType);
     
     Task<ExternalConnectionState> UnsubscribeAllOhlc();
-
-    Task<ExternalConnectionState> SubscribeTick(Security security);
-
-    Task<ExternalConnectionState> UnsubscribeTick(Security security);
-
-    Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType);
-
-    Task<ExternalConnectionState> UnsubscribeOrderBook(Security security, IntervalType intervalType);
 
     Task<OrderBook?> GetCurrentOrderBook(Security security);
 }

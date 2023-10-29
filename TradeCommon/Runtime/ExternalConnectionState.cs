@@ -435,7 +435,7 @@ public static class ExternalConnectionStates
         ResultCode = ResultCode.UnsubscriptionOk,
         ExternalId = BrokerId,
         Description = $"Unsubscribed tick data for {security.Id}",
-        Type = SubscriptionType.TickData,
+        Type = SubscriptionType.TickPrice,
         UniqueConnectionId = "",
     };
 
@@ -445,7 +445,7 @@ public static class ExternalConnectionStates
         ResultCode = ResultCode.UnsubscriptionFailed,
         ExternalId = BrokerId,
         Description = $"Failed to unsubscribed tick data for {security.Id}",
-        Type = SubscriptionType.TickData,
+        Type = SubscriptionType.TickPrice,
         UniqueConnectionId = "",
     };
 

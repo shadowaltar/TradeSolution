@@ -75,5 +75,9 @@ public static class NumericExtensions
 
     public static double ToDouble(this decimal value) => decimal.ToDouble(value);
 
+    public static double ToDouble(this string value) => double.TryParse(value, out var val) ? val : double.NaN;
+
+    public static decimal ToDecimal(this string value) => decimal.TryParse(value, out var val) ? val : decimal.MinValue;
+
     public static string NAIfInvalid(this decimal value, string? format = null) => value.IsValid() ? (format != null ? value.ToString(format) : value.ToString()) : "N/A";
 }

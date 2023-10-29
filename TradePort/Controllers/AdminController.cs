@@ -372,8 +372,8 @@ public class AdminController : Controller
                 resultTableNames.Add(DatabaseNames.AccountTable);
                 break;
             case DataType.Asset:
-                await storage.CreateBalanceTable();
-                resultTableNames.Add(DatabaseNames.BalanceTable);
+                await storage.CreateAssetTable();
+                resultTableNames.Add(DatabaseNames.AssetTable);
                 break;
             case DataType.User:
                 await storage.CreateUserTable();

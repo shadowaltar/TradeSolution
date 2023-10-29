@@ -13,9 +13,12 @@ using TradeDataCore.Instruments;
 using TradeCommon.Essentials.Quotes;
 using Common;
 using TradeCommon.Externals;
+using TradeCommon.Database;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
+
+var buffer = new List<ExtendedOrderBook>();
 
 var log = Logger.New();
 var exchange = ExchangeType.Binance;
@@ -28,21 +31,35 @@ Register(ExternalNames.Convert(exchange), exchange, environment);
 var connectivity = _componentContext.Resolve<IExternalConnectivityManagement>();
 connectivity.SetEnvironment(environment);
 var service = _componentContext.Resolve<IMarketDataService>();
+var storage = _componentContext.Resolve<IStorage>();
 var securityService = _componentContext.Resolve<ISecurityService>();
 await securityService.Initialize();
 
 var security = securityService.GetSecurity(symbol);
+service.NextOrderBook += OnNextOrderBook;
 
-service.NextTick += OnNextTick;
+var orderBookTableName = DatabaseNames.GetOrderBookTableName(symbol, ExchangeType.Binance, 5);
+var isExists = await storage.IsTableExists(orderBookTableName, DatabaseNames.MarketData);
+if (!isExists)
+    await storage.CreateOrderBookTable("btcusdt", ExchangeType.Binance, 5);
 
-await service.SubscribeTick(security);
+await service.SubscribeOrderBook(security);
 
 while (true)
     Thread.Sleep(1000);
 
-void OnNextTick(int securityId, string securityCode, Tick tick)
+void OnNextOrderBook(ExtendedOrderBook orderBook)
 {
-    log.Info(security.FormatTick(tick));
+    log.Info(orderBook);
+    var clone = orderBook with { };
+    clone.Bids.ClearAddRange(orderBook.Bids);
+    clone.Asks.ClearAddRange(orderBook.Asks);
+    buffer.Add(clone);
+    if (buffer.Count >= 10)
+    {
+        var orderBooks = new List<ExtendedOrderBook>(buffer);
+        var task = storage.InsertOrderBooks(orderBooks, orderBookTableName); // fire and forget
+    }
 }
 
 void Register(BrokerType broker, ExchangeType exchange, EnvironmentType environment, ContainerBuilder? builder = null)

@@ -21,4 +21,5 @@ public static class Delegates
 
     public delegate void OhlcPriceReceivedCallback(int securityId, OhlcPrice price, bool isComplete);
     public delegate void TickPriceReceivedCallback(int securityId, string securityCode, Tick tick);
+    public delegate void OrderBookReceivedCallback(ExtendedOrderBook orderBook);
 }

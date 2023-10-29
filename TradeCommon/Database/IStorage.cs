@@ -19,14 +19,15 @@ public interface IStorage
     event Action<object, Exception, string> Failed;
 
     IDatabaseSqlBuilder SqlHelper { get; }
-
+    Task<bool> IsTableExists(string tableName, string databaseName);
     Task CreateAccountTable();
-    Task CreateBalanceTable();
+    Task CreateAssetTable();
     Task CreateFinancialStatsTable();
     Task<string> CreateOpenOrderIdTable();
     Task<List<string>> CreateOrderTable(SecurityType securityType);
     Task<List<string>> CreatePositionTable(SecurityType securityType);
     Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType);
+    Task CreateOrderBookTable(string securityCode, ExchangeType exchange, int level);
     Task CreateSecurityTable(SecurityType type);
     Task<List<string>> CreateTradeTable(SecurityType securityType);
     Task CreateUserTable();
@@ -38,6 +39,7 @@ public interface IStorage
     Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null) where T : class, new();
     Task<int> Insert(PersistenceTask task);
     Task<int> Insert<T>(PersistenceTask task) where T : class, new();
+    Task<int> InsertOrderBooks(List<ExtendedOrderBook> orderBooks, string tableName);
     Task<int> Delete(PersistenceTask task);
     Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
     Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null) where T : class, new();
@@ -74,7 +76,7 @@ public interface IStorage
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
     Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new();
-    bool TryReadScalar<T>(string sql, string database, out T value);
+    Task<(bool, T)> TryReadScalar<T>(string sql, string database);
     Task<int> RunOne(string sql, string database);
     Task<int> RunMany(List<string> sqls, string database);
     void PurgeDatabase();

@@ -20,7 +20,7 @@ public class SecurityService : ISecurityService
     private static readonly ILog _log = Logger.New();
     private readonly Dictionary<int, Security> _securities = new();
     private readonly Dictionary<string, Security> _securitiesByCode = new();
-    private readonly Dictionary<(string code, ExchangeType exchange, SecurityType securityType), int> _mapping = new();
+    private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = new();
     private readonly ApplicationContext _context;
     private readonly IStorage _storage;
     private bool _isInitialized;
@@ -118,29 +118,24 @@ public class SecurityService : ISecurityService
         }
     }
 
-    public async Task<Security?> GetSecurity(string code, string exchange, string securityType, bool requestExternal = false)
+    public async Task<Security?> GetSecurity(string code, string exchange, bool requestExternal = false)
     {
         var exchangeType = ExchangeTypeConverter.Parse(exchange);
-        var secType = SecurityTypeConverter.Parse(securityType);
-        return await GetSecurity(code, exchangeType, secType, requestExternal);
+        return await GetSecurity(code, exchangeType, requestExternal);
     }
 
-    public async Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType, bool requestExternal = false)
+    public async Task<Security?> GetSecurity(string code, ExchangeType exchange, bool requestExternal = false)
     {
         if (requestExternal)
         {
-            var security = await _storage.ReadSecurity(exchange, code, securityType);
-            if (security != null)
-            {
-                await GetAllSecurities();
-            }
+            var security = await _storage.ReadSecurity(exchange, code, SecurityType.Unknown);
             return security;
         }
         else
         {
             lock (_securities)
             {
-                var id = _mapping.TryGetValue((code, exchange, securityType), out var temp) ? temp : 0;
+                var id = _mapping.TryGetValue((code, exchange), out var temp) ? temp : 0;
                 return id <= 0 ? null : _securities.GetValueOrDefault(id);
             }
         }
@@ -249,7 +244,7 @@ public class SecurityService : ISecurityService
                     _securitiesByCode[s.Code] = s;
                 }
 
-                _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), secType)] = s.Id;
+                _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange))] = s.Id;
 
                 // mark the fx for next loop; it includes both fx and assets
                 if (secType == SecurityType.Fx)
@@ -296,7 +291,7 @@ public class SecurityService : ISecurityService
         lock (_securities)
         {
             _securities[s.Id] = s;
-            _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange), SecurityTypeConverter.Parse(s.Type))] = s.Id;
+            _mapping[(s.Code, ExchangeTypeConverter.Parse(s.Exchange))] = s.Id;
         }
     }
 

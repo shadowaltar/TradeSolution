@@ -4,7 +4,6 @@ using log4net;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -32,10 +31,14 @@ public class Quotation : IExternalQuotationManagement
     private readonly Pool<ExtendedTick> _tickPool = new();
     private readonly Dictionary<int, ExtendedTick> _lastTicks = new();
 
+    private readonly Dictionary<int, MessageBroker<ExtendedOrderBook>> _orderBookBrokers = new();
+    private readonly Pool<ExtendedOrderBook> _orderBookPool = new();
+    private readonly Dictionary<int, ExtendedOrderBook> _lastOrderBooks = new();
+
     public string Name => ExternalNames.Binance;
 
     public event Action<int, OhlcPrice, bool>? NextOhlc;
-    public event Action<int, OrderBook>? NextOrderBook;
+    public event Action<ExtendedOrderBook>? NextOrderBook;
     public event Action<ExtendedTick>? NextTick;
 
     public Quotation(IExternalConnectivityManagement connectivity,
@@ -156,7 +159,7 @@ public class Quotation : IExternalQuotationManagement
         return ExternalQueryStates.QueryAccount(content, connId, account).RecordTimes(rtt, swOuter);
     }
 
-    public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval)
+    public ExternalConnectionState SubscribeOhlc(Security security, IntervalType interval)
     {
         if (interval == IntervalType.Unknown)
             interval = IntervalType.OneMinute;
@@ -240,7 +243,7 @@ public class Quotation : IExternalQuotationManagement
     public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval)
     {
         if (!security.IsFrom(ExternalNames.Binance))
-            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Unsubscribe);
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickPrice, ActionType.Unsubscribe);
 
         var broker = _ohlcPriceBrokers.ThreadSafeGetAndRemove((security.Id, interval));
         broker?.Dispose();
@@ -279,7 +282,7 @@ public class Quotation : IExternalQuotationManagement
             var depth = new OrderBookLevel
             {
                 Price = bid![0]!.AsValue().GetDecimal(),
-                Volume = bid![1]!.AsValue().GetDecimal()
+                Size = bid![1]!.AsValue().GetDecimal()
             };
             orderBook.Bids.Add(depth);
         }
@@ -288,17 +291,17 @@ public class Quotation : IExternalQuotationManagement
             var depth = new OrderBookLevel
             {
                 Price = ask![0]!.AsValue().GetDecimal(),
-                Volume = ask![1]!.AsValue().GetDecimal()
+                Size = ask![1]!.AsValue().GetDecimal()
             };
             orderBook.Asks.Add(depth);
         }
         return orderBook;
     }
 
-    public async Task<ExternalConnectionState> SubscribeTick(Security security)
+    public ExternalConnectionState SubscribeTick(Security security)
     {
         if (!security.IsFrom(ExternalNames.Binance))
-            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Subscribe);
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickPrice, ActionType.Subscribe);
 
         var wsName = $"{nameof(ExtendedTick)}_{security.Id}";
         var streamName = $"{security.Code.ToLowerInvariant()}@bookTicker";
@@ -312,7 +315,7 @@ public class Quotation : IExternalQuotationManagement
         var webSocket = new ExtendedWebSocket(_log);
         webSocket.Listen(uri, OnReceivedString, OnWebSocketCreated);
         Threads.WaitUntil(() => _webSockets.ThreadSafeContains(wsName));
-        return ExternalConnectionStates.Subscribed(SubscriptionType.TickData, message);
+        return ExternalConnectionStates.Subscribed(SubscriptionType.TickPrice, message);
 
 
         void OnWebSocketCreated()
@@ -361,10 +364,16 @@ public class Quotation : IExternalQuotationManagement
         _tickPool.Return(tick);
     }
 
+    private void OnNextOrderBook(ExtendedOrderBook orderBook)
+    {
+        NextOrderBook?.Invoke(orderBook);
+        _orderBookPool.Return(orderBook);
+    }
+
     public async Task<ExternalConnectionState> UnsubscribeTick(Security security)
     {
         if (!security.IsFrom(ExternalNames.Binance))
-            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickData, ActionType.Unsubscribe);
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickPrice, ActionType.Unsubscribe);
 
         // do not clear the lastTick cache, only the broker cache
         var broker = _tickBrokers.ThreadSafeGetAndRemove(security.Id);
@@ -378,12 +387,112 @@ public class Quotation : IExternalQuotationManagement
         return ExternalConnectionStates.UnsubscribedTickFailed(security);
     }
 
-    public Task<ExternalConnectionState> SubscribeOrderBook(Security security, IntervalType intervalType)
+    public ExternalConnectionState SubscribeOrderBook(Security security, int? level = null)
     {
-        throw new NotImplementedException();
+        if (!security.IsFrom(ExternalNames.Binance))
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.OrderBook, ActionType.Subscribe);
+
+        if (level == null)
+            throw Exceptions.NotImplemented(); // TODO, full depth book implementation
+
+        var wsName = $"{nameof(OrderBook)}_{security.Id}";
+        var streamName = $"{security.Code.ToLowerInvariant()}@depth{level}";
+        Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={streamName}");
+
+        _lastOrderBooks[security.Id] = new ExtendedOrderBook();
+        var broker = _orderBookBrokers.GetOrCreate(security.Id, () => new MessageBroker<ExtendedOrderBook>(security.Id), (k, v) => v.Run());
+        broker.NewItem += OnNextOrderBook; // broker.Dispose() will clear this up if needed
+
+        string message = "";
+        var webSocket = new ExtendedWebSocket(_log);
+        webSocket.Listen(uri, OnReceivedString, OnWebSocketCreated);
+        Threads.WaitUntil(() => _webSockets.ThreadSafeContains(wsName));
+        return ExternalConnectionStates.Subscribed(SubscriptionType.OrderBook, message);
+
+
+        void OnWebSocketCreated()
+        {
+            message = $"Subscribed to order book data for {security.Code} on {security.Exchange}";
+            _log.Info(message);
+            _webSockets.ThreadSafeSet(wsName, webSocket);
+        };
+
+        void OnReceivedString(byte[] bytes)
+        {
+            var now = DateTime.UtcNow;
+            string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
+            var node = JsonNode.Parse(json)?.AsObject()["data"]?.AsObject();
+            if (node != null)
+            {
+                //                var example = @"
+                //{
+                //  ""lastUpdateId"": 160,  // Last update ID
+                //  ""bids"": [             // Bids to be updated
+                //    [
+                //      ""0.0024"",         // Price level to be updated
+                //      ""10""              // Quantity
+                //    ]
+                //  ],
+                //  ""asks"": [             // Asks to be updated
+                //    [
+                //      ""0.0026"",         // Price level to be updated
+                //      ""100""             // Quantity
+                //    ]
+                //  ]
+                //}";
+                var orderBook = _orderBookPool.Lease();
+                var bids = node["bids"]?.AsArray();
+                var asks = node["asks"]?.AsArray();
+                if (!bids.IsNullOrEmpty())
+                {
+                    if (orderBook.Bids.Count != bids.Count)
+                    {
+                        orderBook.Bids.Clear();
+                        for (int i = 0; i < bids.Count; i++)
+                        {
+                            orderBook.Bids.Add(new OrderBookLevel());
+                        }
+                    }
+                    for (int i = 0; i < bids.Count; i++)
+                    {
+                        JsonNode? levelObject = bids[i];
+                        var level = levelObject?.AsArray();
+                        if (level != null)
+                        {
+                            orderBook.Bids[i].Price = level[0]?.ToString().ToDecimal() ?? 0;
+                            orderBook.Bids[i].Size = level[1]?.ToString().ToDecimal() ?? 0;
+                        }
+                    }
+                }
+                if (!asks.IsNullOrEmpty())
+                {
+                    if (orderBook.Asks.Count != asks.Count)
+                    {
+                        orderBook.Asks.Clear();
+                        for (int i = 0; i < asks.Count; i++)
+                        {
+                            orderBook.Asks.Add(new OrderBookLevel());
+                        }
+                    }
+                    for (int i = 0; i < asks.Count; i++)
+                    {
+                        JsonNode? levelObject = asks[i];
+                        var level = levelObject?.AsArray();
+                        if (level != null)
+                        {
+                            orderBook.Asks[i].Price = level[0]?.ToString().ToDecimal() ?? 0;
+                            orderBook.Asks[i].Size = level[1]?.ToString().ToDecimal() ?? 0;
+                        }
+                    }
+                }
+                orderBook.SecurityId = security.Id;
+                orderBook.Time = now;
+                broker!.Enqueue(orderBook);
+            }
+        }
     }
 
-    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security, IntervalType intervalType)
+    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
     {
         throw new NotImplementedException();
     }
@@ -417,5 +526,10 @@ public class Quotation : IExternalQuotationManagement
             }
             return false;
         }
+    }
+
+    public Task<ExternalConnectionState> SubscribeOrderBook(Security security)
+    {
+        throw new NotImplementedException();
     }
 }

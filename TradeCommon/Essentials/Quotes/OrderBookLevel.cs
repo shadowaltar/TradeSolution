@@ -1,7 +1,19 @@
-﻿namespace TradeCommon.Essentials.Quotes;
+﻿using TradeCommon.Infra;
 
-public record OrderBookLevel
+namespace TradeCommon.Essentials.Quotes;
+
+public record OrderBookLevel : ICloneable
 {
     public decimal Price { get; set; }
-    public decimal Volume { get; set; }
+    public decimal Size { get; set; }
+
+    public override string ToString()
+    {
+        return $"{Price}: {Size}";
+    }
+
+    object ICloneable.Clone()
+    {
+        return this with { };
+    }
 }

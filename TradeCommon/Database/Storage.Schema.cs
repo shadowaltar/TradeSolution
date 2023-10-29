@@ -1,12 +1,23 @@
-﻿using TradeCommon.Essentials;
+﻿using Common;
+using TradeCommon.Constants;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
 
 public partial class Storage
 {
+    public async Task<bool> IsTableExists(string tableName, string databaseName)
+    {
+        var (isGood, result) = await TryReadScalar<string>(
+            $"SELECT name FROM sqlite_master WHERE type = 'table' AND name = '{tableName}'",
+            databaseName);
+        return isGood && result == tableName;
+    }
+
     public async Task CreateUserTable()
     {
         var tableName = DatabaseNames.UserTable;
@@ -80,18 +91,18 @@ CREATE UNIQUE INDEX idx_{DatabaseNames.AccountTable}_ownerId
         await DropThenCreate(dropSql, createSql, DatabaseNames.AccountTable, DatabaseNames.StaticData);
     }
 
-    public async Task CreateBalanceTable()
+    public async Task CreateAssetTable()
     {
         string dropSql =
 @$"
-DROP TABLE IF EXISTS {DatabaseNames.BalanceTable};
-DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_accountId;
-DROP INDEX IF EXISTS idx_{DatabaseNames.BalanceTable}_assetId;
-{SqlHelper.GetDropTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
+DROP TABLE IF EXISTS {DatabaseNames.AssetTable};
+DROP INDEX IF EXISTS idx_{DatabaseNames.AssetTable}_accountId;
+DROP INDEX IF EXISTS idx_{DatabaseNames.AssetTable}_assetId;
+{SqlHelper.GetDropTableUniqueIndexStatement<Asset>(DatabaseNames.AssetTable)}
 ";
         string createSql =
 @$"
-CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
+CREATE TABLE IF NOT EXISTS {DatabaseNames.AssetTable} (
     Id INTEGER PRIMARY KEY,
     AssetId INTEGER NOT NULL,
     AccountId INTEGER NOT NULL,
@@ -101,14 +112,14 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.BalanceTable} (
     UpdateTime DATE
     {SqlHelper.GetCreateTableUniqueClause<Asset>()}
 );
-{SqlHelper.GetCreateTableUniqueIndexStatement<Asset>(DatabaseNames.BalanceTable)}
-CREATE INDEX idx_{DatabaseNames.BalanceTable}_accountId
-    ON {DatabaseNames.BalanceTable} (AccountId);
-CREATE INDEX idx_{DatabaseNames.BalanceTable}_assetId
-    ON {DatabaseNames.BalanceTable} (AssetId);
+{SqlHelper.GetCreateTableUniqueIndexStatement<Asset>(DatabaseNames.AssetTable)}
+CREATE INDEX idx_{DatabaseNames.AssetTable}_accountId
+    ON {DatabaseNames.AssetTable} (AccountId);
+CREATE INDEX idx_{DatabaseNames.AssetTable}_assetId
+    ON {DatabaseNames.AssetTable} (AssetId);
 ";
 
-        await DropThenCreate(dropSql, createSql, DatabaseNames.BalanceTable, DatabaseNames.StaticData);
+        await DropThenCreate(dropSql, createSql, DatabaseNames.AssetTable, DatabaseNames.StaticData);
     }
 
     public async Task CreateSecurityTable(SecurityType type)
@@ -227,6 +238,41 @@ ON {tableName} (SecurityId);
 
         await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.MarketData);
         return tableName;
+    }
+
+    public async Task CreateOrderBookTable(string securityCode, ExchangeType exchange, int level)
+    {
+        if (level > 10 || level <= 0)
+            throw Exceptions.Invalid("Only supports order book table with levels <= 10 and > 0");
+        if (securityCode.IsBlank())
+            throw Exceptions.Invalid("Must specify security code.");
+
+        string tableName = DatabaseNames.GetOrderBookTableName(securityCode, exchange, level);
+        string dropSql =
+@$"
+DROP TABLE IF EXISTS {tableName};
+DROP INDEX IF EXISTS UX_{tableName}_SecurityId_Time;
+";
+        string bidPart = "";
+        string askPart = "";
+        for (int i = 0; i < level; i++)
+        {
+            bidPart += "\t" + "B" + (i + 1) + " REAL NOT NULL DEFAULT 0,\n";
+            bidPart += "\t" + "BS" + (i + 1) + " REAL NOT NULL DEFAULT 0,\n";
+            askPart += "\t" + "A" + (i + 1) + " REAL NOT NULL DEFAULT 0,\n";
+            askPart += "\t" + "AS" + (i + 1) + " REAL NOT NULL DEFAULT 0,\n";
+        }
+        string createSql =
+@$"
+CREATE TABLE IF NOT EXISTS {tableName} (
+    SecurityId INTEGER NOT NULL,
+    Time DATE NOT NULL,
+{bidPart}{askPart}    UNIQUE (SecurityId, Time)
+);
+CREATE UNIQUE INDEX UX_{tableName}_SecurityId_Time
+    ON {tableName} (SecurityId, Time);
+";
+        await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.MarketData);
     }
 
     public async Task<List<string>> CreateOrderTable(SecurityType securityType)

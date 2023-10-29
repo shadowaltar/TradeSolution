@@ -81,6 +81,12 @@ public static class CollectionExtensions
         return results;
     }
 
+    public static void ClearAddRange<T>(this List<T> collection, IEnumerable<T> values)
+    {
+        collection.Clear();
+        collection.AddRange(values);
+    }
+
     public static void AddRange<T>(this Collection<T> collection, IEnumerable<T> values)
     {
         foreach (var v in values)
@@ -471,5 +477,15 @@ public static class CollectionExtensions
             }
         }
         return hash;
+    }
+
+    public static IList<T> Clone<T>(this IList<T> list) where T : ICloneable
+    {
+        var result = new List<T>(list.Count);
+        foreach (var item in list)
+        {
+            result.Add((T)item.Clone());
+        }
+        return result;
     }
 }

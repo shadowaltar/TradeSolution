@@ -101,6 +101,71 @@ public partial class Storage
         return await writer.InsertMany(entries, isUpsert, tableNameOverride ?? t);
     }
 
+    public async Task<int> InsertOrderBooks(List<ExtendedOrderBook> orderBooks, string tableName)
+    {
+        if (orderBooks.IsNullOrEmpty())
+            return 0;
+        var first = orderBooks[0];
+        var level = first.Bids.Count; // assuming all order books have the same level of depth.
+
+        using var connection = await Connect(DatabaseNames.MarketData);
+        using var transaction = connection.BeginTransaction();
+
+        var count = 0;
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            var bidPart = "";
+            var askPart = "";
+            var bidValuePart = "";
+            var askValuePart = "";
+            for (int i = 0; i < level; i++)
+            {
+                var idx = i + 1;
+                bidPart += $"B{idx}, BS{idx}, ";
+                askPart += $"A{idx}, AS{idx}, ";
+                bidValuePart += $"$B{idx}, $BS{idx}, ";
+                askValuePart += $"$A{idx}, $AS{idx}, ";
+            }
+            askPart = askPart[..^2];
+            askValuePart = askValuePart[..^2];
+            command.CommandText = $"UPDATE {tableName} ({bidPart}{askPart}) VALUES ({bidValuePart}{askValuePart})";
+
+            foreach (var orderBook in orderBooks)
+            {
+                command.Parameters.Clear();
+                for (int i = 0; i < level; i++)
+                {
+                    var idx = i + 1;
+                    var depthLevel = orderBooks[i];
+                    command.Parameters.AddWithValue("$B" + idx, depthLevel.Bids[i].Price);
+                    command.Parameters.AddWithValue("$BS" + idx, depthLevel.Bids[i].Size);
+                    command.Parameters.AddWithValue("$A" + idx, depthLevel.Asks[i].Price);
+                    command.Parameters.AddWithValue("$AS" + idx, depthLevel.Asks[i].Size);
+                }
+                await command.ExecuteNonQueryAsync();
+                count++;
+            }
+            transaction.Commit();
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Inserted {count} order book entries into {tableName} table.");
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to inserted order book entries into {tableName} table.", e);
+            transaction.Rollback();
+        }
+        finally
+        {
+            command?.Dispose();
+            await connection.CloseAsync();
+            connection.Dispose();
+        }
+
+        return count;
+    }
+
     public async Task UpsertStockDefinitions(List<Security> entries)
     {
         const string sql =
