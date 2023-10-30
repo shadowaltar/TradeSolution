@@ -25,6 +25,6 @@ public record ExtendedOrderBook : OrderBook
 
     public override string ToString()
     {
-        return Json.Serialize(this, true);
+        return $"{Time:yyyyMMdd-HHmmss.fff} B/A: {Bids.FirstOrDefault()?.Price}/{Asks.FirstOrDefault()?.Price}, Size:{Bids.FirstOrDefault()?.Size}/{Asks.FirstOrDefault()?.Size}";
     }
 }

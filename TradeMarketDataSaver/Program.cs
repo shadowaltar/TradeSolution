@@ -69,6 +69,7 @@ public class Program
                 clone.Asks.Add(ask with { });
             }
             buffer.Add(clone);
+            log.Info(clone);
             if (buffer.Count >= 10)
             {
                 var orderBooks = new List<ExtendedOrderBook>(buffer);
@@ -77,8 +78,8 @@ public class Program
                 var task = storage.InsertOrderBooks(orderBooks, orderBookTableName); // fire and forget
             }
         }
-
     }
+
     private static void Register(BrokerType broker, ExchangeType exchange, EnvironmentType environment, ContainerBuilder? builder = null)
     {
         builder ??= new ContainerBuilder();

@@ -116,22 +116,30 @@ public partial class Storage
         try
         {
             command = connection.CreateCommand();
-            var bidPart = "";
-            var askPart = "";
-            var bidValuePart = "";
-            var askValuePart = "";
-            for (int i = 0; i < level; i++)
+            string sql;
+            lock (_insertSqls)
             {
-                var idx = i + 1;
-                bidPart += $"B{idx}, BS{idx}, ";
-                askPart += $"A{idx}, AS{idx}, ";
-                bidValuePart += $"$B{idx}, $BS{idx}, ";
-                askValuePart += $"$A{idx}, $AS{idx}, ";
+                if (!_insertSqls.TryGetValue(tableName, out sql))
+                {
+                    var bidPart = "";
+                    var askPart = "";
+                    var bidValuePart = "";
+                    var askValuePart = "";
+                    for (int i = 0; i < level; i++)
+                    {
+                        var idx = i + 1;
+                        bidPart += $"B{idx}, BS{idx}, ";
+                        askPart += $"A{idx}, AS{idx}, ";
+                        bidValuePart += $"$B{idx}, $BS{idx}, ";
+                        askValuePart += $"$A{idx}, $AS{idx}, ";
+                    }
+                    askPart = askPart[..^2];
+                    askValuePart = askValuePart[..^2];
+                    sql = $"INSERT INTO {tableName} (SecurityId, Time, {bidPart}{askPart}) VALUES ($SecId, $Time, {bidValuePart}{askValuePart})";
+                    _insertSqls[tableName] = sql;
+                }
             }
-            askPart = askPart[..^2];
-            askValuePart = askValuePart[..^2];
-            command.CommandText = $"INSERT INTO {tableName} (SecurityId, Time, {bidPart}{askPart}) VALUES ($SecId, $Time, {bidValuePart}{askValuePart})";
-
+            command.CommandText = sql;
             foreach (var orderBook in orderBooks)
             {
                 command.Parameters.Clear();
@@ -140,11 +148,10 @@ public partial class Storage
                 for (int i = 0; i < level; i++)
                 {
                     var idx = i + 1;
-                    var depthLevel = orderBooks[i];
-                    command.Parameters.AddWithValue("$B" + idx, depthLevel.Bids[i].Price);
-                    command.Parameters.AddWithValue("$BS" + idx, depthLevel.Bids[i].Size);
-                    command.Parameters.AddWithValue("$A" + idx, depthLevel.Asks[i].Price);
-                    command.Parameters.AddWithValue("$AS" + idx, depthLevel.Asks[i].Size);
+                    command.Parameters.AddWithValue("$B" + idx, orderBook.Bids[i].Price);
+                    command.Parameters.AddWithValue("$BS" + idx, orderBook.Bids[i].Size);
+                    command.Parameters.AddWithValue("$A" + idx, orderBook.Asks[i].Price);
+                    command.Parameters.AddWithValue("$AS" + idx, orderBook.Asks[i].Size);
                 }
                 await command.ExecuteNonQueryAsync();
                 count++;

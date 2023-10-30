@@ -10,6 +10,8 @@ namespace TradeCommon.Database;
 
 public partial class Storage
 {
+    private readonly Dictionary<string, string> _insertSqls = new();
+
     public async Task<bool> IsTableExists(string tableName, string databaseName)
     {
         var (isGood, result) = await TryReadScalar<string>(
@@ -252,6 +254,8 @@ ON {tableName} (SecurityId);
 @$"
 DROP TABLE IF EXISTS {tableName};
 DROP INDEX IF EXISTS UX_{tableName}_SecurityId_Time;
+DROP INDEX IF EXISTS IX_{tableName}_SecurityId;
+DROP INDEX IF EXISTS IX_{tableName}_Time;
 ";
         string bidPart = "";
         string askPart = "";
@@ -271,6 +275,10 @@ CREATE TABLE IF NOT EXISTS {tableName} (
 );
 CREATE UNIQUE INDEX UX_{tableName}_SecurityId_Time
     ON {tableName} (SecurityId, Time);
+CREATE INDEX UX_{tableName}_SecurityId
+    ON {tableName} (SecurityId);
+CREATE INDEX UX_{tableName}_Time
+    ON {tableName} (Time);
 ";
         await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.MarketData);
     }

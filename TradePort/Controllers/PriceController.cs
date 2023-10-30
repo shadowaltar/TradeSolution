@@ -26,28 +26,51 @@ public class PriceController : Controller
 {
     private static readonly ILog _log = Logger.New();
 
-    [HttpGet("order-books/recorder/start")]
-    public async Task<ActionResult> StartOrderBookRecorder([FromServices] ISecurityService securityService,
-                                                           [FromForm(Name = "admin-password")] string adminPassword,
-                                                           [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
-                                                           [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-                                                           [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
-                                                           [FromQuery(Name = "level")] int level = 5)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="securityService"></param>
+    /// <param name="dateStr">The date of the order book data, must be in yyyyMMdd.</param>
+    /// <param name="securityCode"></param>
+    /// <param name="exchange"></param>
+    /// <param name="environment"></param>
+    /// <param name="level"></param>
+    /// <returns></returns>
+    [HttpGet("order-books/download")]
+    public async Task<ActionResult> GetOrderBookHistory([FromServices] ISecurityService securityService,
+                                                        [FromQuery(Name = "date")] string dateStr,
+                                                        [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
+                                                        [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
+                                                        [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
+                                                        [FromQuery(Name = "level")] int level = 5)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (level < 1 || level > 10) return BadRequest("Level must be within 1-10.");
         if (environment == EnvironmentType.Unknown) return BadRequest("Invalid environment");
 
-        var security = securityService.GetSecurity(securityCode, exchange);
+        var security = await securityService.GetSecurity(securityCode, exchange);
         if (security == null) return BadRequest("Invalid security.");
+        var date = dateStr.ParseDate("yyyyMMdd");
+        if (date == default) return BadRequest("Failed to parse date.");
 
-        var uniqueProcessName = $"ORDER_BOOK_RECORDER_{securityCode.ToUpperInvariant()}_{exchange.ToString().ToUpperInvariant()}_{level}";
-        if (Processes.IsExistsInSystem(uniqueProcessName))
+        var orderBooks = await securityService.GetOrderBookHistory(security, level, date);
+
+        var dataFilePath = Path.Join(Path.GetTempPath(), $"AllOrderBooks_{security.Code}_{exchange}_{level}.json");
+
+        try
         {
-            return Ok($"Process {uniqueProcessName} already exists.");
+            var filePath = await JsonWriter.ToJsonFile(orderBooks, dataFilePath);
+            var zipFilePath = dataFilePath.Replace(".json", ".zip");
+            System.IO.File.Delete(zipFilePath);
+            Zip.Archive(dataFilePath, zipFilePath);
+            return System.IO.File.Exists(zipFilePath)
+                ? File(System.IO.File.OpenRead(zipFilePath), "application/octet-stream", Path.GetFileName(zipFilePath))
+                : BadRequest();
         }
-
-        return Ok($"Process {uniqueProcessName} is just started.");
+        catch (Exception e)
+        {
+            _log.Error("Failed to write json, zip or send it.", e);
+            return BadRequest();
+        }
     }
 
     /// <summary>

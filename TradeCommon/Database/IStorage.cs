@@ -56,6 +56,7 @@ public interface IStorage
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
     IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
+    Task<List<ExtendedOrderBook>> ReadOrderBooks(Security security, int level, DateTime date);
     Task<List<Security>> ReadSecurities(List<int>? ids = null);
     Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);

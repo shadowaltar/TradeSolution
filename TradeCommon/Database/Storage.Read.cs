@@ -567,8 +567,8 @@ WHERE
         var ids = securities.Select((s, i) => (id: s.Id, param: $"$Id{i}")).ToArray();
         var securityMap = securities.ToDictionary(s => s.Id, s => s);
         sql = sql + "(" + string.Join(",", ids.Select(p => p.param)) + ")";
-        using var connection = await Connect(DatabaseNames.MarketData);
 
+        using var connection = await Connect(DatabaseNames.MarketData);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("$StartTime", start);
@@ -601,6 +601,37 @@ WHERE
                 T: r.SafeGetString("StartTime").ParseDate("yyyy-MM-dd HH:mm:ss")
             );
             list.Add(price);
+        }
+        if (_log.IsDebugEnabled)
+            _log.Debug($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
+        return results;
+    }
+
+    public async Task<List<ExtendedOrderBook>> ReadOrderBooks(Security security, int level, DateTime date)
+    {
+        var tableName = DatabaseNames.GetOrderBookTableName(security.Code, security.ExchangeType, level);
+        using var connection = await Connect(DatabaseNames.MarketData);
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT * FROM {tableName} WHERE SecurityId = {security.Id} AND DATE(Time) = '{date:yyyy-MM-dd}'";
+        using var r = await command.ExecuteReaderAsync();
+        var results = new List<ExtendedOrderBook>();
+        while (await r.ReadAsync())
+        {
+            var time = r.GetDateTime("Time");
+            var orderBook = new ExtendedOrderBook
+            {
+                SecurityId = security.Id,
+                Time = time,
+            };
+
+            for (int i = 1; i < level + 1; i++)
+            {
+                var bid = new OrderBookLevel { Price = r.GetDecimal("B" + i), Size = r.GetDecimal("BS" + i) };
+                orderBook.Bids.Add(bid);
+                var ask = new OrderBookLevel { Price = r.GetDecimal("B" + i), Size = r.GetDecimal("BS" + i) };
+                orderBook.Asks.Add(ask);
+            }
+            results.Add(orderBook);
         }
         if (_log.IsDebugEnabled)
             _log.Debug($"Read {results.Count} entries from {tableName} table in {DatabaseNames.MarketData}.");
