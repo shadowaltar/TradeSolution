@@ -169,6 +169,7 @@ public class OrderService : IOrderService, IDisposable
             var isOperational = order.Action == OrderActionType.Operational;
             if (isOperational)
                 _operationalOrders.ThreadSafeSet(order.Id, order);
+
             var state = await _execution.SendOrder(order);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
@@ -191,6 +192,16 @@ public class OrderService : IOrderService, IDisposable
             _persistence.Insert(order);
             return state;
         }
+    }
+
+    public async Task<ExternalQueryState> SendOrder(Order order, Position associatedPosition)
+    {
+        // move quantity to working quantity, if we are reducing the position
+        var workingQuantity = order.Quantity;
+        associatedPosition.Quantity -= workingQuantity;
+        associatedPosition.WorkingQuantity = workingQuantity;
+
+        return await SendOrder(order);
     }
 
     public bool IsOperational(long orderId)

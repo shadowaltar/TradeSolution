@@ -110,7 +110,6 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
                 Action = actionType,
                 Comment = Comments.AlgoExit,
             };
-
             return await _orderService.SendOrder(order);
         }
         finally

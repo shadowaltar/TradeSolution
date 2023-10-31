@@ -808,6 +808,8 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         if (!Algorithm.ShallTakeProfit(securityId, tick))
             return;
+        if (Algorithm.Exiting.IsClosing)
+            return;
 
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)

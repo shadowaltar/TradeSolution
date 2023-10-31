@@ -277,39 +277,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         return count > 0;
     }
 
-    //public IEnumerable<Position> CreateOrApply(List<Trade> trades, Position? position = null)
-    //{
-    //    if (trades.IsNullOrEmpty())
-    //    {
-    //        if (position != null)
-    //        {
-    //            yield return position;
-    //        }
-    //        yield break;
-    //    }
-
-    //    foreach (var trade in trades)
-    //    {
-    //        if (position == null)
-    //        {
-    //            position = Position.Create(trade);
-    //            trade.PositionId = position.Id;
-    //        }
-    //        else
-    //        {
-    //            var isClosed = position.Apply(trade);
-    //            trade.PositionId = position.Id;
-    //            if (isClosed)
-    //            {
-    //                yield return position;
-    //                position = null;
-    //            }
-    //        }
-    //    }
-    //    if (position != null)
-    //        yield return position;
-    //}
-
     public Position? CreateOrApply(Trade trade, Position? position = null)
     {
         if (trade.IsOperational) return position;
@@ -394,22 +361,6 @@ public class PortfolioService : IPortfolioService, IDisposable
         var asset = Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
         asset.Quantity -= quantity;
     }
-
-    //public decimal Realize(Security security, decimal realizedPnl)
-    //{
-    //    var position = Portfolio.GetPositionBySecurityId(security.Id);
-    //    if (position != null)
-    //    {
-    //        position.RealizedPnl += realizedPnl;
-
-    //        var asset = Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
-    //        if (asset == null) throw Exceptions.MissingAssetPosition(security);
-    //        asset.Quantity += realizedPnl;
-
-    //        return position.RealizedPnl;
-    //    }
-    //    return decimal.MinValue;
-    //}
 
     public async Task<Asset> Deposit(int assetId, decimal quantity)
     {
@@ -524,7 +475,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             _closedPositions[position.Id] = position;
             Portfolio.RemovePosition(position.Id);
 
-            if (position.Quantity != 0)
+            if (position.Quantity != 0 || position.WorkingQuantity != 0)
             {
                 // has residual, which will be traded in future orders
                 var residual = position.Quantity;
@@ -538,19 +489,11 @@ public class PortfolioService : IPortfolioService, IDisposable
                     _log.Warn("Cannot find base asset security Id! Position's security is: " + position.SecurityCode);
                 }
             }
-
-            _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}");
         }
         else
         {
             Portfolio.AddOrUpdate(position);
-
-            if (!isNew)
-                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Updated]\n\t\tID:{position.Id}, TID:{trade.Id}, R:{position.Return:P4}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
-            else
-                _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Opened]\n\t\tID:{position.Id}, TID:{trade.Id}, COUNT:{position.TradeCount}, QTY:{position.Quantity}");
         }
-
         _persistence.Insert(position);
 
         // invoke post-events

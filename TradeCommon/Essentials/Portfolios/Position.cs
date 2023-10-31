@@ -112,13 +112,26 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     public int TradeCount { get; set; }
 
     /// <summary>
+    /// Indicates quantity of this position currently floating on the market.
+    /// When this is set, the Quantity field should be reduced at the same time.
+    /// </summary>
+    public decimal WorkingQuantity { get; set; }
+
+    /// <summary>
     /// Whether it is a closed position.
-    /// Usually it means (remaining) quantity equals to zero.
-    /// If <see cref="Security.MinNotional"/> is defined (!= 0),
-    /// then when quantity <= minNotional it will also be considered as closed.
+    /// It means quantity + "working quantity" equals to zero,
+    /// or smaller than the minimum allowed residual threshold,
+    /// (when <see cref="Security.MinNotional"/> is defined (!= 0)).
     /// </summary>
     [DatabaseIgnore]
-    public bool IsClosed => (Security == null || Security.MinQuantity == 0) ? Quantity == 0 : Math.Abs(Quantity) <= Security.MinQuantity;
+    public bool IsClosed => (Security == null || Security.MinQuantity == 0) ? (Quantity + WorkingQuantity) == 0 : Math.Abs(Quantity + WorkingQuantity) <= Security.MinQuantity;
+
+    /// <summary>
+    /// Whether it is being closed right now.
+    /// It is when the position is not updated but the close order (by algo, SL or TP) is already sent to the market.
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsClosing => WorkingQuantity != 0;
 
     [DatabaseIgnore]
     public bool IsNew => TradeCount == 1;
