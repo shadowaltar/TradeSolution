@@ -18,6 +18,7 @@ public interface ISecurityService : ISecurityDefinitionProvider
     Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, string exchange, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType = SecurityType.Unknown, bool requestExternal = false);
+    Task<Security?> GetSecurity(string code, SecurityType securityType);
     Task<Security?> GetSecurity(int securityId, bool requestExternal = false);
     Task<List<ExtendedOrderBook>> GetOrderBookHistory(Security security, int level, DateTime date);
     Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime end, int lookBackPeriod);

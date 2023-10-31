@@ -2,8 +2,10 @@
 using log4net;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 using TradeLogicCore.Algorithms.Abnormality;
 using TradeLogicCore.Algorithms.Sizing;
+using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Algorithms;
 
@@ -18,16 +20,15 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
     public decimal AbsoluteMin { get; }
     public decimal RelativeMax { get; }
     public decimal AbsoluteMax { get; }
-    public decimal FixedAmount { get; }
-    public decimal LockedAmount { get; }
+    public decimal FixedAmount { get; private set; }
+    public decimal LockedAmount { get; private set; }
 
     public SimplePositionSizingLogic(PositionSizingMethod sizingMethod = PositionSizingMethod.All,
                                      decimal? relativeMin = null,
                                      decimal? absoluteMin = null,
                                      decimal? relativeMax = null,
                                      decimal? absoluteMax = null,
-                                     decimal? fixedAmount = null,
-                                     decimal? lockedAmount = null)
+                                     decimal? fixedAmount = null)
     {
         if (sizingMethod == PositionSizingMethod.Fixed && !fixedAmount.IsValid())
         {
@@ -65,7 +66,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
         RelativeMax = relativeMax ?? decimal.MinValue;
         AbsoluteMax = absoluteMax ?? decimal.MinValue;
         FixedAmount = fixedAmount ?? decimal.MinValue;
-        LockedAmount = lockedAmount ?? decimal.MinValue;
+        LockedAmount = decimal.MinValue;
     }
 
     public decimal GetSize(decimal freeAmount, AlgoEntry current, AlgoEntry? last, decimal price, DateTime time)
@@ -149,14 +150,21 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
                 throw new InvalidOperationException("Invalid position sizing method.");
         }
     }
-}
 
-public enum PositionSizingMethod
-{
-    Unknown,
-    Zero,
-    Fixed,
-    All,
-    PreserveFixed,// always preserve fixed amount
-    AsSmallAsPossible,
+    public void CalculatePreserveFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal initialFixedQuantity)
+    {
+        var fiat = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
+        var fiatAsset = portfolioService.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
+        var lockedAmount = fiatAsset.Quantity - initialFixedQuantity;
+        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {initialFixedQuantity}");
+        LockedAmount = lockedAmount;
+    }
+
+    public void CalculateFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal fixedQuantity)
+    {
+        var fiat = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
+        var fiatAsset = portfolioService.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
+        if (fiatAsset.Quantity < fixedQuantity) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {fixedQuantity}");
+        FixedAmount = fixedQuantity;
+    }
 }

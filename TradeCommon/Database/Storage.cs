@@ -15,11 +15,12 @@ public partial class Storage : IStorage
     private readonly IComponentContext _container;
     private readonly SqlWriters _writers;
     private readonly Lazy<ApplicationContext> _lazyContext;
-
-    private int AccountId => _lazyContext.Value.AccountId;
-
+    private EnvironmentType _environment;
+    private string _environmentString;
     private SqliteConnection? _globalConnection;
     private SqliteTransaction? _globalTransaction;
+
+    private int AccountId => _lazyContext.Value.AccountId;
 
     public event Action<object, string>? Success;
     public event Action<object, Exception, string>? Failed;
@@ -31,6 +32,14 @@ public partial class Storage : IStorage
         _writers = new SqlWriters(this);
         _container = container;
         _lazyContext = new Lazy<ApplicationContext>(() => _container.Resolve<ApplicationContext>());
+    }
+
+    public void SetEnvironment(EnvironmentType environment)
+    {
+        _environment = environment;
+        _environmentString = _environment.ToString().ToLowerInvariant();
+        var dir = Path.Combine(Consts.DatabaseFolder, _environmentString);
+        Directory.CreateDirectory(dir);
     }
 
     public async Task BeginGlobalTransaction(params string[] databaseNames)
@@ -246,7 +255,7 @@ public partial class Storage : IStorage
 
     private string? GetConnectionString(string databaseName)
     {
-        return $"Data Source={Path.Combine(Consts.DatabaseFolder, databaseName)}.db";
+        return $"Data Source={Path.Combine(Consts.DatabaseFolder, _environmentString, databaseName)}.db";
     }
 
     private async Task<SqliteConnection> Connect(string database)
@@ -254,14 +263,6 @@ public partial class Storage : IStorage
         var conn = new SqliteConnection(GetConnectionString(database));
         await conn.OpenAsync();
         return conn;
-    }
-
-    private void Register(ISqlWriter writer)
-    {
-        writer.Success -= RaiseSuccess;
-        writer.Success += RaiseSuccess;
-        writer.Failed -= RaiseFailed;
-        writer.Failed += RaiseFailed;
     }
 
     public void RaiseSuccess(object entry, string methodName = "")

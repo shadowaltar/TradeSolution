@@ -1,5 +1,4 @@
 ﻿using Common;
-using log4net;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -16,11 +15,14 @@ public class SecurityService : ISecurityService
     private readonly Dictionary<string, Security> _securitiesByCode = new();
     private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = new();
     private readonly IStorage _storage;
+    private readonly ApplicationContext _context;
+
     public bool IsInitialized { get; private set; }
 
-    public SecurityService(IStorage storage)
+    public SecurityService(IStorage storage, ApplicationContext context)
     {
         _storage = storage;
+        _context = context;
     }
 
     public async Task<List<Security>> Initialize()
@@ -31,10 +33,7 @@ public class SecurityService : ISecurityService
         List<Security> securities = new();
         foreach (var secType in Consts.SupportedSecurityTypes)
         {
-            foreach (var exchangeType in exchangeTypes)
-            {
-                securities.AddRange(await _storage.ReadSecurities(secType, exchangeType));
-            }
+            securities.AddRange(await _storage.ReadSecurities(secType, _context.Exchange));
         }
         RefreshCache(securities);
 
@@ -87,7 +86,9 @@ public class SecurityService : ISecurityService
     {
         if (!IsInitialized)
             AsyncHelper.RunSync(Initialize);
-        var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
+        if (exchange == ExchangeType.Unknown)
+            exchange = _context.Exchange;
+        var exchStr = ExchangeTypeConverter.ToString(exchange);
         lock (_securities)
         {
             return _securities.Values
@@ -162,6 +163,13 @@ public class SecurityService : ISecurityService
         {
             return GetSecurity(securityId);
         }
+    }
+
+    public async Task<Security?> GetSecurity(string code, SecurityType securityType)
+    {
+        if (!IsInitialized)
+            await Initialize();
+        return await GetSecurity(code, _context.Exchange, securityType, false);
     }
 
     public Security? GetSecurity(string? code)

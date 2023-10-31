@@ -7,6 +7,11 @@ namespace TradeLogicCore.Services;
 public interface IAdminService
 {
     Context Context { get; }
+    
+    /// <summary>
+    /// Gets if is logged in.
+    /// </summary>
+    bool IsLoggedIn { get;}
 
     User? CurrentUser { get; }
 

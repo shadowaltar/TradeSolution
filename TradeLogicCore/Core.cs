@@ -26,7 +26,7 @@ public class Core
     private readonly Dictionary<long, IAlgorithmEngine> _engines = new();
     private readonly IServices _services;
     private readonly IdGenerator _assetIdGenerator;
-    private Reconcilation? _reconcilation;
+    private Reconcilation? _reconciliation;
 
     public IReadOnlyDictionary<long, IAlgorithmEngine> Engines => _engines;
     public ExchangeType Exchange => Context.Exchange;
@@ -76,16 +76,16 @@ public class Core
         var refPrices = await _services.MarketData.GetPrices(parameters.SecurityPool);
         SetMinQuantities(refPrices);
 
-        _reconcilation = new Reconcilation(Context);
+        _reconciliation = new Reconcilation(Context);
 
-        await _reconcilation.ReconcileAccount(user);
-        await _reconcilation.ReconcileAssets();
+        await _reconciliation.ReconcileAccount(user);
+        await _reconciliation.ReconcileAssets();
 
         // check one week's historical order / trade only
         var previousDay = startTime.AddMonths(-1);
-        await _reconcilation.ReconcileOrders(previousDay, parameters.SecurityPool);
-        await _reconcilation.ReconcileTrades(previousDay, parameters.SecurityPool);
-        await _reconcilation.ReconcilePositions(parameters.SecurityPool);
+        await _reconciliation.ReconcileOrders(previousDay, parameters.SecurityPool);
+        await _reconciliation.ReconcileTrades(previousDay, parameters.SecurityPool);
+        await _reconciliation.ReconcilePositions(parameters.SecurityPool);
 
         var uniqueId = Context.AlgoBatchId;
         _ = Task.Factory.StartNew(async () =>
@@ -134,6 +134,12 @@ public class Core
             _log.Warn("Failed to stop Algorithm Engine " + algoSessionId);
             return ResultCode.StopEngineFailed;
         }
+    }
+
+    public List<long> List()
+    {
+        // WIP
+        return _engines.Select(pair => pair.Key).ToList();
     }
 
     public async Task StopAllAlgorithms()

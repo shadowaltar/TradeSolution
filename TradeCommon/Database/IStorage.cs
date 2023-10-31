@@ -17,8 +17,8 @@ public interface IStorage
 {
     event Action<object, string> Success;
     event Action<object, Exception, string> Failed;
-
     IDatabaseSqlBuilder SqlHelper { get; }
+    void SetEnvironment(EnvironmentType environment);
     Task<bool> IsTableExists(string tableName, string databaseName);
     Task CreateAccountTable();
     Task CreateAssetTable();

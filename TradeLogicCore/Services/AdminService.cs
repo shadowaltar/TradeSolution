@@ -1,12 +1,10 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
 using log4net;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
@@ -24,6 +22,8 @@ public class AdminService : IAdminService
     private readonly IPortfolioService _portfolioService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
+
+    public bool IsLoggedIn { get; private set; }
 
     public User? CurrentUser { get; private set; }
 
@@ -51,8 +51,9 @@ public class AdminService : IAdminService
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
-        _log.Info($"Initializing admin-service, Env:{environment}, Exch:{exchange}, Broker:{broker}.");
+        _log.Info($"Initializing admin-service, Env:{environment}, Exchange:{exchange}, Broker:{broker}.");
         Context.Initialize(_container, environment, exchange, broker);
+        _storage.SetEnvironment(environment);
         _connectivity.SetEnvironment(environment);
 
         _securityService.Initialize();
@@ -61,6 +62,8 @@ public class AdminService : IAdminService
 
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
     {
+        IsLoggedIn = false;
+
         _log.Info($"Logging in user and account: {userName}, {accountName}, {environment}");
         if (userName.IsBlank()) return ResultCode.InvalidArgument;
         if (password.IsBlank()) return ResultCode.InvalidArgument;
@@ -115,6 +118,8 @@ public class AdminService : IAdminService
         var result = await _portfolioService.Initialize();
         if (!result)
             return ResultCode.SubscriptionFailed;
+
+        IsLoggedIn = true;
         return ResultCode.LoginUserAndAccountOk;
     }
 
