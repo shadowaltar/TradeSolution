@@ -180,15 +180,16 @@ public partial class Storage
         const string sql =
 @$"
 INSERT INTO {DatabaseNames.StockDefinitionTable}
-    (Code, Name, Exchange, Type, SubType, LotSize, Currency, Cusip, Isin, YahooTicker, IsShortable, IsEnabled, LocalStartDate, LocalEndDate)
+    (Code, Name, Exchange, Type, SubType, LotSize, TickSize, Currency, Cusip, Isin, YahooTicker, IsShortable, IsEnabled, LocalStartDate, LocalEndDate)
 VALUES
-    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$Currency,$Cusip,$Isin,$YahooTicker,$IsShortable,$IsEnabled,$LocalStartDate,$LocalEndDate)
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$TickSize,$Currency,$Cusip,$Isin,$YahooTicker,$IsShortable,$IsEnabled,$LocalStartDate,$LocalEndDate)
 ON CONFLICT (Code, Exchange)
 DO UPDATE SET
     Name = excluded.Name,
     Type = excluded.Type,
     SubType = excluded.SubType,
     LotSize = excluded.LotSize,
+    TickSize = excluded.TickSize,
     Currency = excluded.Currency,
     Cusip = excluded.Cusip,
     YahooTicker = excluded.YahooTicker,
@@ -216,6 +217,7 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$Type", entry.Type.ToUpperInvariant());
                 command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$LotSize", entry.LotSize);
+                command.Parameters.AddWithValue("$TickSize", entry.TickSize);
                 command.Parameters.AddWithValue("$Currency", entry.Currency.ToUpperInvariant());
                 command.Parameters.AddWithValue("$Cusip", entry.Cusip?.ToUpperInvariant() ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$Isin", entry.Isin?.ToUpperInvariant() ?? (object)DBNull.Value);
@@ -245,15 +247,16 @@ DO UPDATE SET
         const string sql =
 @$"
 INSERT INTO {DatabaseNames.FxDefinitionTable}
-    (Code, Name, Exchange, Type, SubType, LotSize, BaseCurrency, QuoteCurrency, IsEnabled, IsMarginTradingAllowed, LocalStartDate, LocalEndDate, MaxLotSize, MinNotional, PricePrecision, QuantityPrecision)
+    (Code, Name, Exchange, Type, SubType, LotSize, TickSize, BaseCurrency, QuoteCurrency, IsEnabled, IsMarginTradingAllowed, LocalStartDate, LocalEndDate, MaxLotSize, MinNotional, PricePrecision, QuantityPrecision)
 VALUES
-    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$BaseCurrency,$QuoteCurrency,$IsEnabled,$IsMarginTradingAllowed,$LocalStartDate,$LocalEndDate,$MaxLotSize,$MinNotional,$PricePrecision,$QuantityPrecision)
+    ($Code,$Name,$Exchange,$Type,$SubType,$LotSize,$TickSize,$BaseCurrency,$QuoteCurrency,$IsEnabled,$IsMarginTradingAllowed,$LocalStartDate,$LocalEndDate,$MaxLotSize,$MinNotional,$PricePrecision,$QuantityPrecision)
 ON CONFLICT (Code, BaseCurrency, QuoteCurrency, Exchange)
 DO UPDATE SET
     Name = excluded.Name,
     Type = excluded.Type,
     SubType = excluded.SubType,
     LotSize = excluded.LotSize,
+    TickSize = excluded.TickSize,
     IsEnabled = excluded.IsEnabled,
     LocalEndDate = excluded.LocalEndDate
 ;
@@ -277,6 +280,7 @@ DO UPDATE SET
                 command.Parameters.AddWithValue("$Type", entry.Type.ToUpperInvariant());
                 command.Parameters.AddWithValue("$SubType", entry.SubType?.ToUpperInvariant() ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("$LotSize", entry.LotSize);
+                command.Parameters.AddWithValue("$TickSize", entry.TickSize);
                 command.Parameters.AddWithValue("$BaseCurrency", entry.FxInfo!.BaseCurrency);
                 command.Parameters.AddWithValue("$QuoteCurrency", entry.FxInfo!.QuoteCurrency);
                 command.Parameters.AddWithValue("$PricePrecision", entry.PricePrecision);

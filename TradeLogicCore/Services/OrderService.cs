@@ -451,7 +451,8 @@ public class OrderService : IOrderService, IDisposable
                 if (existingOrder.IsClosed)
                 {
                     // the incoming order is older than existing one
-                    _log.Warn($"Out of sequence copy of order is received, id: {order.Id}; it will be ignored.");
+                    if (_log.IsDebugEnabled)
+                        _log.Debug($"Out of sequence copy of order is received, id: {order.Id}; it will be ignored.");
                     return;
                 }
                 if (order.Status == OrderStatus.Unknown && existingOrder.Status != OrderStatus.Unknown)

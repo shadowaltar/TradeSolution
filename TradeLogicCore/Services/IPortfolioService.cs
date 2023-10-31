@@ -15,6 +15,8 @@ public interface IPortfolioService
     Portfolio Portfolio { get; }
 
     bool HasPosition { get; }
+    
+    bool HasAsset { get; }
 
     /// <summary>
     /// Initialize portfolio service.
@@ -119,9 +121,9 @@ public interface IPortfolioService
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    Task CloseAllOpenPositions(string orderComment);
+    Task<bool> CloseAllOpenPositions(string orderComment);
 
-    Task CleanUpNonCashAssets(string orderComment);
+    Task<bool> CleanUpNonCashAssets(string orderComment);
 
     /// <summary>
     /// Create a position by a trade, or apply the trade into the given position.

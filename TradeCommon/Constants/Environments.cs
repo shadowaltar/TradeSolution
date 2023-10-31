@@ -1,4 +1,4 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Common;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Constants;
@@ -11,7 +11,7 @@ public static class Environments
 
     public static EnvironmentType Parse(string? input)
     {
-        if (input.IsNullOrEmpty()) return EnvironmentType.Unknown;
+        if (input.IsBlank()) return EnvironmentType.Unknown;
         if (Enum.TryParse(input, true, out EnvironmentType type))
         {
             return type;

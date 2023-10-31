@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
@@ -114,7 +113,7 @@ public partial class Storage
             from = DatabaseNames.GetPositionTableName(position.Security.SecurityType);
             to = DatabaseNames.GetPositionTableName(position.Security.SecurityType, true);
         }
-        if (from.IsNullOrEmpty() || to.IsNullOrEmpty())
+        if (from.IsBlank() || to.IsBlank())
             return 0;
 
         var writer = _writers.Get<T>();

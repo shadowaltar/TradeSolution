@@ -13,15 +13,18 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Reporting;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
+using TradeDataCore.StaticData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
 
@@ -38,21 +41,18 @@ public class Program
     //private static readonly string _testAccountType = "spot";
     //private static readonly EnvironmentType _testEnvironment = EnvironmentType.Test;
 
-    private static readonly string _testUserName = "test";
-    private static readonly string _testPassword = "testtest";
-    private static readonly string _testEmail = "1688996631782681271@testnet.binance.vision";
-    private static readonly string _testAccountName = "spot";
-    private static readonly string _testAccountType = "spot";
+    private static string _userName = "test";
+    private static string _password = "testtest";
+    private static string _email = "1688996631782681271@testnet.binance.vision";
+    private static string _accountName = "spot";
+    private static string _accountId = "1688996631782681271";
+    private static string _accountType = "spot";
+    private static EnvironmentType _environment = EnvironmentType.Uat;
+    private static BrokerType _broker = BrokerType.Binance;
+    private static ExchangeType _exchange = ExchangeType.Binance;
+
     private static readonly DateTime _testStart = new DateTime(2022, 1, 1);
     private static readonly DateTime _testEnd = new DateTime(2023, 7, 1);
-
-    private static readonly EnvironmentType _testEnvironment = EnvironmentType.Uat;
-
-    private static readonly BrokerType _testBroker = BrokerType.Binance;
-    private static readonly ExchangeType _testExchange = ExchangeType.Binance;
-
-    private static string _fakeSecretFileContent;
-    private static string _fakeSecretFilePath;
 
     public static async Task Main(string[] args)
     {
@@ -60,7 +60,31 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        //await ResetTables();
+        var environment = EnvironmentType.Uat;
+
+        if (environment == EnvironmentType.Uat)
+        {
+            _userName = "test";
+            _password = "testtest";
+            _email = "1688996631782681271@testnet.binance.vision";
+            _accountName = "spot";
+            _accountType = "spot";
+            _accountId = "1688996631782681271";
+            _broker = BrokerType.Binance;
+            _exchange = ExchangeType.Binance;
+        }
+        else if (environment == EnvironmentType.Prod)
+        {
+            _userName = "test";
+            _password = "testtest";
+            _email = "1688996631782681271@testnet.binance.vision";
+            _accountName = "spot";
+            _accountType = "spot";
+            _accountId = "1688996631782681271";
+            _broker = BrokerType.Binance;
+            _exchange = ExchangeType.Binance;
+        }
+
         await RunMacMimicWebService();
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
@@ -68,18 +92,70 @@ public class Program
         //await Run();
     }
 
-    private static async Task ResetTables()
+    private static async Task ResetTables(EnvironmentType environment)
     {
-        //var storage = new Storage();
-        //await storage.CreateTable<Order>("stock_orders");
-        //await storage.CreateTable<Trade>("stock_trades");
-        //await storage.CreateTable<Position>("stock_positions");
-        //await storage.CreateTable<Order>("fx_orders");
-        //await storage.CreateTable<Trade>("fx_trades");
-        //await storage.CreateTable<Position>("fx_positions");
-        //await storage.CreateTable<PositionRecord>();
-        //await storage.CreateTable<AlgoEntry>();
-        //await storage.CreateTable<AlgoBatch>();
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
+        await storage.CreateTable<Order>("stock_orders");
+        await storage.CreateTable<Trade>("stock_trades");
+        await storage.CreateTable<Position>("stock_positions");
+        await storage.CreateTable<Order>("error_stock_orders");
+        await storage.CreateTable<Trade>("error_stock_trades");
+        await storage.CreateTable<Position>("error_stock_positions");
+        await storage.CreateTable<Order>("fx_orders");
+        await storage.CreateTable<Trade>("fx_trades");
+        await storage.CreateTable<Position>("fx_positions");
+        await storage.CreateTable<Order>("error_fx_orders");
+        await storage.CreateTable<Trade>("error_fx_trades");
+        await storage.CreateTable<Position>("error_fx_positions");
+        await storage.CreateTable<Asset>();
+        await storage.CreateTable<AlgoEntry>();
+        await storage.CreateTable<AlgoBatch>();
+        await storage.CreateAccountTable();
+        await storage.CreateUserTable();
+        await storage.CreateSecurityTable(SecurityType.Fx);
+        await storage.CreateSecurityTable(SecurityType.Equity);
+        await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Fx);
+        await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Fx);
+        await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Equity);
+        await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Equity);
+        await storage.CreateFinancialStatsTable();
+
+
+        var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
+        await reader.ReadAndSave(SecurityType.Fx);
+        var now = DateTime.UtcNow;
+        var user = new User
+        {
+            Name = _userName,
+            Email = _email,
+            CreateTime = now,
+            UpdateTime = now,
+            Environment = Environments.ToString(environment),
+        };
+        var userPassword = _password;
+        Credential.EncryptUserPassword(user, ref userPassword);
+        await storage.InsertOne(user, true);
+        user = await storage.ReadUser(user.Name, user.Email, environment);
+
+
+        var account = new Account
+        {
+            OwnerId = user.Id,
+            Name = _accountName,
+            Type = _accountType,
+            SubType = "",
+            Environment = environment,
+            BrokerId = ExternalNames.GetBrokerId(_broker),
+            CreateTime = now,
+            UpdateTime = now,
+            ExternalAccount = _accountId,
+            FeeStructure = "",
+        };
+        await storage.InsertOne(account, true);
+        account = await storage.ReadAccount(account.Name);
+        user.Accounts.Add(account);
     }
 
     private static async Task RunMacMimicWebService()
@@ -94,12 +170,12 @@ public class Program
         }
         // mimic set env + login
 
-        var environment = _testEnvironment;
-        var userName = _testUserName;
-        var accountName = _testAccountName;
-        var accountType = _testAccountType;
-        var password = _testPassword;
-        var email = _testEmail;
+        var environment = _environment;
+        var userName = _userName;
+        var accountName = _accountName;
+        var accountType = _accountType;
+        var password = _password;
+        var email = _email;
 
         var exchange = ExchangeType.Binance;
         var symbol = "BTCUSDT";
@@ -110,14 +186,15 @@ public class Program
         var slowMa = 7;
         var stopLoss = 0.0002m;
         var takeProfit = 0.0005m;
-        var initialFixedQuantity = 100;
+        var initialAvailableQuantity = 100;
 
-        _fakeSecretFileContent = $"{new string('0', 64)}{Environment.NewLine}{new string('0', 64)}{Environment.NewLine}{email}";
-        _fakeSecretFilePath = Path.Combine(Consts.DatabaseFolder, $"{Environments.ToString(environment)}_{userName}_{accountName}");
+
+        //await ResetTables(environment);
+
 
         Dependencies.Register(ExternalNames.Convert(exchange), exchange, environment);
-
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
+        var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var context = Dependencies.ComponentContext.Resolve<Context>();
         var core = Dependencies.ComponentContext.Resolve<Core>();
@@ -147,16 +224,16 @@ public class Program
             default:
                 return;
         }
-
-        var fiat = securityService.GetSecurity(quoteCode) ?? throw Exceptions.Impossible(quoteCode + " definition does not exist.");
-        var fiatAsset = services.Portfolio.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCode + " asset does not exist.");
-        var lockedAmount = fiatAsset.Quantity - initialFixedQuantity;
-        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCode} asset quantity < {initialFixedQuantity}");
-
+        if (!services.Portfolio.HasAsset)
+        {
+            await new Reconcilation(context).ReconcileAssets();
+            services.Portfolio.Update(await services.Portfolio.GetStorageAssets());
+        }
         var parameters = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
         var algorithm = new MovingAverageCrossing(context, parameters, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
-        var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed, lockedAmount: lockedAmount);
+        var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed);
+        sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
 
@@ -185,16 +262,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-                {
-                    File.Delete(_fakeSecretFilePath);
-                    File.WriteAllText(_fakeSecretFilePath, _fakeSecretFileContent);
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                }
+            {
+                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+            }
             case ResultCode.GetAccountFailed:
-                {
-                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                }
+            {
+                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+            }
             default:
                 return result;
         }
@@ -249,7 +324,7 @@ public class Program
                 OwnerId = user.Id,
                 Type = at,
                 SubType = "",
-                BrokerId = ExternalNames.GetBrokerId(_testBroker),
+                BrokerId = ExternalNames.GetBrokerId(_broker),
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
                 Environment = et,
@@ -309,7 +384,7 @@ public class Program
         orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
-        var resultCode = await adminService.Login(_testUserName, _testPassword, _testAccountName, _testEnvironment);
+        var resultCode = await adminService.Login(_userName, _password, _accountName, _environment);
         if (resultCode != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("Login failed with code: " + resultCode);
 
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
@@ -332,7 +407,7 @@ public class Program
         };
         await Task.Run(async () =>
         {
-            await adminService.GetAccount(_testAccountName, _testEnvironment, false);
+            await adminService.GetAccount(_accountName, _environment, false);
             await orderService.SendOrder(order);
         });
 
@@ -370,7 +445,7 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
-        await services.Admin.Login(_testUserName, _testPassword, _testAccountName, _testEnvironment);
+        await services.Admin.Login(_userName, _password, _accountName, _environment);
         var context = Dependencies.ComponentContext.Resolve<Context>();
 
         //var filter = "00001,00002,00005";
@@ -417,8 +492,12 @@ public class Program
                     algorithm.Screening = screening;
 
                     var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                                true, true, true, true,
-                                                                new List<string> { "BTC", "USDT" });
+                                                                new List<string> { "BTC", "USDT" },
+                                                                AssumeNoOpenPositionOnStart: true,
+                                                                CancelOpenOrdersOnStart: true,
+                                                                CloseOpenPositionsOnStop: true,
+                                                                CloseOpenPositionsOnStart: true,
+                                                                CleanUpNonCashOnStart: false);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange);
@@ -525,7 +604,7 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
-        await services.Admin.Login(_testUserName, _testPassword, _testAccountName, _testEnvironment);
+        await services.Admin.Login(_userName, _password, _accountName, _environment);
         var context = Dependencies.ComponentContext.Resolve<Context>();
 
         var filter = "ETHUSDT";
@@ -585,8 +664,12 @@ public class Program
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
                         var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                                    true, true, true, true,
-                                                                    new List<string> { "BTC", "USDT" });
+                                                                    new List<string> { "BTC", "USDT" },
+                                                                    AssumeNoOpenPositionOnStart: true,
+                                                                    CancelOpenOrdersOnStart: true,
+                                                                    CloseOpenPositionsOnStop: true,
+                                                                    CloseOpenPositionsOnStart: true,
+                                                                    CleanUpNonCashOnStart: false);
                         var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                         await engine.Run(algoStartParams);
 

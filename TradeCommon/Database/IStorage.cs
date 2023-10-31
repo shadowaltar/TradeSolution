@@ -23,7 +23,6 @@ public interface IStorage
     Task CreateAccountTable();
     Task CreateAssetTable();
     Task CreateFinancialStatsTable();
-    Task<string> CreateOpenOrderIdTable();
     Task<List<string>> CreateOrderTable(SecurityType securityType);
     Task<List<string>> CreatePositionTable(SecurityType securityType);
     Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType);
@@ -43,7 +42,7 @@ public interface IStorage
     Task<int> Delete(PersistenceTask task);
     Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
     Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null) where T : class, new();
-    Task<Account?> ReadAccount(string accountName, EnvironmentType environment);
+    Task<Account?> ReadAccount(string accountName);
     Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
     Task<List<Asset>> ReadAssets();
     Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType);
@@ -60,7 +59,7 @@ public interface IStorage
     Task<List<Security>> ReadSecurities(List<int>? ids = null);
     Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);
-    Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end);
+    Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end, bool? isOperational = false);
     Task<List<Trade>> ReadTrades(Security security, List<long> ids);
     Task<List<Trade>> ReadTradesByOrderId(Security security, long orderId);
     Task<Trade?> ReadTradeByExternalId(long externalTradeId);

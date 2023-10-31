@@ -37,6 +37,7 @@ public class ApplicationContext
     /// If this is set, any assets with currencies not in this filter will be ignored.
     /// </summary>
     public IReadOnlyList<string> GlobalCurrencyFilter => _globalCurrencyFilter;
+    public bool HasGlobalCurrencyFilter => _globalCurrencyFilter.Count != 0;
 
     public ApplicationContext(IStorage storage)
     {

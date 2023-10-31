@@ -1,19 +1,9 @@
-﻿using Autofac.Core;
-using Common;
+﻿using Common;
 using log4net;
-using System.Data;
-using System.Diagnostics;
-using System.Linq;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
-using TradeCommon.Database;
-using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
-using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
-using TradeCommon.Utils;
-using TradeDataCore.Essentials;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
@@ -91,8 +81,8 @@ public class Core
         _ = Task.Factory.StartNew(async () =>
         {
             var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                        true, true, true, true,
-                                                        new List<string> { "BTC", "USDT" });
+                                                        new List<string> { "BTC", "USDT" },
+                                                        true, true, true, true, true);
 
             var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
             _engines[uniqueId] = engine;

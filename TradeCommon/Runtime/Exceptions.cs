@@ -1,9 +1,6 @@
-﻿using Microsoft.Identity.Client;
-using System;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 
 namespace TradeCommon.Runtime;
 
@@ -56,9 +53,9 @@ public static class Exceptions
 
     public static Exception InvalidBackTestMode(bool mustBeInBackTestMode)
     {
-        if (mustBeInBackTestMode)
-            return new InvalidOperationException($"Must be in back-test mode here.");
-        return new InvalidOperationException($"Must not be in back-test mode here.");
+        return mustBeInBackTestMode
+            ? new InvalidOperationException($"Must be in back-test mode here.")
+            : (Exception)new InvalidOperationException($"Must not be in back-test mode here.");
     }
 
     public static Exception MissingBalance(int accountId, int assetId)
@@ -153,9 +150,9 @@ public static class Exceptions
 
     public static Exception Impossible(object? message = null)
     {
-        if (message == null)
-            return new InvalidOperationException("Impossible case is hit.");
-        return new InvalidOperationException("Impossible case is hit: " + message);
+        return message == null
+            ? new InvalidOperationException("Impossible case is hit.")
+            : (Exception)new InvalidOperationException("Impossible case is hit: " + message);
     }
 
     public static Exception InvalidSecurityInTrades()

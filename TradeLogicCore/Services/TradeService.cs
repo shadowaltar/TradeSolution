@@ -1,7 +1,5 @@
 ﻿using Common;
 using log4net;
-using Microsoft.IdentityModel.Tokens;
-using OfficeOpenXml.Style;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
@@ -188,11 +186,11 @@ public class TradeService : ITradeService, IDisposable
         return trades;
     }
 
-    public async Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null)
+    public async Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null, bool? isOperational = false)
     {
         var s = start ?? DateTime.MinValue;
         var e = end ?? DateTime.MaxValue;
-        var trades = await _storage.ReadTrades(security, s, e);
+        var trades = await _storage.ReadTrades(security, s, e, isOperational);
         Update(trades, security);
         return trades;
     }

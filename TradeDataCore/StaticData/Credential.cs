@@ -1,6 +1,5 @@
 ﻿using Common;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Utils.Common;
 
 namespace TradeDataCore.StaticData;
 public class Credential
@@ -11,8 +10,7 @@ public class Credential
     public static bool Matches(string input, string hash)
     {
         if (input.IsBlank()) return false;
-        if (hash.IsBlank()) return false;
-        return CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
+        return !hash.IsBlank() && CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
     }
 
     public static bool IsPasswordCorrect(User user, string password)
@@ -28,8 +26,7 @@ public class Credential
 
     public static bool IsAdminPasswordCorrect(string password)
     {
-        if (password.IsBlank()) return false;
-        return CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
+        return !password.IsBlank() && CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
     }
 
     public static void EncryptUserPassword(User user, ref string password)

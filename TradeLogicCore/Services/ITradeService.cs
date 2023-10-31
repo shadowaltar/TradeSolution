@@ -31,7 +31,7 @@ public interface ITradeService
 
     Task<List<Trade>> GetExternalTrades(Security security, DateTime? start = null, DateTime? end = null);
 
-    Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null);
+    Task<List<Trade>> GetStorageTrades(Security security, DateTime? start = null, DateTime? end = null, bool? isOperational = false);
 
     /// <summary>
     /// Get the executed trades for a given security.

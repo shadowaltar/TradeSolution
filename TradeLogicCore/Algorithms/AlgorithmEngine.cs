@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using System.Security.Cryptography;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -193,18 +192,30 @@ public class AlgorithmEngine : IAlgorithmEngine
             }
         }
 
-        // close open positions
-        if (EngineParameters.CloseOpenPositionsOnStart)
+        await InitializeCaches(false);
+
+        var hasPositionChangedDuringInit = false;
+        // close open positions, when do not assume no open position
+        if (!EngineParameters.AssumeNoOpenPositionOnStart && EngineParameters.CloseOpenPositionsOnStart)
         {
-            await _services.Portfolio.CloseAllOpenPositions(Comments.CloseAllBeforeStart);
+            if (await _services.Portfolio.CloseAllOpenPositions(Comments.CloseAllBeforeStart))
+            {
+                hasPositionChangedDuringInit = true;
+            }
         }
         // sell non-cash assets
-        if (EngineParameters.CleanUpNonCashOnStart)
+        if (!EngineParameters.AssumeNoOpenPositionOnStart && EngineParameters.CleanUpNonCashOnStart)
         {
-            await _services.Portfolio.CleanUpNonCashAssets("Clean up assets before engine starts.");
+            if (await _services.Portfolio.CleanUpNonCashAssets("Clean up assets before engine starts."))
+            {
+                hasPositionChangedDuringInit = true;
+            }
         }
-
-        await InitializeCaches();
+        if (hasPositionChangedDuringInit || EngineParameters.AssumeNoOpenPositionOnStart)
+        {
+            // refresh the cache again
+            await InitializeCaches(EngineParameters.AssumeNoOpenPositionOnStart);
+        }
 
         // subscribe to events
         _services.MarketData.NextOhlc -= OnNextOhlcPrice;
@@ -214,6 +225,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
         _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
 
+        // subscribe to prices
         var subscriptionCount = 0;
         var pickedSecurities = Screening.GetAll();
         foreach (var security in pickedSecurities.Values)
@@ -238,36 +250,40 @@ public class AlgorithmEngine : IAlgorithmEngine
         return TotalPriceEventCount;
     }
 
-    private async Task InitializeCaches()
+    private async Task InitializeCaches(bool assumeNoOpenPosition)
     {
         _services.Order.Reset();
         _services.Trade.Reset();
         _services.Portfolio.Reset(true, true, true);
 
-        var positions = await _services.Portfolio.GetStoragePositions(DateUtils.TMinus(Consts.LookbackDayCount), OpenClose.OpenOnly);
-        _services.Security.Fix(positions);
         var assets = await _context.Storage.ReadAssets();
         _services.Security.Fix(assets);
-
-        List<Trade> trades = new();
-        foreach (var position in positions)
-        {
-            trades.AddRange(await _context.Storage.ReadTradesByPositionId(position.Security, position.Id, OperatorType.Equals));
-        }
-        _services.Security.Fix(trades);
-
-        List<Order> orders = new();
-        foreach (var group in trades.GroupBy(t => t.SecurityId))
-        {
-            var security = await _services.Security.GetSecurity(group.Key);
-            orders.AddRange(await _context.Storage.ReadOrders(security!, group.Select(t => t.OrderId).ToList()));
-        }
-        _services.Security.Fix(orders);
-
-        _services.Order.Update(orders);
-        _services.Trade.Update(trades);
         _services.Portfolio.Update(assets, true);
-        _services.Portfolio.Update(positions, true);
+
+        if (!assumeNoOpenPosition)
+        {
+            var positions = await _services.Portfolio.GetStoragePositions(DateUtils.TMinus(Consts.LookbackDayCount), OpenClose.OpenOnly);
+            _services.Security.Fix(positions);
+
+            List<Trade> trades = new();
+            foreach (var position in positions)
+            {
+                trades.AddRange(await _context.Storage.ReadTradesByPositionId(position.Security, position.Id, OperatorType.Equals));
+            }
+            _services.Security.Fix(trades);
+
+            List<Order> orders = new();
+            foreach (var group in trades.GroupBy(t => t.SecurityId))
+            {
+                var security = await _services.Security.GetSecurity(group.Key);
+                orders.AddRange(await _context.Storage.ReadOrders(security!, group.Select(t => t.OrderId).ToList()));
+            }
+            _services.Security.Fix(orders);
+
+            _services.Order.Update(orders);
+            _services.Trade.Update(trades);
+            _services.Portfolio.Update(positions, true);
+        }
     }
 
     private void OnOrderProcessed(Order order)
@@ -508,7 +524,7 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private async Task ClosePositionIfNeeded()
     {
-        if (_runningState == AlgoRunningState.Stopped || _runningState == AlgoRunningState.Halted)
+        if (_runningState is AlgoRunningState.Stopped or AlgoRunningState.Halted)
         {
             if (EngineParameters.CloseOpenPositionsOnStop && _services.Portfolio.HasPosition)
             {
@@ -532,89 +548,89 @@ public class AlgorithmEngine : IAlgorithmEngine
                 }
                 return true;
             case AlgoRunningState.NotYetStarted:
+            {
+                var timeRange = AlgoParameters.TimeRange;
+                // handle (and wait for) the start time
+                if (DesignatedStartTime == null)
                 {
-                    var timeRange = AlgoParameters.TimeRange;
-                    // handle (and wait for) the start time
-                    if (DesignatedStartTime == null)
-                    {
-                        // one time assignment
-                        DesignatedStartTime = timeRange.ActualStartTime;
-                    }
-                    DateTime start = DesignatedStartTime.Value;
-
-                    switch (timeRange.WhenToStart)
-                    {
-                        case AlgoStartTimeType.Designated:
-                            if (start.IsValid())
-                            {
-                                var r = CanStart(start, DesignatedStopTime, now);
-                                if (r)
-                                {
-                                    _runningState = AlgoRunningState.Running;
-                                    _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
-                                    return true;
-                                }
-                            }
-                            else
-                            {
-                                _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
-                            }
-                            return false;
-                        case AlgoStartTimeType.Immediately:
-                            _runningState = AlgoRunningState.Running;
-                            _log.Info($"Engine starts running immediately.");
-                            return true;
-                        case AlgoStartTimeType.Never:
-                            _runningState = AlgoRunningState.Stopped;
-                            _log.Info($"Engine never runs even in {AlgoRunningState.NotYetStarted} state.");
-                            return false;
-                        case AlgoStartTimeType.NextStartOf:
-                            if (timeRange.NextStartOfIntervalType != null)
-                            {
-                                var r = CanStart(start, DesignatedStopTime, now);
-                                if (r)
-                                {
-                                    _runningState = AlgoRunningState.Running;
-                                    _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.NextStartOf}-{timeRange.NextStartOfIntervalType}: {start:yyyyMMdd-HHmmss}");
-                                    return true;
-                                }
-                            }
-                            else
-                            {
-                                _log.Error($"Invalid designated algo start time type, missing interval for \"NextStartOf\" type.");
-                            }
-                            return false;
-                        case AlgoStartTimeType.NextStartOfLocalDay:
-                            {
-                                _runningState = AlgoRunningState.Stopped;
-                                var localNow = DateTime.Now;
-                                if (start > localNow)
-                                {
-                                    var stopTime = DesignatedStopTime;
-                                    if (stopTime != null)
-                                        stopTime = stopTime.Value.ToLocalTime();
-                                    var r = CanStart(start, stopTime, localNow);
-                                    if (r)
-                                    {
-                                        _runningState = AlgoRunningState.Running;
-                                        return true;
-                                    }
-                                }
-                                else
-                                {
-                                    _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
-                                }
-                                return false;
-                            }
-                        case AlgoStartTimeType.NextMarketOpens:
-                            // TODO, need market meta data
-                            return false;
-                        case AlgoStartTimeType.NextWeekMarketOpens:
-                            // TODO, need market meta data
-                            return false;
-                        default: return false;
-                    }
+                    // one time assignment
+                    DesignatedStartTime = timeRange.ActualStartTime;
                 }
+                DateTime start = DesignatedStartTime.Value;
+
+                switch (timeRange.WhenToStart)
+                {
+                    case AlgoStartTimeType.Designated:
+                        if (start.IsValid())
+                        {
+                            var r = CanStart(start, DesignatedStopTime, now);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.Designated}: {start:yyyyMMdd-HHmmss}");
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            _log.Error($"Invalid designated algo start time: {start:yyyyMMdd-HHmmss}");
+                        }
+                        return false;
+                    case AlgoStartTimeType.Immediately:
+                        _runningState = AlgoRunningState.Running;
+                        _log.Info($"Engine starts running immediately.");
+                        return true;
+                    case AlgoStartTimeType.Never:
+                        _runningState = AlgoRunningState.Stopped;
+                        _log.Info($"Engine never runs even in {AlgoRunningState.NotYetStarted} state.");
+                        return false;
+                    case AlgoStartTimeType.NextStartOf:
+                        if (timeRange.NextStartOfIntervalType != null)
+                        {
+                            var r = CanStart(start, DesignatedStopTime, now);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                _log.Info($"Engine starts running from {AlgoRunningState.NotYetStarted} state, start type is {AlgoStartTimeType.NextStartOf}-{timeRange.NextStartOfIntervalType}: {start:yyyyMMdd-HHmmss}");
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            _log.Error($"Invalid designated algo start time type, missing interval for \"NextStartOf\" type.");
+                        }
+                        return false;
+                    case AlgoStartTimeType.NextStartOfLocalDay:
+                    {
+                        _runningState = AlgoRunningState.Stopped;
+                        var localNow = DateTime.Now;
+                        if (start > localNow)
+                        {
+                            var stopTime = DesignatedStopTime;
+                            if (stopTime != null)
+                                stopTime = stopTime.Value.ToLocalTime();
+                            var r = CanStart(start, stopTime, localNow);
+                            if (r)
+                            {
+                                _runningState = AlgoRunningState.Running;
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            _log.Error($"Invalid designated local algo start time: {start:yyyyMMdd-HHmmss}");
+                        }
+                        return false;
+                    }
+                    case AlgoStartTimeType.NextMarketOpens:
+                        // TODO, need market meta data
+                        return false;
+                    case AlgoStartTimeType.NextWeekMarketOpens:
+                        // TODO, need market meta data
+                        return false;
+                    default: return false;
+                }
+            }
 
             case AlgoRunningState.Stopped:
                 return false;

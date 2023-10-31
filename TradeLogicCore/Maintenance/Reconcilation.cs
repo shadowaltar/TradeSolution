@@ -83,7 +83,6 @@ public class Reconcilation
         }
         _persistence.WaitAll();
         return;
-
     }
 
     public async Task ReconcileOrders(DateTime start, List<Security> securities)
@@ -212,7 +211,7 @@ public class Reconcilation
         foreach (var security in securities)
         {
             // must get internal first then external: the external ones will have the corresponding trade id assigned
-            var internalResults = await _tradeService.GetStorageTrades(security, start);
+            var internalResults = await _tradeService.GetStorageTrades(security, start, isOperational: null);
             var externalResults = await _tradeService.GetExternalTrades(security, start);
             var externalTrades = externalResults.ToDictionary(o => o.ExternalTradeId, o => o);
             var internalTrades = internalResults.ToDictionary(o => o.ExternalTradeId, o => o);
@@ -220,7 +219,8 @@ public class Reconcilation
             var missingPositionIdTrades = internalResults.Where(t => t.PositionId <= 0).ToList();
             foreach (var trade in missingPositionIdTrades)
             {
-                _log.Warn($"Trade {trade.Id} has no position id, will be fixed in position reconcilation step.");
+                if (!trade.IsOperational)
+                    _log.Warn($"Trade {trade.Id} has no position id, will be fixed in position reconcilation step.");
             }
 
             // sync external to internal
@@ -535,6 +535,7 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
 
             // out of order trade id handling
             // not only reconstruct the trade ids but also may need to update existing positions
+            _securityService.Fix(trades);
             var ps = await ProcessAndSavePosition(security, trades)!;
             _persistence.WaitAll();
             _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
@@ -565,7 +566,8 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
                     movedErrorCount++;
             }
         }
-        _log.Warn($"Found {errorCount} positions with issues and moved {movedErrorCount} entries to error table.");
+        if (errorCount != 0)
+            _log.Warn($"Found {errorCount} positions with issues and moved {movedErrorCount} entries to error table.");
     }
 
     //private async Task FixInvalidPositions(Security security, int lookbackDays)

@@ -1,8 +1,6 @@
 ﻿using Common;
 using log4net;
-using Microsoft.IdentityModel.Tokens;
 using TradeCommon.Database;
-using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
@@ -33,6 +31,8 @@ public class PortfolioService : IPortfolioService, IDisposable
     public Portfolio Portfolio { get; private set; }
 
     public bool HasPosition => Portfolio.HasPosition;
+
+    public bool HasAsset => Portfolio.HasAsset;
 
     public event Action<Position, Trade>? PositionProcessed;
     public event Action<Position>? PositionCreated;
@@ -155,45 +155,47 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     private Order CreateCloseOrder(decimal quantity, Security security, string comment)
     {
-        if (_context.Account == null) throw Exceptions.MustLogin();
+        return _context.Account == null
+            ? throw Exceptions.MustLogin()
+            : new Order
+            {
+                Id = _orderIdGenerator.NewTimeBasedId,
+                CreateTime = DateTime.UtcNow,
+                UpdateTime = DateTime.UtcNow,
+                Quantity = Math.Abs(quantity),
+                Side = quantity > 0 ? Side.Sell : Side.Buy,
+                Type = OrderType.Market,
+                TimeInForce = TimeInForceType.GoodTillCancel,
+                Status = OrderStatus.Sending,
 
-        return new Order
-        {
-            Id = _orderIdGenerator.NewTimeBasedId,
-            CreateTime = DateTime.UtcNow,
-            UpdateTime = DateTime.UtcNow,
-            Quantity = Math.Abs(quantity),
-            Side = quantity > 0 ? Side.Sell : Side.Buy,
-            Type = OrderType.Market,
-            TimeInForce = TimeInForceType.GoodTillCancel,
-            Status = OrderStatus.Sending,
-
-            AccountId = _context.AccountId,
-            ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId,
-            FilledQuantity = 0,
-            ExternalCreateTime = DateTime.MinValue,
-            ExternalUpdateTime = DateTime.MinValue,
-            ParentOrderId = 0,
-            Price = 0,
-            StopPrice = 0,
-            Security = security,
-            SecurityId = security.Id,
-            SecurityCode = security.Code,
-            Comment = comment,
-        };
+                AccountId = _context.AccountId,
+                ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId,
+                FilledQuantity = 0,
+                ExternalCreateTime = DateTime.MinValue,
+                ExternalUpdateTime = DateTime.MinValue,
+                ParentOrderId = 0,
+                Price = 0,
+                StopPrice = 0,
+                Security = security,
+                SecurityId = security.Id,
+                SecurityCode = security.Code,
+                Comment = comment,
+            };
     }
 
-    public async Task CloseAllOpenPositions(string orderComment)
+    public async Task<bool> CloseAllOpenPositions(string orderComment)
     {
         // if it is non-fx, create orders to expunge the long/short positions
         var positions = Portfolio.GetPositions();
-        if (positions.IsNullOrEmpty()) return;
+        if (positions.IsNullOrEmpty()) return false;
 
         _log.Info($"Closing {positions.Count} opened positions.");
+        var count = 0;
         foreach (var position in positions)
         {
             if (position.IsClosed) continue;
 
+            count++;
             var order = CreateCloseOrder(position.Quantity, position.Security, orderComment);
             var state = await _orderService.SendOrder(order);
             // need to wait for a while
@@ -203,34 +205,30 @@ public class PortfolioService : IPortfolioService, IDisposable
                 _log.Error("Failed to close position (timed-out), id: " + position.Id);
         }
         _persistence.WaitAll();
+        return count > 0;
     }
 
-    public async Task CleanUpNonCashAssets(string orderComment)
+    public async Task<bool> CleanUpNonCashAssets(string orderComment)
     {
         // sell any assets which is not cash / fiat
         var assets = Portfolio.GetAssets();
-        if (assets.IsNullOrEmpty()) return;
+        if (assets.IsNullOrEmpty()) return false;
 
         var preferredQuoteCurrency = _context.PreferredQuoteCurrencies.FirstOrDefault();
         if (preferredQuoteCurrency == null)
         {
             _log.Error("Failed to get preferred quote currency.");
-            return;
+            return false;
         }
         // fx only logic
-        List<Asset> assetsToBeCleanedUp;
-        if (_context.GlobalCurrencyFilter.IsNullOrEmpty())
-        {
-            assetsToBeCleanedUp = assets;
-        }
-        else
-        {
-            assetsToBeCleanedUp = assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.SecurityCode)).ToList();
-        }
+        List<Asset> assetsToBeCleanedUp = !_context.HasGlobalCurrencyFilter
+            ? assets
+            : assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.SecurityCode)).ToList();
         if (assetsToBeCleanedUp.IsNullOrEmpty())
-            return;
+            return false;
 
         _log.Info($"Cleaning up {assetsToBeCleanedUp.Count} assets.");
+        var count = 0;
         foreach (var asset in assetsToBeCleanedUp)
         {
             if (asset.SecurityCode == preferredQuoteCurrency) continue;
@@ -244,6 +242,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             if (asset.IsEmpty)
                 continue;
 
+            count++;
             var oldQuantity = asset.Quantity;
             var order = CreateCloseOrder(oldQuantity, currencyPair, orderComment);
             order.Action = OrderActionType.Operational;
@@ -275,6 +274,7 @@ public class PortfolioService : IPortfolioService, IDisposable
                 _log.Error($"Failed to clean up asset {asset.SecurityCode} (sell order failed).");
             }
         }
+        return count > 0;
     }
 
     //public IEnumerable<Position> CreateOrApply(List<Trade> trades, Position? position = null)
@@ -446,28 +446,16 @@ public class PortfolioService : IPortfolioService, IDisposable
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
             };
-            if (await _storage.InsertOne(asset, false) > 0)
-                return asset;
-            else
-            {
-                if (Portfolio.AccountId == accountId)
-                    throw Exceptions.MissingAsset(assetId);
-                else
-                    return null;
-            }
+            return await _storage.InsertOne(asset, false) > 0
+                ? asset
+                : Portfolio.AccountId == accountId ? throw Exceptions.MissingAsset(assetId) : null;
         }
         else
         {
             asset.Quantity += quantity;
-            if (await _storage.InsertOne(asset, true) > 0)
-                return asset;
-            else
-            {
-                if (Portfolio.AccountId == accountId)
-                    throw Exceptions.MissingAsset(assetId);
-                else
-                    return null;
-            }
+            return await _storage.InsertOne(asset, true) > 0
+                ? asset
+                : Portfolio.AccountId == accountId ? throw Exceptions.MissingAsset(assetId) : null;
         }
     }
 
@@ -581,8 +569,7 @@ public class PortfolioService : IPortfolioService, IDisposable
     public Side GetOpenPositionSide(int securityId)
     {
         var position = GetPositionBySecurityId(securityId);
-        if (position == null) return Side.None;
-        return position.Side;
+        return position == null ? Side.None : position.Side;
     }
 
     public decimal GetAssetPositionResidual(int assetSecurityId)
@@ -616,10 +603,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             _securityService.Fix(asset);
             var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
-            if (existingAsset != null)
-                asset.Id = existingAsset.Id;
-            else
-                asset.Id = _assetIdGenerator.NewTimeBasedId;
+            asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
 
             asset.AccountId = account.Id;
             asset.UpdateTime = DateTime.UtcNow;

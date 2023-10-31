@@ -37,9 +37,11 @@ public partial class Storage : IStorage
     public void SetEnvironment(EnvironmentType environment)
     {
         _environment = environment;
-        _environmentString = _environment.ToString().ToLowerInvariant();
+        _environmentString = Environments.ToString(_environment);
         var dir = Path.Combine(Consts.DatabaseFolder, _environmentString);
         Directory.CreateDirectory(dir);
+
+        _writers.SetEnvironmentString(_environmentString);
     }
 
     public async Task BeginGlobalTransaction(params string[] databaseNames)
@@ -111,6 +113,10 @@ public partial class Storage : IStorage
 
             for (int i = 0; i < r.FieldCount; i++)
             {
+                if (r.IsDBNull(i))
+                {
+                    continue;
+                }
                 entries.Rows[j][i] = typeCodes[i] switch
                 {
                     TypeCode.Char or TypeCode.String => r.GetString(i),
@@ -279,21 +285,30 @@ public partial class Storage : IStorage
     {
         private readonly Dictionary<string, ISqlWriter> _writers = new();
         private readonly IStorage _storage;
+        private string? _environmentString;
 
         public SqlWriters(IStorage storage)
         {
             _storage = storage;
         }
 
+        public void SetEnvironmentString(string environmentString)
+        {
+            _environmentString = environmentString;
+        }
+
         public ISqlWriter Get<T>() where T : class, new()
         {
+            if (_environmentString.IsBlank())
+                throw Exceptions.MustLogin();
+
             lock (_writers)
             {
                 var type = typeof(T);
                 var name = type.Name;
                 if (!_writers.TryGetValue(name, out var writer))
                 {
-                    writer = new SqlWriter<T>(_storage);
+                    writer = new SqlWriter<T>(_storage, _environmentString);
                     writer.Success += RaiseSuccess;
                     writer.Failed += RaiseFailed;
                     _writers[name] = writer;

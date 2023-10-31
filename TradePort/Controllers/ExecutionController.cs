@@ -176,7 +176,7 @@ public class ExecutionController : Controller
     /// no matter it grows or shrinks.
     /// Fixed: give a fixed amount of quote currency and all the trades' quantity is fixed to this amount.
     /// </param>
-    /// <param name="fixedQuantity"></param>
+    /// <param name="initialAvailableQuantity"></param>
     /// <returns></returns>
     [HttpPost("algorithms/mac/start")]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
@@ -192,7 +192,7 @@ public class ExecutionController : Controller
                                             [FromForm(Name = "stop-loss")] decimal stopLoss = 0.0005m,
                                             [FromForm(Name = "take-profit")] decimal takeProfit = 0.0005m,
                                             [FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
-                                            [FromForm(Name = "initial-fixed-quote-quantity")] decimal fixedQuantity = 100)
+                                            [FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
@@ -229,10 +229,10 @@ public class ExecutionController : Controller
         switch (positionSizingMethod)
         {
             case PositionSizingMethod.PreserveFixed:
-                sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, fixedQuantity);
+                sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
                 break;
             case PositionSizingMethod.Fixed:
-                sizing.CalculateFixed(securityService, portfolioService, quoteCode, fixedQuantity);
+                sizing.CalculateFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
                 break;
         }
         var batchId = await core.Run(parameters, algorithm);

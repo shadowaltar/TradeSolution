@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -485,7 +484,7 @@ public static class ExternalConnectionStates
         Action = ActionType.GetSubscription,
         ResultCode = ResultCode.SubscriptionOk,
         ExternalId = BrokerId,
-        Description = "The subscription does not exist" + (message.IsNullOrEmpty() ? "." : message),
+        Description = "The subscription does not exist" + (message.IsBlank() ? "." : message),
         Type = type,
     };
 

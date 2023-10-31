@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Common;
 using log4net;
-using Microsoft.Identity.Client.Extensions.Msal;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -178,7 +177,7 @@ public class AdminService : IAdminService
 
         if (!requestExternal)
         {
-            var account = await _storage.ReadAccount(accountName, environment);
+            var account = await _storage.ReadAccount(accountName);
             if (account == null)
             {
                 _log.Error($"Failed to read account by name {accountName} from database in {environment}.");

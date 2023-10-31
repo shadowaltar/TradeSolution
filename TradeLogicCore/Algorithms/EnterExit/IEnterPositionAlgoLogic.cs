@@ -1,5 +1,4 @@
 ﻿using TradeCommon.Essentials.Algorithms;
-using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.FeeCalculation;

@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using System;
 using System.Security.Cryptography;
 using System.Text;
 using TradeCommon.Constants;
@@ -43,7 +44,7 @@ public class KeyManager
         var secretFileName = $"{user!.Environment}_{user.Name}_{account.Name}";
         try
         {
-            var path = Path.Combine(_secretFolder, secretFileName);
+            var path = Path.Combine(_secretFolder, Environments.ToString(account.Environment), secretFileName);
             var lines = File.ReadAllLines(path);
             if (lines.Length != 3)
             {
@@ -93,9 +94,9 @@ public class KeyManager
 
             return ResultCode.GetSecretOk;
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            _log.Error("Failed to read secret file.", ex);
+            _log.Error("Failed to read secret file.", e);
             return ResultCode.GetSecretFailed;
         }
     }

@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Attributes;
-using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -222,7 +221,7 @@ public static class DatabaseNames
         }
 
         (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
-        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
+        specificTable = specificTable.IsBlank() ? existing.tableName : specificTable;
         return (specificTable, existing.databaseName);
     }
 
@@ -244,7 +243,7 @@ public static class DatabaseNames
         }
 
         (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
-        specificTable = specificTable.IsNullOrEmpty() ? existing.tableName : specificTable;
+        specificTable = specificTable.IsBlank() ? existing.tableName : specificTable;
         return (specificTable, existing.databaseName);
     }
 

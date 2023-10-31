@@ -151,12 +151,12 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
         }
     }
 
-    public void CalculatePreserveFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal initialFixedQuantity)
+    public void CalculatePreserveFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal initialAvailableQuantity)
     {
         var fiat = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
         var fiatAsset = portfolioService.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
-        var lockedAmount = fiatAsset.Quantity - initialFixedQuantity;
-        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {initialFixedQuantity}");
+        var lockedAmount = fiatAsset.Quantity - initialAvailableQuantity;
+        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {initialAvailableQuantity}");
         LockedAmount = lockedAmount;
     }
 

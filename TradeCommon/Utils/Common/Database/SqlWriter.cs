@@ -1,7 +1,6 @@
 ﻿using Common.Attributes;
 using log4net;
 using Microsoft.Data.Sqlite;
-using Microsoft.IdentityModel.Tokens;
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
@@ -24,6 +23,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
     public List<string> AutoIncrementOnInsertFieldNames { get; }
 
     private readonly IStorage _storage;
+    private readonly string _environmentString;
     private readonly string _defaultTableName;
     private readonly string _databasePath;
     private readonly string _databaseName;
@@ -42,7 +42,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
     public Dictionary<string, string> CreateTableAndIndexSqls { get; } = new();
 
-    public SqlWriter(IStorage storage, char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
+    public SqlWriter(IStorage storage, string environmentString, char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
     {
         var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>();
         _defaultTableName = t ?? throw new ArgumentNullException("Default table name");
@@ -67,6 +67,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         _valueGetter = ReflectionUtils.GetValueGetter<T>();
 
         _storage = storage;
+        _environmentString = environmentString;
     }
 
     public async Task<int> InsertOne<T1>(T1 entry, bool isUpsert, string? tableNameOverride = null)
@@ -184,7 +185,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             result = await deleteCommand.ExecuteNonQueryAsync();
             if (result != 1)
             {
-                throw new Exception("Failed to insert during move.");
+                throw new Exception("Failed to delete after move.");
             }
 
             transaction.Commit();
@@ -300,7 +301,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
     public string GetDropTableAndIndexSql(string? tableNameOverride = null)
     {
         var tableName = tableNameOverride ?? _defaultTableName;
-        if (DropTableAndIndexSqls.TryGetValue(tableName, out var dropSql) && !dropSql.IsNullOrEmpty())
+        if (DropTableAndIndexSqls.TryGetValue(tableName, out var dropSql) && !dropSql.IsBlank())
         {
             return dropSql;
         }
@@ -318,7 +319,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
     protected virtual string? GetConnectionString()
     {
-        return $"Data Source={Path.Combine(_databasePath, _databaseName)}.db";
+        return $"Data Source={Path.Combine(_databasePath, _environmentString, _databaseName)}.db";
     }
 
     private string GetDeleteSql(string? tableNameOverride = null)
@@ -327,7 +328,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             throw new InvalidOperationException("Auto SQL generation for DELETE is not supported if a type has no unique key columns.");
 
         var tableName = tableNameOverride ?? _defaultTableName;
-        if (DeleteSqls.TryGetValue(tableName, out var deleteSql) && !deleteSql.IsNullOrEmpty())
+        if (DeleteSqls.TryGetValue(tableName, out var deleteSql) && !deleteSql.IsBlank())
         {
             return deleteSql;
         }
@@ -343,12 +344,12 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
         tableName ??= _defaultTableName;
 
-        if (isUpsert && UpsertSqls.TryGetValue(tableName, out var upsertSql) && !upsertSql.IsNullOrEmpty())
+        if (isUpsert && UpsertSqls.TryGetValue(tableName, out var upsertSql) && !upsertSql.IsBlank())
         {
             return upsertSql;
         }
 
-        if (!isUpsert && InsertSqls.TryGetValue(tableName, out var insertSql) && !insertSql.IsNullOrEmpty())
+        if (!isUpsert && InsertSqls.TryGetValue(tableName, out var insertSql) && !insertSql.IsBlank())
         {
             return insertSql;
         }

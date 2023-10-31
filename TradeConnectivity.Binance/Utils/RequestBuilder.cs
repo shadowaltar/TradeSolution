@@ -1,9 +1,4 @@
 ﻿using Common;
-using Microsoft.Identity.Client;
-using System;
-using System.Text;
-using TradeCommon.Essentials.Accounts;
-using TradeCommon.Runtime;
 using TradeCommon.Utils;
 using TradeConnectivity.Binance.Services;
 
@@ -31,8 +26,10 @@ public class RequestBuilder
                                     string url,
                                     List<(string key, string value)>? parameters = null)
     {
-        var request = new HttpRequestMessage();
-        request.Method = method;
+        var request = new HttpRequestMessage
+        {
+            Method = method
+        };
 
         var result = "";
         if (method == HttpMethod.Get)
@@ -60,8 +57,10 @@ public class RequestBuilder
                                           string url,
                                           List<(string key, string value)>? parameters = null)
     {
-        var request = new HttpRequestMessage();
-        request.Method = method;
+        var request = new HttpRequestMessage
+        {
+            Method = method
+        };
 
         parameters ??= new List<(string, string)>();
         var result = AppendSignedParameters(request, parameters);
@@ -89,8 +88,10 @@ public class RequestBuilder
                                           string url,
                                           List<(string key, string value)>? parameters = null)
     {
-        var request = new HttpRequestMessage();
-        request.Method = method;
+        var request = new HttpRequestMessage
+        {
+            Method = method
+        };
 
         parameters ??= new List<(string, string)>();
         AppendApiKey(request);

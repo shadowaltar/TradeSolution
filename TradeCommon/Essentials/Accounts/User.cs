@@ -1,8 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using TradeCommon.Constants;
-using Common.Attributes;
+﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
-using System.ComponentModel.DataAnnotations.Schema;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 
 namespace TradeCommon.Essentials.Accounts;

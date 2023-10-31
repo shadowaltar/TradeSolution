@@ -15,7 +15,6 @@ public class SqlReader<T> : IDisposable where T : new()
 {
     private static readonly ILog _log = Logger.New();
     private static readonly Dictionary<Type, string> _selectClauses = new();
-
     private Dictionary<string, PropertyInfo> _properties;
     private ValueSetter<T> _valueSetter;
 
@@ -168,12 +167,12 @@ public static class SqlReader
     /// <param name="transformFunc"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
+    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string environmentString, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
     {
         try
         {
             var sw = Stopwatch.StartNew();
-            using var connection = await Connect(databaseName);
+            using var connection = await Connect(databaseName, environmentString);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -210,12 +209,12 @@ public static class SqlReader
     /// <param name="sql"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string environmentString, string sql, params (string key, object? value)[] parameterValues) where T : new()
     {
         try
         {
             var sw = Stopwatch.StartNew();
-            using var connection = await Connect(databaseName);
+            using var connection = await Connect(databaseName, environmentString);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -253,12 +252,12 @@ public static class SqlReader
     /// <param name="transformFunc"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
+    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string environmentString, string sql, Func<SqliteDataReader, T> transformFunc, params (string key, object? value)[] parameterValues)
     {
         try
         {
             var sw = Stopwatch.StartNew();
-            using var connection = await Connect(databaseName);
+            using var connection = await Connect(databaseName, environmentString);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -294,12 +293,12 @@ public static class SqlReader
     /// <param name="sql"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    public static async Task<T?> ReadOne<T>(string tableName, string databaseName, string environmentString, string sql, params (string key, object? value)[] parameterValues) where T : new()
     {
         try
         {
             var sw = Stopwatch.StartNew();
-            using var connection = await Connect(databaseName);
+            using var connection = await Connect(databaseName, environmentString);
 
             using var command = connection.CreateCommand();
             command.CommandText = sql;
@@ -326,14 +325,14 @@ public static class SqlReader
         }
     }
 
-    private static string? GetConnectionString(string databaseName)
+    private static string? GetConnectionString(string databaseName, string environmentString)
     {
-        return $"Data Source={Path.Combine(Consts.DatabaseFolder, databaseName)}.db";
+        return $"Data Source={Path.Combine(Consts.DatabaseFolder, environmentString, databaseName)}.db";
     }
 
-    private static async Task<SqliteConnection> Connect(string database)
+    private static async Task<SqliteConnection> Connect(string database, string environmentString)
     {
-        var conn = new SqliteConnection(GetConnectionString(database));
+        var conn = new SqliteConnection(GetConnectionString(database, environmentString));
         await conn.OpenAsync();
         return conn;
     }
