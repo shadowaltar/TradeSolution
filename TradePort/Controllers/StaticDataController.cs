@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System.Xml.Linq;
+﻿using Common;
+using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Instruments;
 using TradeDataCore.Importing.Yahoo;
-using Common;
 using TradePort.Utils;
 
 namespace TradePort.Controllers;
@@ -32,11 +31,7 @@ public class StaticDataController : Controller
             return BadRequest();
 
         var resultSet = await storage.Query("SELECT COUNT(Id) FROM " + tableName, DatabaseNames.StaticData);
-        if (resultSet != null)
-        {
-            return Ok(resultSet.Rows[0][0]);
-        }
-        return BadRequest();
+        return resultSet != null ? Ok(resultSet.Rows[0][0]) : BadRequest();
     }
 
     /// <summary>
@@ -54,7 +49,7 @@ public class StaticDataController : Controller
     {
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(exchTypeStr, out ExchangeType exchange, out br)) return br;
-        
+
         var securities = await storage.ReadSecurities(secType, exchange);
 
         return Ok(securities.Take(limit));

@@ -38,9 +38,7 @@ public static class Utils
 
     public static bool IsValid(this Security? security)
     {
-        if (security == null) return false;
-        if (!security.Id.IsValid() || security.Code.IsBlank()) return false;
-        return true;
+        return security != null && security.Id.IsValid() && !security.Code.IsBlank();
     }
 
     public static CompareReport ReportComparison<T>(T a, T b)

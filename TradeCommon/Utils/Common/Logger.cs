@@ -9,9 +9,7 @@ public static class Logger
     {
         var methodInfo = new StackTrace().GetFrame(1)?.GetMethod();
         var clz = methodInfo?.ReflectedType;
-        if (clz == null)
-            throw new InvalidOperationException("Unable to find the caller class.");
-        return LogManager.GetLogger(clz);
+        return clz == null ? throw new InvalidOperationException("Unable to find the caller class.") : LogManager.GetLogger(clz);
     }
 
     /// <summary>

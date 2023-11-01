@@ -30,12 +30,7 @@ public partial class Storage
     {
         var typeCode = TypeConverter.ToTypeCode(typeof(T));
         var dt = await Query(sql, database, typeCode);
-        if (dt.Rows.Count == 0) return (false, default);
-        if (dt.Rows[0][0] is T value)
-        {
-            return (true, value);
-        }
-        return (false, default);
+        return dt.Rows.Count == 0 ? ((bool, T))(false, default) : dt.Rows[0][0] is T value ? ((bool, T))(true, value) : ((bool, T))(false, default);
     }
 
     public async Task<User?> ReadUser(string userName, string email, EnvironmentType environment)
@@ -93,10 +88,10 @@ WHERE
     {
         var dbName = DatabaseNames.ExecutionData;
         var sqlPart = SqlReader<Order>.GetSelectClause();
-        var inClause = GetInClause("Id", ids, false);
+        var inClause = GetInClause("Id", ids, true, false);
         var secType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetOrderTableName(secType);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = {security.Id} AND {inClause}";
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = {security.Id} {inClause}";
         return await SqlReader.ReadMany<Order>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id));
     }
 
@@ -170,8 +165,8 @@ WHERE
     {
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
         var sqlPart = SqlReader<Trade>.GetSelectClause();
-        var inClause = GetInClause("Id", ids, false);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND IsOperational = 0 AND {inClause}";
+        var inClause = GetInClause("Id", ids, true, false);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $SecurityId AND IsOperational = 0 {inClause}";
         return await SqlReader.ReadMany<Trade>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id));
     }
 
@@ -293,14 +288,15 @@ WHERE
         return results;
     }
 
-    public static string GetInClause<T>(string fieldName, List<T>? items, bool withEndingAnd)
+    public static string GetInClause<T>(string fieldName, List<T>? items, bool withStartingAnd, bool withEndingAnd)
     {
         var endingAnd = withEndingAnd ? " AND " : "";
+        var startingAnd = withStartingAnd ? " AND " : "";
         return items.IsNullOrEmpty()
             ? ""
             : items.Count == 1
-            ? $"{fieldName} = {items[0]}{endingAnd}"
-            : $"{fieldName} IN ({string.Join(',', items)}){endingAnd}";
+            ? $"{startingAnd}{fieldName} = {items[0]}{endingAnd}"
+            : $"{startingAnd}{fieldName} IN ({string.Join(',', items)}){endingAnd}";
     }
 
     public async Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null)
@@ -311,7 +307,7 @@ WHERE
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         var typeStr = type.ToString().ToUpperInvariant();
         var exchangeStr = exchange.ToString().ToUpperInvariant();
-        var idClause = GetInClause("Id", ids, true);
+        var idClause = GetInClause("Id", ids, false, true);
         var exchangeClause = exchange.IsUnknown()
             ? ""
             : "AND Exchange = $Exchange";

@@ -1,11 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
-using BenchmarkDotNet.Running;
 using log4net.Config;
 using OfficeOpenXml;
 using System.Text;
-using TradeCommon.CodeAnalysis;
-using TradeCommon.Database;
-using TradeCommon.Utils.Common;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();

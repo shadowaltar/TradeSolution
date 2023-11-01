@@ -24,10 +24,7 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
 
         var availableNewPositionCount = Math.Max(maxConcurrentPositionCount - positions.Count, 0);
 
-        if (freeBalance > 0)
-            return LotRounding(security.Id, freeBalance / availableNewPositionCount);
-
-        return 0;
+        return freeBalance > 0 ? LotRounding(security.Id, freeBalance / availableNewPositionCount) : 0;
     }
 
     public decimal GetSize(decimal availableCash, AlgoEntry current, AlgoEntry? last, decimal price, DateTime time)

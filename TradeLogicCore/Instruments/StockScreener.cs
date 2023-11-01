@@ -4,9 +4,7 @@ using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Utils.Evaluation;
-using TradeDataCore;
 using TradeDataCore.Instruments;
-using static OfficeOpenXml.ExcelErrorValue;
 
 namespace TradeLogicCore.Instruments;
 

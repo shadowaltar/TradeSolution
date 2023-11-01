@@ -55,9 +55,7 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
 
     public virtual bool Equals(Asset? obj)
     {
-        if (obj == null) return false;
-        if (Id != obj.Id) return false;
-        return CompareTo(obj) == 0;
+        return obj != null && Id == obj.Id && CompareTo(obj) == 0;
     }
 
     public override int GetHashCode()
@@ -86,7 +84,6 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
 
     public virtual bool EqualsIgnoreId(IIdEntry other)
     {
-        if (other is not Asset asset) return false;
-        return CompareTo(asset) == 0;
+        return other is Asset asset && CompareTo(asset) == 0;
     }
 }

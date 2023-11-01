@@ -272,9 +272,9 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
     {
         var type = typeof(T);
         var uniqueKeys = type.GetCustomAttribute<UniqueAttribute>()?.FieldNames;
-        if (uniqueKeys.IsNullOrEmpty())
-            return "";
-        return @$"
+        return uniqueKeys.IsNullOrEmpty()
+            ? ""
+            : @$"
 CREATE UNIQUE INDEX
     idx_{tableName}_{string.Join("_", uniqueKeys.Select(k => k.FirstCharLowerCase()))}
 ON {tableName}

@@ -60,7 +60,7 @@ public partial class Storage
 
     public async Task<int> Insert<T>(PersistenceTask task) where T : class, new()
     {
-        if (task.Action != DatabaseActionType.Insert && task.Action != DatabaseActionType.Upsert)
+        if (task.Action is not DatabaseActionType.Insert and not DatabaseActionType.Upsert)
         {
             _log.Warn("Invalid db action type.");
             return 0;

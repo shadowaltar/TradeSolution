@@ -56,7 +56,10 @@ public static class CollectionExtensions
     /// </summary>
     /// <param name="collection"></param>
     /// <returns></returns>
-    public static bool IsNullOrEmpty<T>([NotNullWhen(false)][AllowNull] this ICollection<T> collection) => collection == null || collection.Count == 0;
+    public static bool IsNullOrEmpty<T>([NotNullWhen(false)][AllowNull] this ICollection<T> collection)
+    {
+        return collection == null || collection.Count == 0;
+    }
 
     /// <summary>
     /// Append values to an existing array.
@@ -88,7 +91,7 @@ public static class CollectionExtensions
     /// <param name="collection"></param>
     /// <param name="values"></param>
     /// <returns></returns>
-    public static void AddRange<T>(this ICollection<T> collection, params T[] values)
+    public static void AddRange<T>(this IList<T> collection, params T[] values)
     {
         if (values.IsNullOrEmpty()) return;
         foreach (var item in values)
@@ -296,7 +299,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static Tv? ThreadSafeGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             return dictionary!.GetOrDefault(key);
@@ -305,7 +308,7 @@ public static class CollectionExtensions
 
     public static bool ThreadSafeContains<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             return dictionary!.ContainsKey(key);
@@ -314,7 +317,7 @@ public static class CollectionExtensions
 
     public static void ThreadSafeClear<T, Tv>(this IDictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             dictionary!.Clear();
@@ -332,7 +335,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static bool ThreadSafeRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             return dictionary!.Remove(key);
@@ -352,7 +355,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static Tv? ThreadSafeGetAndRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             var value = dictionary.GetOrDefault(key, default);
@@ -374,7 +377,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static bool ThreadSafeContainsOrSet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Tv value, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             if (dictionary.ContainsKey(key))
@@ -386,7 +389,7 @@ public static class CollectionExtensions
 
     public static T? ThreadSafeFirst<T>(this IEnumerable<T> collection, Func<T, bool> selector, object? @lock = null)
     {
-        object lockObject = @lock != null ? @lock : collection;
+        object lockObject = @lock ?? collection;
         lock (lockObject)
         {
             return collection.FirstOrDefault(selector);
@@ -405,7 +408,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static bool ThreadSafeTryGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             var r = dictionary.TryGetValue(key, out y);
@@ -415,7 +418,7 @@ public static class CollectionExtensions
 
     public static void ThreadSafeSet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Tv y, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             dictionary[key] = y;
@@ -424,7 +427,7 @@ public static class CollectionExtensions
 
     public static List<Tv> ThreadSafeValues<T, Tv>(this IDictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : dictionary;
+        object lockObject = @lock ?? dictionary;
         lock (lockObject)
         {
             return dictionary.Values.ToList();
@@ -433,7 +436,7 @@ public static class CollectionExtensions
 
     public static bool ThreadSafeAdd<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : set;
+        object lockObject = @lock ?? set;
         lock (lockObject)
         {
             return set.Add(value);
@@ -442,7 +445,7 @@ public static class CollectionExtensions
 
     public static bool ThreadSafeContains<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : set;
+        object lockObject = @lock ?? set;
         lock (lockObject)
         {
             return set.Contains(value);
@@ -460,7 +463,7 @@ public static class CollectionExtensions
     /// <returns></returns>
     public static bool ThreadSafeContainsElseAdd<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : set;
+        object lockObject = @lock ?? set;
         lock (lockObject)
         {
             var r = set.Contains(value);
@@ -472,7 +475,7 @@ public static class CollectionExtensions
 
     public static bool ThreadSafeRemove<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
     {
-        object lockObject = @lock != null ? @lock : set;
+        object lockObject = @lock ?? set;
         lock (lockObject)
         {
             return set.Remove(value);
@@ -542,7 +545,7 @@ public static class CollectionExtensions
             {
                 var value = list[i];
                 if (value == null) continue;
-                hash = 31 * hash + value.GetHashCode();
+                hash = (31 * hash) + value.GetHashCode();
             }
         }
         return hash;

@@ -12,10 +12,9 @@ public class Persistence : IDisposable
     private readonly Pool<PersistenceTask> _taskPool = new();
 
     private int _currentThreadId;
-    private bool _isEmpty = true;
     private bool _isRunning;
 
-    public bool IsEmpty => _isEmpty;
+    public bool IsEmpty { get; private set; } = true;
 
     public Persistence(IStorage storage)
     {
@@ -96,7 +95,7 @@ public class Persistence : IDisposable
         _tasks.Enqueue(task);
         return task;
     }
-    
+
     /// <summary>
     /// Block until all queued database actions are finished.
     /// </summary>
@@ -104,7 +103,7 @@ public class Persistence : IDisposable
     {
         if (Environment.CurrentManagedThreadId == _currentThreadId)
             throw Exceptions.Invalid("Must not call method to wait for all tasks to finish inside the Persistence instance.");
-        Threads.WaitUntil(() => _isEmpty);
+        Threads.WaitUntil(() => IsEmpty);
     }
 
     private async Task Run()
@@ -113,12 +112,12 @@ public class Persistence : IDisposable
         {
             if (_tasks.TryDequeue(out var task))
             {
-                _isEmpty = false;
+                IsEmpty = false;
                 _ = await RunTask(task);
             }
             else
             {
-                _isEmpty = true;
+                IsEmpty = true;
                 Thread.Sleep(100);
             }
         }

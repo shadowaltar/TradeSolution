@@ -1,10 +1,4 @@
-﻿using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Utils.Evaluation;
+﻿using TradeCommon.Utils.Evaluation;
 
 namespace TradeCommon.Maths.Tests;
 

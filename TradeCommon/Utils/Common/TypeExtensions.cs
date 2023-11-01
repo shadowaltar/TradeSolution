@@ -9,13 +9,11 @@ public static class TypeExtensions
 
     public static List<T> GetDistinctAttributes<T>(this Type type, IEqualityComparer<T>? comparer = null) where T : Attribute
     {
-        if (comparer != null)
-            return type.GetCustomAttributes<T>().Distinct(comparer).ToList();
-
-        if (typeof(T) is IFieldNamesAttribute)
-            return type.GetCustomAttributes<T>().OfType<IFieldNamesAttribute>()
-                .Distinct(_comparer).OfType<T>().ToList();
-
-        return type.GetCustomAttributes<T>().Distinct().ToList();
+        return comparer != null
+            ? type.GetCustomAttributes<T>().Distinct(comparer).ToList()
+            : typeof(T) is IFieldNamesAttribute
+            ? type.GetCustomAttributes<T>().OfType<IFieldNamesAttribute>()
+                .Distinct(_comparer).OfType<T>().ToList()
+            : type.GetCustomAttributes<T>().Distinct().ToList();
     }
 }

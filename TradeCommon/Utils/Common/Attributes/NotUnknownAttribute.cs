@@ -9,6 +9,6 @@ public class NotUnknownAttribute : ValidationAttribute
     {
         if (value == null) return false;
         var str = value.ToString();
-        return str != "UNKNOWN" && str != "Unknown";
+        return str is not "UNKNOWN" and not "Unknown";
     }
 }

@@ -1,12 +1,4 @@
-﻿using NUnit.Framework;
-using TradeCommon.Calculations;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Calculations.Tests;
+﻿namespace TradeCommon.Calculations.Tests;
 
 [TestFixture()]
 public class ExponentialMovingAverageTests

@@ -193,7 +193,8 @@ public class MovingAverageCrossing : Algorithm
     {
         if (_closingPositionMonitor.IsMonitoring(securityId))
         {
-            _log.Info($"Already working on the position (with security Id {securityId}) so cannot run StopLoss.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Already working on the position (with security Id {securityId}) so cannot run StopLoss.");
             return false;
         }
 
@@ -204,12 +205,12 @@ public class MovingAverageCrossing : Algorithm
         if (position == null || position.IsClosed) return false;
 
         var side = position.Side;
-        if (side == Side.Buy && sl >= tick.Mid)
+        if (side == Side.Buy && sl >= tick.Bid)
         {
             _log.Info($"\n\tALGO:[ALGO SL][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             return true;
         }
-        if (side == Side.Sell && sl <= tick.Mid)
+        if (side == Side.Sell && sl <= tick.Bid)
         {
             _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             return true;
@@ -221,7 +222,8 @@ public class MovingAverageCrossing : Algorithm
     {
         if (_closingPositionMonitor.IsMonitoring(securityId))
         {
-            _log.Info($"Already working on the position (with security Id {securityId}) so cannot run TakeProfit.");
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Already working on the position (with security Id {securityId}) so cannot run TakeProfit.");
             return false;
         }
 
@@ -232,12 +234,12 @@ public class MovingAverageCrossing : Algorithm
         if (position == null || position.IsClosed) return false;
 
         var side = position.Side;
-        if (side == Side.Buy && tp <= tick.Mid)
+        if (side == Side.Buy && tp <= tick.Bid)
         {
             _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             return true;
         }
-        if (side == Side.Sell && tp >= tick.Mid)
+        if (side == Side.Sell && tp >= tick.Bid)
         {
             _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             return true;
@@ -312,9 +314,15 @@ public class MovingAverageCrossing : Algorithm
         _closingPositionMonitor.MarkAsDone(entry.SecurityId);
     }
 
-    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide) => ResetInheritedVariables(entry);
+    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide)
+    {
+        ResetInheritedVariables(entry);
+    }
 
-    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide) => ResetInheritedVariables(entry);
+    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide)
+    {
+        ResetInheritedVariables(entry);
+    }
 
     private bool CanOpen(AlgoEntry current)
     {
@@ -451,10 +459,7 @@ public record MacVariables : IAlgorithmVariables
     {
         return $"F:{FormatPrice(Fast, security)}, S:{FormatPrice(Slow, security)}, PxF:{PriceXFast}, PxS:{PriceXSlow}, FxS:{FastXSlow}";
 
-        static string FormatPrice(decimal price, Security security)
-        {
-            return price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
-        }
+        static string FormatPrice(decimal price, Security security) => price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
     }
 
     public override string ToString()

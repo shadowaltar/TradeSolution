@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Attributes;
-using Microsoft.CodeAnalysis;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Calculations;
 using TradeCommon.Essentials.Portfolios;
@@ -157,8 +156,7 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
 
     public bool EqualsIgnoreId(IIdEntry other)
     {
-        if (other is not Trade trade) return false;
-        return CompareTo(trade) == 0;
+        return other is Trade trade && CompareTo(trade) == 0;
     }
 
     public override string ToString()

@@ -1,5 +1,4 @@
-﻿using TradeCommon.Constants;
-using static TradeCommon.Constants.SecurityTypes;
+﻿using static TradeCommon.Constants.SecurityTypes;
 
 namespace TradeCommon.Essentials.Instruments;
 
@@ -15,13 +14,13 @@ public static class SecurityTypeConverter
             return SecurityType.Equity;
 
         return str switch
-        {
-            Fx or Crypto => SecurityType.Fx,
-            Future or Futures => SecurityType.Future,
-            Forward => SecurityType.Forward,
-            Option => SecurityType.Option,
-            _ => SecurityType.Unknown,
-        };
+            {
+                Fx or Crypto => SecurityType.Fx,
+                Future or Futures => SecurityType.Future,
+                Forward => SecurityType.Forward,
+                Option => SecurityType.Option,
+                _ => SecurityType.Unknown,
+            };
     }
 
     public static SecurityType ParseSubType(string? str)
@@ -34,13 +33,19 @@ public static class SecurityTypeConverter
             return SecurityType.Equity;
 
         return str switch
-        {
-            Crypto => SecurityType.Crypto,
-            _ => SecurityType.Unknown,
-        };
+            {
+                Crypto => SecurityType.Crypto,
+                _ => SecurityType.Unknown,
+            };
     }
 
-    public static bool Matches(string typeStr, SecurityType type) => Parse(typeStr) == type;
+    public static bool Matches(string typeStr, SecurityType type)
+    {
+        return Parse(typeStr) == type;
+    }
 
-    public static bool IsEquity(string typeStr) => Matches(typeStr, SecurityType.Equity);
+    public static bool IsEquity(string typeStr)
+    {
+        return Matches(typeStr, SecurityType.Equity);
+    }
 }

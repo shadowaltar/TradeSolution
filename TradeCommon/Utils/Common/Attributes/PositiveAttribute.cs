@@ -23,14 +23,6 @@ public class PositiveAttribute : ValidationAttribute
         {
             return decimalValue > 0;
         }
-        if (value is short)
-        {
-            return (short)value > 0;
-        }
-        if (value is byte)
-        {
-            return (byte)value > 0;
-        }
-        return false;
+        return value is short ? (short)value > 0 : value is byte && (byte)value > 0;
     }
 }

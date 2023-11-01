@@ -8,10 +8,9 @@ public static class AutofacExtensions
         where TImpl : notnull, T
         where T : notnull
     {
-        if (key != null)
-            return builder.RegisterType<TImpl>().Keyed<T>(key).SingleInstance();
-        else
-            return builder.RegisterType<TImpl>().As<T>().SingleInstance();
+        return key != null
+            ? builder.RegisterType<TImpl>().Keyed<T>(key).SingleInstance()
+            : builder.RegisterType<TImpl>().As<T>().SingleInstance();
     }
 
     public static IRegistrationBuilder<T, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton<T>(this ContainerBuilder builder)

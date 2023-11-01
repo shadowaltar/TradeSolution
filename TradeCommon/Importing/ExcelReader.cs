@@ -175,7 +175,7 @@ public class ExcelReader
                 throw new ArgumentException("Only support ABC or ABC.DEF two kinds of fieldName.");
 
             // only support 2 levels
-            if(ReflectionUtils.GetPropertyToName(typeof(T)).TryGetValue(fields[0], out var pi))
+            if (ReflectionUtils.GetPropertyToName(typeof(T)).TryGetValue(fields[0], out var pi))
             {
                 var type = pi.PropertyType;
                 if (type != null)

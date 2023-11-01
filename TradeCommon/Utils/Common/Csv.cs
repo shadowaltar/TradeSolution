@@ -1,6 +1,5 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
-using Microsoft.SqlServer.Server;
 using System.Globalization;
 using System.Linq.Expressions;
 using TradeCommon.Constants;
@@ -23,8 +22,7 @@ public static class Csv
         csvReader.ReadHeader();
         while (csvReader.Read())
         {
-            var p = csvReader.GetRecord<dynamic>() as IDictionary<string, object>;
-            if (p == null)
+            if (csvReader.GetRecord<dynamic>() is not IDictionary<string, object> p)
                 continue;
 
             if (p.Count < 2) // must be at least two columns
@@ -217,8 +215,10 @@ public static class CsvSettings<T>
             var noStrings = Consts.NoStrings;
             if (treatEmptyStringAsFalse)
             {
-                var temp = new List<string>(Consts.NoStrings);
-                temp.Add(string.Empty);
+                var temp = new List<string>(Consts.NoStrings)
+                {
+                    string.Empty
+                };
                 noStrings = temp.ToArray();
             }
 

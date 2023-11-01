@@ -10,8 +10,8 @@ public class ExponentialMovingAverage : Calculator
     private List<double>? _cachedValues;
     private List<decimal>? _cachedDecimalValues;
 
-    private double _factor = 0;
-    private decimal _factorDecimal = 0;
+    private readonly double _factor = 0;
+    private readonly decimal _factorDecimal = 0;
 
     public int Smoothing { get; }
 
@@ -49,7 +49,7 @@ public class ExponentialMovingAverage : Calculator
         }
         else
         {
-            _previous = value * _factor + _previous * (1 - _factor);
+            _previous = (value * _factor) + (_previous * (1 - _factor));
             return _previous;
         }
     }
@@ -78,7 +78,7 @@ public class ExponentialMovingAverage : Calculator
         }
         else
         {
-            _previousDecimal = value * _factorDecimal + _previousDecimal * (1 - _factorDecimal);
+            _previousDecimal = (value * _factorDecimal) + (_previousDecimal * (1 - _factorDecimal));
             return _previousDecimal;
         }
     }

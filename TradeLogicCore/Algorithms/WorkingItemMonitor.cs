@@ -14,11 +14,9 @@ public class WorkingItemMonitor<T> where T : SecurityRelatedEntry, IIdEntry
     /// <returns></returns>
     public bool MonitorAndPreventOtherActivity(T item)
     {
-        if (item.IsSecurityInvalid()) throw Exceptions.InvalidSecurityInPosition(item.Id);
-
-        if (ItemsBySecurityId.ThreadSafeContainsOrSet(item.SecurityId, item))
-            return true;
-        return false;
+        return item.IsSecurityInvalid()
+            ? throw Exceptions.InvalidSecurityInPosition(item.Id)
+            : ItemsBySecurityId.ThreadSafeContainsOrSet(item.SecurityId, item);
     }
 
     /// <summary>

@@ -13,10 +13,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
     {
         _context = context;
         _security = security;
-        if (security != null)
-            _securities = new Dictionary<int, Security> { { security.Id, security } };
-        else
-            _securities = new Dictionary<int, Security>();
+        _securities = security != null ? new Dictionary<int, Security> { { security.Id, security } } : new Dictionary<int, Security>();
     }
 
     public void SetAndPick(IDictionary<int, Security> securityPool)
@@ -32,8 +29,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 
     public bool CheckIsPicked(int securityId)
     {
-        if (_security == null) return false;
-        return securityId == _security?.Id;
+        return _security != null && securityId == _security?.Id;
     }
 
     public IReadOnlyDictionary<int, Security> GetPickedOnes()

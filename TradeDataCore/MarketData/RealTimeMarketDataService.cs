@@ -11,11 +11,10 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeDataCore.MarketData;
 public class RealTimeMarketDataService : IMarketDataService, IDisposable
 {
-    private readonly IExternalQuotationManagement _external;
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
     private readonly ISecurityService _securityService;
 
-    public IExternalQuotationManagement External => _external;
+    public IExternalQuotationManagement External { get; }
 
     public event OhlcPriceReceivedCallback? NextOhlc;
     public event TickPriceReceivedCallback? NextTick;
@@ -29,15 +28,15 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         IHistoricalMarketDataService historicalMarketDataService,
         ISecurityService securityService)
     {
-        _external = external;
+        External = external;
         _historicalMarketDataService = historicalMarketDataService;
         _securityService = securityService;
-        _external.NextOhlc -= OnNextOhlc;
-        _external.NextOhlc += OnNextOhlc;
-        _external.NextTick -= OnNextTick;
-        _external.NextTick += OnNextTick;
-        _external.NextOrderBook -= OnNextOrderBook;
-        _external.NextOrderBook += OnNextOrderBook;
+        External.NextOhlc -= OnNextOhlc;
+        External.NextOhlc += OnNextOhlc;
+        External.NextTick -= OnNextTick;
+        External.NextTick += OnNextTick;
+        External.NextOrderBook -= OnNextOrderBook;
+        External.NextOrderBook += OnNextOrderBook;
     }
 
     private void OnNextOhlc(int securityId, OhlcPrice price, bool isComplete)
@@ -57,17 +56,13 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public async Task Initialize()
     {
-        await _external.Initialize();
+        await External.Initialize();
     }
 
     public async Task<Dictionary<string, decimal>?> GetPrices(List<Security> securities)
     {
-        var state = await _external.GetPrices(securities.Select(s => s.Code).ToArray());
-        if (state.ResultCode == ResultCode.GetPriceOk)
-        {
-            return state.Get<Dictionary<string, decimal>>();
-        }
-        return null;
+        var state = await External.GetPrices(securities.Select(s => s.Code).ToArray());
+        return state.ResultCode == ResultCode.GetPriceOk ? state.Get<Dictionary<string, decimal>>() : null;
     }
 
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null)
@@ -106,7 +101,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
             if (c == 1)
             {
                 // need to subscribe
-                return _external.SubscribeOhlc(security, interval);
+                return External.SubscribeOhlc(security, interval);
             }
             else
             {
@@ -148,12 +143,12 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public async Task<ExternalConnectionState> SubscribeTick(Security security)
     {
-        return _external.SubscribeTick(security);
+        return External.SubscribeTick(security);
     }
 
     public async Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null)
     {
-        return _external.SubscribeOrderBook(security, 5);
+        return External.SubscribeOrderBook(security, 5);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
@@ -166,10 +161,10 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         var securities = await _securityService.GetSecurities(keys.Select(k => k.securityId).Distinct().ToList());
         var securityMap = securities.ToDictionary(s => s.Id, s => s);
         var states = new List<ExternalConnectionState>();
-        foreach (var key in keys)
+        foreach (var (securityId, interval) in keys)
         {
-            var security = securityMap[key.securityId];
-            var state = await _external.UnsubscribeOhlc(security, key.interval);
+            var security = securityMap[securityId];
+            var state = await External.UnsubscribeOhlc(security, interval);
             states.Add(state);
         }
         return ExternalConnectionStates.UnsubscribedMultipleRealTimeOhlc(states);
@@ -188,10 +183,9 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval)
     {
         var count = CountOhlcSubscription(security.Id, interval, -1);
-        if (count == 0)
-            return await _external.UnsubscribeOhlc(security, interval);
-
-        return ExternalConnectionStates.StillHasSubscribedRealTimeOhlc(security, interval);
+        return count == 0
+            ? await External.UnsubscribeOhlc(security, interval)
+            : ExternalConnectionStates.StillHasSubscribedRealTimeOhlc(security, interval);
     }
 
     public Task<ExternalConnectionState> UnsubscribeTick(Security security)
@@ -201,7 +195,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public void Dispose()
     {
-        _external.NextOhlc -= OnNextOhlc;
+        External.NextOhlc -= OnNextOhlc;
         NextOhlc = null;
     }
 }

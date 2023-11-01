@@ -59,7 +59,7 @@ public interface IOrderService
     /// <param name="end"></param>
     /// <returns></returns>
     Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null);
-    
+
     /// <summary>
     /// Get all orders from storage for a specific security and optional time range.
     /// </summary>
@@ -166,7 +166,7 @@ public interface IOrderService
     /// Reset all caches in this service.
     /// </summary>
     void Reset();
-    
+
     /// <summary>
     /// Update the internal state.
     /// </summary>

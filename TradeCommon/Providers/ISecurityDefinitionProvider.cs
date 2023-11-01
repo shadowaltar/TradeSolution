@@ -1,6 +1,4 @@
-﻿using Common;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
+﻿using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Providers;
@@ -37,6 +35,6 @@ public interface ISecurityDefinitionProvider
     /// <param name="security"></param>
     /// <returns></returns>
     void Fix(SecurityRelatedEntry entry, Security? security = null);
-    
-    void Fix<T>(IList<T> entries, Security? security = null) where T: SecurityRelatedEntry;
+
+    void Fix<T>(IList<T> entries, Security? security = null) where T : SecurityRelatedEntry;
 }

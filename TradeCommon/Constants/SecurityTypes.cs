@@ -6,7 +6,7 @@ public static class SecurityTypes
         "REAL ESTATE INVESTMENT TRUSTS", "REITS", "REIT",
         "EXCHANGE TRADED PRODUCTS", "ETP"};
 
-    
+
 
     public const string Stock = "STOCK";
     public const string Fx = "FX";

@@ -1,6 +1,8 @@
 ﻿namespace Common;
 public class IdGenerator
 {
+    private static readonly long _baseTicks = new DateTime(2000, 1, 1).Ticks;
+
     private long _longId;
     private int _intId;
     private volatile int _sequentialSuffix;
@@ -30,7 +32,7 @@ public class IdGenerator
                 _sequentialSuffix++;
                 if (_sequentialSuffix == 10)
                     _sequentialSuffix = 0;
-                return DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
+                return ((DateTime.UtcNow.Ticks - _baseTicks) * 10) + _sequentialSuffix;
             }
         }
     }
@@ -44,7 +46,7 @@ public class IdGenerator
                 _negativeSequentialSuffix--;
                 if (_negativeSequentialSuffix == 0)
                     _negativeSequentialSuffix = 10;
-                return - DateTime.UtcNow.Ticks * 10 + _sequentialSuffix;
+                return (-(DateTime.UtcNow.Ticks - _baseTicks) * 10) + _sequentialSuffix;
             }
         }
     }

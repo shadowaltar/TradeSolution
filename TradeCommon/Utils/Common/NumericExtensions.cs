@@ -23,7 +23,7 @@ public static class NumericExtensions
         while (value != 0)
         {
             rem = value % 10;
-            reverse = reverse * 10 + rem;
+            reverse = (reverse * 10) + rem;
             value /= 10;
         }
         return reverse;
@@ -43,41 +43,65 @@ public static class NumericExtensions
         return decimalPlaces;
     }
 
-    public static bool IsNaN(this double value) => double.IsNaN(value);
+    public static bool IsNaN(this double value)
+    {
+        return double.IsNaN(value);
+    }
 
-    public static bool IsValid(this int value) => value != int.MinValue && value != int.MaxValue;
+    public static bool IsValid(this int value)
+    {
+        return value is not int.MinValue and not int.MaxValue;
+    }
 
-    public static bool IsValid(this double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+    public static bool IsValid(this double value)
+    {
+        return !double.IsNaN(value) && !double.IsInfinity(value);
+    }
 
-    public static bool IsValid(this decimal value) => value != decimal.MinValue && value != decimal.MaxValue;
+    public static bool IsValid(this decimal value)
+    {
+        return value is not decimal.MinValue and not decimal.MaxValue;
+    }
 
-    public static bool IsValid(this decimal? value) => value != null && value != decimal.MinValue && value != decimal.MaxValue;
+    public static bool IsValid(this decimal? value)
+    {
+        return value is not null and not decimal.MinValue and not decimal.MaxValue;
+    }
 
-    public static bool IsValid(this long value) => value != long.MinValue && value != long.MaxValue;
+    public static bool IsValid(this long value)
+    {
+        return value is not long.MinValue and not long.MaxValue;
+    }
 
     public static bool ApproxEquals(this decimal value1, decimal value2)
     {
         var diff = value1 - value2;
-        if (diff == 0) return true;
-        if (diff > 0 && diff < 1E-20m) return true;
-        if (diff < 0 && diff > -1E-20m) return true;
-        return false;
+        return diff is 0 or (> 0 and < 1E-20m) or (< 0 and > (-1E-20m));
     }
 
     public static bool ApproxEquals(this double value1, double value2)
     {
         var diff = value1 - value2;
-        if (diff == 0) return true;
-        if (diff > 0 && diff < 1E-14) return true;
-        if (diff < 0 && diff > -1E-14) return true;
-        return false;
+        return diff is 0 or (> 0 and < 1E-14) or (< 0 and > (-1E-14));
     }
 
-    public static double ToDouble(this decimal value) => decimal.ToDouble(value);
+    public static double ToDouble(this decimal value)
+    {
+        return decimal.ToDouble(value);
+    }
 
-    public static double ToDouble(this string value) => double.TryParse(value, out var val) ? val : double.NaN;
+    public static double ToDouble(this string value)
+    {
+        return double.TryParse(value, out var val) ? val : double.NaN;
+    }
 
-    public static decimal ToDecimal(this string value) => decimal.TryParse(value, out var val) ? val : decimal.MinValue;
+    public static decimal ToDecimal(this string value)
+    {
+        return decimal.TryParse(value, out var val) ? val : decimal.MinValue;
+    }
 
-    public static string NAIfInvalid(this decimal value, string? format = null) => value.IsValid() ? (format != null ? value.ToString(format) : value.ToString()) : "N/A";
+    public static string NAIfInvalid(this decimal value, string? format = null)
+    {
+        return value.IsValid() ? (format != null ? value.ToString(format) : value.ToString()) : "N/A";
+    }
 }

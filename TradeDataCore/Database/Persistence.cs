@@ -1,7 +1,4 @@
-﻿using System.Collections.Concurrent;
-using TradeCommon.Database;
-
-namespace TradeDataCore.Database;
+﻿namespace TradeDataCore.Database;
 //public class Persistence
 //{
 //    private readonly ConcurrentQueue<IPersistenceTask> _tasks = new();
@@ -27,7 +24,7 @@ namespace TradeDataCore.Database;
 //    public void Stop() => _isRunning = false;
 
 //    public void Pause() => _isPaused = true;
-    
+
 //    public void Resume() => _isPaused = false;
 
 //    public void Submit(IPersistenceTask task) => _tasks.Enqueue(task);

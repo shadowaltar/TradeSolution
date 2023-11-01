@@ -1,9 +1,4 @@
 ﻿using org.mariuszgromada.math.mxparser;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TradeCommon.Utils.Evaluation;
 
@@ -14,9 +9,10 @@ public class FormulaBuilder
 
     public static FormulaBuilder NewLogic(string formula)
     {
-        var builder = new FormulaBuilder();
-
-        builder._function = new Function(formula);
+        var builder = new FormulaBuilder
+        {
+            _function = new Function(formula)
+        };
         return builder;
     }
 

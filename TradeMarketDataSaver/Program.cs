@@ -1,19 +1,16 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Autofac;
+using Common;
 using log4net.Config;
-using System.ComponentModel;
 using System.Text;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials;
-using TradeDataCore;
-using TradeCommon.Runtime;
-using Autofac;
-using TradeDataCore.MarketData;
-using TradeDataCore.Instruments;
-using TradeCommon.Essentials.Quotes;
-using Common;
-using TradeCommon.Externals;
 using TradeCommon.Database;
+using TradeCommon.Essentials.Quotes;
+using TradeCommon.Externals;
+using TradeCommon.Runtime;
+using TradeDataCore;
+using TradeDataCore.Instruments;
+using TradeDataCore.MarketData;
 
 public class Program
 {

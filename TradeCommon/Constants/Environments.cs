@@ -11,12 +11,9 @@ public static class Environments
 
     public static EnvironmentType Parse(string? input)
     {
-        if (input.IsBlank()) return EnvironmentType.Unknown;
-        if (Enum.TryParse(input, true, out EnvironmentType type))
-        {
-            return type;
-        }
-        return EnvironmentType.Unknown;
+        return input.IsBlank()
+            ? EnvironmentType.Unknown
+            : Enum.TryParse(input, true, out EnvironmentType type) ? type : EnvironmentType.Unknown;
     }
 
     public static string ToString(EnvironmentType type)

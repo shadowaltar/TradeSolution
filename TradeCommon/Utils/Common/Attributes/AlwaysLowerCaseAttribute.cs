@@ -4,7 +4,6 @@ public class AlwaysLowerCaseAttribute : AutoCorrectAttribute
 {
     public override object? AutoCorrect(object? value)
     {
-        if (value is string s) { return s.ToLowerInvariant(); }
-        return value;
+        return value is string s ? s.ToLowerInvariant() : value;
     }
 }

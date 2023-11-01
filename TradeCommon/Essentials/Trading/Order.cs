@@ -1,8 +1,6 @@
-﻿using Common;
-using Common.Attributes;
+﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;
@@ -135,7 +133,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
     /// </summary>
     [DatabaseIgnore]
     public bool IsGood => Status is OrderStatus.Live or OrderStatus.Filled or OrderStatus.PartialFilled;
-    
+
 
     /// <summary>
     /// Gets if the order is in alive state: live or partially filled.
@@ -195,8 +193,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
 
     public bool EqualsIgnoreId(IIdEntry other)
     {
-        if (other is not Order order) return false;
-        return CompareTo(order) == 0;
+        return other is Order order && CompareTo(order) == 0;
     }
 
     public override string ToString()

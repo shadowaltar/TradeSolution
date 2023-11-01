@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradeCommon.Essentials.Instruments;
-
-namespace TradeCommon.Constants;
+﻿namespace TradeCommon.Constants;
 
 public enum DataType
 {
@@ -52,5 +45,8 @@ public class DataTypeConverter
         };
     }
 
-    public static bool Matches(string typeStr, DataType type) => Parse(typeStr) == type;
+    public static bool Matches(string typeStr, DataType type)
+    {
+        return Parse(typeStr) == type;
+    }
 }

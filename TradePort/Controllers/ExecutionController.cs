@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Common;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Diagnostics.Symbols;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -404,30 +403,21 @@ public class ExecutionController : Controller
             if (security == null || !security.IsAsset) return BadRequest("Invalid code / missing asset security.");
         }
 
-        if (!isInitialPortfolio)
-            switch (dataSourceType)
+        return !isInitialPortfolio
+            ? (ActionResult)(dataSourceType switch
             {
-                case DataSourceType.MemoryCached:
-                    return Ok(services.Portfolio.GetAssets());
-                case DataSourceType.InternalStorage:
-                    return Ok(await services.Portfolio.GetStorageAssets());
-                case DataSourceType.External:
-                    return Ok(await services.Portfolio.GetExternalAssets());
-                default:
-                    return BadRequest("Impossible");
-            }
-        else
-            switch (dataSourceType)
+                DataSourceType.MemoryCached => Ok(services.Portfolio.GetAssets()),
+                DataSourceType.InternalStorage => Ok(await services.Portfolio.GetStorageAssets()),
+                DataSourceType.External => Ok(await services.Portfolio.GetExternalAssets()),
+                _ => BadRequest("Impossible"),
+            })
+            : dataSourceType switch
             {
-                case DataSourceType.MemoryCached:
-                    return Ok(services.Portfolio.InitialPortfolio.GetAssets());
-                case DataSourceType.InternalStorage:
-                    return BadRequest("Initial portfolio assets only exists in memory, as portfolio changes are always synchronized to internal storage.");
-                case DataSourceType.External:
-                    return BadRequest("Initial portfolio assets only exists in memory, external asset position is always the most updated.");
-                default:
-                    return BadRequest("Impossible");
-            }
+                DataSourceType.MemoryCached => Ok(services.Portfolio.InitialPortfolio.GetAssets()),
+                DataSourceType.InternalStorage => BadRequest("Initial portfolio assets only exists in memory, as portfolio changes are always synchronized to internal storage."),
+                DataSourceType.External => BadRequest("Initial portfolio assets only exists in memory, external asset position is always the most updated."),
+                _ => BadRequest("Impossible"),
+            };
     }
 
     [HttpPost("algorithms/list")]

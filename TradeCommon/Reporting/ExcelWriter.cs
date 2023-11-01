@@ -16,11 +16,10 @@ public class ExcelWriter
 
     private bool _isDisposed = false;
     private bool _isSavedSuccessfully = false;
-    private int _writtenSheetIndex = 0;
     private FileInfo _file = new(Path.GetTempFileName());
     private ExcelPackage? _package;
 
-    public int CurrentWritingSheetIndex => _writtenSheetIndex;
+    public int CurrentWritingSheetIndex { get; private set; } = 0;
 
     public ExcelWorksheet CreateSheet(string sheetCaption)
     {
@@ -71,7 +70,7 @@ public class ExcelWriter
             _package!.Workbook.View.ActiveTab = sheet.Index;
 
         _log.Info($"Finished writing sheet {sheetCaption}.");
-        _writtenSheetIndex++;
+        CurrentWritingSheetIndex++;
 
         return this;
     }

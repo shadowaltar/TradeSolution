@@ -33,7 +33,7 @@ public enum ResultCode
     UpdateOrderOk,
 
     GetTradeOk,
-    
+
     GetPositionOk,
 
     GetSecretOk,
@@ -43,7 +43,7 @@ public enum ResultCode
 
     SubscriptionWaiting = 1000,
     UnsubscriptionWaiting,
-    
+
     NoBalance,
 
     InvalidArgument = 4000,
@@ -55,7 +55,7 @@ public enum ResultCode
     DisconnectionFailed,
     SubscriptionFailed,
     UnsubscriptionFailed,
-    
+
     StartEngineFailed,
     StopEngineFailed,
 
@@ -65,7 +65,7 @@ public enum ResultCode
     GetBalanceFailed,
     GetSomeAccountsFailed,
     GetPriceFailed,
-    AccountNotOwnedByUser,    
+    AccountNotOwnedByUser,
     LoginUserFailed,
     LoginAccountFailed,
     LoginUserAndAccountFailed,
@@ -77,7 +77,7 @@ public enum ResultCode
     UpdateOrderSendFailed,
 
     GetTradeFailed,
-    
+
     GetPositionFailed,
 
     GetSecretFailed,

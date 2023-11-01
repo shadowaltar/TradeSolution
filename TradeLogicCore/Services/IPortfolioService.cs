@@ -10,12 +10,10 @@ public interface IPortfolioService
     event Action<Position>? PositionUpdated;
     event Action<Position>? PositionClosed;
 
-    Portfolio InitialPortfolio { get; }
-
     Portfolio Portfolio { get; }
 
     bool HasPosition { get; }
-    
+
     bool HasAsset { get; }
 
     /// <summary>

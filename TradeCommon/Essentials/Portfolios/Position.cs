@@ -1,7 +1,5 @@
 ﻿using Common;
 using Common.Attributes;
-using log4net;
-using SQLitePCL;
 using System.Text.Json.Serialization;
 using TradeCommon.Calculations;
 using TradeCommon.Database;
@@ -124,8 +122,8 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     [DatabaseIgnore]
     public decimal Return => Side switch
     {
-        Side.Buy => (ShortPrice - LongPrice).ZeroDivision(LongPrice),
-        Side.Sell => (ShortPrice - LongPrice).ZeroDivision(ShortPrice),
+        Side.Buy => (ShortPrice == 0 || LongPrice == 0) ? 0 : (ShortPrice - LongPrice).ZeroDivision(LongPrice),
+        Side.Sell => (ShortPrice == 0 || LongPrice == 0) ? 0 : (ShortPrice - LongPrice).ZeroDivision(ShortPrice),
         _ => 0,
     };
 
@@ -248,16 +246,12 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 
     public override bool EqualsIgnoreId(IIdEntry other)
     {
-        if (other is not Position position) return false;
-        return CompareTo(position) == 0;
+        return other is Position position && CompareTo(position) == 0;
     }
 
     public bool Equals(Position? obj)
     {
-        if (!base.Equals(obj))
-            return false;
-
-        return CompareTo(obj) == 0;
+        return base.Equals(obj) && CompareTo(obj) == 0;
     }
 
     public override int GetHashCode()

@@ -1,6 +1,4 @@
-﻿using BenchmarkDotNet.Attributes;
-
-namespace TradeCommon.Essentials.Trading;
+﻿namespace TradeCommon.Essentials.Trading;
 
 /// <summary>
 /// Status enum for an order.
@@ -104,12 +102,12 @@ public static class OrderStatusConverter
 
     public static bool IsFinishedWithoutFilled(this OrderStatus status)
     {
-        return status == OrderStatus.Cancelled
-            || status == OrderStatus.Expired
-            || status == OrderStatus.Deleted
-            || status == OrderStatus.Failed
-            || status == OrderStatus.Prevented
-            || status == OrderStatus.Rejected;
+        return status is OrderStatus.Cancelled
+            or OrderStatus.Expired
+            or OrderStatus.Deleted
+            or OrderStatus.Failed
+            or OrderStatus.Prevented
+            or OrderStatus.Rejected;
     }
 
     public static OrderStatus ParseBinance(string? statusStr)

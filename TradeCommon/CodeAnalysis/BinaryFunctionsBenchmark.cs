@@ -1,12 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using Common;
 using org.mariuszgromada.math.mxparser;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TradeCommon.Utils.Evaluation;
 
 namespace TradeCommon.CodeAnalysis;
@@ -16,7 +10,7 @@ namespace TradeCommon.CodeAnalysis;
 [MemoryDiagnoser]
 public class BinaryFunctionsBenchmark
 {
-    private Expression e;
+    private readonly Expression e;
 
     [GlobalSetup]
     public void Setup()
@@ -32,7 +26,7 @@ public class BinaryFunctionsBenchmark
     [Benchmark]
     public double MxBinomialCoefficient()
     {
-       var e = new Expression("C(40,19)");
+        var e = new Expression("C(40,19)");
         return e.calculate();
     }
 }

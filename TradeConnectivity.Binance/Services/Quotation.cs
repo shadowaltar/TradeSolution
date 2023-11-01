@@ -125,15 +125,9 @@ public class Quotation : IExternalQuotationManagement
 
         return ExternalQueryStates.QueryPrices(prices, content, connId, true).RecordTimes(rtt, swOuter);
 
-        static (string symbol, decimal price) ParsePrice(JsonObject json)
-        {
-            return (json.GetString("symbol"), json.GetDecimal("price"));
-        }
+        static (string symbol, decimal price) ParsePrice(JsonObject json) => (json.GetString("symbol"), json.GetDecimal("price"));
 
-        ExternalQueryState GetErrorState()
-        {
-            return ExternalQueryStates.QueryPrices(prices, content, connId, false, errorMessage, Errors.ProcessErrorMessage(errorMessage));
-        }
+        ExternalQueryState GetErrorState() => ExternalQueryStates.QueryPrices(prices, content, connId, false, errorMessage, Errors.ProcessErrorMessage(errorMessage));
     }
 
     public async Task<ExternalQueryState> GetAccount()
@@ -249,11 +243,9 @@ public class Quotation : IExternalQuotationManagement
         broker?.Dispose();
         var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
         var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
-        if (ws != null && await CloseWebSocket(ws, wsName))
-        {
-            return ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security, interval);
-        }
-        return ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
+        return ws != null && await CloseWebSocket(ws, wsName)
+            ? ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security, interval)
+            : ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
@@ -380,11 +372,9 @@ public class Quotation : IExternalQuotationManagement
         broker?.Dispose();
         var wsName = $"{nameof(ExtendedTick)}_{security.Id}";
         var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
-        if (ws != null && await CloseWebSocket(ws, wsName))
-        {
-            return ExternalConnectionStates.UnsubscribedTickOk(security);
-        }
-        return ExternalConnectionStates.UnsubscribedTickFailed(security);
+        return ws != null && await CloseWebSocket(ws, wsName)
+            ? ExternalConnectionStates.UnsubscribedTickOk(security)
+            : ExternalConnectionStates.UnsubscribedTickFailed(security);
     }
 
     public ExternalConnectionState SubscribeOrderBook(Security security, int? level = null)

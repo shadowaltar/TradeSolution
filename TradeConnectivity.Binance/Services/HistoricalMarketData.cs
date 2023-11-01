@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using System.Net.Http;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
@@ -16,10 +15,7 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 
     public HistoricalMarketData(IExternalConnectivityManagement connectivity, HttpClient httpClient, ApplicationContext context)
     {
-        if (context.IsExternalProhibited)
-            _httpClient = new FakeHttpClient();
-        else
-            _httpClient = httpClient;
+        _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
     }
 

@@ -1,5 +1,4 @@
-﻿using Azure.Core;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 
 namespace TradeCommon.Externals;

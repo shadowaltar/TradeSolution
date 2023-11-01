@@ -9,11 +9,6 @@ public class Errors
 
     public static ResultCode ProcessErrorMessage(string? errorMessage)
     {
-        if (errorMessage.IsBlank()) return ResultCode.Ok;
-        if (errorMessage.Contains(ClockOutOfSync))
-        {
-            return ResultCode.ClockOutOfSync;
-        }
-        return ResultCode.Ok;
+        return errorMessage.IsBlank() ? ResultCode.Ok : errorMessage.Contains(ClockOutOfSync) ? ResultCode.ClockOutOfSync : ResultCode.Ok;
     }
 }

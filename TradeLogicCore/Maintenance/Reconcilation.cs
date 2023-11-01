@@ -126,37 +126,37 @@ public class Reconcilation
                     var i = internalOrders[eoid];
                     var e = externalOrders[eoid];
                     var report = Utils.ReportComparison(i, e);
-                    foreach (var reportEntry in report.Values)
+                    foreach (var (propertyName, isEqual, value1, value2) in report.Values)
                     {
-                        if (!reportEntry.isEqual)
+                        if (!isEqual)
                         {
-                            switch (reportEntry.propertyName)
+                            switch (propertyName)
                             {
                                 case nameof(Order.CreateTime):
-                                    var minCreateTime = DateUtils.Min((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    var minCreateTime = DateUtils.Min((DateTime)value2!, (DateTime)value1!);
                                     i.CreateTime = minCreateTime;
                                     e.CreateTime = minCreateTime;
                                     break;
                                 case nameof(Order.UpdateTime):
-                                    var maxUpdateTime = DateUtils.Max((DateTime)reportEntry.value2!, (DateTime)reportEntry.value1!);
+                                    var maxUpdateTime = DateUtils.Max((DateTime)value2!, (DateTime)value1!);
                                     i.UpdateTime = maxUpdateTime;
                                     e.UpdateTime = maxUpdateTime;
                                     break;
                                 case nameof(Order.Price):
-                                    if (reportEntry.value2.Equals(0m) && !reportEntry.value1.Equals(0m))
-                                        e.Price = (decimal)reportEntry.value1;
+                                    if (value2.Equals(0m) && !value1.Equals(0m))
+                                        e.Price = (decimal)value1;
                                     break;
                                 case nameof(Order.Comment):
-                                    if (((string)reportEntry.value2).IsBlank() && !((string)reportEntry.value1).IsBlank())
-                                        e.Comment = (string)reportEntry.value1; // orders' comment only appears internally
+                                    if (((string)value2).IsBlank() && !((string)value1).IsBlank())
+                                        e.Comment = (string)value1; // orders' comment only appears internally
                                     break;
                                 case nameof(Order.Action):
-                                    if ((OrderActionType)reportEntry.value2 != (OrderActionType)reportEntry.value1)
-                                        e.Action = (OrderActionType)reportEntry.value1; // orders' action type only appears internally
+                                    if ((OrderActionType)value2 != (OrderActionType)value1)
+                                        e.Action = (OrderActionType)value1; // orders' action type only appears internally
                                     break;
                                 case nameof(Order.AdvancedSettings):
-                                    if (reportEntry.value2 == null && reportEntry.value1 != null)
-                                        e.AdvancedSettings = (AdvancedOrderSettings)reportEntry.value1;
+                                    if (value2 == null && value1 != null)
+                                        e.AdvancedSettings = (AdvancedOrderSettings)value1;
                                     // orders' adv settings only appears internally
                                     break;
                             }
@@ -363,16 +363,16 @@ public class Reconcilation
                 var isQuantityEquals = false;
                 var isLockedQuantityEquals = false;
                 var report = Utils.ReportComparison(ic, ec);
-                foreach (var reportEntry in report.Values)
+                foreach (var (propertyName, isEqual, value1, value2) in report.Values)
                 {
-                    switch (reportEntry.propertyName)
+                    switch (propertyName)
                     {
                         case nameof(Asset.Quantity):
-                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                            if (decimal.Equals((decimal)value2, (decimal)value1))
                                 isQuantityEquals = true;
                             break;
                         case nameof(Asset.LockedQuantity):
-                            if (decimal.Equals((decimal)reportEntry.value2, (decimal)reportEntry.value1))
+                            if (decimal.Equals((decimal)value2, (decimal)value1))
                                 isLockedQuantityEquals = true;
                             break;
                     }
@@ -434,7 +434,7 @@ public class Reconcilation
         if (oldIds.IsNullOrEmpty())
             return;
 
-        whereClause = $"SecurityId = {security.Id} AND ({Storage.GetInClause("StartTradeId", oldIds, false)} OR {Storage.GetInClause("EndTradeId", oldIds, false)})";
+        whereClause = $"SecurityId = {security.Id} AND ({Storage.GetInClause("StartTradeId", oldIds, false, false)} OR {Storage.GetInClause("EndTradeId", oldIds, false, false)})";
         var affectedPositions = await _storage.Read<Position>(posTable, posDb, whereClause);
 
         var affectedTrades = new List<Trade>();
@@ -446,7 +446,7 @@ public class Reconcilation
             _securityService.Fix(affectedTrade);
             affectedTrades.Add(affectedTrade);
         }
-        await _storage.RunOne($"DELETE FROM {tradeTable} WHERE {Storage.GetInClause("Id", oldIds, false)}", tradeDb);
+        await _storage.RunOne($"DELETE FROM {tradeTable} WHERE {Storage.GetInClause("Id", oldIds, false, false)}", tradeDb);
         await _storage.InsertMany(affectedTrades, false);
         var updateSqls = new List<string>();
         foreach (var ap in affectedPositions)
@@ -474,8 +474,8 @@ public class Reconcilation
         var whereClause = $"SecurityId = {security.Id} AND Time >= '{earliestTradeTime:yyyy-MM-dd HH:mm:ss}' AND AccountId = {_context.AccountId} AND IsOperational = 0";
         var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
         var positionIds = trades.Select(t => t.PositionId).Distinct().ToList(); // we don't expect zero pid here anymore
-        var positionInClause = Storage.GetInClause("Id", positionIds, false);
-        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} AND {positionInClause}");
+        var positionInClause = Storage.GetInClause("Id", positionIds, true, false);
+        var positions = await _storage.Read<Position>(posTable, posDb, $"SecurityId = {security.Id} AND AccountId = {_context.AccountId} {positionInClause}");
         var missingPIds = new List<long>();
         foreach (var pidInTrade in positionIds)
         {

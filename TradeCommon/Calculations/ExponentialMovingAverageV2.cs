@@ -56,7 +56,7 @@ public class ExponentialMovingAverageV2 : Calculator
         var i = 0;
         foreach (var item in _cachedValues)
         {
-            sum += (Factors[i] * item);
+            sum += Factors[i] * item;
             i++;
         }
         _previous = sum;
@@ -85,7 +85,7 @@ public class ExponentialMovingAverageV2 : Calculator
         for (int i = 0; i < Period; i++)
         {
             var v = node!.Value;
-            sum += (DecimalFactors[i] * v);
+            sum += DecimalFactors[i] * v;
             node = node.Previous;
         }
         _previousDecimal = sum;

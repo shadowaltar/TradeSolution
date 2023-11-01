@@ -1,7 +1,4 @@
-﻿using TradeCommon.Constants;
-using TradeCommon.Essentials.Portfolios;
-
-namespace TradeCommon.Utils.Evaluation;
+﻿namespace TradeCommon.Utils.Evaluation;
 public enum RankingType
 {
     None,

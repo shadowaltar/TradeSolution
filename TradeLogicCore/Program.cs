@@ -47,7 +47,7 @@ public class Program
     private static string _accountName = "spot";
     private static string _accountId = "1688996631782681271";
     private static string _accountType = "spot";
-    private static EnvironmentType _environment = EnvironmentType.Uat;
+    private static readonly EnvironmentType _environment = EnvironmentType.Uat;
     private static BrokerType _broker = BrokerType.Binance;
     private static ExchangeType _exchange = ExchangeType.Binance;
 
@@ -265,14 +265,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-                {
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                }
+            {
+                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+            }
             case ResultCode.GetAccountFailed:
-                {
-                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
-                }
+            {
+                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+            }
             default:
                 return result;
         }

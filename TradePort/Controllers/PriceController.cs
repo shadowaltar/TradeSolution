@@ -10,7 +10,6 @@ using TradeCommon.Essentials.Fundamentals;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Exporting;
 using TradeCommon.Runtime;
-using TradeCommon.Utils;
 using TradeDataCore.Essentials;
 using TradeDataCore.Instruments;
 using TradePort.Utils;
@@ -44,7 +43,7 @@ public class PriceController : Controller
                                                         [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
                                                         [FromQuery(Name = "level")] int level = 5)
     {
-        if (level < 1 || level > 10) return BadRequest("Level must be within 1-10.");
+        if (level is < 1 or > 10) return BadRequest("Level must be within 1-10.");
         if (environment == EnvironmentType.Unknown) return BadRequest("Invalid environment");
 
         var security = await securityService.GetSecurity(securityCode, exchange);

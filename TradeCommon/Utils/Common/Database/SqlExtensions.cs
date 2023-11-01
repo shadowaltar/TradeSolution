@@ -1,5 +1,4 @@
-﻿using Common;
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using System.Data;
 using System.Data.Common;
 
@@ -90,9 +89,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetString(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetString(i);
     }
 
     public static double SafeGetDouble(this DbDataReader reader, string fieldName, double defaultValue = default)
@@ -100,9 +97,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetDouble(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetDouble(i);
     }
 
     public static long SafeGetLong(this DbDataReader reader, string fieldName, long defaultValue = default)
@@ -110,9 +105,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetInt64(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetInt64(i);
     }
 
     public static decimal SafeGetDecimal(this DbDataReader reader, string fieldName, decimal defaultValue = default)
@@ -120,9 +113,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetDecimal(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetDecimal(i);
     }
 
     public static int? SafeGetInt(this DbDataReader reader, string fieldName, int? defaultValue = null)
@@ -130,9 +121,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetInt32(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetInt32(i);
     }
 
     public static DateTime? SafeGetDateTime(this DbDataReader reader, string fieldName, DateTime? defaultValue = null)
@@ -140,9 +129,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetDateTime(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetDateTime(i);
     }
 
     public static bool? SafeGetBool(this DbDataReader reader, string fieldName, bool? defaultValue = null)
@@ -150,9 +137,7 @@ public static class SqlExtensions
         if (!reader.HasColumn(fieldName))
             return defaultValue;
         var i = reader.GetOrdinal(fieldName);
-        if (reader.IsDBNull(i))
-            return defaultValue;
-        return reader.GetBoolean(i);
+        return reader.IsDBNull(i) ? defaultValue : reader.GetBoolean(i);
     }
 
     public static bool HasColumn(this IDataRecord record, string columnName)
@@ -178,23 +163,13 @@ public static class SqlExtensions
             || type == typeof(decimal?)
             || type == typeof(double?))
             return true;
-        if (type == typeof(string)
+        return type == typeof(string)
             || type == typeof(char)
-            || type == typeof(char?))
-            return true;
-
-        if (type == typeof(DateTime)
+            || type == typeof(char?)
+|| type == typeof(DateTime)
             || type == typeof(TimeSpan)
             || type == typeof(DateTime?)
-            || type == typeof(TimeSpan?))
-            return true;
-
-        if (type == typeof(bool) || type == typeof(bool?))
-            return true;
-
-        if (type.IsEnum)
-            return true;
-
-        return false;
+            || type == typeof(TimeSpan?)
+|| type == typeof(bool) || type == typeof(bool?) || type.IsEnum;
     }
 }

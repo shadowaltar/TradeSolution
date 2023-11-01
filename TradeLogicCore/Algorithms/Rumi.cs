@@ -127,17 +127,13 @@ public class Rumi : Algorithm
     public override bool CanOpenLong(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
-        if (openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open)
-            return true;
-        return false;
+        return openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
     }
 
     public override bool CanOpenShort(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
-        if (openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open)
-            return true;
-        return false;
+        return openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
     }
 
     public override bool CanCloseLong(AlgoEntry current)
@@ -226,10 +222,7 @@ public record RumiVariables : IAlgorithmVariables
     {
         return $"F:{FormatPrice(Fast, security)}, S:{FormatPrice(Slow, security)}, Rumi:{FormatPrice(Rumi, security)}";
 
-        static string FormatPrice(decimal price, Security security)
-        {
-            return price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
-        }
+        static string FormatPrice(decimal price, Security security) => price.IsValid() ? security.RoundTickSize(price).ToString() : "N/A";
     }
 
     public override string ToString()

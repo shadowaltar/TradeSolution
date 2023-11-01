@@ -4,7 +4,6 @@ using log4net;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json.Nodes;
 using TradeCommon.Constants;
@@ -153,7 +152,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             Action = order.Action,
             AccountId = _context.AccountId,
             CreateTime = order.CreateTime,
-            
+
             Side = order.Side,
             Price = order.Price,
             Quantity = order.Quantity,
@@ -237,7 +236,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         IsOperational = isOperational,
                     };
                     trades.Add(trade);
-                    averagePrice = (averagePrice * tradedQuantity + trade.Price * trade.Quantity) / (tradedQuantity + trade.Quantity);
+                    averagePrice = ((averagePrice * tradedQuantity) + (trade.Price * trade.Quantity)) / (tradedQuantity + trade.Quantity);
                     tradedQuantity += trade.Quantity;
                 }
                 order.Price = averagePrice;
@@ -912,41 +911,41 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
             switch (messageType)
             {
                 case "outboundAccountPosition": // asset changes due to trading activities
+                {
+                    var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
+                    var balanceArray = jsonNode["B"]?.AsArray();
+                    if (balanceArray == null)
                     {
-                        var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
-                        var balanceArray = jsonNode["B"]?.AsArray();
-                        if (balanceArray == null)
-                        {
-                            _log.Warn($"Unknown user-streaming account asset data."); break;
-                        }
-                        var assets = new List<Asset>();
-                        foreach (var balanceObject in balanceArray.OfType<JsonObject>())
-                        {
-                            var asset = new Asset
-                            {
-                                SecurityCode = balanceObject.GetString("a"),
-                                Quantity = balanceObject.GetDecimal("f"),
-                                LockedQuantity = balanceObject.GetDecimal("l"),
-                            };
-                            assets.Add(asset);
-                        }
-                        AssetsChanged?.Invoke(assets);
+                        _log.Warn($"Unknown user-streaming account asset data."); break;
                     }
-                    break;
-                case "balanceUpdate": // asset changes due to deposit or withdrawal or fund transfer
+                    var assets = new List<Asset>();
+                    foreach (var balanceObject in balanceArray.OfType<JsonObject>())
                     {
-                        var delta = jsonNode.GetDecimal("d");
-                        var transaction = new TransferAction
+                        var asset = new Asset
                         {
-                            Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
-                            Quantity = Math.Abs(delta),
-                            AssetCode = jsonNode.GetString("a"),
-                            RequestTime = eventTime,
-                            EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                            SecurityCode = balanceObject.GetString("a"),
+                            Quantity = balanceObject.GetDecimal("f"),
+                            LockedQuantity = balanceObject.GetDecimal("l"),
                         };
-                        Transferred?.Invoke(transaction);
+                        assets.Add(asset);
                     }
-                    break;
+                    AssetsChanged?.Invoke(assets);
+                }
+                break;
+                case "balanceUpdate": // asset changes due to deposit or withdrawal or fund transfer
+                {
+                    var delta = jsonNode.GetDecimal("d");
+                    var transaction = new TransferAction
+                    {
+                        Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
+                        Quantity = Math.Abs(delta),
+                        AssetCode = jsonNode.GetString("a"),
+                        RequestTime = eventTime,
+                        EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                    };
+                    Transferred?.Invoke(transaction);
+                }
+                break;
                 case "executionReport": // order
                     if (_log.IsDebugEnabled)
                         _log.Debug("Received streamed JSON for execution:" + Environment.NewLine + json);

@@ -56,7 +56,7 @@ public static class DatabaseNames
 
     public const string TradePositionReconciliation = "reconciled_trade_position";
 
-    private static Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
+    private static readonly Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
 
     public static string GetDatabaseName<T>()
     {
@@ -66,13 +66,15 @@ public static class DatabaseNames
         if (t == typeof(Position)) return ExecutionData;
 
         if (t == typeof(Account)) return StaticData;
-        if (t == typeof(Asset)) return StaticData;
-
-        if (t == typeof(ExtendedOhlcPrice)) return MarketData;
-        if (t == typeof(OhlcPrice)) return MarketData;
-        if (t == typeof(Tick)) return MarketData;
-
-        throw new InvalidOperationException("Unsupported Type to Database name mapping.");
+        return t == typeof(Asset)
+            ? StaticData
+            : t == typeof(ExtendedOhlcPrice)
+            ? MarketData
+            : t == typeof(OhlcPrice)
+            ? MarketData
+            : t == typeof(Tick)
+            ? MarketData
+            : throw new InvalidOperationException("Unsupported Type to Database name mapping.");
     }
 
     public static string GetDefinitionTableName(SecurityType type)
@@ -87,15 +89,14 @@ public static class DatabaseNames
 
     public static string? GetOrderTableName(SecurityType type, bool isErrorTable = false)
     {
-        if (!isErrorTable)
-            return type switch
+        return !isErrorTable
+            ? type switch
             {
                 SecurityType.Equity => StockOrderTable,
                 SecurityType.Fx => FxOrderTable,
                 _ => null,
-            };
-        else
-            return type switch
+            }
+            : type switch
             {
                 SecurityType.Equity => ErrorStockOrderTable,
                 SecurityType.Fx => ErrorFxOrderTable,
@@ -111,15 +112,14 @@ public static class DatabaseNames
 
     public static string? GetTradeTableName(SecurityType type, bool isErrorTable = false)
     {
-        if (!isErrorTable)
-            return type switch
+        return !isErrorTable
+            ? type switch
             {
                 SecurityType.Equity => StockTradeTable,
                 SecurityType.Fx => FxTradeTable,
                 _ => null,
-            };
-        else
-            return type switch
+            }
+            : type switch
             {
                 SecurityType.Equity => ErrorStockTradeTable,
                 SecurityType.Fx => ErrorFxTradeTable,
@@ -135,15 +135,14 @@ public static class DatabaseNames
 
     public static string? GetPositionTableName(SecurityType type, bool isErrorTable = false)
     {
-        if (!isErrorTable)
-            return type switch
+        return !isErrorTable
+            ? type switch
             {
                 SecurityType.Equity => StockPositionTable,
                 SecurityType.Fx => FxPositionTable,
                 _ => null
-            };
-        else
-            return type switch
+            }
+            : type switch
             {
                 SecurityType.Equity => ErrorStockPositionTable,
                 SecurityType.Fx => ErrorFxPositionTable,
@@ -159,32 +158,25 @@ public static class DatabaseNames
 
     public static string GetPriceTableName(IntervalType intervalType, SecurityType securityType)
     {
-        string tableName;
-        switch (intervalType)
+        string tableName = intervalType switch
         {
-            case IntervalType.OneDay:
-                tableName = securityType == SecurityType.Equity
-                    ? StockPrice1dTable
-                    : securityType == SecurityType.Fx
-                    ? FxPrice1dTable
-                    : throw new NotImplementedException();
-                break;
-            case IntervalType.OneHour:
-                tableName = securityType == SecurityType.Equity
-                    ? StockPrice1hTable
-                    : securityType == SecurityType.Fx
-                    ? FxPrice1hTable
-                    : throw new NotImplementedException();
-                break;
-            case IntervalType.OneMinute:
-                tableName = securityType == SecurityType.Equity
-                    ? StockPrice1mTable
-                    : securityType == SecurityType.Fx
-                    ? FxPrice1mTable
-                    : throw new NotImplementedException();
-                break;
-            default: throw new NotImplementedException();
-        }
+            IntervalType.OneDay => securityType == SecurityType.Equity
+                                ? StockPrice1dTable
+                                : securityType == SecurityType.Fx
+                                ? FxPrice1dTable
+                                : throw new NotImplementedException(),
+            IntervalType.OneHour => securityType == SecurityType.Equity
+                                ? StockPrice1hTable
+                                : securityType == SecurityType.Fx
+                                ? FxPrice1hTable
+                                : throw new NotImplementedException(),
+            IntervalType.OneMinute => securityType == SecurityType.Equity
+                                ? StockPrice1mTable
+                                : securityType == SecurityType.Fx
+                                ? FxPrice1mTable
+                                : throw new NotImplementedException(),
+            _ => throw new NotImplementedException(),
+        };
         return tableName;
     }
 
@@ -220,9 +212,9 @@ public static class DatabaseNames
             specificTable = GetPositionTableName(securityType);
         }
 
-        (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
-        specificTable = specificTable.IsBlank() ? existing.tableName : specificTable;
-        return (specificTable, existing.databaseName);
+        (string tableName, string databaseName) = GetTableAndDatabaseName<T>();
+        specificTable = specificTable.IsBlank() ? tableName : specificTable;
+        return (specificTable, databaseName);
     }
 
     public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T entry) where T : class
@@ -242,16 +234,15 @@ public static class DatabaseNames
             specificTable = GetPositionTableName(position.Security?.Type ?? throw Exceptions.Invalid<Position>("Missing security in position."));
         }
 
-        (string tableName, string databaseName) existing = GetTableAndDatabaseName<T>();
-        specificTable = specificTable.IsBlank() ? existing.tableName : specificTable;
-        return (specificTable, existing.databaseName);
+        (string tableName, string databaseName) = GetTableAndDatabaseName<T>();
+        specificTable = specificTable.IsBlank() ? tableName : specificTable;
+        return (specificTable, databaseName);
     }
 
     public static (string tableName, string databaseName) GetTableAndDatabaseName<T>() where T : class
     {
         var type = typeof(T);
-        (string tableName, string databaseName) existing;
-        if (!_tableDatabaseNamesByType.TryGetValue(type, out existing))
+        if (!_tableDatabaseNamesByType.TryGetValue(type, out (string tableName, string databaseName) existing))
         {
             var storageAttr = type.GetCustomAttribute<StorageAttribute>() ?? throw Exceptions.InvalidStorageDefinition();
 

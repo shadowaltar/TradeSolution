@@ -1,17 +1,16 @@
 ﻿using TradeCommon.Constants;
 using TradeCommon.Essentials.Accounts;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Services;
 public interface IAdminService
 {
     Context Context { get; }
-    
+
     /// <summary>
     /// Gets if is logged in.
     /// </summary>
-    bool IsLoggedIn { get;}
+    bool IsLoggedIn { get; }
 
     User? CurrentUser { get; }
 

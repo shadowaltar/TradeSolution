@@ -31,7 +31,6 @@ public static class Maths
 
     public static decimal ZeroDivision(this decimal numerator, decimal denominator, decimal valueIfZeroDevision = 0m)
     {
-        if (denominator == 0) return valueIfZeroDevision;
-        return numerator / denominator;
+        return denominator == 0 ? valueIfZeroDevision : numerator / denominator;
     }
 }

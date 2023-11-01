@@ -3,7 +3,7 @@
 public abstract class Calculator
 {
     public virtual int Period { get; protected set; }
-    
+
     public string Label { get; protected set; } = "";
 
 

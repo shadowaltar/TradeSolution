@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace TradeCommon.Essentials.Corporates;
+﻿namespace TradeCommon.Essentials.Corporates;
 
 public interface IStockCorporateAction
 {

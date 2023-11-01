@@ -25,24 +25,27 @@ public static class StringExtensions
 
     public static bool StartsWithIgnoreCase(this string @string, string subString)
     {
-        if (@string == null) throw new ArgumentNullException(nameof(@string));
-        return subString == null
+        return @string == null
+            ? throw new ArgumentNullException(nameof(@string))
+            : subString == null
             ? throw new ArgumentNullException(nameof(subString))
             : @string.StartsWith(subString, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool EndsWithIgnoreCase(this string @string, string subString)
     {
-        if (@string == null) throw new ArgumentNullException(nameof(@string));
-        return subString == null
+        return @string == null
+            ? throw new ArgumentNullException(nameof(@string))
+            : subString == null
             ? throw new ArgumentNullException(nameof(subString))
             : @string.EndsWith(subString, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool ContainsIgnoreCase(this string @string, string subString)
     {
-        if (@string == null) throw new ArgumentNullException(nameof(@string));
-        return subString == null
+        return @string == null
+            ? throw new ArgumentNullException(nameof(@string))
+            : subString == null
             ? throw new ArgumentNullException(nameof(subString))
             : @string.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0;
     }
@@ -126,8 +129,9 @@ public static class StringExtensions
 
     public static double ParseDouble(this string? value, double defaultValue = default, string cultureInfoName = "")
     {
-        if (string.IsNullOrWhiteSpace(value)) return defaultValue;
-        return double.TryParse(value,
+        return string.IsNullOrWhiteSpace(value)
+            ? defaultValue
+            : double.TryParse(value,
             string.IsNullOrEmpty(cultureInfoName) ? CultureInfo.InvariantCulture :
             CultureInfo.GetCultureInfo(cultureInfoName), out double result)
             ? result
@@ -200,25 +204,17 @@ public static class StringExtensions
 
         var trimmedEmail = email.Trim();
 
-        if (trimmedEmail.EndsWith(".") || trimmedEmail.Contains(' '))
-        {
-            return false;
-        }
-
-        return MailAddress.TryCreate(email, out var addr) && addr.Address == trimmedEmail;
+        return !trimmedEmail.EndsWith(".") && !trimmedEmail.Contains(' ')
+&& MailAddress.TryCreate(email, out var addr) && addr.Address == trimmedEmail;
     }
 
     public static StringBuilder RemoveLast(this StringBuilder sb)
     {
-        if (sb.Length > 0)
-            return sb.Remove(sb.Length - 1, 1);
-        return sb;
+        return sb.Length > 0 ? sb.Remove(sb.Length - 1, 1) : sb;
     }
 
     public static string FirstCharLowerCase(this string value)
     {
-        if (value.IsBlank()) return value;
-        if (value.Length == 1) return char.ToUpper(value[0]).ToString();
-        return char.ToUpper(value[0]) + value[1..];
+        return value.IsBlank() ? value : value.Length == 1 ? char.ToUpper(value[0]).ToString() : char.ToUpper(value[0]) + value[1..];
     }
 }

@@ -20,21 +20,15 @@ public class LengthAttribute : ValidationAttribute, IStorageRelatedAttribute
         if (value == null) return false;
         if (value is string stringValue)
         {
-            if (stringValue.Length < MinLength) return false;
-            if (stringValue.Length > MaxLength) return false;
-            return true;
+            return stringValue.Length >= MinLength && stringValue.Length <= MaxLength;
         }
         else if (value is ICollection collection)
         {
-            if (collection.Count < MinLength) return false;
-            if (collection.Count > MaxLength) return false;
-            return true;
+            return collection.Count >= MinLength && collection.Count <= MaxLength;
         }
         else if (value is Array a)
         {
-            if (a.Length < MinLength) return false;
-            if (a.Length > MaxLength) return false;
-            return true;
+            return a.Length >= MinLength && a.Length <= MaxLength;
         }
         return false;
     }
@@ -44,11 +38,6 @@ public class NotBlank : ValidationAttribute
 {
     public override bool IsValid(object? value)
     {
-        if (value == null) return false;
-        if (value is string stringValue)
-        {
-            return !stringValue.IsBlank();
-        }
-        return false;
+        return value != null && value is string stringValue && !stringValue.IsBlank();
     }
 }

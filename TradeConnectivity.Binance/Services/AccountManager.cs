@@ -22,10 +22,7 @@ public class AccountManager : IExternalAccountManagement
                           ApplicationContext context,
                           KeyManager keyManager)
     {
-        if (context.IsExternalProhibited)
-            _httpClient = new FakeHttpClient();
-        else
-            _httpClient = httpClient;
+        _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
         _keyManager = keyManager;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
@@ -101,9 +98,6 @@ public class AccountManager : IExternalAccountManagement
             return ExternalQueryStates.Error(ActionType.GetAccount, ResultCode.GetAccountFailed, Errors.ProcessErrorMessage(errorMessage), content, connId, errorMessage);
         }
 
-        Account Parse(JsonObject rootObj)
-        {
-            throw new NotImplementedException();
-        }
+        Account Parse(JsonObject rootObj) => throw new NotImplementedException();
     }
 }

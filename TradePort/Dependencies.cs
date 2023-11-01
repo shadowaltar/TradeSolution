@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using static TradeDataCore.Dependencies;
 
 namespace TradePort;
 

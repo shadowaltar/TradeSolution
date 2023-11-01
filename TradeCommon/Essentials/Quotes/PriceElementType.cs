@@ -1,7 +1,4 @@
-﻿using TradeCommon.Constants;
-using TradeCommon.Essentials.Instruments;
-
-namespace TradeCommon.Essentials.Quotes;
+﻿namespace TradeCommon.Essentials.Quotes;
 public enum PriceElementType
 {
     Default,

@@ -39,7 +39,7 @@ public class SimpleMovingAverage : Calculator
         {
             double first = _cachedValues.First!.ValueRef;
             _cachedValues.RemoveFirst();
-            _previous = (_previous * Period + value - first) / Period;
+            _previous = ((_previous * Period) + value - first) / Period;
             return _previous;
         }
     }
@@ -68,7 +68,7 @@ public class SimpleMovingAverage : Calculator
         {
             decimal first = _cachedDecimalValues.First!.ValueRef;
             _cachedDecimalValues.RemoveFirst();
-            _previousDecimal = (_previousDecimal * Period + value - first) / Period;
+            _previousDecimal = ((_previousDecimal * Period) + value - first) / Period;
             return _previousDecimal;
         }
     }

@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using System;
 using System.Security.Cryptography;
 using System.Text;
 using TradeCommon.Constants;

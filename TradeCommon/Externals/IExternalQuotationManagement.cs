@@ -29,7 +29,7 @@ public interface IExternalQuotationManagement
     Task<ExternalConnectionState> UnsubscribeOrderBook(Security security);
 
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType intervalType);
-    
+
     Task<ExternalConnectionState> UnsubscribeAllOhlc();
 
     Task<OrderBook?> GetCurrentOrderBook(Security security);

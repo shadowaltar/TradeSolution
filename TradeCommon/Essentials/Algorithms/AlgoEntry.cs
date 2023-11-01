@@ -19,7 +19,7 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// Index / serial number / sequence id of an algo entry in a batch.
     /// </summary>
     public int SequenceId { get; set; }
-    
+
     public long AlgoBatchId { get; set; }
 
     /// <summary>

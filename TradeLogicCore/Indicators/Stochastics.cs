@@ -70,6 +70,9 @@ public class Stochastics : PriceSeriesIndicator<decimal[]>
             return RunFormula(close, high, low);
         }
 
-        private static decimal RunFormula(decimal c, decimal h, decimal l) => (c - l) / (h - l) * 100;
+        private static decimal RunFormula(decimal c, decimal h, decimal l)
+        {
+            return (c - l) / (h - l) * 100;
+        }
     }
 }

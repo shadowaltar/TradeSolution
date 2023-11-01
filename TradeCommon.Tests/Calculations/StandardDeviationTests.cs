@@ -1,12 +1,5 @@
-﻿using NUnit.Framework;
-using TradeCommon.Calculations;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Common;
 using org.mariuszgromada.math.mxparser;
-using Common;
 
 namespace TradeCommon.Calculations.Tests;
 

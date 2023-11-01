@@ -18,14 +18,9 @@ public class Context : ApplicationContext
     {
     }
 
-    public bool IsBackTesting
-    {
-        get
-        {
-            if (_algorithmEngine?.AlgoParameters == null) throw Exceptions.InvalidAlgorithmEngineState();
-            return _algorithmEngine.AlgoParameters.IsBackTesting;
-        }
-    }
+    public bool IsBackTesting => _algorithmEngine?.AlgoParameters == null
+                ? throw Exceptions.InvalidAlgorithmEngineState()
+                : _algorithmEngine.AlgoParameters.IsBackTesting;
 
     public IServices Services
     {

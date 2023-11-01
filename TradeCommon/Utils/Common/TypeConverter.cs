@@ -5,32 +5,17 @@ public static class TypeConverter
 {
     public static TypeCode ToTypeCode(string typeString)
     {
-        switch (typeString)
+        return typeString switch
         {
-            case "STRING":
-                return TypeCode.String;
-            case "INT":
-            case "INT32":
-            case "INTEGER":
-                return TypeCode.Int32;
-            case "DOUBLE":
-                return TypeCode.Double;
-            case "DECIMAL":
-                return TypeCode.Decimal;
-            case "DATE":
-            case "TIME":
-            case "DATETIME":
-            case "TIMESTAMP":
-                return TypeCode.DateTime;
-            case "BOOL":
-            case "BOOLEAN":
-                return TypeCode.Boolean;
-            case "LONG":
-            case "INT64":
-                return TypeCode.Int64;
-            default:
-                throw new ArgumentNullException($"Type value {typeString} is invalid.");
-        }
+            "STRING" => TypeCode.String,
+            "INT" or "INT32" or "INTEGER" => TypeCode.Int32,
+            "DOUBLE" => TypeCode.Double,
+            "DECIMAL" => TypeCode.Decimal,
+            "DATE" or "TIME" or "DATETIME" or "TIMESTAMP" => TypeCode.DateTime,
+            "BOOL" or "BOOLEAN" => TypeCode.Boolean,
+            "LONG" or "INT64" => TypeCode.Int64,
+            _ => throw new ArgumentNullException($"Type value {typeString} is invalid."),
+        };
     }
 
     public static TypeCode ToTypeCode(Type type)
@@ -59,16 +44,11 @@ public static class TypeConverter
             return TypeCode.Decimal;
         if (type == typeof(DateTime?))
             return TypeCode.DateTime;
-        if (type == typeof(TimeSpan?))
-            return TypeCode.DateTime;
-        if (type == typeof(bool?))
-            return TypeCode.Boolean;
-        if (type == typeof(long?))
-            return TypeCode.Int64;
-        if (type.IsEnum)
-            return TypeCode.Object;
-
-        return TypeCode.Object;
+        return type == typeof(TimeSpan?)
+            ? TypeCode.DateTime
+            : type == typeof(bool?)
+            ? TypeCode.Boolean
+            : type == typeof(long?) ? TypeCode.Int64 : type.IsEnum ? TypeCode.Object : TypeCode.Object;
     }
 
     public static string ToSqliteType(Type type)
@@ -84,24 +64,16 @@ public static class TypeConverter
             || type == typeof(decimal?)
             || type == typeof(double?))
             return "REAL";
-        if (type == typeof(string)
+        return type == typeof(string)
             || type == typeof(char)
-            || type == typeof(char?))
-            return "VARCHAR";
-
-        if (type == typeof(DateTime)
+            || type == typeof(char?)
+            ? "VARCHAR"
+            : type == typeof(DateTime)
             || type == typeof(TimeSpan)
             || type == typeof(DateTime?)
-            || type == typeof(TimeSpan?))
-            return "DATE";
-
-        if (type == typeof(bool) || type == typeof(bool?))
-            return "BOOLEAN";
-
-        if (type.IsEnum)
-            return "VARCHAR";
-
-        return "VARCHAR";
+            || type == typeof(TimeSpan?)
+            ? "DATE"
+            : type == typeof(bool) || type == typeof(bool?) ? "BOOLEAN" : type.IsEnum ? "VARCHAR" : "VARCHAR";
     }
 
     public static string ToSnowflakeType(Type type)
@@ -117,24 +89,16 @@ public static class TypeConverter
             || type == typeof(decimal?)
             || type == typeof(double?))
             return "REAL";
-        if (type == typeof(string)
+        return type == typeof(string)
             || type == typeof(char)
-            || type == typeof(char?))
-            return "VARCHAR";
-
-        if (type == typeof(DateTime)
+            || type == typeof(char?)
+            ? "VARCHAR"
+            : type == typeof(DateTime)
             || type == typeof(TimeSpan)
             || type == typeof(DateTime?)
-            || type == typeof(TimeSpan?))
-            return "TIMESTAMP";
-
-        if (type == typeof(bool) || type == typeof(bool?))
-            return "BOOLEAN";
-
-        if (type.IsEnum)
-            return "VARCHAR";
-
-        return "VARCHAR";
+            || type == typeof(TimeSpan?)
+            ? "TIMESTAMP"
+            : type == typeof(bool) || type == typeof(bool?) ? "BOOLEAN" : type.IsEnum ? "VARCHAR" : "VARCHAR";
     }
 
     public static string ToSqlServerType(Type type, bool containsUnicode = false)
@@ -157,22 +121,14 @@ public static class TypeConverter
             || type == typeof(char)
             || type == typeof(char?))
             return "VARCHAR";
-        if (type == typeof(string) && containsUnicode)
-            return "NVARCHAR";
-
-        if (type == typeof(DateTime)
+        return type == typeof(string) && containsUnicode
+            ? "NVARCHAR"
+            : type == typeof(DateTime)
             || type == typeof(TimeSpan)
             || type == typeof(DateTime?)
-            || type == typeof(TimeSpan?))
-            return "DATETIMEOFFSET";
-
-        if (type == typeof(bool) || type == typeof(bool?))
-            return "BIT";
-
-        if (type.IsEnum)
-            return "VARCHAR";
-
-        return "VARCHAR";
+            || type == typeof(TimeSpan?)
+            ? "DATETIMEOFFSET"
+            : type == typeof(bool) || type == typeof(bool?) ? "BIT" : type.IsEnum ? "VARCHAR" : "VARCHAR";
     }
 
     public static Type FromTypeCode(TypeCode typeCode)

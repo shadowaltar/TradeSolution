@@ -12,11 +12,7 @@ public static class ObjectExtensions
     /// <returns></returns>
     public static int SafeCompareTo<T>(this T? o1, T? o2) where T : IComparable
     {
-        if (o1 == null && o2 == null) return 0;
-        if (o1 != null && o2 == null) return 1;
-        if (o1 == null && o2 != null) return -1;
-
-        return o1!.CompareTo(o2);
+        return o1 == null && o2 == null ? 0 : o1 != null && o2 == null ? 1 : o1 == null && o2 != null ? -1 : o1!.CompareTo(o2);
     }
 
     /// <summary>

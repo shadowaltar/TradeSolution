@@ -20,16 +20,12 @@ public class PersistenceTask
 
     public T? GetEntry<T>() where T : class
     {
-        if (_entry != null)
-            return Unsafe.As<T>(_entry);
-        return default;
+        return _entry != null ? Unsafe.As<T>(_entry) : default;
     }
 
     public IList<T> GetEntries<T>() where T : class
     {
-        if (_entries != null)
-            return Unsafe.As<IList<T>>(_entries);
-        return new List<T>(0);
+        return _entries != null ? Unsafe.As<IList<T>>(_entries) : new List<T>(0);
     }
 
     public void SetEntry(object o)

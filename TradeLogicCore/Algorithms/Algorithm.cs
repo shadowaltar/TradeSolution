@@ -1,6 +1,4 @@
 ﻿using Common;
-using System.Diagnostics;
-using System.Security.Cryptography;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
@@ -71,9 +69,7 @@ public abstract class Algorithm
             Side.Sell => -ShortStopLossRatio,
             _ => throw Exceptions.InvalidSide(),
         };
-        if (!slRatio.IsValid() && slRatio <= 0)
-            return 0;
-        return security.GetStopLossPrice(price, slRatio);
+        return !slRatio.IsValid() && slRatio <= 0 ? 0 : security.GetStopLossPrice(price, slRatio);
     }
 
     public virtual decimal GetTakeProfitPrice(decimal price, Side parentOrderSide, Security security)
@@ -84,9 +80,7 @@ public abstract class Algorithm
             Side.Sell => -ShortTakeProfitRatio,
             _ => throw Exceptions.InvalidSide(),
         };
-        if (!tpRatio.IsValid() && tpRatio <= 0)
-            return 0;
-        return security.GetTakeProfitPrice(price, tpRatio);
+        return !tpRatio.IsValid() && tpRatio <= 0 ? 0 : security.GetTakeProfitPrice(price, tpRatio);
     }
 
     public virtual async Task<ExternalQueryState> Open(AlgoEntry current, AlgoEntry last, decimal price, Side enterSide, DateTime time)

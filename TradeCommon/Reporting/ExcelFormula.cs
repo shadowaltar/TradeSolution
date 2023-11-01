@@ -29,9 +29,6 @@ public class ExcelFormula
 
     public override string ToString()
     {
-        if (IsArrayFormula)
-            return $"ArrayFormula: {Formula}";
-        return $"Formula: {Formula}";
-
+        return IsArrayFormula ? $"ArrayFormula: {Formula}" : $"Formula: {Formula}";
     }
 }

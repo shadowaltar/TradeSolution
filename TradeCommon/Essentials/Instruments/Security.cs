@@ -83,15 +83,9 @@ public class Security
         if (!proposedPrice.IsValid()) return proposedPrice;
         if (TickSize == 0) return proposedPrice;
 
-        decimal result;
-        if (proposedPrice > roundingHint)
-        {
-            result = Math.Floor(proposedPrice * (1 / TickSize)) * TickSize;
-        }
-        else
-        {
-            result = Math.Ceiling(proposedPrice * (1 / TickSize)) * TickSize;
-        }
+        decimal result = proposedPrice > roundingHint
+            ? Math.Floor(proposedPrice * (1 / TickSize)) * TickSize
+            : Math.Ceiling(proposedPrice * (1 / TickSize)) * TickSize;
         if (proposedPrice < 0 && result > 0)
             result -= TickSize;
         if (proposedPrice > 0 && result < 0)
@@ -129,9 +123,15 @@ public class Security
         return result;
     }
 
-    public string FormatPrice(decimal price) => RoundTickSize(price).ToString();
+    public string FormatPrice(decimal price)
+    {
+        return RoundTickSize(price).ToString();
+    }
 
-    public string FormatQuantity(decimal quantity) => RoundLotSize(quantity).ToString();
+    public string FormatQuantity(decimal quantity)
+    {
+        return RoundLotSize(quantity).ToString();
+    }
 
     public string FormatTick(Tick tick)
     {

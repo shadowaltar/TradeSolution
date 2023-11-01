@@ -21,7 +21,7 @@ public static class EnumExtensions
             Cache(type);
             values = _enumValueToDescriptions[type];
         }
-        return values.TryGetValue((T)enumValue, out var str) ? str : defaultValue;
+        return values.TryGetValue(enumValue, out var str) ? str : defaultValue;
     }
 
     public static object ConvertDescriptionToEnum(this string description, Type type, object defaultValue)
@@ -69,8 +69,7 @@ public static class EnumExtensions
 
     public static T ParseEnum<T>(this string value) where T : struct, Enum
     {
-        if (value == null) return default;
-        return Enum.TryParse<T>(value, out var t) ? t : default;
+        return value == null ? default : Enum.TryParse<T>(value, out var t) ? t : default;
     }
 
     public static bool IsUnknown<T>(this T value) where T : struct, Enum

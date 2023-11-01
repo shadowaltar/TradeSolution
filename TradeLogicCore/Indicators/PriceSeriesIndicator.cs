@@ -46,7 +46,7 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
         ElementSelector = GetPriceElementSelector(elementToUse);
     }
 
-    public PriceSeriesIndicator(int period): base()
+    public PriceSeriesIndicator(int period) : base()
     {
         Period = period;
     }
@@ -74,7 +74,7 @@ public abstract class PriceSeriesIndicator<T> : IIndicator
 
     public virtual T Calculate(IList<double> values, IList<object>? otherInputs = null)
     {
-        return default(T);
+        return default;
     }
 
     protected virtual bool TryGetStartIndex(IList<OhlcPrice> ohlcPrices, out int startIndex)

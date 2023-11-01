@@ -1,7 +1,6 @@
 ﻿using Common;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
-using TradeDataCore;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Instruments;
@@ -27,10 +26,6 @@ public class OhlcPriceScreeningCriteria : ScreeningCriteria
             var prices = AsyncHelper.RunSync(() => securityService.GetOhlcPrices(security, IntervalType, EndTime, actualLookBack));
             values = prices.Select(Selector).ToList();
         }
-        if (values != null)
-        {
-            return Calculator?.Invoke(values) ?? double.NaN;
-        }
-        return double.NaN;
+        return values != null ? Calculator?.Invoke(values) ?? double.NaN : double.NaN;
     }
 }

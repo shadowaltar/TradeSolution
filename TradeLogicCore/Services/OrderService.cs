@@ -130,10 +130,9 @@ public class OrderService : IOrderService, IDisposable
     public List<Order> GetOpenOrders(Security? security = null)
     {
         if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
-        if (security == null)
-            return _openOrders.ThreadSafeValues();
-
-        return _openOrders.ThreadSafeValues().Where(o => o.SecurityId == security.Id).ToList();
+        return security == null
+            ? _openOrders.ThreadSafeValues()
+            : _openOrders.ThreadSafeValues().Where(o => o.SecurityId == security.Id).ToList();
     }
 
     public async Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false)
@@ -169,7 +168,7 @@ public class OrderService : IOrderService, IDisposable
             var isOperational = order.Action == OrderActionType.Operational;
             if (isOperational)
                 _operationalOrders.ThreadSafeSet(order.Id, order);
-
+            var action = order.Action;
             var state = await _execution.SendOrder(order);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
@@ -189,6 +188,7 @@ public class OrderService : IOrderService, IDisposable
                 _orders.ThreadSafeRemove(order.Id);
                 _errorOrders.ThreadSafeSet(order.Id, order);
             }
+            order.Action = action;
             _persistence.Insert(order);
             return state;
         }
@@ -442,10 +442,7 @@ public class OrderService : IOrderService, IDisposable
 
             if (!order.Price.IsValid() || order.Price == 0)
             {
-                if (existingOrder.Price != 0)
-                    order.Price = existingOrder.Price;
-                else
-                    order.Price = 0;
+                order.Price = existingOrder.Price != 0 ? existingOrder.Price : 0;
             }
             if (order.Status != existingOrder.Status)
             {
@@ -547,10 +544,7 @@ public class OrderService : IOrderService, IDisposable
             {
                 // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
                 var sameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
-                if (sameOrder != null)
-                    order.Id = sameOrder.Id;
-                else
-                    order.Id = _orderIdGen.NewTimeBasedId;
+                order.Id = sameOrder != null ? sameOrder.Id : _orderIdGen.NewTimeBasedId;
             }
             order.AccountId = _context.AccountId;
 

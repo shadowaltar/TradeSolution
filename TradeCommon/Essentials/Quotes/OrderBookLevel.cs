@@ -1,6 +1,4 @@
-﻿using TradeCommon.Infra;
-
-namespace TradeCommon.Essentials.Quotes;
+﻿namespace TradeCommon.Essentials.Quotes;
 
 public record OrderBookLevel : ICloneable
 {

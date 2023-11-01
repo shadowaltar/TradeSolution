@@ -6,12 +6,12 @@ public static class DateUtils
 {
     public static int ToDateNumber(this DateTime value)
     {
-        return value.Year * 10000 + value.Month * 100 + value.Day;
+        return (value.Year * 10000) + (value.Month * 100) + value.Day;
     }
 
     public static int ToSecondNumber(this DateTime value)
     {
-        return (value.Year * 10000 + value.Month * 100 + value.Day) * 1000000 + value.Hour * 10000 + value.Minute * 100 + value.Second;
+        return (((value.Year * 10000) + (value.Month * 100) + value.Day) * 1000000) + (value.Hour * 10000) + (value.Minute * 100) + value.Second;
     }
 
     public static int ToUnixSec(this DateTime value)
@@ -68,37 +68,37 @@ public static class DateUtils
         return current;
     }
 
-    public static bool IsValid(this DateTime value) => value != DateTime.MaxValue && value != DateTime.MinValue;
+    public static bool IsValid(this DateTime value)
+    {
+        return value != DateTime.MaxValue && value != DateTime.MinValue;
+    }
 
-    public static bool IsValid([NotNullWhen(true)] this DateTime? value) => value != null && value != DateTime.MaxValue && value != DateTime.MinValue;
+    public static bool IsValid([NotNullWhen(true)] this DateTime? value)
+    {
+        return value != null && value != DateTime.MaxValue && value != DateTime.MinValue;
+    }
 
-    public static bool IsWeekend(this DateTime date) => date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+    public static bool IsWeekend(this DateTime date)
+    {
+        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+    }
 
     public static DateTime NextOf(this DateTime fromTime, TimeSpan interval)
     {
         DateTime baseTime;
         if (interval == TimeSpans.OneMinute)
         {
-            if (fromTime.Second == 0)
-                baseTime = fromTime;
-            else
-                baseTime = new DateTime(fromTime.Year, fromTime.Month, fromTime.Day, fromTime.Hour, fromTime.Minute, 0);
+            baseTime = fromTime.Second == 0 ? fromTime : new DateTime(fromTime.Year, fromTime.Month, fromTime.Day, fromTime.Hour, fromTime.Minute, 0);
             return baseTime.AddMinutes(1);
         }
         else if (interval == TimeSpans.OneHour)
         {
-            if (fromTime.Minute == 0)
-                baseTime = fromTime;
-            else
-                baseTime = new DateTime(fromTime.Year, fromTime.Month, fromTime.Day, fromTime.Hour, 0, 0);
+            baseTime = fromTime.Minute == 0 ? fromTime : new DateTime(fromTime.Year, fromTime.Month, fromTime.Day, fromTime.Hour, 0, 0);
             return baseTime.AddHours(1);
         }
         else if (interval == TimeSpans.OneDay)
         {
-            if (fromTime.Hour == 0)
-                baseTime = fromTime;
-            else
-                baseTime = new DateTime(fromTime.Year, fromTime.Month, fromTime.Day);
+            baseTime = fromTime.Hour == 0 ? fromTime : new DateTime(fromTime.Year, fromTime.Month, fromTime.Day);
             return baseTime.AddDays(1);
         }
         else if (interval == TimeSpans.OneWeek)

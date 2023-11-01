@@ -77,19 +77,18 @@ public class Account : ITimeRelatedEntry
 
     public override bool Equals(object? obj)
     {
-        if (obj is not Account account) return false;
-
-        return Id == account.Id &&
-               Name == account.Name &&
-               OwnerId == account.OwnerId &&
-               ExternalAccount == account.ExternalAccount &&
-               BrokerId == account.BrokerId &&
-               Type == account.Type &&
-               (SubType == account.SubType || Conditions.BothBlank(SubType, account.SubType)) &&
-               Environment == account.Environment &&
-               (FeeStructure == account.FeeStructure || Conditions.BothBlank(FeeStructure, account.FeeStructure)) &&
-               CreateTime == account.CreateTime &&
-               UpdateTime == account.UpdateTime;
+        return obj is Account account
+               && Id == account.Id
+               && Name == account.Name
+               && OwnerId == account.OwnerId
+               && ExternalAccount == account.ExternalAccount
+               && BrokerId == account.BrokerId
+               && Type == account.Type
+               && (SubType == account.SubType || Conditions.BothBlank(SubType, account.SubType))
+               && Environment == account.Environment
+               && (FeeStructure == account.FeeStructure || Conditions.BothBlank(FeeStructure, account.FeeStructure))
+               && CreateTime == account.CreateTime
+               && UpdateTime == account.UpdateTime;
     }
 
     public override int GetHashCode()

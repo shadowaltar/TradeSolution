@@ -116,7 +116,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                                          Order parentOrder,
                                          ExternalQueryState parentState)
     {
-        var stopPrice = current.Security.RoundTickSize((enterPrice - stopLossPrice) * Consts.StopPriceRatio + stopLossPrice, enterPrice);
+        var stopPrice = current.Security.RoundTickSize(((enterPrice - stopLossPrice) * Consts.StopPriceRatio) + stopLossPrice, enterPrice);
         var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
         var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security,
             OrderActionType.AlgoPlacedStopLoss, stopPrice, Comments.AlgoStopLossLimit);
@@ -149,7 +149,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                                            Order parentOrder,
                                            ExternalQueryState parentState)
     {
-        var stopPrice = (enterPrice - takeProfitPrice) * Consts.StopPriceRatio + takeProfitPrice;
+        var stopPrice = ((enterPrice - takeProfitPrice) * Consts.StopPriceRatio) + takeProfitPrice;
         var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
         var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security,
             OrderActionType.AlgoPlacedTakeProfit, stopPrice, Comments.AlgoTakeProfitLimit);
@@ -201,7 +201,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         if (assetPosition == null || !assetPosition.Security.IsValid()) throw Exceptions.Invalid<Security>("asset position security is: " + assetPosition?.Security);
         if (assetPosition.Quantity < quantity)
             throw Exceptions.InvalidOrder($"Insufficient quote asset to be traded. Existing: {assetPosition.Quantity}; desired: {quantity}");
-        if (type == OrderType.Market || type == OrderType.Stop || type == OrderType.TakeProfit)
+        if (type is OrderType.Market or OrderType.Stop or OrderType.TakeProfit)
             price = 0;
 
         var order = new Order

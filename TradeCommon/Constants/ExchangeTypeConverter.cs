@@ -11,20 +11,22 @@ public static class ExchangeTypeConverter
             return ExchangeType.Unknown;
 
         str = str.Trim().ToUpperInvariant();
-
-        if (str.EqualsIgnoreCase(Hkex))
-        {
-            return ExchangeType.Hkex;
-        }
         if (str.EqualsIgnoreCase(Binance))
         {
-            return ExchangeType.Binance;
+            return str.EqualsIgnoreCase(Hkex)
+                ? ExchangeType.Hkex
+                : ExchangeType.Binance;
         }
-        if (str.EqualsIgnoreCase(Okex))
+        else
         {
-            return ExchangeType.Okex;
+            return str.EqualsIgnoreCase(Okex)
+                ? str.EqualsIgnoreCase(Hkex)
+                ? ExchangeType.Hkex
+                : ExchangeType.Okex
+                : str.EqualsIgnoreCase(Hkex)
+                ? ExchangeType.Hkex
+                : ExchangeType.Unknown;
         }
-        return ExchangeType.Unknown;
     }
 
     public static string ToString(ExchangeType exchangeType)

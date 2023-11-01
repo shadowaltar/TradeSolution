@@ -154,7 +154,10 @@ public class PortfolioService : IPortfolioService, IDisposable
         // currentPosition by SecurityId should be initialized;
         // must be two different instances
         Portfolio = new Portfolio(_context.AccountId, positions, assets);
-        InitialPortfolio = Portfolio with { };
+
+        InitialPortfolio = new Portfolio(_context.AccountId,
+            positions.Select(p => p with { }).ToList(),
+            assets.Select(a => a with { }).ToList());
         return true;
     }
 
@@ -327,7 +330,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             }
             if (isInitializing)
             {
-                InitialPortfolio.AddOrUpdate(position);
+                InitialPortfolio.AddOrUpdate(position with { });
             }
         }
     }
@@ -345,7 +348,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             asset.AccountId = _context.AccountId;
             if (isInitializing)
             {
-                InitialPortfolio.Add(asset);
+                InitialPortfolio.Add(asset with { });
             }
             Portfolio.Add(asset);
         }
@@ -551,10 +554,14 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             _securityService.Fix(asset);
             var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
-            asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
 
             asset.AccountId = account.Id;
             asset.UpdateTime = DateTime.UtcNow;
+            if (existingAsset != null)
+            {
+                existingAsset.Quantity = asset.Quantity;
+                asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
+            }
         }
         _persistence.Insert(assets, isUpsert: true);
     }

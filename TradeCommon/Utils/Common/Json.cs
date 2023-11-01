@@ -3,7 +3,7 @@
 namespace Common;
 public static class Json
 {
-    private static JsonSerializerOptions _option = new JsonSerializerOptions()
+    private static readonly JsonSerializerOptions _option = new JsonSerializerOptions()
     {
         WriteIndented = true
     };
@@ -15,9 +15,7 @@ public static class Json
 
     public static string Serialize<T>(T obj, bool isPretty = false)
     {
-        if (isPretty)
-            return JsonSerializer.Serialize<T>(obj, _option);
-        return JsonSerializer.Serialize<T>(obj);
+        return isPretty ? JsonSerializer.Serialize<T>(obj, _option) : JsonSerializer.Serialize<T>(obj);
     }
 
     public static T? Deserialize<T>(string content)

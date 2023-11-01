@@ -9,8 +9,7 @@ public class Credential
 
     public static bool Matches(string input, string hash)
     {
-        if (input.IsBlank()) return false;
-        return !hash.IsBlank() && CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
+        return !input.IsBlank() && !hash.IsBlank() && CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
     }
 
     public static bool IsPasswordCorrect(User user, string password)

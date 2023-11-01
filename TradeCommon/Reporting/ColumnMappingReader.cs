@@ -1,7 +1,6 @@
 ﻿using Common;
 using CsvHelper;
 using log4net;
-using System.Formats.Asn1;
 using System.Globalization;
 using TradeCommon.Utils;
 using TradeCommon.Utils.Excels;
@@ -122,20 +121,13 @@ public class ColumnMappingReader
 
     private static string GetDefaultFormat(TypeCode t)
     {
-        switch (t)
+        return t switch
         {
-            case TypeCode.Decimal:
-            case TypeCode.Double:
-                return "General";
-            case TypeCode.Int64:
-            case TypeCode.Int32:
-                return "0";
-            case TypeCode.String:
-            case TypeCode.Boolean:
-                return "@";
-            case TypeCode.DateTime:
-                return "yyyy-MM-dd HH:mm:ss";
-        }
-        return "@";
+            TypeCode.Decimal or TypeCode.Double => "General",
+            TypeCode.Int64 or TypeCode.Int32 => "0",
+            TypeCode.String or TypeCode.Boolean => "@",
+            TypeCode.DateTime => "yyyy-MM-dd HH:mm:ss",
+            _ => "@",
+        };
     }
 }

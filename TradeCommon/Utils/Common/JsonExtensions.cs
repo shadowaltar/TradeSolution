@@ -8,23 +8,21 @@ public static class JsonExtensions
     public static long GetLong(this JsonNode? node, string? fieldName = null, long defaultValue = long.MinValue)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<long>(),
-            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
-            _ => defaultValue
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<long>(),
+                JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
+                _ => defaultValue
+            };
     }
 
     public static int GetInt(this JsonNode? node, string? fieldName = null, int defaultValue = int.MinValue)
     {
-        if (fieldName == null)
-            return node?.AsValue().ToString()?.ParseInt(defaultValue: defaultValue) ?? defaultValue;
-        return node?[fieldName]?.AsValue().GetValue<int>() ?? defaultValue;
+        return fieldName == null
+            ? node?.AsValue().ToString()?.ParseInt(defaultValue: defaultValue) ?? defaultValue
+            : node?[fieldName]?.AsValue().GetValue<int>() ?? defaultValue;
     }
 
     public static bool GetBoolean(this JsonNode node, string? fieldName = null, bool defaultValue = false)
@@ -34,8 +32,7 @@ public static class JsonExtensions
             if (fieldName == null)
                 return node.AsValue().GetValue<bool>();
             var sub = node[fieldName];
-            if (sub == null) return defaultValue;
-            return sub.AsValue().GetValue<bool>();
+            return sub == null ? defaultValue : sub.AsValue().GetValue<bool>();
         }
         catch
         {
@@ -50,8 +47,7 @@ public static class JsonExtensions
             if (fieldName == null)
                 return node?.AsValue().GetValue<string>() ?? defaultValue;
             var sub = node[fieldName];
-            if (sub == null) return defaultValue;
-            return sub.AsValue().GetValue<string>() ?? defaultValue;
+            return sub == null ? defaultValue : sub.AsValue().GetValue<string>() ?? defaultValue;
         }
         catch
         {
@@ -62,79 +58,66 @@ public static class JsonExtensions
     public static decimal GetDecimal(this JsonNode? node, string? fieldName = null, decimal defaultValue = 0)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<decimal>(),
-            JsonValueKind.String => decimal.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
-            _ => defaultValue
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<decimal>(),
+                JsonValueKind.String => decimal.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
+                _ => defaultValue
+            };
     }
 
     public static double GetDouble(this JsonNode? node, string? fieldName = null, double defaultValue = double.NaN)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<double>(),
-            JsonValueKind.String => double.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
-            _ => defaultValue
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<double>(),
+                JsonValueKind.String => double.TryParse(jsonValue.GetValue<string>(), out var result) ? result : defaultValue,
+                _ => defaultValue
+            };
     }
 
     public static DateTime GetLocalFromUnixSec(this JsonNode? node, string? fieldName = null, DateTime defaultValue = default)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixSec(),
-            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixSec() : default,
-            _ => defaultValue,
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixSec(),
+                JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixSec() : default,
+                _ => defaultValue,
+            };
     }
 
     public static DateTime GetLocalFromUnixMs(this JsonNode? node, string? fieldName = null, DateTime defaultValue = default)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixMs(),
-            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixMs() : default,
-            _ => defaultValue,
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<long>().FromLocalUnixMs(),
+                JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromLocalUnixMs() : default,
+                _ => defaultValue,
+            };
     }
 
     public static DateTime GetUtcFromUnixMs(this JsonNode? node, string? fieldName = null, DateTime defaultValue = default)
     {
         var kind = TryGetJsonValueAndKind(node, fieldName, out var jsonValue);
-        if (kind == JsonValueKind.Undefined || jsonValue == null)
-        {
-            return defaultValue;
-        }
-
-        return kind switch
-        {
-            JsonValueKind.Number => jsonValue.GetValue<long>().FromUnixMs(),
-            JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromUnixMs() : default,
-            _ => defaultValue,
-        };
+        return kind == JsonValueKind.Undefined || jsonValue == null
+            ? defaultValue
+            : kind switch
+            {
+                JsonValueKind.Number => jsonValue.GetValue<long>().FromUnixMs(),
+                JsonValueKind.String => long.TryParse(jsonValue.GetValue<string>(), out var result) ? result.FromUnixMs() : default,
+                _ => defaultValue,
+            };
     }
 
     private static JsonValueKind TryGetJsonValueAndKind(JsonNode? node, string? fieldName, out JsonValue? jsonValue)
@@ -144,10 +127,6 @@ public static class JsonExtensions
             return JsonValueKind.Undefined;
 
         var innerJsonValue = jsonValue.GetValue<object>();
-        if (innerJsonValue is not JsonElement element)
-        {
-            return JsonValueKind.Undefined;
-        }
-        return element.ValueKind;
+        return innerJsonValue is not JsonElement element ? JsonValueKind.Undefined : element.ValueKind;
     }
 }

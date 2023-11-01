@@ -1,12 +1,4 @@
-﻿using NUnit.Framework;
-using TradeCommon.Utils.Evaluation;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Utils.Evaluation.Tests;
+﻿namespace TradeCommon.Utils.Evaluation.Tests;
 
 [TestFixture()]
 public class FormulaBuilderTests

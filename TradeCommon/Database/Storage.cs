@@ -31,7 +31,7 @@ public partial class Storage : IStorage
     {
         _writers = new SqlWriters(this);
         _container = container;
-        _lazyContext = new Lazy<ApplicationContext>(() => _container.Resolve<ApplicationContext>());
+        _lazyContext = new Lazy<ApplicationContext>(_container.Resolve<ApplicationContext>);
     }
 
     public void SetEnvironment(EnvironmentType environment)

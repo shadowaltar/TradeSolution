@@ -1,5 +1,4 @@
-﻿using Common.Attributes;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Common.Attributes;
 public class AttributeMetaInfo

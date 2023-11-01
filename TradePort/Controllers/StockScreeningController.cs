@@ -6,7 +6,6 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Utils.Evaluation;
-using TradeLogicCore.Indicators;
 using TradeLogicCore.Instruments;
 
 namespace TradePort.Controllers;

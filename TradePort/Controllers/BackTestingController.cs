@@ -1,12 +1,4 @@
-﻿using Common;
-using log4net;
-using Microsoft.AspNetCore.Mvc;
-using TradeCommon.Calculations;
-using TradeCommon.Constants;
-using TradeCommon.Essentials;
-using TradeCommon.Essentials.Instruments;
-using TradeLogicCore.Algorithms;
-using TradeLogicCore.Services;
+﻿using Microsoft.AspNetCore.Mvc;
 
 namespace TradePort.Controllers;
 

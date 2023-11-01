@@ -12,30 +12,21 @@ public class Sorters
     {
         public int Compare(SecurityRelatedEntry? x, SecurityRelatedEntry? y)
         {
-            if (x == null && y == null) return 0;
-            if (x == null) return -1;
-            if (y == null) return 1;
-            return x.SecurityCode.CompareTo(y.SecurityCode);
+            return x == null && y == null ? 0 : x == null ? -1 : y == null ? 1 : x.SecurityCode.CompareTo(y.SecurityCode);
         }
     }
     public class IdSorterImpl : IComparer<SecurityRelatedEntry>
     {
         public int Compare(SecurityRelatedEntry? x, SecurityRelatedEntry? y)
         {
-            if (x == null && y == null) return 0;
-            if (x == null) return -1;
-            if (y == null) return 1;
-            return x.SecurityId.CompareTo(y.SecurityId);
+            return x == null && y == null ? 0 : x == null ? -1 : y == null ? 1 : x.SecurityId.CompareTo(y.SecurityId);
         }
     }
     public class CreateTimeSorterImpl : IComparer<ITimeRelatedEntry>
     {
         public int Compare(ITimeRelatedEntry? x, ITimeRelatedEntry? y)
         {
-            if (x == null && y == null) return 0;
-            if (x == null) return -1;
-            if (y == null) return 1;
-            return x.CreateTime.CompareTo(y.CreateTime);
+            return x == null && y == null ? 0 : x == null ? -1 : y == null ? 1 : x.CreateTime.CompareTo(y.CreateTime);
         }
     }
 }

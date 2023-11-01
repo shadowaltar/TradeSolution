@@ -99,22 +99,20 @@ public class SqlReader<T> : IDisposable where T : new()
             return Reader.SafeGetLong(name);
         else if (type == typeof(double?))
             return Reader.SafeGetDouble(name);
-        else if (type == typeof(DateTime?))
-            return Reader.SafeGetDateTime(name);
-        else if (type == typeof(int?))
-            return Reader.SafeGetInt(name);
-        else if (type == typeof(bool?))
-            return Reader.SafeGetBool(name);
-        else if (type.IsEnum)
-            return Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : default;
-        else
-            throw new NotImplementedException("Unsupported type: " + type.Name);
+        else return type == typeof(DateTime?)
+            ? Reader.SafeGetDateTime(name)
+            : type == typeof(int?)
+            ? Reader.SafeGetInt(name)
+            : type == typeof(bool?)
+            ? Reader.SafeGetBool(name)
+            : type.IsEnum
+            ? Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : default
+            : throw new NotImplementedException("Unsupported type: " + type.Name);
     }
 
     public TV? GetOrDefault<TV>(string columnName, TV? defaultValue = default)
     {
-        if (!Columns.Contains(columnName)) return defaultValue;
-        return (TV?)Get(typeof(TV), columnName);
+        return !Columns.Contains(columnName) ? defaultValue : (TV?)Get(typeof(TV), columnName);
     }
 
     public static string GetSelectClause()
@@ -125,8 +123,7 @@ public class SqlReader<T> : IDisposable where T : new()
             var selectIgnoreFieldNames = properties.Where(pair =>
             {
                 var ignoreAttr = pair.Value.GetCustomAttribute<DatabaseIgnoreAttribute>();
-                if (ignoreAttr != null && ignoreAttr.IgnoreSelect) return true;
-                return false;
+                return ignoreAttr != null && ignoreAttr.IgnoreSelect;
             }).Select(pair => pair.Key).ToList();
 
             var sb = new StringBuilder("SELECT ");
