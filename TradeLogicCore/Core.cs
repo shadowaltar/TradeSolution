@@ -35,7 +35,7 @@ public class Core
     /// Start a trading algorithm working thread and returns a GUID.
     /// The working thread will not end by itself unless being stopped manually or reaching its designated end time.
     /// 
-    /// The following parameters need to be provided:
+    /// The following algoParameters need to be provided:
     /// * environment, broker, exchange, user and account details.
     /// * securities to be listened and screened.
     /// * algorithm instance, with position-sizing, entering, exiting, screening, fee-charging logic components.
@@ -47,23 +47,24 @@ public class Core
     /// 
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    /// <param name="parameters"></param>
+    /// <param name="engineParameters"></param>
+    /// <param name="algoParameters"></param>
     /// <param name="algorithm"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task<long> Run(AlgorithmParameters parameters, Algorithm algorithm)
+    public async Task<long> Run(EngineParameters engineParameters, AlgorithmParameters algoParameters, Algorithm algorithm)
     {
         _log.Info($"Starting algorithm: {algorithm.GetType().Name}, Id [{algorithm.Id}], VerId [{algorithm.VersionId}]");
         var user = _services.Admin.CurrentUser;
         if (user == null) throw new InvalidOperationException("The user does not exist.");
 
-        var startTime = parameters.TimeRange.ActualStartTime;
+        var startTime = algoParameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
         var isExternalAvailable = await _services.Admin.Ping();
         if (!isExternalAvailable) throw Exceptions.Unreachable(Context.Broker);
         // some externals need this for calculation like minimal notional amount
-        var refPrices = await _services.MarketData.GetPrices(parameters.SecurityPool);
+        var refPrices = await _services.MarketData.GetPrices(algoParameters.SecurityPool);
         SetMinQuantities(refPrices);
 
         _reconciliation = new Reconcilation(Context);
@@ -73,20 +74,16 @@ public class Core
 
         // check one week's historical order / trade only
         var previousDay = startTime.AddMonths(-1);
-        await _reconciliation.ReconcileOrders(previousDay, parameters.SecurityPool);
-        await _reconciliation.ReconcileTrades(previousDay, parameters.SecurityPool);
-        await _reconciliation.ReconcilePositions(parameters.SecurityPool);
+        await _reconciliation.ReconcileOrders(previousDay, algoParameters.SecurityPool);
+        await _reconciliation.ReconcileTrades(previousDay, algoParameters.SecurityPool);
+        await _reconciliation.ReconcilePositions(algoParameters.SecurityPool);
 
         var uniqueId = Context.AlgoBatchId;
         _ = Task.Factory.StartNew(async () =>
         {
-            var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                        new List<string> { "BTC", "USDT" },
-                                                        true, true, true, true, true);
-
             var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
             _engines[uniqueId] = engine;
-            await engine.Run(parameters); // this is a blocking call
+            await engine.Run(algoParameters); // this is a blocking call
 
         }, TaskCreationOptions.LongRunning);
 

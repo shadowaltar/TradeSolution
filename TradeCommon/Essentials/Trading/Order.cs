@@ -15,7 +15,7 @@ namespace TradeCommon.Essentials.Trading;
 [Unique(nameof(ExternalOrderId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(SecurityId), nameof(CreateTime))]
-public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUniqueIdEntry
+public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
 {
     /// <summary>
     /// Unique order id.
@@ -193,7 +193,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, ITimeBasedUnique
         return r;
     }
 
-    public bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    public bool EqualsIgnoreId(IIdEntry other)
     {
         if (other is not Order order) return false;
         return CompareTo(order) == 0;

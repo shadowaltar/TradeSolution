@@ -1,10 +1,8 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
-using log4net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Diagnostics.Symbols;
 using TradeCommon.Algorithms;
-using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -164,6 +162,8 @@ public class ExecutionController : Controller
     /// <summary>
     /// Start an algorithm.
     /// </summary>
+    /// <param name="core"></param>
+    /// <param name="services"></param>
     /// <param name="adminPassword"></param>
     /// <param name="symbol">Single symbol for trading.</param>
     /// <param name="intervalStr">Trading time interval</param>
@@ -176,14 +176,20 @@ public class ExecutionController : Controller
     /// no matter it grows or shrinks.
     /// Fixed: give a fixed amount of quote currency and all the trades' quantity is fixed to this amount.
     /// </param>
-    /// <param name="initialAvailableQuantity"></param>
+    /// <param name="initialAvailableQuantity">For PreserveFixed/Fixed position sizing, this is the initial quote quantity.</param>
+    /// <param name="preferredQuoteCurrencies">List of preferred quote currency codes (can be only one), delimited by ",",
+    ///     eg. "TUSD,USDT". Used as fallback quote ccy when only base ccy or asset-security is specified</param>
+    /// <param name="globalCurrencyFilter">List of security codes which this algo can only use, delimited by ",".
+    ///     If empty, will be derived from <paramref name="symbol"/> and <paramref name="preferredQuoteCurrencies"/> input parameters.</param>
+    /// <param name="cancelOpenOrdersOnStart">Cancel any open orders in the market on engine start.</param>
+    /// <param name="assumeNoOpenPositionOnStart">Assume no open position exists on engine start.</param>
+    /// <param name="closeOpenPositionsOnStart">Close any open positions on engine start (if assume-no-open-position-on-start is false).</param>
+    /// <param name="closeOpenPositionsOnStop">Close any open positions on engine stop.</param>
+    /// <param name="cleanUpNonCashOnStart">Clean up (usually sell out) any holding assets on engine start, excluding all quote currencies.</param>
     /// <returns></returns>
     [HttpPost("algorithms/mac/start")]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
-                                            [FromServices] Context context,
-                                            [FromServices] ISecurityService securityService,
-                                            [FromServices] IPortfolioService portfolioService,
-                                            [FromServices] IAdminService adminService,
+                                            [FromServices] IServices services,
                                             [FromForm(Name = "admin-password")] string adminPassword,
                                             [FromForm(Name = "symbol")] string symbol = "BTCTUSD",
                                             [FromForm(Name = "interval")] string intervalStr = "1m",
@@ -192,7 +198,14 @@ public class ExecutionController : Controller
                                             [FromForm(Name = "stop-loss")] decimal stopLoss = 0.0005m,
                                             [FromForm(Name = "take-profit")] decimal takeProfit = 0.0005m,
                                             [FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
-                                            [FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100)
+                                            [FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100,
+                                            [FromForm(Name = "preferred-quote-currencies")] string preferredQuoteCurrencies = "TUSD",
+                                            [FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "",
+                                            [FromForm(Name = "cancel-open-orders-on-start")] bool cancelOpenOrdersOnStart = true,
+                                            [FromForm(Name = "assume-no-open-position")] bool assumeNoOpenPositionOnStart = true,
+                                            [FromForm(Name = "close-open-position-on-start")] bool closeOpenPositionsOnStart = true,
+                                            [FromForm(Name = "close-open-position-on-stop")] bool closeOpenPositionsOnStop = true,
+                                            [FromForm(Name = "clean-up-non-cash-on-start")] bool cleanUpNonCashOnStart = false)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
@@ -200,9 +213,9 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsIntNegativeOrZero(slowMa, out br)) return br;
         if (ControllerValidator.IsDecimalNegative(stopLoss, out br)) return br;
         if (ControllerValidator.IsDecimalNegative(takeProfit, out br)) return br;
-        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account");
+        if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
-        var security = securityService.GetSecurity(symbol);
+        var security = services.Security.GetSecurity(symbol);
         if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
         var quoteCode = security.QuoteSecurity.Code;
 
@@ -220,42 +233,220 @@ public class ExecutionController : Controller
                 return BadRequest("Invalid environment type to start algo.");
         }
 
-        var parameters = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
-        var algorithm = new MovingAverageCrossing(context, parameters, fastMa, slowMa, stopLoss, takeProfit);
-        var screening = new SingleSecurityLogic(context, security);
+        var preferredCashCodes = preferredQuoteCurrencies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (preferredCashCodes.Count == 0)
+        {
+            preferredCashCodes.AddRange("USDT", "USD");
+        }
+
+        var globalCodes = globalCurrencyFilter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        globalCodes.AddRange(preferredCashCodes);
+        if (security.FxInfo?.BaseAsset != null)
+            globalCodes.Add(security.FxInfo.BaseAsset.Code);
+        if (security.FxInfo?.QuoteAsset != null)
+            globalCodes.Add(security.FxInfo.QuoteAsset.Code);
+        globalCodes = globalCodes.Distinct().OrderBy(c => c).ToList();
+
+        var ep = new EngineParameters(preferredCashCodes, globalCodes,
+            assumeNoOpenPositionOnStart, cancelOpenOrdersOnStart, closeOpenPositionsOnStop,
+            closeOpenPositionsOnStart, cleanUpNonCashOnStart);
+        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
+        var algorithm = new MovingAverageCrossing(services.Context, ap, fastMa, slowMa, stopLoss, takeProfit);
+        var screening = new SingleSecurityLogic(services.Context, security);
         var sizing = new SimplePositionSizingLogic(positionSizingMethod);
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
         switch (positionSizingMethod)
         {
             case PositionSizingMethod.PreserveFixed:
-                sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
+                sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, initialAvailableQuantity);
                 break;
             case PositionSizingMethod.Fixed:
-                sizing.CalculateFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
+                sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, initialAvailableQuantity);
                 break;
         }
-        var batchId = await core.Run(parameters, algorithm);
+        var batchId = await core.Run(ep, ap, algorithm);
         return Ok(batchId);
     }
 
-    [HttpPost("algorithms/list")]
-    public async Task<ActionResult> GetAllAlgorithms([FromQuery(Name = "admin-password")] string? adminPassword)
+    [HttpPost("orders/list")]
+    public async Task<ActionResult> GetOrders([FromServices] IServices services,
+                                              [FromForm(Name = "admin-password")] string? adminPassword,
+                                              [FromQuery(Name = "start")] string startStr = "20231101",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                              [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
+
+        var security = services.Security.GetSecurity(symbol);
+        if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
+
+        switch (dataSourceType)
+        {
+            case DataSourceType.MemoryCached:
+                var cached = services.Order.GetOrders(security);
+                return Ok(cached.Select(o => o.CreateTime >= start));
+            case DataSourceType.InternalStorage:
+                return Ok(await services.Order.GetStorageOrders(security, start));
+            case DataSourceType.External:
+                return Ok(await services.Order.GetExternalOrders(security, start));
+            default:
+                return BadRequest("Impossible");
+        }
+    }
+
+    [HttpPost("trades/list")]
+    public async Task<ActionResult> GetTrades([FromServices] IServices services,
+                                              [FromForm(Name = "admin-password")] string? adminPassword,
+                                              [FromQuery(Name = "start")] string startStr = "20231101",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                              [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
+
+        var security = services.Security.GetSecurity(symbol);
+        if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
+
+        switch (dataSourceType)
+        {
+            case DataSourceType.MemoryCached:
+                var cached = services.Trade.GetTrades(security);
+                return Ok(cached.Select(o => o.Time >= start));
+            case DataSourceType.InternalStorage:
+                return Ok(await services.Trade.GetStorageTrades(security, start, null, false));
+            case DataSourceType.External:
+                return Ok(await services.Trade.GetExternalTrades(security, start));
+            default:
+                return BadRequest("Impossible");
+        }
+    }
+
+    /// <summary>
+    /// Get positions. Optionally can get the initial state of positions before algo engine is started.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="adminPassword"></param>
+    /// <param name="startStr"></param>
+    /// <param name="symbol"></param>
+    /// <param name="dataSourceType"></param>
+    /// <param name="isInitialPortfolio"></param>
+    /// <returns></returns>
+    [HttpPost("positions/list")]
+    public async Task<ActionResult> GetPositions([FromServices] IServices services,
+                                                 [FromForm(Name = "admin-password")] string? adminPassword,
+                                                 [FromQuery(Name = "start")] string startStr = "20231101",
+                                                 [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                                 [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
+                                                 [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
+
+        var security = services.Security.GetSecurity(symbol);
+        if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
+
+        if (!isInitialPortfolio)
+            switch (dataSourceType)
+            {
+                case DataSourceType.MemoryCached:
+                    var cached = services.Portfolio.GetPositions();
+                    return Ok(cached.Select(o => o.UpdateTime >= start));
+                case DataSourceType.InternalStorage:
+                    return Ok(await services.Portfolio.GetStoragePositions(start));
+                case DataSourceType.External:
+                    return BadRequest("External system (broker/exchange) does not support position info; maybe you are looking for Asset query API?");
+                default:
+                    return BadRequest("Impossible");
+            }
+        else
+            switch (dataSourceType)
+            {
+                case DataSourceType.MemoryCached:
+                    var cached = services.Portfolio.InitialPortfolio.GetPositions();
+                    return Ok(cached.Select(o => o.UpdateTime >= start));
+                case DataSourceType.InternalStorage:
+                    return BadRequest("Initial portfolio positions only exists in memory, as portfolio changes are always synchronized to internal storage.");
+                case DataSourceType.External:
+                    return BadRequest("Initial portfolio positions only exists in memory, external asset position is always the most updated.");
+                default:
+                    return BadRequest("Impossible");
+            }
+    }
+
+    /// <summary>
+    /// Gets asset positions. Optionally can get the initial state of assets before algo engine is started.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="adminPassword"></param>
+    /// <param name="symbolStr"></param>
+    /// <param name="dataSourceType"></param>
+    /// <param name="isInitialPortfolio"></param>
+    /// <returns></returns>
+    [HttpPost("assets/list")]
+    public async Task<ActionResult> GetAssets([FromServices] IServices services,
+                                              [FromForm(Name = "admin-password")] string? adminPassword,
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTC,TUSD,USDT",
+                                              [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
+                                              [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
+
+        var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var code in codes)
+        {
+            var security = services.Security.GetSecurity(code);
+            if (security == null || !security.IsAsset) return BadRequest("Invalid code / missing asset security.");
+        }
+
+        if (!isInitialPortfolio)
+            switch (dataSourceType)
+            {
+                case DataSourceType.MemoryCached:
+                    return Ok(services.Portfolio.GetAssets());
+                case DataSourceType.InternalStorage:
+                    return Ok(await services.Portfolio.GetStorageAssets());
+                case DataSourceType.External:
+                    return Ok(await services.Portfolio.GetExternalAssets());
+                default:
+                    return BadRequest("Impossible");
+            }
+        else
+            switch (dataSourceType)
+            {
+                case DataSourceType.MemoryCached:
+                    return Ok(services.Portfolio.InitialPortfolio.GetAssets());
+                case DataSourceType.InternalStorage:
+                    return BadRequest("Initial portfolio assets only exists in memory, as portfolio changes are always synchronized to internal storage.");
+                case DataSourceType.External:
+                    return BadRequest("Initial portfolio assets only exists in memory, external asset position is always the most updated.");
+                default:
+                    return BadRequest("Impossible");
+            }
+    }
+
+    [HttpPost("algorithms/list")]
+    public ActionResult GetAllAlgorithms([FromForm(Name = "admin-password")] string? adminPassword)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
 
         var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         var ids = core.List();
         return Ok(ids);
     }
 
-    [HttpPost("algorithms/stop")]
-    public async Task<ActionResult> StopAlgorithm([FromQuery(Name = "admin-password")] string? adminPassword,
+    [HttpDelete("algorithms/stop")]
+    public async Task<ActionResult> StopAlgorithm([FromForm(Name = "admin-password")] string? adminPassword,
                                                   [FromQuery(Name = "algo-batch-id")] long algoBatchId)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
+        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
 
         var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         await core.StopAlgorithm(algoBatchId);
@@ -263,10 +454,10 @@ public class ExecutionController : Controller
     }
 
     [HttpPost("algorithms/stop-all")]
-    public async Task<ActionResult> StopAllAlgorithms([FromQuery(Name = "admin-password")] string? adminPassword)
+    public async Task<ActionResult> StopAllAlgorithms([FromForm(Name = "admin-password")] string? adminPassword)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Core is not even initialized.");
+        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
 
         var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         await core.StopAllAlgorithms();

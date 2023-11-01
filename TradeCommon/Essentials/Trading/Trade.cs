@@ -18,7 +18,7 @@ namespace TradeCommon.Essentials.Trading;
 [Index(nameof(SecurityId))]
 [Index(nameof(PositionId))]
 [Storage("trades", "execution")]
-public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUniqueIdEntry
+public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
 {
     /// <summary>
     /// Unique trade id.
@@ -155,7 +155,7 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, ITimeBasedUnique
         return r;
     }
 
-    public bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    public bool EqualsIgnoreId(IIdEntry other)
     {
         if (other is not Trade trade) return false;
         return CompareTo(trade) == 0;

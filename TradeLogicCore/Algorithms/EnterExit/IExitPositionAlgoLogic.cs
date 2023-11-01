@@ -7,7 +7,6 @@ using TradeLogicCore.Algorithms.FeeCalculation;
 namespace TradeLogicCore.Algorithms.EnterExit;
 public interface IExitPositionAlgoLogic
 {
-    bool IsClosing { get; }
 
     decimal LongStopLossRatio { get; }
 

@@ -86,6 +86,11 @@ public class PortfolioService : IPortfolioService, IDisposable
         return Portfolio.GetAsset(id);
     }
 
+    public List<Asset> GetAssets()
+    {
+        return Portfolio.GetAssets();
+    }
+
     public Asset? GetAssetBySecurityId(int securityId)
     {
         return Portfolio.GetAssetBySecurityId(securityId);
@@ -475,7 +480,7 @@ public class PortfolioService : IPortfolioService, IDisposable
             _closedPositions[position.Id] = position;
             Portfolio.RemovePosition(position.Id);
 
-            if (position.Quantity != 0 || position.WorkingQuantity != 0)
+            if (position.Quantity != 0)
             {
                 // has residual, which will be traded in future orders
                 var residual = position.Quantity;
@@ -553,5 +558,4 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
         _persistence.Insert(assets, isUpsert: true);
     }
-
 }

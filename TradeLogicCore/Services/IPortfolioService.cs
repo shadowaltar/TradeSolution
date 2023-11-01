@@ -63,6 +63,12 @@ public interface IPortfolioService
     Side GetOpenPositionSide(int securityId);
 
     /// <summary>
+    /// Get all asset positions.
+    /// </summary>
+    /// <returns></returns>
+    List<Asset> GetAssets();
+
+    /// <summary>
     /// Get asset position given its Id.
     /// </summary>
     /// <param name="id"></param>

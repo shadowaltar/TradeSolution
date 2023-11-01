@@ -124,8 +124,6 @@ public interface IOrderService
     /// <param name="order"></param>
     /// <param name="isFakeOrder"></param>
     Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false);
-    
-    Task<ExternalQueryState> SendOrder(Order order, Position associatedPosition);
 
     /// <summary>
     /// Cancel an order.

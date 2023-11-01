@@ -19,10 +19,6 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     private readonly IPortfolioService _portfolioService;
     private readonly IdGenerator _orderIdGen;
 
-    public readonly object _closeFlagLock = new();
-
-    public bool IsClosing { get; private set; }
-
     public ITransactionFeeLogic? FeeLogic { get; set; }
 
     public decimal LongStopLossRatio { get; }
@@ -62,61 +58,46 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
-        try
-        {
-            lock (_closeFlagLock)
-            {
-                if (IsClosing)
-                    return ExternalQueryStates.CloseConflict(security.Code);
-                IsClosing = true;
-            }
+        // cancel any partial filled, SL or TP orders
+        await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
 
-            // cancel any partial filled, SL or TP orders
-            await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
-
-            // now close the position using algorithm only
-            var position = _portfolioService.GetPositionBySecurityId(security.Id);
-            if (position == null || position.IsClosed)
-            {
-                var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
-                _log.Warn(message);
-                return ExternalQueryStates.InvalidPosition(message);
-            }
-            var quantity = Math.Abs(position.Quantity);
-            var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseAsset?.Id ?? 0);
-            var residualSign = Math.Sign(residualQuantity);
-            if (residualSign == -(int)exitSide)
-            {
-                // if residual is the opposite side of exit-side, it is time to close the residual
-                quantity += Math.Abs(residualQuantity);
-                _log.Info($"Discovered residual quantity for asset {security.FxInfo?.BaseAsset?.Code}, value is {residualQuantity}; we will {exitSide} them in this close order.");
-            }
-            var order = new Order
-            {
-                Id = _orderIdGen.NewTimeBasedId,
-                ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
-                AccountId = _context.AccountId,
-                CreateTime = exitTime,
-                UpdateTime = exitTime,
-                Quantity = quantity,
-                Side = exitSide,
-                Status = OrderStatus.Sending,
-                TimeInForce = TimeInForceType.GoodTillCancel,
-                Price = 0,
-                Type = OrderType.Market,
-                Security = security,
-                SecurityId = security.Id,
-                SecurityCode = security.Code,
-                Action = actionType,
-                Comment = Comments.AlgoExit,
-            };
-            return await _orderService.SendOrder(order);
-        }
-        finally
+        // now close the position using algorithm only
+        var position = _portfolioService.GetPositionBySecurityId(security.Id);
+        if (position == null || position.IsClosed)
         {
-            lock (_closeFlagLock)
-                IsClosing = false;
+            var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
+            _log.Warn(message);
+            return ExternalQueryStates.InvalidPosition(message);
         }
+        var quantity = Math.Abs(position.Quantity);
+        var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseAsset?.Id ?? 0);
+        var residualSign = Math.Sign(residualQuantity);
+        if (residualSign == -(int)exitSide)
+        {
+            // if residual is the opposite side of exit-side, it is time to close the residual
+            quantity += Math.Abs(residualQuantity);
+            _log.Info($"Discovered residual quantity for asset {security.FxInfo?.BaseAsset?.Code}, value is {residualQuantity}; we will {exitSide} them in this close order.");
+        }
+        var order = new Order
+        {
+            Id = _orderIdGen.NewTimeBasedId,
+            ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
+            AccountId = _context.AccountId,
+            CreateTime = exitTime,
+            UpdateTime = exitTime,
+            Quantity = quantity,
+            Side = exitSide,
+            Status = OrderStatus.Sending,
+            TimeInForce = TimeInForceType.GoodTillCancel,
+            Price = 0,
+            Type = OrderType.Market,
+            Security = security,
+            SecurityId = security.Id,
+            SecurityCode = security.Code,
+            Action = actionType,
+            Comment = Comments.AlgoExit,
+        };
+        return await _orderService.SendOrder(order);
     }
 
     public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)

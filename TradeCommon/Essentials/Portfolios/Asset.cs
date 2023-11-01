@@ -13,7 +13,7 @@ namespace TradeCommon.Essentials.Portfolios;
 [Unique(nameof(Id))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
-public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUniqueIdEntry
+public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
 {
     /// <summary>
     /// Unique id of this asset asset.
@@ -84,7 +84,7 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, ITimeBasedUnique
         return r;
     }
 
-    public virtual bool EqualsIgnoreId(ITimeBasedUniqueIdEntry other)
+    public virtual bool EqualsIgnoreId(IIdEntry other)
     {
         if (other is not Asset asset) return false;
         return CompareTo(asset) == 0;

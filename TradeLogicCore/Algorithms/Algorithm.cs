@@ -16,6 +16,8 @@ namespace TradeLogicCore.Algorithms;
 
 public abstract class Algorithm
 {
+    protected WorkingItemMonitor<Position> _closingPositionMonitor;
+
     public virtual int Id { get; }
     public virtual int VersionId { get; }
     public virtual bool IsShortSellAllowed { get; }
@@ -40,6 +42,8 @@ public abstract class Algorithm
     public virtual void AfterAlgoExecution() { }
     public virtual void BeforeProcessingSecurity(Security security) { }
     public virtual void AfterProcessingSecurity(Security security) { }
+    public abstract void AfterPositionCreated(AlgoEntry current);
+    public abstract void AfterPositionUpdated(AlgoEntry current);
     public abstract void AfterPositionClosed(AlgoEntry entry);
     public abstract void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide);
     public abstract void AfterTookProfit(AlgoEntry entry, Side takeProfitSide);
@@ -53,6 +57,11 @@ public abstract class Algorithm
     public abstract bool ShallStopLoss(int securityId, Tick tick);
     public abstract bool ShallTakeProfit(int securityId, Tick tick);
     public abstract bool CanCancel(AlgoEntry current);
+
+    protected Algorithm()
+    {
+        _closingPositionMonitor = new WorkingItemMonitor<Position>();
+    }
 
     public virtual decimal GetStopLossPrice(decimal price, Side parentOrderSide, Security security)
     {

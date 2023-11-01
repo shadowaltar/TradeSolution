@@ -229,18 +229,21 @@ public class Program
             await new Reconcilation(context).ReconcileAssets();
             services.Portfolio.Update(await services.Portfolio.GetStorageAssets());
         }
-        var parameters = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
-        var algorithm = new MovingAverageCrossing(context, parameters, fastMa, slowMa, stopLoss, takeProfit);
+
+        var ep = new EngineParameters(new List<string> { "USDT" }, new List<string> { "BTC", "USDT" }, true, true, true, true, true);
+        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
+
+        var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed);
         sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
 
-        _log.Info("Execute algorithm with parameters #1: " + parameters);
-        _log.Info("Execute algorithm with parameters #2: " + algorithm);
+        _log.Info("Execute algorithm with ap #1: " + ap);
+        _log.Info("Execute algorithm with ap #2: " + algorithm);
 
-        var algoBatchId = await core.Run(parameters, algorithm);
+        var algoBatchId = await core.Run(ep, ap, algorithm);
 
         while (true)
         {
@@ -262,14 +265,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-            {
-                return await Login(services, userName, password, email, accountName, accountType, environment, security);
-            }
+                {
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                }
             case ResultCode.GetAccountFailed:
-            {
-                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                return await Login(services, userName, password, email, accountName, accountType, environment, security);
-            }
+                {
+                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                    return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                }
             default:
                 return result;
         }
@@ -293,13 +296,13 @@ public class Program
     //    var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
     //    var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
     //    algorithm.Screening = screening;
-    //    var parameters = new AlgoStartupParameters(true, _testUserName, account.Name, _testEnvironment, _testExchange, _testBroker,
+    //    var ap = new AlgoStartupParameters(true, _testUserName, account.Name, _testEnvironment, _testExchange, _testBroker,
     //        IntervalType.OneMinute, securityPool, AlgoEffectiveTimeRange.ForBackTesting(new DateTime(2022, 1, 1), DateTime.UtcNow));
 
-    //    var loginResult = await services.Admin.Login(parameters.UserName, _testPassword, parameters.AccountName, parameters.Environment);
+    //    var loginResult = await services.Admin.Login(ap.UserName, _testPassword, ap.AccountName, ap.Environment);
     //    if (loginResult != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException(loginResult.ToString());
 
-    //    await core.StartAlgorithm(parameters, algorithm);
+    //    await core.StartAlgorithm(ap, algorithm);
     //}
 
     private static async Task<Account> CheckTestUserAndAccount(IServices services, string un, string pwd, string email, string an, string at, EnvironmentType et)

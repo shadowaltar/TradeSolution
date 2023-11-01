@@ -81,6 +81,22 @@ public static class CollectionExtensions
         return results;
     }
 
+    /// <summary>
+    /// Append values to an existing collection.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="collection"></param>
+    /// <param name="values"></param>
+    /// <returns></returns>
+    public static void AddRange<T>(this ICollection<T> collection, params T[] values)
+    {
+        if (values.IsNullOrEmpty()) return;
+        foreach (var item in values)
+        {
+            collection.Add(item);
+        }
+    }
+
     public static void ClearAddRange<T>(this List<T> collection, IEnumerable<T> values)
     {
         collection.Clear();
@@ -305,6 +321,15 @@ public static class CollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Remove an item by its key from dictionary. Returns false if it is removed and it existed.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
     public static bool ThreadSafeRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
@@ -314,6 +339,17 @@ public static class CollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Returns the value by the key from the dictionary,
+    /// and also removes it.
+    /// Returns null if it does not exist.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
     public static Tv? ThreadSafeGetAndRemove<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;
@@ -322,6 +358,29 @@ public static class CollectionExtensions
             var value = dictionary.GetOrDefault(key, default);
             dictionary.Remove(key);
             return value;
+        }
+    }
+
+    /// <summary>
+    /// Checks if the dictionary contains a key and returns true if yes.
+    /// Returns false if it does not contain the key, and the value will be set into it.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="value"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
+    public static bool ThreadSafeContainsOrSet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Tv value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock != null ? @lock : dictionary;
+        lock (lockObject)
+        {
+            if (dictionary.ContainsKey(key))
+                return true;
+            dictionary[key] = value;
+            return false;
         }
     }
 
@@ -334,6 +393,16 @@ public static class CollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Try to get an item by a key.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="y"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
     public static bool ThreadSafeTryGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, out Tv y, object? @lock = null) where T : notnull
     {
         object lockObject = @lock != null ? @lock : dictionary;

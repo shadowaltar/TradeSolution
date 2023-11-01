@@ -160,6 +160,11 @@ public static class Exceptions
         return new InvalidOperationException("Trades must with the same security.");
     }
 
+    public static Exception InvalidSecurityInPosition(long id)
+    {
+        return new InvalidOperationException($"Security in position (with id {id})is invalid.");
+    }
+
     public static Exception NotImplemented(string message = "")
     {
         return new NotImplementedException(message);

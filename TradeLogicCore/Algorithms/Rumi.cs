@@ -203,6 +203,16 @@ public class Rumi : Algorithm
     {
         throw new NotImplementedException();
     }
+
+    public override void AfterPositionCreated(AlgoEntry current)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void AfterPositionUpdated(AlgoEntry current)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 public record RumiVariables : IAlgorithmVariables

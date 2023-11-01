@@ -194,16 +194,6 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public async Task<ExternalQueryState> SendOrder(Order order, Position associatedPosition)
-    {
-        // move quantity to working quantity, if we are reducing the position
-        var workingQuantity = order.Quantity;
-        associatedPosition.Quantity -= workingQuantity;
-        associatedPosition.WorkingQuantity = workingQuantity;
-
-        return await SendOrder(order);
-    }
-
     public bool IsOperational(long orderId)
     {
         return _operationalOrders.ThreadSafeContains(orderId);
