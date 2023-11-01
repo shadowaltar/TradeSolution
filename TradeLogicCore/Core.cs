@@ -123,10 +123,9 @@ public class Core
         }
     }
 
-    public List<long> List()
+    public List<string> List()
     {
-        // WIP
-        return _engines.Select(pair => pair.Key).ToList();
+        return _engines.Keys.Select(i => i.ToString()).ToList();
     }
 
     public async Task StopAllAlgorithms()

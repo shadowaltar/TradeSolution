@@ -14,7 +14,7 @@ public class Context : ApplicationContext
     private Algorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
 
-    public Context(IStorage storage) : base(storage)
+    public Context(IComponentContext container, IStorage storage) : base(container, storage)
     {
     }
 

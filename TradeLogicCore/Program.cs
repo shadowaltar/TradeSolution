@@ -191,18 +191,18 @@ public class Program
 
         //await ResetTables(environment);
 
+        var broker = ExternalNames.Convert(exchange);
+        var context = Dependencies.Register(broker);
+        context.Initialize(environment, exchange, broker);
 
-        Dependencies.Register(ExternalNames.Convert(exchange), exchange, environment);
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
         var services = Dependencies.ComponentContext.Resolve<IServices>();
-        var context = Dependencies.ComponentContext.Resolve<Context>();
+
         var core = Dependencies.ComponentContext.Resolve<Core>();
         var storage = Dependencies.ComponentContext.Resolve<IStorage>();
         storage.Success += OnStorageSuccess;
         storage.Failed += OnStorageFailed;
-        var broker = ExternalNames.Convert(exchange);
-        services.Admin.Initialize(environment, exchange, broker);
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var result = await Login(services, userName, password, email, accountName, accountType, context.Environment, security);

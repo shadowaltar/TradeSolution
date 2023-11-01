@@ -32,7 +32,7 @@ public interface IAdminService
     /// <returns></returns>
     Task<bool> Ping();
 
-    void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker);
+    void Initialize();
 
     Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false);
 

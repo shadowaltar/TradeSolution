@@ -21,6 +21,7 @@ public class AdminService : IAdminService
     private readonly IPortfolioService _portfolioService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
+    private bool _isInitialized;
 
     public bool IsLoggedIn { get; private set; }
 
@@ -48,15 +49,18 @@ public class AdminService : IAdminService
         _connectivity = connectivity;
     }
 
-    public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
+    public void Initialize()
     {
-        _log.Info($"Initializing admin-service, Env:{environment}, Exchange:{exchange}, Broker:{broker}.");
-        Context.Initialize(_container, environment, exchange, broker);
+        if (_isInitialized) return;
+
+        var environment = Context.Environment;
+        _log.Info($"Initializing admin-service, Env:{environment}.");
         _storage.SetEnvironment(environment);
         _connectivity.SetEnvironment(environment);
 
         _securityService.Initialize();
         _tradeService.Initialize();
+        _isInitialized = true;
     }
 
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
@@ -67,6 +71,11 @@ public class AdminService : IAdminService
         if (userName.IsBlank()) return ResultCode.InvalidArgument;
         if (password.IsBlank()) return ResultCode.InvalidArgument;
         if (accountName.IsBlank()) return ResultCode.InvalidArgument;
+
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
 
         CurrentUser = null;
         CurrentAccount = null;

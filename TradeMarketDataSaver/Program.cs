@@ -95,6 +95,6 @@ public class Program
 
         // setup context
         var context = container.Resolve<ApplicationContext>();
-        context.Initialize(container, environment, exchange, broker);
+        context.Initialize(environment, exchange, broker);
     }
 }

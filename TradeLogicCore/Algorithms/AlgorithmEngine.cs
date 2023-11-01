@@ -353,6 +353,11 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.MarketData.NextOhlc -= OnNextOhlcPrice;
         _services.MarketData.NextTick -= OnNextTickPrice;
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
+
+        _services.Order.OrderProcessed -= OnOrderProcessed;
+        _services.Trade.TradeProcessed -= OnTradeProcessed;
+        _services.Portfolio.PositionProcessed -= OnPositionProcessed;
+
         await _services.MarketData.UnsubscribeAllOhlcs();
         var securities = Screening.GetAll();
         foreach (var security in securities.Values)

@@ -12,12 +12,31 @@ public static class Dependencies
     [NotNull]
     public static IComponentContext? ComponentContext { get; private set; }
 
-    public static bool IsRegistered { get; private set; } = false;
-
-    public static void Register(BrokerType broker, ExchangeType exchange, EnvironmentType environment, ContainerBuilder? builder = null)
+    public static Context UpdateBrokerModule(IComponentContext existingContainer, BrokerType broker)
     {
-        builder ??= new ContainerBuilder();
+        var scope = (Autofac.Core.Lifetime.LifetimeScope)existingContainer;
+        scope.BeginLifetimeScope(builder =>
+        {
+            switch (broker)
+            {
+                case BrokerType.Binance:
+                    builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                    break;
+                    //case BrokerType.Futu:
+                    //    _builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
+                    //    break;
+                    //case BrokerType.Simulator:
+                    //    _builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+                    //    break;
+            }
+        }); // should not dispose this!
+        ComponentContext = existingContainer;
+        return existingContainer.Resolve<Context>();
+    }
 
+    public static Context Register(BrokerType broker)
+    {
+        var builder = new ContainerBuilder();
         builder.RegisterModule<DependencyModule>();
         builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
         switch (broker)
@@ -34,13 +53,8 @@ public static class Dependencies
         }
 
         var container = builder.Build();
-
         ComponentContext = container.Resolve<IComponentContext>();
-
-        // setup context
-        var context = container.Resolve<Context>();
-        context.Initialize(container, environment, exchange, broker);
-        IsRegistered = true;
+        return container.Resolve<Context>();
     }
 
     public class DependencyModule : Module

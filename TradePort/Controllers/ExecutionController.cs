@@ -199,7 +199,7 @@ public class ExecutionController : Controller
                                             [FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
                                             [FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100,
                                             [FromForm(Name = "preferred-quote-currencies")] string preferredQuoteCurrencies = "TUSD",
-                                            [FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "",
+                                            [FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "BTC,TUSD,BNB,USDT",
                                             [FromForm(Name = "cancel-open-orders-on-start")] bool cancelOpenOrdersOnStart = true,
                                             [FromForm(Name = "assume-no-open-position")] bool assumeNoOpenPositionOnStart = true,
                                             [FromForm(Name = "close-open-position-on-start")] bool closeOpenPositionsOnStart = true,
@@ -421,35 +421,39 @@ public class ExecutionController : Controller
     }
 
     [HttpPost("algorithms/list")]
-    public ActionResult GetAllAlgorithms([FromForm(Name = "admin-password")] string? adminPassword)
+    public ActionResult GetAllAlgorithms([FromServices] Core core,
+                                         [FromServices] IAdminService adminService,
+                                         [FromForm(Name = "admin-password")] string? adminPassword)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
+        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         var ids = core.List();
         return Ok(ids);
     }
 
     [HttpDelete("algorithms/stop")]
-    public async Task<ActionResult> StopAlgorithm([FromForm(Name = "admin-password")] string? adminPassword,
+    public async Task<ActionResult> StopAlgorithm([FromServices] Core core,
+                                                  [FromServices] IAdminService adminService,
+                                                  [FromForm(Name = "admin-password")] string? adminPassword,
                                                   [FromQuery(Name = "algo-batch-id")] long algoBatchId)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
+        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
         await core.StopAlgorithm(algoBatchId);
         return Ok();
     }
 
     [HttpPost("algorithms/stop-all")]
-    public async Task<ActionResult> StopAllAlgorithms([FromForm(Name = "admin-password")] string? adminPassword)
+    public async Task<ActionResult> StopAllAlgorithms([FromServices] IComponentContext container,
+                                                      [FromServices] IAdminService adminService,
+                                                      [FromForm(Name = "admin-password")] string? adminPassword)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!TradeLogicCore.Dependencies.IsRegistered) return BadRequest("Error: core is not initialized.");
+        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var core = TradeLogicCore.Dependencies.ComponentContext.Resolve<Core>();
+        var core = container.Resolve<Core>();
         await core.StopAllAlgorithms();
         return Ok();
     }

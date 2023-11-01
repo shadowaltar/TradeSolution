@@ -39,8 +39,9 @@ public class ApplicationContext
     public IReadOnlyList<string> GlobalCurrencyFilter => _globalCurrencyFilter;
     public bool HasGlobalCurrencyFilter => _globalCurrencyFilter.Count != 0;
 
-    public ApplicationContext(IStorage storage)
+    public ApplicationContext(IComponentContext container, IStorage storage)
     {
+        _container = container;
         Storage = storage;
         AlgoBatchId = IdGenerators.Get<AlgoBatch>().NewTimeBasedId;
     }
@@ -93,13 +94,11 @@ public class ApplicationContext
         private set => _brokerId = value;
     }
 
-    public void Initialize(IComponentContext container, EnvironmentType environment, ExchangeType exchange, BrokerType broker)
+    public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
         if (environment is EnvironmentType.Unknown) throw Exceptions.EnumUnknown(nameof(environment));
         if (exchange is ExchangeType.Unknown) throw Exceptions.EnumUnknown(nameof(exchange));
         if (broker is BrokerType.Unknown) throw Exceptions.EnumUnknown(nameof(broker));
-
-        _container = container;
 
         IsInitialized = true;
         IsExternalProhibited = Dns.GetHostName().Contains("PAG");

@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -32,7 +33,8 @@ public class AdminController : Controller
     /// <param name="exchange"></param>
     /// <returns></returns>
     [HttpPost("login")]
-    public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IAdminService adminService,
+    public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IComponentContext container,
+                                                           [FromServices] IAdminService adminService,
                                                            [FromForm(Name = "admin-password")] string adminPassword,
                                                            [FromForm(Name = "user-password")] string password,
                                                            [FromQuery(Name = "user")] string userName,
@@ -45,7 +47,8 @@ public class AdminController : Controller
         if (ControllerValidator.IsUnknown(exchange, out br)) return br;
 
         var broker = ExternalNames.Convert(exchange);
-        adminService.Initialize(environment, exchange, broker);
+        var context = container.Resolve<Context>();
+        context.Initialize(environment, exchange, broker);
 
         var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
         return result != ResultCode.LoginUserAndAccountOk
