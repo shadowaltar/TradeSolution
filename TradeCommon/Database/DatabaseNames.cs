@@ -37,13 +37,16 @@ public static class DatabaseNames
     public const string FxPrice1hTable = "fx_prices_1h";
     public const string FxPrice1dTable = "fx_prices_1d";
 
-    public const string OpenOrderIdTable = "open_order_ids";
     public const string StockOrderTable = "stock_orders";
     public const string StockTradeTable = "stock_trades";
     public const string StockPositionTable = "stock_positions";
+    public const string StockOrderStateTable = "stock_order_states";
+    public const string StockAssetStateTable = "stock_asset_states";
     public const string FxOrderTable = "fx_orders";
     public const string FxTradeTable = "fx_trades";
     public const string FxPositionTable = "fx_positions";
+    public const string FxOrderStateTable = "fx_order_states";
+    public const string FxAssetStateTable = "fx_asset_states";
     public const string ErrorStockOrderTable = "error_stock_orders";
     public const string ErrorStockTradeTable = "error_stock_trades";
     public const string ErrorStockPositionTable = "error_stock_positions";
@@ -63,6 +66,7 @@ public static class DatabaseNames
         var t = typeof(T);
         if (t == typeof(Trade)) return ExecutionData;
         if (t == typeof(Order)) return ExecutionData;
+        if (t == typeof(OrderState)) return ExecutionData;
         if (t == typeof(Position)) return ExecutionData;
 
         if (t == typeof(Account)) return StaticData;
@@ -110,6 +114,16 @@ public static class DatabaseNames
         return GetOrderTableName(type, isErrorTable);
     }
 
+    public static string? GetOrderStateTableName(SecurityType type)
+    {
+        return type switch
+        {
+            SecurityType.Equity => StockOrderStateTable,
+            SecurityType.Fx => FxOrderStateTable,
+            _ => null,
+        };
+    }
+
     public static string? GetTradeTableName(SecurityType type, bool isErrorTable = false)
     {
         return !isErrorTable
@@ -131,6 +145,16 @@ public static class DatabaseNames
     {
         var type = SecurityTypeConverter.Parse(securityType);
         return GetTradeTableName(type, isErrorTable);
+    }
+
+    public static string? GetAssetStateTableName(SecurityType type)
+    {
+        return type switch
+        {
+            SecurityType.Equity => StockPositionTable,
+            SecurityType.Fx => FxPositionTable,
+            _ => null
+        };
     }
 
     public static string? GetPositionTableName(SecurityType type, bool isErrorTable = false)
@@ -211,6 +235,10 @@ public static class DatabaseNames
         {
             specificTable = GetPositionTableName(securityType);
         }
+        else if (type == typeof(OrderState))
+        {
+            specificTable = GetOrderStateTableName(securityType);
+        }
 
         (string tableName, string databaseName) = GetTableAndDatabaseName<T>();
         specificTable = specificTable.IsBlank() ? tableName : specificTable;
@@ -219,21 +247,27 @@ public static class DatabaseNames
 
     public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(T entry) where T : class
     {
-        var type = typeof(T);
         var specificTable = "";
-        if (entry is Order order)
+        if (entry is SecurityRelatedEntry sre)
         {
-            specificTable = GetOrderTableName(order.Security?.Type ?? throw Exceptions.Invalid<Order>("Missing security in order."));
+            var secType = sre.Security?.SecurityType ?? throw Exceptions.Invalid<Order>($"Missing security in {entry.GetType().Name}.");
+            if (entry is Order)
+            {
+                specificTable = GetOrderTableName(secType);
+            }
+            else if (entry is Trade)
+            {
+                specificTable = GetTradeTableName(secType);
+            }
+            else if (entry is OrderState)
+            {
+                specificTable = GetOrderStateTableName(secType);
+            }
+            else if (entry is Position)
+            {
+                specificTable = GetPositionTableName(secType);
+            }
         }
-        else if (entry is Trade trade)
-        {
-            specificTable = GetTradeTableName(trade.Security?.Type ?? throw Exceptions.Invalid<Trade>("Missing security in trade."));
-        }
-        else if (entry is Position position)
-        {
-            specificTable = GetPositionTableName(position.Security?.Type ?? throw Exceptions.Invalid<Position>("Missing security in position."));
-        }
-
         (string tableName, string databaseName) = GetTableAndDatabaseName<T>();
         specificTable = specificTable.IsBlank() ? tableName : specificTable;
         return (specificTable, databaseName);

@@ -1,6 +1,7 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Trading;

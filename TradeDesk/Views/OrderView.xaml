@@ -1,0 +1,35 @@
+﻿<UserControl x:Class="TradeDesk.Views.OrderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TradeDesk.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+            <Button Content="Create" />
+            <Button Content="Cancel" />
+            <Button Content="Cancel All" />
+        </StackPanel>
+        <DataGrid Grid.Row="1" Margin="5"
+                  ItemsSource="{Binding Orders}"
+                  Selected="{Binding SelectedCommand}"
+                  AutoGenerateColumns="True"
+                  IsReadOnly="True"
+                  VerticalGridLinesBrush="Transparent"
+                  VerticalScrollBarVisibility="Visible"
+                  CanUserAddRows="False"
+                  CanUserReorderColumns="False"/>
+    </Grid>
+</UserControl>

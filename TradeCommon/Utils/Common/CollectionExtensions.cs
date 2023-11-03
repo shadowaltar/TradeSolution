@@ -306,6 +306,25 @@ public static class CollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Thread-safe version of <see cref="GetOrCreate{T, Tv}(IDictionary{T, Tv}, T)"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
+    public static Tv ThreadSafeGetOrCreate<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
+          where Tv : new()
+    {
+        object lockObject = @lock ?? dictionary;
+        lock (lockObject)
+        {
+            return dictionary.GetOrCreate(key);
+        }
+    }
+
     public static bool ThreadSafeContains<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
     {
         object lockObject = @lock ?? dictionary;
@@ -366,7 +385,7 @@ public static class CollectionExtensions
 
     /// <summary>
     /// Checks if the dictionary contains a key and returns true if yes.
-    /// Returns false if it does not contain the key, and the value will be set into it.
+    /// Returns false if it does not contain the key, and the value will be list into it.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="Tv"></typeparam>
@@ -434,6 +453,15 @@ public static class CollectionExtensions
         }
     }
 
+    public static void ThreadSafeAdd<T>(this List<T> list, T value, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock ?? list;
+        lock (lockObject)
+        {
+            list.Add(value);
+        }
+    }
+
     public static bool ThreadSafeAdd<T>(this HashSet<T> set, T value, object? @lock = null) where T : notnull
     {
         object lockObject = @lock ?? set;
@@ -453,8 +481,8 @@ public static class CollectionExtensions
     }
 
     /// <summary>
-    /// [Thread-safe] check if set contains given value. If yes returns true,
-    /// otherwise returns false and also add the value into the set.
+    /// [Thread-safe] check if list contains given value. If yes returns true,
+    /// otherwise returns false and also add the value into the list.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <param name="set"></param>

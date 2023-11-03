@@ -26,10 +26,9 @@ public class OrderService : IOrderService, IDisposable
     private readonly Dictionary<long, Order> _cancelledOrders = new(); // all cancelled, expired orders
     private readonly Dictionary<long, Order> _errorOrders = new(); // all error, rejected orders
     private readonly Dictionary<long, Order> _operationalOrders = new(); // orders which should not be considered affecting any positions
+    private readonly Dictionary<long, List<OrderState>> _orderStates = new(); // full states for all orders
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
-
-    public bool IsFakeOrderSupported => _execution.IsFakeOrderSupported;
 
     public event Action<Order>? AfterOrderSent;
     public event Action<Order>? OrderCancelled;
@@ -135,7 +134,7 @@ public class OrderService : IOrderService, IDisposable
             : _openOrders.ThreadSafeValues().Where(o => o.SecurityId == security.Id).ToList();
     }
 
-    public async Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false)
+    public async Task<ExternalQueryState> SendOrder(Order order)
     {
         // this new order's id may or may not be used by external
         // eg. binance uses it
@@ -146,52 +145,39 @@ public class OrderService : IOrderService, IDisposable
 
         _securityService.Fix(order);
 
-        if (isFakeOrder && _execution is ISupportFakeOrder fakeOrderEndPoint)
-        {
-            return await fakeOrderEndPoint.SendFakeOrder(order);
-        }
-        else if (isFakeOrder)
-        {
-            var message = "The external end point does not support fake order.";
-            _log.Warn(message + " Order will not be sent: " + order);
-            return ExternalQueryStates.InvalidOrder("", "", message);
-        }
-        else
-        {
-            // persistence probably happens twice: one is before send (status = Sending)
-            // the other is if order is accepted by external execution logic
-            // and its new status (like Live / Filled) piggy-backed in the response
-            // or the order failed to be sent, status = Failed.
-            _orders.ThreadSafeSet(order.Id, order);
-            _persistence.Insert(order);
+        // persistence probably happens twice: one is before send (status = Sending)
+        // the other is if order is accepted by external execution logic
+        // and its new status (like Live / Filled) piggy-backed in the response
+        // or the order failed to be sent, status = Failed.
+        _orders.ThreadSafeSet(order.Id, order);
+        _persistence.Insert(order);
 
-            var isOperational = order.Action == OrderActionType.Operational;
-            if (isOperational)
-                _operationalOrders.ThreadSafeSet(order.Id, order);
-            var action = order.Action;
-            var state = await _execution.SendOrder(order);
-            if (state.ResultCode == ResultCode.SendOrderOk)
-            {
-                order = state.Get<Order>()!;
-                Assertion.Shall(order.ExternalOrderId > 0);
-                _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+        var isOperational = order.Action == OrderActionType.Operational;
+        if (isOperational)
+            _operationalOrders.ThreadSafeSet(order.Id, order);
+        var action = order.Action;
+        var state = await _execution.SendOrder(order);
+        if (state.ResultCode == ResultCode.SendOrderOk)
+        {
+            order = state.Get<Order>()!;
+            Assertion.Shall(order.ExternalOrderId > 0);
+            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
 
-                if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
-                    _openOrders.ThreadSafeSet(order.Id, order);
-            }
-            else if (state.ResultCode != ResultCode.SendOrderOk)
-            {
-                order.Status = OrderStatus.Failed;
-                order.UpdateTime = DateTime.UtcNow;
-                order.Comment += " | error code: " + state.ResultCode;
-
-                _orders.ThreadSafeRemove(order.Id);
-                _errorOrders.ThreadSafeSet(order.Id, order);
-            }
-            order.Action = action;
-            _persistence.Insert(order);
-            return state;
+            if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
+                _openOrders.ThreadSafeSet(order.Id, order);
         }
+        else if (state.ResultCode != ResultCode.SendOrderOk)
+        {
+            order.Status = OrderStatus.Failed;
+            order.UpdateTime = DateTime.UtcNow;
+            order.Comment += " | error code: " + state.ResultCode;
+
+            _orders.ThreadSafeRemove(order.Id);
+            _errorOrders.ThreadSafeSet(order.Id, order);
+        }
+        order.Action = action;
+        _persistence.Insert(order);
+        return state;
     }
 
     public bool IsOperational(long orderId)
@@ -418,20 +404,26 @@ public class OrderService : IOrderService, IDisposable
         var eoid = order.ExternalOrderId;
         var oid = order.Id;
 
-        var receivedOnce = false;
-        // already cached the order in SENDING state
-        if (!_orders.ThreadSafeTryGet(oid, out var existingOrder) && !_ordersByExternalId.ThreadSafeTryGet(eoid, out existingOrder))
+        if (_orders.ThreadSafeTryGet(oid, out var existingOrder) || _ordersByExternalId.ThreadSafeTryGet(eoid, out existingOrder))
         {
-            // probably an order which was not saved in database due to program crash, and being cancelled during startup
-            _log.Warn("Received an order which was not cached.");
-
-            await FixOrderIdByExternalId(order);
-        }
-        else
-        {
+            // already cached the order in SENDING state
+            if (order.FilledQuantity < existingOrder.FilledQuantity)
+            {
+                // must ignore this out of order piece of info
+                _log.Warn("Received an order which filled quantity is smaller than the one cached, id: " + order.Id);
+                return;
+            }
+            if (order.UpdateTime < existingOrder.UpdateTime)
+            {
+                // must ignore this out of order piece of info
+                _log.Warn("Received an order which update time is smaller than the one cached, id: " + order.Id);
+                return;
+            }
             if (order.Status == existingOrder.Status && order.FilledQuantity == existingOrder.FilledQuantity)
             {
-                receivedOnce = true;
+                // can ignore this duplicated piece of info
+                _log.Warn("Received an order which has the same status and filled quantity, id: " + order.Id);
+                return;
             }
 
             order.Id = existingOrder.Id;
@@ -463,9 +455,15 @@ public class OrderService : IOrderService, IDisposable
                     _log.Debug($"Order status is changed from {existingOrder.Status} to {order.Status}");
             }
         }
+        else
+        {
+            // probably an order which was not saved in database due to program crash, and being cancelled during startup
+            _log.Warn("Received an order which was not cached.");
+
+            await FixOrderIdByExternalId(order);
+        }
 
         _orders.ThreadSafeSet(order.Id, order);
-
         switch (order.Status)
         {
             case OrderStatus.Live or OrderStatus.PartialFilled:
@@ -478,9 +476,14 @@ public class OrderService : IOrderService, IDisposable
         if (order.Status.IsFinished())
             _openOrders.ThreadSafeRemove(order.Id);
 
-        _securityService.Fix(order);
         _ordersByExternalId.ThreadSafeSet(eoid, order);
         _persistence.Insert(order);
+
+        // cache and store the state
+        var state = OrderState.From(order);
+        var states = _orderStates.ThreadSafeGetOrCreate(state.OrderId);
+        states.ThreadSafeAdd(state);
+        _persistence.Insert(state);
 
         OrderProcessed?.Invoke(order);
     }

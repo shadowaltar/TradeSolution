@@ -557,12 +557,16 @@ public class PortfolioService : IPortfolioService, IDisposable
 
             asset.AccountId = account.Id;
             asset.UpdateTime = DateTime.UtcNow;
+            asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
             if (existingAsset != null)
             {
                 existingAsset.Quantity = asset.Quantity;
-                asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
             }
         }
         _persistence.Insert(assets, isUpsert: true);
+        foreach (var asset in assets)
+        {
+            _persistence.Insert(asset, DatabaseNames.GetAssetStateTableName(asset.Security.SecurityType), isUpsert: false);
+        }
     }
 }

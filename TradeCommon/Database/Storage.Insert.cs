@@ -53,6 +53,10 @@ public partial class Storage
         {
             count = await Insert<AlgoBatch>(task);
         }
+        else if (task.Type == typeof(OrderState))
+        {
+            count = await Insert<OrderState>(task);
+        }
         else
             throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
         return count;
