@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
+    <ProjectReference Include="..\TradeLogicCore\TradeLogicCore.csproj" />
   </ItemGroup>
 
 </Project>

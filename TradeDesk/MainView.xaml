@@ -3,15 +3,44 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:TradeDesk"
+        xmlns:local="clr-namespace:TradeDesk" xmlns:views="clr-namespace:TradeDesk.Views"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+        <TabControl Grid.Row="0">
+            <TabItem Header="Open Orders">
+                <views:OrderView/>
+            </TabItem>
+            <TabItem Header="Order States">
+                <views:OrderStateView/>
+            </TabItem>
+            <TabItem Header="Error Orders">
+                <views:OrderView/>
+            </TabItem>
+            <TabItem Header="Cancelled Orders">
+                <views:OrderView/>
+            </TabItem>
+        </TabControl>
+        <TabControl Grid.Row="1">
+            <TabItem Header="Trades">
+                <views:TradeView/>
+            </TabItem>
+        </TabControl>
+        <TabControl Grid.Row="2">
+            <TabItem Header="Assets">
+                <views:AssetView/>
+            </TabItem>
+            <TabItem Header="Asset States">
+                <views:AssetStateView/>
+            </TabItem>
+            <TabItem Header="Open Positions">
+                <views:PositionView/>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
