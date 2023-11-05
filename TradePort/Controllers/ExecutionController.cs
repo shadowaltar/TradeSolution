@@ -38,7 +38,6 @@ public class ExecutionController : Controller
     /// <param name="price">Price of order. If Market order this is ignored; otherwise it must be > 0.</param>
     /// <param name="quantity">Quantity of order. Must be > 0.</param>
     /// <param name="stopLoss">Stop loss price of order. Must be > 0.</param>
-    /// <param name="isFakeOrder">Send a fake order if true.</param>
     /// <returns></returns>
     [HttpPost("orders/send")]
     public async Task<ActionResult> SendOrder([FromServices] ISecurityService securityService,
@@ -52,8 +51,7 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "order-type")] OrderType orderType = OrderType.Limit,
                                               [FromQuery(Name = "price")] decimal price = 0,
                                               [FromQuery(Name = "quantity")] decimal quantity = 0,
-                                              [FromQuery(Name = "stop-loss")] decimal stopLoss = 0.002m,
-                                              [FromQuery(Name = "fake")] bool isFakeOrder = true)
+                                              [FromQuery(Name = "stop-loss")] decimal stopLoss = 0.002m)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
@@ -84,7 +82,7 @@ public class ExecutionController : Controller
             return BadRequest("Invalid order price or quantity.");
 
         // as a manual order, no need to go through algorithm position sizing rules
-        await orderService.SendOrder(order, isFakeOrder);
+        await orderService.SendOrder(order);
         return Ok(order);
     }
 
@@ -265,7 +263,7 @@ public class ExecutionController : Controller
                 break;
         }
         var batchId = await core.Run(ep, ap, algorithm);
-        return Ok(batchId);
+        return Ok(batchId.ToString());
     }
 
     [HttpPost("orders/list")]

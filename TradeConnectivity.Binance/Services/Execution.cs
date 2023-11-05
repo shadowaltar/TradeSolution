@@ -24,7 +24,7 @@ namespace TradeConnectivity.Binance.Services;
 /// SIGNED mark: must provide both API Key and Signature (Secret Key);
 /// in Binance doc they are also marked as TRADE / USER_DATA / MARGIN.
 /// </summary>
-public class Execution : IExternalExecutionManagement, ISupportFakeOrder
+public class Execution : IExternalExecutionManagement
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalConnectivityManagement _connectivity;
@@ -48,8 +48,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
 
     private string? _listenKey;
     private Timer? _listenKeyTimer;
-
-    public bool IsFakeOrderSupported => true;
 
     public event OrderPlacedCallback? OrderPlaced;
     public event OrderModifiedCallback? OrderModified;
@@ -85,17 +83,6 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
     public async Task<ExternalQueryState> SendOrder(Order order)
     {
         var url = $"{_connectivity.RootUrl}/api/v3/order";
-        return await SendOrder(url, order);
-    }
-
-    /// <summary>
-    /// Send an order to Binance's test order endpoint [SIGNED].
-    /// </summary>
-    /// <param name="order"></param>
-    /// <returns></returns>
-    public async Task<ExternalQueryState> SendFakeOrder(Order order)
-    {
-        var url = $"{_connectivity.RootUrl}/api/v3/order/test";
         return await SendOrder(url, order);
     }
 
@@ -998,7 +985,7 @@ public class Execution : IExternalExecutionManagement, ISupportFakeOrder
                         ExternalCreateTime = createTime,
                         ExternalUpdateTime = updateTime, // the transaction time which should also be order's update time
                         ExternalOrderId = externalOrderId,
-                        UpdateTime = DateTime.UtcNow, // if no user changes, the update time should be the same as external update time
+                        UpdateTime = updateTime, // if no user changes, the update time should be the same as external update time
                         FilledQuantity = cumulativeFilledQuantity,
                         Status = OrderStatusConverter.ParseBinance(status),
                         Type = orderType,

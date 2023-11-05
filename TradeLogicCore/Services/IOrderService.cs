@@ -7,8 +7,6 @@ namespace TradeLogicCore.Services;
 
 public interface IOrderService
 {
-    bool IsFakeOrderSupported { get; }
-
     /// <summary>
     /// Invoked when an order is successfully created.
     /// </summary>
@@ -122,8 +120,7 @@ public interface IOrderService
     /// The order will also be stored after sent.
     /// </summary>
     /// <param name="order"></param>
-    /// <param name="isFakeOrder"></param>
-    Task<ExternalQueryState> SendOrder(Order order, bool isFakeOrder = false);
+    Task<ExternalQueryState> SendOrder(Order order);
 
     /// <summary>
     /// Cancel an order.

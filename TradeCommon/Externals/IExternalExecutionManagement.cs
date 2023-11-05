@@ -6,8 +6,6 @@ using static TradeCommon.Utils.Delegates;
 namespace TradeCommon.Externals;
 public interface IExternalExecutionManagement
 {
-    bool IsFakeOrderSupported { get; }
-
     event OrderPlacedCallback? OrderPlaced;
     event OrderModifiedCallback? OrderModified;
     event OrderCancelledCallback? OrderCancelled;
