@@ -6,7 +6,4 @@ namespace TradeCommon.Algorithms;
 public record AlgorithmParameters(bool IsBackTesting,
                                   IntervalType Interval,
                                   List<Security> SecurityPool,
-                                  AlgoEffectiveTimeRange TimeRange)
-{
-    public bool ShouldCloseOpenPositionsWhenHalted { get; set; } = true;
-}
+                                  AlgoEffectiveTimeRange TimeRange);

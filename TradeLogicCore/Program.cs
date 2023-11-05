@@ -47,7 +47,6 @@ public class Program
     private static string _accountName = "spot";
     private static string _accountId = "1688996631782681271";
     private static string _accountType = "spot";
-    private static readonly EnvironmentType _environment = EnvironmentType.Uat;
     private static BrokerType _broker = BrokerType.Binance;
     private static ExchangeType _exchange = ExchangeType.Binance;
 
@@ -60,7 +59,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Uat;
+        var environment = EnvironmentType.Prod;
 
         if (environment == EnvironmentType.Uat)
         {
@@ -75,17 +74,17 @@ public class Program
         }
         else if (environment == EnvironmentType.Prod)
         {
-            _userName = "test";
-            _password = "testtest";
-            _email = "1688996631782681271@testnet.binance.vision";
-            _accountName = "spot";
+            _userName = "U0";
+            _password = "unicorn";
+            _email = "special.trading.unicorn@gmail.com";
+            _accountName = "A0";
             _accountType = "spot";
-            _accountId = "1688996631782681271";
+            _accountId = "764565388";
             _broker = BrokerType.Binance;
             _exchange = ExchangeType.Binance;
         }
 
-        await RunMacMimicWebService();
+        await RunMacMimicWebService(environment);
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
@@ -128,7 +127,7 @@ public class Program
         var now = DateTime.UtcNow;
         var user = new User
         {
-            Name = _userName,
+            Name = _userName.ToLowerInvariant(),
             Email = _email,
             CreateTime = now,
             UpdateTime = now,
@@ -143,7 +142,7 @@ public class Program
         var account = new Account
         {
             OwnerId = user.Id,
-            Name = _accountName,
+            Name = _accountName.ToLowerInvariant(),
             Type = _accountType,
             SubType = "",
             Environment = environment,
@@ -156,9 +155,11 @@ public class Program
         await storage.InsertOne(account, true);
         account = await storage.ReadAccount(account.Name);
         user.Accounts.Add(account);
+
+        Environment.Exit(0);
     }
 
-    private static async Task RunMacMimicWebService()
+    private static async Task RunMacMimicWebService(EnvironmentType environment)
     {
 
         static void OnStorageSuccess(object entry, string method)
@@ -168,9 +169,7 @@ public class Program
         static void OnStorageFailed(object entry, Exception e, string method)
         {
         }
-        // mimic set env + login
 
-        var environment = _environment;
         var userName = _userName;
         var accountName = _accountName;
         var accountType = _accountType;
@@ -204,8 +203,7 @@ public class Program
         storage.Success += OnStorageSuccess;
         storage.Failed += OnStorageFailed;
 
-        var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
-        var result = await Login(services, userName, password, email, accountName, accountType, context.Environment, security);
+        var result = await Login(services, userName, password, email, accountName, accountType, context.Environment);
         if (result != ResultCode.LoginUserAndAccountOk)
         {
             _log.Error("Login user / account failed: " + result);
@@ -230,6 +228,7 @@ public class Program
             services.Portfolio.Update(await services.Portfolio.GetStorageAssets());
         }
 
+        var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var ep = new EngineParameters(new List<string> { "USDT" }, new List<string> { "BTC", "USDT" }, true, true, true, true, true);
         var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
 
@@ -253,7 +252,7 @@ public class Program
         await core.StopAlgorithm(algoBatchId);
     }
 
-    private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment, Security security)
+    private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment)
     {
         var result = await services.Admin.Login(userName, password, accountName, services.Context.Environment);
         if (result == ResultCode.LoginUserAndAccountOk)
@@ -266,12 +265,12 @@ public class Program
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
             {
-                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                return await Login(services, userName, password, email, accountName, accountType, environment);
             }
             case ResultCode.GetAccountFailed:
             {
                 _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                return await Login(services, userName, password, email, accountName, accountType, environment, security);
+                return await Login(services, userName, password, email, accountName, accountType, environment);
             }
             default:
                 return result;
@@ -373,7 +372,7 @@ public class Program
         }
     }
 
-    private static async Task NewOrderDemo()
+    private static async Task NewOrderDemo(EnvironmentType environment)
     {
         var engine = Dependencies.ComponentContext.Resolve<Core>();
 
@@ -387,7 +386,7 @@ public class Program
         orderService.OrderCancelled += OnOrderCancelled;
         tradeService.NextTrades += OnNewTradesReceived;
 
-        var resultCode = await adminService.Login(_userName, _password, _accountName, _environment);
+        var resultCode = await adminService.Login(_userName, _password, _accountName, environment);
         if (resultCode != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("Login failed with code: " + resultCode);
 
         var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
@@ -410,7 +409,7 @@ public class Program
         };
         await Task.Run(async () =>
         {
-            await adminService.GetAccount(_accountName, _environment, false);
+            await adminService.GetAccount(_accountName, environment, false);
             await orderService.SendOrder(order);
         });
 
@@ -443,12 +442,12 @@ public class Program
         static void OnOrderCancelled(Order order) => _log.Info("Order cancelled: " + order);
     }
 
-    private static async Task RunRumiBackTestDemo()
+    private static async Task RunRumiBackTestDemo(EnvironmentType environment)
     {
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
-        await services.Admin.Login(_userName, _password, _accountName, _environment);
+        await services.Admin.Login(_userName, _password, _accountName, environment);
         var context = Dependencies.ComponentContext.Resolve<Context>();
 
         //var filter = "00001,00002,00005";
@@ -586,7 +585,7 @@ public class Program
         _log.Info(Printer.Print(summaryRows));
     }
 
-    private static async Task RunMACBackTestDemo()
+    private static async Task RunMACBackTestDemo(EnvironmentType environment)
     {
         List<string> headers = new List<string> {
             "StartAlgorithm",
@@ -607,7 +606,7 @@ public class Program
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
-        await services.Admin.Login(_userName, _password, _accountName, _environment);
+        await services.Admin.Login(_userName, _password, _accountName, environment);
         var context = Dependencies.ComponentContext.Resolve<Context>();
 
         var filter = "ETHUSDT";

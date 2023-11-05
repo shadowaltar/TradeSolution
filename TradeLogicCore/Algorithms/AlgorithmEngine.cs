@@ -321,9 +321,11 @@ public class AlgorithmEngine : IAlgorithmEngine
         var current = _currentEntriesBySecurityId.ThreadSafeGet(position.SecurityId)!;
         if (position.IsClosed)
         {
-            _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}");
             var initialQuoteAsset = _services.Portfolio.InitialPortfolio.GetAssetBySecurityId(position.Security.QuoteSecurity.Id);
             var currentQuoteAsset = _services.Portfolio.Portfolio.GetAssetBySecurityId(position.Security.QuoteSecurity.Id);
+
+            _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}, Notional:{initialQuoteAsset?.Quantity}=>{currentQuoteAsset?.Quantity}");
+
             Algorithm.AfterPositionClosed(current);
         }
         else
@@ -506,23 +508,23 @@ public class AlgorithmEngine : IAlgorithmEngine
         // try to open or close long or short
         if (await TryOpenLong(current, last, ohlcPrice, lastOhlcPrice))
         {
-            LogAlgoEntry(current, OrderActionType.AlgoOpen, Side.Buy);
+            LogAndSaveAlgoEntry(current, OrderActionType.AlgoOpen, Side.Buy);
         }
         else if (await TryCloseLong(current, ohlcPrice, _intervalType))
         {
-            LogAlgoEntry(current, OrderActionType.AlgoClose, Side.Sell);
+            LogAndSaveAlgoEntry(current, OrderActionType.AlgoClose, Side.Sell);
         }
         else if (await TryOpenShort(current, last, ohlcPrice, lastOhlcPrice))
         {
-            LogAlgoEntry(current, OrderActionType.AlgoOpen, Side.Sell);
+            LogAndSaveAlgoEntry(current, OrderActionType.AlgoOpen, Side.Sell);
         }
         else if (await TryCloseShort(current, ohlcPrice, _intervalType))
         {
-            LogAlgoEntry(current, OrderActionType.AlgoClose, Side.Buy);
+            LogAndSaveAlgoEntry(current, OrderActionType.AlgoClose, Side.Buy);
         }
         else
         {
-            LogAlgoEntry(current, null, null);
+            LogAndSaveAlgoEntry(current, null, null);
         }
         entries.Add(current);
 
@@ -532,12 +534,12 @@ public class AlgorithmEngine : IAlgorithmEngine
         _lastOhlcPricesBySecurityId.ThreadSafeSet(securityId, ohlcPrice);
     }
 
-    private void LogAlgoEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
+    private void LogAndSaveAlgoEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
     {
         if (actionType == null)
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
         else
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][{actionType}][{side}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][{actionType}][{side}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
     }
 
     private async Task ClosePositionIfNeeded()
@@ -724,7 +726,6 @@ public class AlgorithmEngine : IAlgorithmEngine
         }
         else
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][OpenLong]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
             await Algorithm.Open(current, last, price.C, enterSide, time);
         }
 
@@ -753,7 +754,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         }
         else
         {
-            _log.Info($"\n\tAE:  [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][OpenShort]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
+            _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][OpenShort]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(security)}}}");
             await Algorithm.Open(current, last, price.C, enterSide, time);
         }
 
@@ -802,22 +803,30 @@ public class AlgorithmEngine : IAlgorithmEngine
         return true;
     }
 
-    private async Task TryStopLoss(int securityId, Tick tick)
+    private async Task<bool> TryStopLoss(int securityId, Tick tick)
     {
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
         if (!Algorithm.ShallStopLoss(securityId, tick))
-            return;
+            return false;
 
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
+            var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{algoEntry?.SequenceId}][StopLoss]\n\t\tR:{position.Return:P4}");
+
             var state = await Algorithm.CloseByTickStopLoss(position);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
                 Algorithm.AfterStoppedLoss(algoEntry!, position.CloseSide);
             }
+            else
+            {
+                _log.Error($"STOP LOSS ORDER FAILURE! SecId: {securityId}");
+            }
+            return true;
         }
+        return false;
     }
 
     private async Task TryTakeProfit(int securityId, Tick tick)
@@ -830,10 +839,12 @@ public class AlgorithmEngine : IAlgorithmEngine
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
+            var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{algoEntry?.SequenceId}][TakeProfit]\n\t\tR:{position.Return:P4}");
+
             var state = await Algorithm.CloseByTickTakeProfit(position);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
                 Algorithm.AfterTookProfit(algoEntry!, position.CloseSide);
             }
         }

@@ -49,20 +49,6 @@ public class AdminService : IAdminService
         _connectivity = connectivity;
     }
 
-    public void Initialize()
-    {
-        if (_isInitialized) return;
-
-        var environment = Context.Environment;
-        _log.Info($"Initializing admin-service, Env:{environment}.");
-        _storage.SetEnvironment(environment);
-        _connectivity.SetEnvironment(environment);
-
-        _securityService.Initialize();
-        _tradeService.Initialize();
-        _isInitialized = true;
-    }
-
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
     {
         IsLoggedIn = false;
@@ -74,7 +60,13 @@ public class AdminService : IAdminService
 
         if (!_isInitialized)
         {
-            Initialize();
+            _storage.SetEnvironment(environment);
+            _connectivity.SetEnvironment(environment);
+
+            await _securityService.Initialize();
+            _tradeService.Initialize();
+
+            _isInitialized = true;
         }
 
         CurrentUser = null;

@@ -231,7 +231,7 @@ public class PortfolioService : IPortfolioService, IDisposable
         // fx only logic
         List<Asset> assetsToBeCleanedUp = !_context.HasGlobalCurrencyFilter
             ? assets
-            : assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.SecurityCode)).ToList();
+            : assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.Security)).ToList();
         if (assetsToBeCleanedUp.IsNullOrEmpty())
             return false;
 
@@ -239,9 +239,9 @@ public class PortfolioService : IPortfolioService, IDisposable
         var count = 0;
         foreach (var asset in assetsToBeCleanedUp)
         {
-            if (asset.SecurityCode == preferredQuoteCurrency) continue;
-            var oldQuoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => a.SecurityCode == preferredQuoteCurrency)?.Quantity ?? 0;
-            var currencyPair = _securityService.GetFxSecurity(asset.SecurityCode, preferredQuoteCurrency);
+            if (preferredQuoteCurrency.Equals(asset.Security)) continue;
+            var oldQuoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => preferredQuoteCurrency.Equals(a.Security))?.Quantity ?? 0;
+            var currencyPair = _securityService.GetFxSecurity(asset.SecurityCode, preferredQuoteCurrency.Code);
             if (currencyPair == null)
             {
                 _log.Warn($"Unable to clean up asset position for currency pair (base:{asset.SecurityCode}, quote:{preferredQuoteCurrency}).");
@@ -267,7 +267,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
                 if (r)
                 {
-                    var quoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => a.SecurityCode == preferredQuoteCurrency)?.Quantity ?? 0;
+                    var quoteCurrencyQuantity = Portfolio.GetAssets().FirstOrDefault(a => a.Security.Equals(preferredQuoteCurrency))?.Quantity ?? 0;
 
                     _log.Info($"Cleaned up asset {asset.SecurityCode} by selling {currencyPair.Code} with quantity {oldQuantity};" +
                         $" quote currency {preferredQuoteCurrency} quantity {oldQuoteCurrencyQuantity}->{quoteCurrencyQuantity}");

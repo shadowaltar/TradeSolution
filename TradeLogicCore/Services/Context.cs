@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
@@ -96,5 +97,54 @@ public class Context : ApplicationContext
         };
         Services.Persistence.Insert(algoBatch, isSynchronous: true);
         return algoBatch;
+    }
+
+
+    public bool SetPreferredQuoteCurrencies(List<string>? currencies)
+    {
+        _preferredQuoteCurrencies.Clear();
+        if (currencies.IsNullOrEmpty())
+        {
+            _log.Warn("No preferred quote currencies are set!");
+            return false;
+        }
+        foreach (var currency in currencies)
+        {
+            var security = Services.Security.GetSecurity(currency);
+            if (security != null)
+            {
+                _preferredQuoteCurrencies.Add(security);
+            }
+            else
+            {
+                _log.Warn($"Invalid preferred quote currency: {currency}; it will be ignored.");
+            }
+        }
+        _log.Info($"Set preferred assets: " + string.Join(", ", _preferredQuoteCurrencies.Select(s => s.Code + "/" + s.Id)));
+        return true;
+    }
+
+    public bool SetGlobalCurrencyFilter(List<string>? currencies)
+    {
+        _globalCurrencyFilter.Clear();
+        if (currencies.IsNullOrEmpty())
+        {
+            _log.Info("No global currency filter is set.");
+            return false;
+        }
+        foreach (var currency in currencies)
+        {
+            var security = Services.Security.GetSecurity(currency);
+            if (security != null)
+            {
+                _globalCurrencyFilter.Add(security);
+            }
+            else
+            {
+                _log.Warn($"Invalid global currency filter: {currency}; it will be ignored.");
+            }
+        }
+        _log.Info($"Set global currency filter: " + string.Join(", ", _globalCurrencyFilter.Select(s => s.Code + "/" + s.Id)));
+        return true;
     }
 }
