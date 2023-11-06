@@ -9,7 +9,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
-    <ProjectReference Include="..\TradeLogicCore\TradeLogicCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Views\NewOrderView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>

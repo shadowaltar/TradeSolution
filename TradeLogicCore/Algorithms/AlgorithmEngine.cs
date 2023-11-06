@@ -67,6 +67,8 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     public event Action? ReachedDesignatedEndTime;
 
+    public string Id => AlgoBatch.Id;
+
     public bool IsBackTesting { get; private set; } = true;
 
     public EngineParameters EngineParameters { get; private set; }

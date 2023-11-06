@@ -291,7 +291,7 @@ public class Program
     //        _log.Error("Security is not found.");
     //        return;
     //    }
-    //    var securityPool = new List<Security> { security };
+    //    var securityPool = new ListAlgoBatches<Security> { security };
     //    var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
     //    var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
     //    algorithm.Screening = screening;
@@ -622,8 +622,8 @@ public class Program
         var intervalTypes = new List<IntervalType> { IntervalType.OneHour };
         //var fast = 2;
         //var slow = 5;
-        //var stopLosses = new List<decimal> { 0.0002m, 0.00015m };
-        //var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
+        //var stopLosses = new ListAlgoBatches<decimal> { 0.0002m, 0.00015m };
+        //var intervalTypes = new ListAlgoBatches<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
 

@@ -84,6 +84,14 @@ WHERE
         return await SqlReader.ReadMany<Order>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$StartTime", start), ("$EndTime", end));
     }
 
+    public async Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end)
+    {
+        var sqlPart = SqlReader<OrderState>.GetSelectClause();
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(security.SecurityType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND CreateTime >= $StartTime AND UpdateTime <= $EndTime";
+        return await SqlReader.ReadMany<OrderState>(tableName, dbName, _environmentString, sql, ("$StartTime", start), ("$EndTime", end));
+    }
+
     public async Task<List<Order>> ReadOrders(Security security, List<long> ids)
     {
         var dbName = DatabaseNames.ExecutionData;

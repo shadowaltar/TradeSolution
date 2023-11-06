@@ -402,7 +402,7 @@ public class AdminController : Controller
                     resultTableNames.AddRange(await storage.CreatePositionTable(secType));
                     break;
                     //case DataType.TradeOrderPositionRelationship:
-                    //    results = new List<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
+                    //    results = new ListAlgoBatches<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
                     //    break;
             }
         }

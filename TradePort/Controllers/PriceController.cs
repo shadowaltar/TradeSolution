@@ -443,7 +443,7 @@ public class PriceController : Controller
     }
 
     /// <summary>
-    /// List the count of OHLC price entries within one day.
+    /// ListAlgoBatches the count of OHLC price entries within one day.
     /// Supports 1m, 1h, 1d.
     /// </summary>
     /// <param name="intervalStr"></param>

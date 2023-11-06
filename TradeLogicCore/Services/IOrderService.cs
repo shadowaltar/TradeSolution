@@ -113,6 +113,16 @@ public interface IOrderService
     Order? GetOrderByExternalId(long externalOrderId);
 
     /// <summary>
+    /// Get order states related to a security from a start date.
+    /// TODO: accountId is not supported yet.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <returns></returns>
+    Task<List<OrderState>> GetOrderStates(Security security, DateTime start, DateTime? end = null);
+
+    /// <summary>
     /// Send an order.
     /// Before sent it will be stored with <see cref="OrderStatus.Sending"/>.
     /// After sent, depending on the result, the state may contain <see cref="ResultCode.SendOrderOk"/>
@@ -133,6 +143,12 @@ public interface IOrderService
     /// Need to specify whether sync with external to get the most precise status of open orders.
     /// </summary>
     Task<bool> CancelAllOpenOrders(Security security, OrderActionType action, bool syncExternal);
+    
+    /// <summary>
+    /// Cancel all open orders immediately.
+    /// </summary>
+    /// <returns></returns>
+    Task<bool> CancelAllOpenOrders();
 
     /// <summary>
     /// Create an order without any validation.
@@ -154,10 +170,10 @@ public interface IOrderService
                             string comment = "manual",
                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
 
-    Task<bool> SendLongLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    Task<bool> SendLongMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    Task<bool> SendShortLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    Task<bool> SendShortMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    //Task<bool> SendLongLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    //Task<bool> SendLongMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    //Task<bool> SendShortLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
+    //Task<bool> SendShortMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
 
     /// <summary>
     /// Reset all caches in this service.
@@ -170,6 +186,7 @@ public interface IOrderService
     /// <param name="orders"></param>
     /// <param name="security"></param>
     void Update(ICollection<Order> orders, Security? security = null);
+    void Update(ICollection<OrderState> orderStates, Security? security = null);
 
     /// <summary>
     /// Clear cached orders which their positions are closed.

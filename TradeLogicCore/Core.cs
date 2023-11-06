@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
@@ -123,9 +124,9 @@ public class Core
         }
     }
 
-    public List<string> List()
+    public List<AlgoBatch> ListAlgoBatches()
     {
-        return _engines.Keys.Select(i => i.ToString()).ToList();
+        return _engines.Values.Select(e => e.AlgoBatch).ToList();
     }
 
     public async Task StopAllAlgorithms()

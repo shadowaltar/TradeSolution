@@ -68,17 +68,14 @@ public static class DatabaseNames
         if (t == typeof(Order)) return ExecutionData;
         if (t == typeof(OrderState)) return ExecutionData;
         if (t == typeof(Position)) return ExecutionData;
+        if (t == typeof(Asset)) return ExecutionData;
+        if (t == typeof(Asset)) return ExecutionData;
 
         if (t == typeof(Account)) return StaticData;
-        return t == typeof(Asset)
-            ? StaticData
-            : t == typeof(ExtendedOhlcPrice)
-            ? MarketData
-            : t == typeof(OhlcPrice)
-            ? MarketData
-            : t == typeof(Tick)
-            ? MarketData
-            : throw new InvalidOperationException("Unsupported Type to Database name mapping.");
+        if (t == typeof(Tick)) return MarketData;
+        if (t == typeof(OhlcPrice)) return MarketData;
+        if (t == typeof(ExtendedOhlcPrice)) return MarketData;
+        throw new InvalidOperationException("Unsupported Type to Database name mapping.");
     }
 
     public static string GetDefinitionTableName(SecurityType type)

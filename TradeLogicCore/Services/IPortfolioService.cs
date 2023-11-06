@@ -154,6 +154,8 @@ public interface IPortfolioService
 
     Task<List<Asset>> GetStorageAssets();
 
+    Task<List<Asset>> GetAssetStates(string[] codes, DateTime start);
+
     void Update(List<Asset> assets, bool isInitializing = false);
 
     void Update(List<Position> positions, bool isInitializing = false);

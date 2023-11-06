@@ -84,10 +84,10 @@ public class TradeService : ITradeService, IDisposable
         _portfolioService.Process(trade);
     }
 
-    //private void OnTradesReceived(List<Trade> trades, bool isSameSecurity)
+    //private void OnTradesReceived(ListAlgoBatches<Trade> trades, bool isSameSecurity)
     //{
     //    if (trades.IsNullOrEmpty()) return;
-    //    var newOnes = new List<Trade>();
+    //    var newOnes = new ListAlgoBatches<Trade>();
     //    foreach (var trade in trades)
     //    {
     //        InternalOnNextTrade(trade);
