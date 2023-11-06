@@ -22,9 +22,12 @@ public record OrderState : SecurityRelatedEntry
     [NotNull]
     public long OrderId { get; set; }
     [NotNull]
+    public int AccountId { get; set; }
+    [NotNull]
     public decimal FilledQuantity { get; set; }
     [NotNull]
     public OrderStatus Status { get; set; } = OrderStatus.Unknown;
+
     [NotNull]
     public DateTime Time { get; set; }
 
@@ -34,6 +37,7 @@ public record OrderState : SecurityRelatedEntry
         {
             Id = _orderStateIdGen.NewTimeBasedId,
             OrderId = order.Id,
+            AccountId = order.AccountId,
             FilledQuantity = order.FilledQuantity,
             Status = order.Status,
             Time = order.UpdateTime,

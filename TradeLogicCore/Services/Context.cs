@@ -78,13 +78,13 @@ public class Context : ApplicationContext
         return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
     }
 
-    public AlgoBatch SaveAlgoBatch()
+    public AlgoBatch CreateAlgoBatch(long id)
     {
         if (_algorithm == null || _algorithmEngine == null) throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-batch entry.");
 
         var algoBatch = new AlgoBatch
         {
-            Id = AlgoBatchId,
+            Id = id,
             AlgoId = _algorithm.Id,
             AlgoName = _algorithm.GetType().Name,
             AlgoVersionId = _algorithm.VersionId,
@@ -95,7 +95,6 @@ public class Context : ApplicationContext
             EngineParameters = _algorithmEngine.EngineParameters,
             StartTime = DateTime.UtcNow,
         };
-        Services.Persistence.Insert(algoBatch, isSynchronous: true);
         return algoBatch;
     }
 

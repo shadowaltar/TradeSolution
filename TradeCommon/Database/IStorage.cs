@@ -45,6 +45,7 @@ public interface IStorage
     Task<Account?> ReadAccount(string accountName);
     Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
     Task<List<Asset>> ReadAssets();
+    Task<List<AssetState>> ReadAssetStates(Security security, DateTime start);
     Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType);
     Task<List<FinancialStat>> ReadFinancialStats();
     Task<List<FinancialStat>> ReadFinancialStats(int secId);
@@ -52,6 +53,7 @@ public interface IStorage
     Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end);
     Task<List<Order>> ReadOrders(Security security, List<long> ids);
     Task<Order?> ReadOrderByExternalId(long externalOrderId);
+    Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
     IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
@@ -75,6 +77,8 @@ public interface IStorage
     Task<bool> CheckTableExists(string tableName, string database);
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
+
+    Task<int> Count<T>(string? tableNameOverride = null, string? whereClause = "") where T : class, new();
     Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new();
     Task<(bool, T)> TryReadScalar<T>(string sql, string database);
     Task<int> RunOne(string sql, string database);

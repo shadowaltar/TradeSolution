@@ -87,7 +87,7 @@ public record Portfolio
         }
     }
 
-    public void Add(Asset asset)
+    public void AddOrUpdate(Asset asset)
     {
         lock (_lock)
         {

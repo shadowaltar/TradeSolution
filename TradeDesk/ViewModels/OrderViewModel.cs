@@ -1,15 +1,18 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows.Input;
 using TradeCommon.Essentials.Trading;
+using TradeDesk.Services;
 using TradeDesk.Utils;
-using TradeLogicCore.Services;
+using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
 
-public class OrderViewModel
+public class OrderViewModel : AbstractViewModel
 {
-    private readonly IOrderService _orderService;
+    private bool _isOrderToolBarVisible;
+    private readonly Server _server;
+
+    public bool IsOrderToolBarVisible { get => _isOrderToolBarVisible; set => SetValue(ref _isOrderToolBarVisible, value); }
 
     public ObservableCollection<Order> Orders { get; } = new();
 
@@ -20,32 +23,38 @@ public class OrderViewModel
     public ICommand CancelCommand { get; }
     public ICommand CancelAllCommand { get; }
 
-    public OrderViewModel(IOrderService orderService)
+    public OrderViewModel(Server server)
     {
-        _orderService = orderService;
         SelectedCommand = new DelegateCommand(Select);
-        CreateCommand = new DelegateCommand(Create);
+        CreateCommand = new DelegateCommand(CreateOrder);
         CancelCommand = new DelegateCommand(Cancel);
         CancelAllCommand = new DelegateCommand(CancelAll);
+        _server = server;
     }
 
     private async void CancelAll()
     {
-        foreach (var order in _orderService.GetOpenOrders())
+        foreach (var order in await _server.GetOpenOrders())
         {
-            var result = await _orderService.CancelOrder(order);
+            var result = await _server.CancelOrder(order);
         }
     }
 
     private async void Cancel()
     {
         if (SelectedOrder == null) return;
-        var result = await _orderService.CancelOrder(SelectedOrder);
+        var result = await _server.CancelOrder(SelectedOrder);
     }
 
-    private void Create()
+    public void CreateOrder()
     {
-        
+        var view = new NewOrderView();
+        var vm = new NewOrderViewModel
+        {
+            Parent = this
+        };
+        view.DataContext = vm;
+        view.ShowDialog();
     }
 
     private void Select()

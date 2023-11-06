@@ -64,7 +64,7 @@ public class BackTestingController : Controller
     //    var initCash = 100000;
     //    var algo = new Rumi(fastParam, slowParam, rumiParam, stopLossRatio);
     //    var engine = new AlgorithmEngine<RumiVariables>(services, algo);
-    //    var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
+    //    var entries = await engine.BackTest(new ListAlgoBatches<Security> { security }, interval, start, end, initCash);
     //    return Ok(entries);
     //}
 
@@ -118,7 +118,7 @@ public class BackTestingController : Controller
 
     //    var codes = concatenatedCodes?.Split(',');
 
-    //    var securities = new List<Security>();
+    //    var securities = new ListAlgoBatches<Security>();
     //    if (codes.IsNullOrEmpty())
     //    {
     //        securities = await services.Security.GetSecurities(exchange, secType);
@@ -140,7 +140,7 @@ public class BackTestingController : Controller
     //    var slows = concatenatedSlowParam.Split(',').Use(i => int.TryParse(i, out var v) ? v : 0);
     //    var rumis = concatenatedRumiParam.Split(',').Use(i => int.TryParse(i, out var v) ? v : 0);
 
-    //    var zipFilePaths = new List<string>();
+    //    var zipFilePaths = new ListAlgoBatches<string>();
     //    await Parallel.ForEachAsync(fasts, async (f, t) =>
     //    {
     //        await Parallel.ForEachAsync(slows, async (s, t) =>
@@ -173,7 +173,7 @@ public class BackTestingController : Controller
     //}
 
     //private async Task<string> RunRumi(IServices services,
-    //                                   List<Security> securities,
+    //                                   ListAlgoBatches<Security> securities,
     //                                   int f,
     //                                   int s,
     //                                   int r,
@@ -189,12 +189,12 @@ public class BackTestingController : Controller
     //    var folder = Path.Combine(rootFolder, subFolder);
     //    var zipFilePath = Path.Combine(rootFolder, zipFileName);
     //    var summaryFilePath = Path.Combine(folder, $"!Summary-{f},{s},{r}-{now:yyyyMMdd-HHmmss}.csv");
-    //    var summaryRows = new List<List<object>>();
+    //    var summaryRows = new ListAlgoBatches<ListAlgoBatches<object>>();
     //    await Parallel.ForEachAsync(securities, async (security, t) =>
     //    {
     //        var algo = new Rumi(f, s, r, stopLossRatio);
     //        var engine = new AlgorithmEngine<RumiVariables>(services, algo);
-    //        var entries = await engine.BackTest(new List<Security> { security }, interval, start, end, initCash);
+    //        var entries = await engine.BackTest(new ListAlgoBatches<Security> { security }, interval, start, end, initCash);
     //        if (entries.IsNullOrEmpty())
     //            return;
     //        var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
@@ -202,7 +202,7 @@ public class BackTestingController : Controller
 
     //        Csv.Write(entries, filePath);
 
-    //        var result = new List<object>
+    //        var result = new ListAlgoBatches<object>
     //        {
     //            security.Code,
     //            security.Name,
@@ -219,7 +219,7 @@ public class BackTestingController : Controller
     //        summaryRows.Add(result);
     //    });
 
-    //    var headers = new List<string> {
+    //    var headers = new ListAlgoBatches<string> {
     //        "SecurityCode",
     //        "SecurityName",
     //        "Interval",

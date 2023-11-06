@@ -910,6 +910,7 @@ public class Execution : IExternalExecutionManagement
                     {
                         var asset = new Asset
                         {
+                            UpdateTime = accountUpdateTime,
                             SecurityCode = balanceObject.GetString("a"),
                             Quantity = balanceObject.GetDecimal("f"),
                             LockedQuantity = balanceObject.GetDecimal("l"),

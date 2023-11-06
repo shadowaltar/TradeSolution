@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace TradeDesk;
+namespace TradeDesk.ViewModels;
 /// <summary>
 /// Interaction logic for MainView.xaml
 /// </summary>

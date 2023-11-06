@@ -37,8 +37,8 @@ public class AdminController : Controller
                                                            [FromServices] IAdminService adminService,
                                                            [FromForm(Name = "admin-password")] string adminPassword,
                                                            [FromForm(Name = "user-password")] string password,
-                                                           [FromQuery(Name = "user")] string userName,
-                                                           [FromQuery(Name = "account-name")] string accountName,
+                                                           [FromQuery(Name = "user")] string userName = "test",
+                                                           [FromQuery(Name = "account-name")] string accountName = "spot",
                                                            [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                                            [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
     {
@@ -402,7 +402,7 @@ public class AdminController : Controller
                     resultTableNames.AddRange(await storage.CreatePositionTable(secType));
                     break;
                     //case DataType.TradeOrderPositionRelationship:
-                    //    results = new List<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
+                    //    results = new ListAlgoBatches<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
                     //    break;
             }
         }

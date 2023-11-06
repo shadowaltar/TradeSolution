@@ -59,7 +59,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Prod;
+        var environment = EnvironmentType.Uat;
 
         if (environment == EnvironmentType.Uat)
         {
@@ -96,19 +96,28 @@ public class Program
         var storage = new Storage(Dependencies.ComponentContext);
         storage.SetEnvironment(environment);
 
+        _log.Info("Changing Environment: " + environment);
+        if (environment == EnvironmentType.Prod)
+        {
+            Environment.Exit(1);
+        }
+
         await storage.CreateTable<Order>("stock_orders");
+        await storage.CreateTable<OrderState>("stock_order_states");
         await storage.CreateTable<Trade>("stock_trades");
         await storage.CreateTable<Position>("stock_positions");
         await storage.CreateTable<Order>("error_stock_orders");
         await storage.CreateTable<Trade>("error_stock_trades");
         await storage.CreateTable<Position>("error_stock_positions");
         await storage.CreateTable<Order>("fx_orders");
+        await storage.CreateTable<OrderState>("fx_order_states");
         await storage.CreateTable<Trade>("fx_trades");
         await storage.CreateTable<Position>("fx_positions");
         await storage.CreateTable<Order>("error_fx_orders");
         await storage.CreateTable<Trade>("error_fx_trades");
         await storage.CreateTable<Position>("error_fx_positions");
         await storage.CreateTable<Asset>();
+        await storage.CreateTable<AssetState>();
         await storage.CreateTable<AlgoEntry>();
         await storage.CreateTable<AlgoBatch>();
         await storage.CreateAccountTable();
@@ -188,7 +197,8 @@ public class Program
         var initialAvailableQuantity = 100;
 
 
-        //await ResetTables(environment);
+        await ResetTables(environment);
+
 
         var broker = ExternalNames.Convert(exchange);
         var context = Dependencies.Register(broker);
@@ -222,10 +232,12 @@ public class Program
             default:
                 return;
         }
+
+        // in case the environment is new, read asset data from external, store and cache
         if (!services.Portfolio.HasAsset)
         {
             await new Reconcilation(context).ReconcileAssets();
-            services.Portfolio.Update(await services.Portfolio.GetStorageAssets());
+            services.Portfolio.Update(await services.Portfolio.GetStorageAssets(), true);
         }
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
@@ -242,14 +254,14 @@ public class Program
         _log.Info("Execute algorithm with ap #1: " + ap);
         _log.Info("Execute algorithm with ap #2: " + algorithm);
 
-        var algoBatchId = await core.Run(ep, ap, algorithm);
+        var algoBatch = await core.Run(ep, ap, algorithm);
 
         while (true)
         {
             Thread.Sleep(5000);
         }
 
-        await core.StopAlgorithm(algoBatchId);
+        await core.StopAlgorithm(algoBatch.Id);
     }
 
     private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment)
@@ -291,7 +303,7 @@ public class Program
     //        _log.Error("Security is not found.");
     //        return;
     //    }
-    //    var securityPool = new List<Security> { security };
+    //    var securityPool = new ListAlgoBatches<Security> { security };
     //    var algorithm = new MovingAverageCrossing(3, 7, 0.0005m);
     //    var screening = new SingleSecurityLogic<MacVariables>(algorithm, security);
     //    algorithm.Screening = screening;
@@ -622,8 +634,8 @@ public class Program
         var intervalTypes = new List<IntervalType> { IntervalType.OneHour };
         //var fast = 2;
         //var slow = 5;
-        //var stopLosses = new List<decimal> { 0.0002m, 0.00015m };
-        //var intervalTypes = new List<IntervalType> { IntervalType.OneMinute };
+        //var stopLosses = new ListAlgoBatches<decimal> { 0.0002m, 0.00015m };
+        //var intervalTypes = new ListAlgoBatches<IntervalType> { IntervalType.OneMinute };
 
         var summaryRows = new List<List<object>>();
 

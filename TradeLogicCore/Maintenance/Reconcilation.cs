@@ -199,6 +199,18 @@ public class Reconcilation
                 }
             }
 
+            // add the initial batch of asset states if it was empty
+            foreach (var order in externalResults)
+            {
+                var (table, _) = DatabaseNames.GetTableAndDatabaseName<OrderState>(order.Security.SecurityType);
+                var i = await _storage.Count<OrderState>(tableNameOverride: table, $"OrderId = {order.Id}");
+                if (i == 0)
+                {
+                    var state = OrderState.From(order);
+                    await _storage.InsertOne(state, false);
+                }
+            }
+
             _persistence.WaitAll();
         }
     }
@@ -397,6 +409,19 @@ public class Reconcilation
                 _log.Info($"{i} recent assets for account {_context.Account.Name} from external are different from which in internal system and are updated into database.");
             }
         }
+
+        // add the initial batch of asset states if it was empty
+        foreach (var asset in internalResults)
+        {
+            var i = await _storage.Count<AssetState>(whereClause: $"AssetId = {asset.Id}");
+            if (i == 0)
+            {
+                var state = AssetState.From(asset);
+                await _storage.InsertOne(state, false);
+            }
+        }
+
+        _persistence.WaitAll();
     }
 
     private async Task FixOutOfOrderTrades(Security security, int lookbackDays)

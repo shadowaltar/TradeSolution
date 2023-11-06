@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
@@ -52,7 +53,7 @@ public class Core
     /// <param name="algorithm"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task<long> Run(EngineParameters engineParameters, AlgorithmParameters algoParameters, Algorithm algorithm)
+    public async Task<AlgoBatch> Run(EngineParameters engineParameters, AlgorithmParameters algoParameters, Algorithm algorithm)
     {
         _log.Info($"Starting algorithm: {algorithm.GetType().Name}, Id [{algorithm.Id}], VerId [{algorithm.VersionId}]");
         var user = _services.Admin.CurrentUser;
@@ -78,17 +79,17 @@ public class Core
         await _reconciliation.ReconcileTrades(previousDay, algoParameters.SecurityPool);
         await _reconciliation.ReconcilePositions(algoParameters.SecurityPool);
 
-        var uniqueId = Context.AlgoBatchId;
+        var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
+        _engines[engine.AlgoBatchId] = engine;
+        var algoBatch = engine.AlgoBatch;
         _ = Task.Factory.StartNew(async () =>
         {
-            var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
-            _engines[uniqueId] = engine;
             await engine.Run(algoParameters); // this is a blocking call
 
         }, TaskCreationOptions.LongRunning);
 
         // the engine execution is a blocking call
-        return uniqueId;
+        return algoBatch;
     }
 
     /// <summary>
@@ -123,9 +124,9 @@ public class Core
         }
     }
 
-    public List<string> List()
+    public List<AlgoBatch> ListAlgoBatches()
     {
-        return _engines.Keys.Select(i => i.ToString()).ToList();
+        return _engines.Values.Select(e => e.AlgoBatch).ToList();
     }
 
     public async Task StopAllAlgorithms()

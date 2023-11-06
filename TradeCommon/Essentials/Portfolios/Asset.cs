@@ -5,14 +5,11 @@ using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
 
-/// <summary>
-/// An asset entry in an account (one account may hold multiple asset entries).
-/// </summary>
-
 [Storage("assets", DatabaseNames.ExecutionData)]
 [Unique(nameof(Id))]
+[Unique(nameof(SecurityId), nameof(AccountId))]
 [Index(nameof(SecurityId))]
-[Index(nameof(CreateTime))]
+[Index(nameof(UpdateTime))]
 public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
 {
     /// <summary>
@@ -27,6 +24,7 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
     public int AccountId { get; set; } = 0;
 
     public DateTime CreateTime { get; set; }
+
     public DateTime UpdateTime { get; set; }
 
     /// <summary>

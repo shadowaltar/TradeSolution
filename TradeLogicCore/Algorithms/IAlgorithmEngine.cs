@@ -13,6 +13,16 @@ public interface IAlgorithmEngine
 {
     event Action ReachedDesignatedEndTime;
 
+    long AlgoBatchId { get; }
+
+    AlgorithmParameters? AlgoParameters { get; }
+
+    EngineParameters? EngineParameters { get; }
+
+    User? User { get; }
+
+    Account? Account { get; }
+
     IPositionSizingAlgoLogic? Sizing { get; }
 
     IEnterPositionAlgoLogic? EnterLogic { get; }
@@ -20,10 +30,6 @@ public interface IAlgorithmEngine
     IExitPositionAlgoLogic? ExitLogic { get; }
 
     ISecurityScreeningAlgoLogic? Screening { get; }
-
-    User? User { get; }
-
-    Account? Account { get; }
 
     /// <summary>
     /// Total signal count being processed. It is usually the count of prices / ticks.
@@ -43,10 +49,6 @@ public interface IAlgorithmEngine
     IntervalType Interval { get; }
 
     AlgoStopTimeType WhenToStopOrHalt { get; }
-
-    AlgorithmParameters? AlgoParameters { get; }
-
-    EngineParameters? EngineParameters { get; }
 
     Task<int> Run(AlgorithmParameters parameters);
 

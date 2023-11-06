@@ -23,7 +23,11 @@ public class ApplicationContext
     private BrokerType _broker;
     private int _brokerId;
 
-    public long AlgoBatchId { get; }
+    /// <summary>
+    /// Gets / sets algo's batch Id.
+    /// Notice that this Id will be changed when any new algo engine is started.
+    /// </summary>
+    public long AlgoBatchId { get; set; }
 
     public bool IsExternalProhibited { get; private set; }
 
@@ -47,7 +51,6 @@ public class ApplicationContext
     {
         _container = container;
         Storage = storage;
-        AlgoBatchId = IdGenerators.Get<AlgoBatch>().NewTimeBasedId;
     }
 
     /// <summary>

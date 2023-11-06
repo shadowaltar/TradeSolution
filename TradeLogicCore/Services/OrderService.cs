@@ -1,5 +1,7 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
+using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -8,6 +10,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
+using static System.Collections.Specialized.BitVector32;
 
 namespace TradeLogicCore.Services;
 
@@ -134,6 +137,13 @@ public class OrderService : IOrderService, IDisposable
             : _openOrders.ThreadSafeValues().Where(o => o.SecurityId == security.Id).ToList();
     }
 
+    public async Task<List<OrderState>> GetOrderStates(Security security, DateTime start, DateTime? end = null)
+    {
+        var orderStates = await _storage.ReadOrderStates(security, start, end ?? DateTime.UtcNow);
+        Update(orderStates, security);
+        return orderStates;
+    }
+
     public async Task<ExternalQueryState> SendOrder(Order order)
     {
         // this new order's id may or may not be used by external
@@ -200,11 +210,7 @@ public class OrderService : IOrderService, IDisposable
             _log.Info($"Canceled order: " + externalOrder.Id);
 
             await FixOrderIdByExternalId(order);
-
-            _openOrders.ThreadSafeRemove(order.Id);
-            _cancelledOrders.ThreadSafeSet(order.Id, order);
-            _orders.ThreadSafeRemove(order.Id);
-            _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+            SyncCachedCancelledOrder(order);
             _persistence.Insert(order);
 
             return true;
@@ -257,6 +263,7 @@ public class OrderService : IOrderService, IDisposable
                 {
                     order.Action = action;
                     await FixOrderIdByExternalId(order);
+                    SyncCachedCancelledOrder(order);
                 }
                 _persistence.Insert(cancelledOrders);
             }
@@ -267,6 +274,52 @@ public class OrderService : IOrderService, IDisposable
             }
         }
         return true;
+    }
+
+    public async Task<bool> CancelAllOpenOrders()
+    {
+        var state0 = await _execution.GetOpenOrders();
+        if (state0.ResultCode != ResultCode.GetOrderOk)
+        {
+            _log.Error("Failed to query opened orders before cancellation.");
+            return false;
+        }
+        var openOrders = state0.Get<List<Order>>();
+        if (openOrders.IsNullOrEmpty())
+            return false;
+
+        _securityService.Fix(openOrders);
+        // orders from external has no internal id
+        var securities = openOrders.Select(o => o.Security).Distinct().ToList();
+        var isGood = true;
+        foreach (var security in securities)
+        {
+            try
+            {
+                var state1 = await _execution.CancelAllOrders(security);
+                var cancelled = state1.Get<List<Order>>();
+                if (state1.ResultCode == ResultCode.CancelOrderOk && !cancelled.IsNullOrEmpty())
+                {
+                    _log.Info($"Cancelled {cancelled.Count} open orders.");
+                    _persistence.Insert(cancelled);
+                    foreach (var o in cancelled)
+                    {
+                        SyncCachedCancelledOrder(o);
+                    }
+                }
+                else
+                {
+                    _log.Error($"Failed to cancel orders for {security.Code}! ResultCode: {state1.ResultCode}; description: {state1.Description}. Continue to cancel remaining securities if any.");
+                    isGood = false;
+                }
+            }
+            catch (Exception e)
+            {
+                _log.Error($"Failed to cancel orders for {security.Code}! Continue to cancel remaining securities if any.", e);
+                isGood = false;
+            }
+        }
+        return isGood;
     }
 
     private async Task FixOrderIdByExternalId(Order order)
@@ -343,54 +396,150 @@ public class OrderService : IOrderService, IDisposable
         return order;
     }
 
-    public async Task<bool> SendLongMarketOrder(string securityCode,
-                                                decimal quantity,
-                                                string comment = "",
-                                                TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    //public async Task<bool> SendLongMarketOrder(string securityCode,
+    //                                            decimal quantity,
+    //                                            string comment = "",
+    //                                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    //{
+    //    var security = _securityService.GetSecurity(securityCode);
+    //    if (security == null) return false;
+    //    var order = CreateManualOrder(security, 0, quantity, Side.Buy, OrderType.Market, comment, timeInForce);
+    //    var state = await SendOrder(order);
+    //    return state.ResultCode == ResultCode.SendOrderOk;
+    //}
+
+    //public async Task<bool> SendShortMarketOrder(string securityCode,
+    //                                             decimal quantity,
+    //                                             string comment = "",
+    //                                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    //{
+    //    var security = _securityService.GetSecurity(securityCode);
+    //    if (security == null) return false;
+    //    var order = CreateManualOrder(security, 0, quantity, Side.Sell, OrderType.Market, comment, timeInForce);
+    //    var state = await SendOrder(order);
+    //    return state.ResultCode == ResultCode.SendOrderOk;
+    //}
+
+    //public async Task<bool> SendLongLimitOrder(string securityCode,
+    //                                           decimal price,
+    //                                           decimal quantity,
+    //                                           string comment = "",
+    //                                           TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    //{
+    //    var security = _securityService.GetSecurity(securityCode);
+    //    if (security == null) return false;
+    //    var order = CreateManualOrder(security, price, quantity, Side.Buy, OrderType.Limit, comment, timeInForce);
+    //    var state = await SendOrder(order);
+    //    return state.ResultCode == ResultCode.SendOrderOk;
+    //}
+
+    //public async Task<bool> SendShortLimitOrder(string securityCode,
+    //                                            decimal price,
+    //                                            decimal quantity,
+    //                                            string comment = "",
+    //                                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    //{
+    //    var security = _securityService.GetSecurity(securityCode);
+    //    if (security == null) return false;
+    //    var order = CreateManualOrder(security, price, quantity, Side.Sell, OrderType.Limit, comment, timeInForce);
+    //    var state = await SendOrder(order);
+    //    return state.ResultCode == ResultCode.SendOrderOk;
+    //}
+
+    public void Reset()
     {
-        var security = _securityService.GetSecurity(securityCode);
-        if (security == null) return false;
-        var order = CreateManualOrder(security, 0, quantity, Side.Buy, OrderType.Market, comment, timeInForce);
-        var state = await SendOrder(order);
-        return state.ResultCode == ResultCode.SendOrderOk;
+        _errorOrders.Clear();
+        _cancelledOrders.Clear();
+        _openOrders.Clear();
+        _orders.Clear();
+        _ordersByExternalId.Clear();
     }
 
-    public async Task<bool> SendShortMarketOrder(string securityCode,
-                                                 decimal quantity,
-                                                 string comment = "",
-                                                 TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    public void Update(ICollection<Order> orders, Security? security = null)
     {
-        var security = _securityService.GetSecurity(securityCode);
-        if (security == null) return false;
-        var order = CreateManualOrder(security, 0, quantity, Side.Sell, OrderType.Market, comment, timeInForce);
-        var state = await SendOrder(order);
-        return state.ResultCode == ResultCode.SendOrderOk;
+        foreach (var order in orders)
+        {
+            if (order.Id <= 0)
+            {
+                // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
+                var sameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
+                order.Id = sameOrder != null ? sameOrder.Id : _orderIdGen.NewTimeBasedId;
+            }
+            order.AccountId = _context.AccountId;
+
+            _securityService.Fix(order, security);
+
+            if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
+            {
+                _openOrders.ThreadSafeSet(order.Id, order);
+            }
+            else if (order.Status == OrderStatus.Failed)
+            {
+                _errorOrders.ThreadSafeSet(order.Id, order);
+            }
+            else if (order.Status is OrderStatus.Cancelled or OrderStatus.PartialCancelled)
+            {
+                _cancelledOrders.ThreadSafeSet(order.Id, order);
+            }
+            _orders.ThreadSafeSet(order.Id, order);
+            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+        }
     }
 
-    public async Task<bool> SendLongLimitOrder(string securityCode,
-                                               decimal price,
-                                               decimal quantity,
-                                               string comment = "",
-                                               TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    public void Update(ICollection<OrderState> orderStates, Security? security = null)
     {
-        var security = _securityService.GetSecurity(securityCode);
-        if (security == null) return false;
-        var order = CreateManualOrder(security, price, quantity, Side.Buy, OrderType.Limit, comment, timeInForce);
-        var state = await SendOrder(order);
-        return state.ResultCode == ResultCode.SendOrderOk;
+        foreach (var orderState in orderStates)
+        {
+            _securityService.Fix(orderState, security);
+        }
     }
 
-    public async Task<bool> SendShortLimitOrder(string securityCode,
-                                                decimal price,
-                                                decimal quantity,
-                                                string comment = "",
-                                                TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
+    public void ClearCachedClosedPositionOrders(Position? position = null)
     {
-        var security = _securityService.GetSecurity(securityCode);
-        if (security == null) return false;
-        var order = CreateManualOrder(security, price, quantity, Side.Sell, OrderType.Limit, comment, timeInForce);
-        var state = await SendOrder(order);
-        return state.ResultCode == ResultCode.SendOrderOk;
+        if (_orders.IsNullOrEmpty()) return;
+
+        if (position != null && position.IsClosed)
+        {
+            lock (_orders)
+            {
+                var orders = _orders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
+                if (orders.IsNullOrEmpty()) return;
+
+                var security = orders[0].Security;
+                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, orders[0].CreateTime, DateTime.MaxValue));
+                var closedOrderIds = trades.Where(t => position.Id == t.PositionId).Select(t => t.OrderId);
+                Clear(closedOrderIds);
+            }
+        }
+        else if (position == null)
+        {
+            var start = _orders.Values.Min(o => o.UpdateTime);
+            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
+            var groupedOrders = _orders.Values.GroupBy(o => o.Security);
+            foreach (var group in groupedOrders)
+            {
+                var security = group.Key;
+                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, start, DateTime.MaxValue));
+                var closedOrderIds = trades.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.OrderId);
+                Clear(closedOrderIds);
+            }
+        }
+
+        void Clear(IEnumerable<long> closedOrderIds)
+        {
+            lock (_orders)
+            {
+                foreach (var id in closedOrderIds)
+                {
+                    var order = _orders.GetOrDefault(id);
+                    _orders.ThreadSafeRemove(id);
+                    if (order != null)
+                        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+                    _cancelledOrders.ThreadSafeRemove(id);
+                    _errorOrders.ThreadSafeRemove(id);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -483,7 +632,7 @@ public class OrderService : IOrderService, IDisposable
         var state = OrderState.From(order);
         var states = _orderStates.ThreadSafeGetOrCreate(state.OrderId);
         states.ThreadSafeAdd(state);
-        _persistence.Insert(state);
+        _persistence.Insert(state, isUpsert: false);
 
         OrderProcessed?.Invoke(order);
     }
@@ -530,91 +679,11 @@ public class OrderService : IOrderService, IDisposable
         OrderCancelled?.Invoke(order);
     }
 
-    public void Reset()
+    private void SyncCachedCancelledOrder(Order order)
     {
-        _errorOrders.Clear();
-        _cancelledOrders.Clear();
-        _openOrders.Clear();
-        _orders.Clear();
-        _ordersByExternalId.Clear();
-    }
-
-    public void Update(ICollection<Order> orders, Security? security = null)
-    {
-        foreach (var order in orders)
-        {
-            if (order.Id <= 0)
-            {
-                // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
-                var sameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
-                order.Id = sameOrder != null ? sameOrder.Id : _orderIdGen.NewTimeBasedId;
-            }
-            order.AccountId = _context.AccountId;
-
-            _securityService.Fix(order, security);
-
-            if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
-            {
-                _openOrders.ThreadSafeSet(order.Id, order);
-            }
-            else if (order.Status == OrderStatus.Failed)
-            {
-                _errorOrders.ThreadSafeSet(order.Id, order);
-            }
-            else if (order.Status is OrderStatus.Cancelled or OrderStatus.PartialCancelled)
-            {
-                _cancelledOrders.ThreadSafeSet(order.Id, order);
-            }
-            _orders.ThreadSafeSet(order.Id, order);
-            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
-        }
-    }
-
-    public void ClearCachedClosedPositionOrders(Position? position = null)
-    {
-        if (_orders.IsNullOrEmpty()) return;
-
-        if (position != null && position.IsClosed)
-        {
-            lock (_orders)
-            {
-                var orders = _orders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
-                if (orders.IsNullOrEmpty()) return;
-
-                var security = orders[0].Security;
-                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, orders[0].CreateTime, DateTime.MaxValue));
-                var closedOrderIds = trades.Where(t => position.Id == t.PositionId).Select(t => t.OrderId);
-                Clear(closedOrderIds);
-            }
-        }
-        else if (position == null)
-        {
-            var start = _orders.Values.Min(o => o.UpdateTime);
-            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
-            var groupedOrders = _orders.Values.GroupBy(o => o.Security);
-            foreach (var group in groupedOrders)
-            {
-                var security = group.Key;
-                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, start, DateTime.MaxValue));
-                var closedOrderIds = trades.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.OrderId);
-                Clear(closedOrderIds);
-            }
-        }
-
-        void Clear(IEnumerable<long> closedOrderIds)
-        {
-            lock (_orders)
-            {
-                foreach (var id in closedOrderIds)
-                {
-                    var order = _orders.GetOrDefault(id);
-                    _orders.ThreadSafeRemove(id);
-                    if (order != null)
-                        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
-                    _cancelledOrders.ThreadSafeRemove(id);
-                    _errorOrders.ThreadSafeRemove(id);
-                }
-            }
-        }
+        _openOrders.ThreadSafeRemove(order.Id);
+        _cancelledOrders.ThreadSafeSet(order.Id, order);
+        _orders.ThreadSafeRemove(order.Id);
+        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
     }
 }

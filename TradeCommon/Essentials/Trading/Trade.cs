@@ -134,7 +134,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
         }
         entry.Notional = entry.ShortNotional - entry.LongNotional;
         entry.Quantity += signedQuantity; // this is signed
-        entry.Price = Math.Abs(entry.Notional.ZeroDivision(quantity));
     }
 
     public int CompareTo(Trade? trade)

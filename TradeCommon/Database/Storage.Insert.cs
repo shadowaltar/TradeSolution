@@ -29,6 +29,14 @@ public partial class Storage
         {
             count = await Insert<Order>(task);
         }
+        else if (task.Type == typeof(OrderState))
+        {
+            count = await Insert<OrderState>(task);
+        }
+        else if (task.Type == typeof(AssetState))
+        {
+            count = await Insert<AssetState>(task);
+        }
         else if (task.Type == typeof(Asset))
         {
             count = await Insert<Asset>(task);
