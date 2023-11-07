@@ -78,7 +78,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
         var actualSize = current.Security.RoundLotSize(size);
         if (!SizeAbnormalityDetector.IsNormal(actualSize))
         {
-            _log.Error($"Erroneous trading size: {actualSize}; previous {SizeAbnormalityDetector.Count} items' average is {SizeAbnormalityDetector.LastAverage}");
+            _log.Error($"Errors trading size: {actualSize}; previous {SizeAbnormalityDetector.Count} items' average is {SizeAbnormalityDetector.LastAverage}");
             return 0;
         }
         return actualSize;

@@ -23,9 +23,9 @@ public class OrderService : IOrderService, IDisposable
     private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<long, Order> _orders = new(); // all sending, live, partial filled orders
+    private readonly Dictionary<long, Order> _allOrders = new(); // all orders
+    private readonly Dictionary<long, Order> _allOrdersByExternalId = new(); // same as _allOrders
     private readonly Dictionary<long, Order> _openOrders = new(); // all live, partial filled orders
-    private readonly Dictionary<long, Order> _ordersByExternalId = new(); // same as _orders
     private readonly Dictionary<long, Order> _cancelledOrders = new(); // all cancelled, expired orders
     private readonly Dictionary<long, Order> _errorOrders = new(); // all error, rejected orders
     private readonly Dictionary<long, Order> _operationalOrders = new(); // orders which should not be considered affecting any positions
@@ -62,21 +62,21 @@ public class OrderService : IOrderService, IDisposable
 
     public Order? GetOrder(long orderId)
     {
-        return _orders.ThreadSafeGet(orderId);
+        return _allOrders.ThreadSafeGet(orderId);
     }
 
     public Order? GetOrderByExternalId(long externalOrderId)
     {
-        return _ordersByExternalId.ThreadSafeGet(externalOrderId);
+        return _allOrdersByExternalId.ThreadSafeGet(externalOrderId);
     }
 
     public List<Order> GetOrders(Security? security = null, bool requestExternal = false)
     {
         // TODO
-        return _orders.ThreadSafeValues();
+        return _allOrders.ThreadSafeValues();
     }
 
-    public async Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null)
+    public async Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses)
     {
         var orders = new List<Order>();
         var state = await _execution.GetOrders(security, start: start, end: end);
@@ -91,7 +91,7 @@ public class OrderService : IOrderService, IDisposable
 
     public async Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null)
     {
-        var orders = await _storage.ReadOrders(security, start, end ?? DateTime.UtcNow);
+        var orders = await _storage.ReadOrders(security, null, start, end);
         Update(orders, security);
         return orders;
     }
@@ -99,7 +99,7 @@ public class OrderService : IOrderService, IDisposable
     public List<Order> GetOrders(Security security, DateTime start, DateTime? end = null)
     {
         var e = end ?? DateTime.MaxValue;
-        return _orders.ThreadSafeValues()
+        return _allOrders.ThreadSafeValues()
             .Where(o => o.SecurityId == security.Id && o.CreateTime <= start && o.UpdateTime >= e).ToList();
     }
 
@@ -117,7 +117,7 @@ public class OrderService : IOrderService, IDisposable
     {
         if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
 
-        var orders = await _storage.ReadOpenOrders(security);
+        var orders = await _storage.ReadOrders(security, null, null, null, OrderStatuses.Lives);
         lock (_openOrders)
         {
             foreach (var openOrder in orders)
@@ -159,7 +159,7 @@ public class OrderService : IOrderService, IDisposable
         // the other is if order is accepted by external execution logic
         // and its new status (like Live / Filled) piggy-backed in the response
         // or the order failed to be sent, status = Failed.
-        _orders.ThreadSafeSet(order.Id, order);
+        _allOrders.ThreadSafeSet(order.Id, order);
         _persistence.Insert(order);
 
         var isOperational = order.Action == OrderActionType.Operational;
@@ -171,7 +171,7 @@ public class OrderService : IOrderService, IDisposable
         {
             order = state.Get<Order>()!;
             Assertion.Shall(order.ExternalOrderId > 0);
-            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+            _allOrdersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
 
             if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
                 _openOrders.ThreadSafeSet(order.Id, order);
@@ -182,7 +182,7 @@ public class OrderService : IOrderService, IDisposable
             order.UpdateTime = DateTime.UtcNow;
             order.Comment += " | error code: " + state.ResultCode;
 
-            _orders.ThreadSafeRemove(order.Id);
+            _allOrders.ThreadSafeRemove(order.Id);
             _errorOrders.ThreadSafeSet(order.Id, order);
         }
         order.Action = action;
@@ -326,7 +326,7 @@ public class OrderService : IOrderService, IDisposable
     {
         if (order.Id <= 0)
         {
-            var existingOpenOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
+            var existingOpenOrder = _allOrdersByExternalId.GetOrDefault(order.ExternalOrderId);
             if (existingOpenOrder == null)
                 existingOpenOrder = _openOrders.ThreadSafeValues().FirstOrDefault(o => o.ExternalOrderId == order.ExternalOrderId);
             if (existingOpenOrder == null)
@@ -451,8 +451,8 @@ public class OrderService : IOrderService, IDisposable
         _errorOrders.Clear();
         _cancelledOrders.Clear();
         _openOrders.Clear();
-        _orders.Clear();
-        _ordersByExternalId.Clear();
+        _allOrders.Clear();
+        _allOrdersByExternalId.Clear();
     }
 
     public void Update(ICollection<Order> orders, Security? security = null)
@@ -462,7 +462,7 @@ public class OrderService : IOrderService, IDisposable
             if (order.Id <= 0)
             {
                 // to avoid case that incoming orders are actually already cached even they don't have id assigned yet
-                var sameOrder = _ordersByExternalId.GetOrDefault(order.ExternalOrderId);
+                var sameOrder = _allOrdersByExternalId.GetOrDefault(order.ExternalOrderId);
                 order.Id = sameOrder != null ? sameOrder.Id : _orderIdGen.NewTimeBasedId;
             }
             order.AccountId = _context.AccountId;
@@ -481,8 +481,8 @@ public class OrderService : IOrderService, IDisposable
             {
                 _cancelledOrders.ThreadSafeSet(order.Id, order);
             }
-            _orders.ThreadSafeSet(order.Id, order);
-            _ordersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
+            _allOrders.ThreadSafeSet(order.Id, order);
+            _allOrdersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
         }
     }
 
@@ -496,13 +496,13 @@ public class OrderService : IOrderService, IDisposable
 
     public void ClearCachedClosedPositionOrders(Position? position = null)
     {
-        if (_orders.IsNullOrEmpty()) return;
+        if (_allOrders.IsNullOrEmpty()) return;
 
         if (position != null && position.IsClosed)
         {
-            lock (_orders)
+            lock (_allOrders)
             {
-                var orders = _orders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
+                var orders = _allOrders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
                 if (orders.IsNullOrEmpty()) return;
 
                 var security = orders[0].Security;
@@ -513,9 +513,9 @@ public class OrderService : IOrderService, IDisposable
         }
         else if (position == null)
         {
-            var start = _orders.Values.Min(o => o.UpdateTime);
+            var start = _allOrders.Values.Min(o => o.UpdateTime);
             var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
-            var groupedOrders = _orders.Values.GroupBy(o => o.Security);
+            var groupedOrders = _allOrders.Values.GroupBy(o => o.Security);
             foreach (var group in groupedOrders)
             {
                 var security = group.Key;
@@ -527,14 +527,14 @@ public class OrderService : IOrderService, IDisposable
 
         void Clear(IEnumerable<long> closedOrderIds)
         {
-            lock (_orders)
+            lock (_allOrders)
             {
                 foreach (var id in closedOrderIds)
                 {
-                    var order = _orders.GetOrDefault(id);
-                    _orders.ThreadSafeRemove(id);
+                    var order = _allOrders.GetOrDefault(id);
+                    _allOrders.ThreadSafeRemove(id);
                     if (order != null)
-                        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+                        _allOrdersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
                     _cancelledOrders.ThreadSafeRemove(id);
                     _errorOrders.ThreadSafeRemove(id);
                 }
@@ -553,7 +553,7 @@ public class OrderService : IOrderService, IDisposable
         var eoid = order.ExternalOrderId;
         var oid = order.Id;
 
-        if (_orders.ThreadSafeTryGet(oid, out var existingOrder) || _ordersByExternalId.ThreadSafeTryGet(eoid, out existingOrder))
+        if (_allOrders.ThreadSafeTryGet(oid, out var existingOrder) || _allOrdersByExternalId.ThreadSafeTryGet(eoid, out existingOrder))
         {
             // already cached the order in SENDING state
             if (order.FilledQuantity < existingOrder.FilledQuantity)
@@ -612,7 +612,7 @@ public class OrderService : IOrderService, IDisposable
             await FixOrderIdByExternalId(order);
         }
 
-        _orders.ThreadSafeSet(order.Id, order);
+        _allOrders.ThreadSafeSet(order.Id, order);
         switch (order.Status)
         {
             case OrderStatus.Live or OrderStatus.PartialFilled:
@@ -625,7 +625,7 @@ public class OrderService : IOrderService, IDisposable
         if (order.Status.IsFinished())
             _openOrders.ThreadSafeRemove(order.Id);
 
-        _ordersByExternalId.ThreadSafeSet(eoid, order);
+        _allOrdersByExternalId.ThreadSafeSet(eoid, order);
         _persistence.Insert(order);
 
         // cache and store the state
@@ -669,7 +669,6 @@ public class OrderService : IOrderService, IDisposable
 
         lock (_lock)
         {
-            _orders.Remove(order.Id);
             _cancelledOrders[order.Id] = order;
         }
 
@@ -683,7 +682,6 @@ public class OrderService : IOrderService, IDisposable
     {
         _openOrders.ThreadSafeRemove(order.Id);
         _cancelledOrders.ThreadSafeSet(order.Id, order);
-        _orders.ThreadSafeRemove(order.Id);
-        _ordersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+        _allOrdersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
     }
 }

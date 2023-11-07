@@ -49,10 +49,8 @@ public interface IStorage
     Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType);
     Task<List<FinancialStat>> ReadFinancialStats();
     Task<List<FinancialStat>> ReadFinancialStats(int secId);
-    Task<List<Order>> ReadOpenOrders(Security? security = null, SecurityType securityType = SecurityType.Unknown);
-    Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end);
-    Task<List<Order>> ReadOrders(Security security, List<long> ids);
     Task<Order?> ReadOrderByExternalId(long externalOrderId);
+    Task<List<Order>> ReadOrders(Security? security, List<long>? ids, DateTime? start, DateTime? end, params OrderStatus[] orderStatuses);
     Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);

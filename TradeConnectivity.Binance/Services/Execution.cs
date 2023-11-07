@@ -184,7 +184,7 @@ public class Execution : IExternalExecutionManagement
             if (code is < 0 and not int.MinValue)
                 return;
             order.ExternalOrderId = json.GetLong("orderId");
-            order.Status = OrderStatusConverter.ParseBinance(json.GetString("status"));
+            order.Status = OrderStatuses.ParseBinance(json.GetString("status"));
             order.ExternalCreateTime = json.GetUtcFromUnixMs("transactTime"); // TODO not sure if workingTime is useful or not
             order.FilledQuantity = json.GetDecimal("executedQty");
             order.ExternalUpdateTime = json.GetUtcFromUnixMs("workingTime");
@@ -261,7 +261,7 @@ public class Execution : IExternalExecutionManagement
         {
             // var cancelId = rootObj.GetLong("clientOrderId"); // should be equal to the above newClientOrderId
             order.ExternalUpdateTime = json.GetUtcFromUnixMs("transactTime");
-            order.Status = OrderStatusConverter.ParseBinance(json.GetString("status"));
+            order.Status = OrderStatuses.ParseBinance(json.GetString("status"));
         }
 
         // raise events
@@ -816,7 +816,7 @@ public class Execution : IExternalExecutionManagement
             Price = rootObj.GetDecimal("price"),
             Quantity = rootObj.GetDecimal("origQty"),
             FilledQuantity = rootObj.GetDecimal("executedQty"),
-            Status = OrderStatusConverter.ParseBinance(rootObj.GetString("status")),
+            Status = OrderStatuses.ParseBinance(rootObj.GetString("status")),
             TimeInForce = rootObj.GetString("timeInForce").ConvertDescriptionToEnum(TimeInForceType.Unknown),
             Type = rootObj.GetString("type").ConvertDescriptionToEnum(OrderType.Unknown),
             Side = rootObj.GetString("side").ConvertDescriptionToEnum<Side>(),
@@ -988,7 +988,7 @@ public class Execution : IExternalExecutionManagement
                         ExternalOrderId = externalOrderId,
                         UpdateTime = updateTime, // if no user changes, the update time should be the same as external update time
                         FilledQuantity = cumulativeFilledQuantity,
-                        Status = OrderStatusConverter.ParseBinance(status),
+                        Status = OrderStatuses.ParseBinance(status),
                         Type = orderType,
                         TimeInForce = timeInForce,
                         Price = orderPrice,

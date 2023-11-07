@@ -279,7 +279,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             foreach (var group in trades.GroupBy(t => t.SecurityId))
             {
                 var security = await _services.Security.GetSecurity(group.Key);
-                orders.AddRange(await _context.Storage.ReadOrders(security!, group.Select(t => t.OrderId).ToList()));
+                orders.AddRange(await _context.Storage.ReadOrders(security!, group.Select(t => t.OrderId).ToList(), null, null));
             }
             _services.Security.Fix(orders);
 

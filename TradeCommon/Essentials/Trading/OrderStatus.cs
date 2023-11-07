@@ -93,7 +93,7 @@ public enum OrderStatus
     Prevented = 53,
 }
 
-public static class OrderStatusConverter
+public static class OrderStatuses
 {
     public static bool IsFinished(this OrderStatus status)
     {
@@ -108,6 +108,46 @@ public static class OrderStatusConverter
             or OrderStatus.Failed
             or OrderStatus.Prevented
             or OrderStatus.Rejected;
+    }
+
+    public static OrderStatus[] Lives { get; } = new OrderStatus[]
+    {
+        OrderStatus.Sending, OrderStatus.Live, OrderStatus.PartialFilled
+    };
+
+    public static OrderStatus[] Fills { get; } = new OrderStatus[]
+    {
+        OrderStatus.Filled, OrderStatus.PartialFilled, OrderStatus.PartialCancelled
+    };
+
+    public static OrderStatus[] Errors { get; } = new OrderStatus[]
+    {
+        OrderStatus.Failed, OrderStatus.Prevented, OrderStatus.Rejected
+    };
+
+    public static OrderStatus[] Cancels { get; } = new OrderStatus[]
+    {
+        OrderStatus.Canceling, OrderStatus.Cancelled, OrderStatus.PartialCancelled, OrderStatus.Deleted, OrderStatus.Expired
+    };
+
+    public static bool IsAlive(this OrderStatus status)
+    {
+        return Array.IndexOf(Lives, status) != -1;
+    }
+
+    public static bool IsFilled(this OrderStatus status)
+    {
+        return Array.IndexOf(Fills, status) != -1;
+    }
+
+    public static bool IsErroneous(this OrderStatus status)
+    {
+        return Array.IndexOf(Errors, status) != -1;
+    }
+
+    public static bool IsCancel(this OrderStatus status)
+    {
+        return Array.IndexOf(Cancels, status) != -1;
     }
 
     public static OrderStatus ParseBinance(string? statusStr)

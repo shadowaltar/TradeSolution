@@ -1,23 +1,35 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using TradeCommon.Constants;
 using TradeCommon.Essentials.Trading;
 
 namespace TradeDesk.Services;
 public class Server
 {
     private string _url;
-
+    private HttpClient _client = new HttpClient();
     public void SetUrl(string url)
     {
-        _url = url;
+        _url = url.Trim('/');
+    }
+
+    internal async Task<List<Order>> GetOrders()
+    {
+        var url = $"{_url}/{RestApiConstants.QueryOrders}";
+        var json = await _client.GetStringAsync(url);
+        return Json.Deserialize<List<Order>>(json) ?? new();
     }
 
     internal async Task<List<Order>> GetOpenOrders()
     {
-        throw new NotImplementedException();
+        var url = $"{_url}/{RestApiConstants.QueryOrders}";
+        var json = await _client.GetStringAsync(url);
+        return Json.Deserialize<List<Order>>(json) ?? new();
     }
 
     internal async Task<Order> CancelOrder(Order order)

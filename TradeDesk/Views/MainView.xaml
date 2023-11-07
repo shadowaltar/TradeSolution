@@ -9,13 +9,23 @@
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
+    <Window.Resources>
+        <ResourceDictionary Source="../Styles.xaml"/>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <TabControl Grid.Row="0">
+        <DockPanel>
+            <StackPanel Orientation="Horizontal">
+                <Label Content="Server URL:" VerticalAlignment="Center"/>
+                <Button Content="Connect"/>
+            </StackPanel>
+        </DockPanel>
+        <TabControl Grid.Row="1">
             <TabItem Header="Open Orders">
                 <views:OrderView DataContext="{Binding OpenOrderViewModel}"/>
             </TabItem>
@@ -29,12 +39,12 @@
                 <views:OrderView DataContext="{Binding CancelledOrderViewModel}"/>
             </TabItem>
         </TabControl>
-        <TabControl Grid.Row="1">
+        <TabControl Grid.Row="2">
             <TabItem Header="Trades">
                 <views:TradeView/>
             </TabItem>
         </TabControl>
-        <TabControl Grid.Row="2">
+        <TabControl Grid.Row="3">
             <TabItem Header="Assets">
                 <views:AssetView/>
             </TabItem>

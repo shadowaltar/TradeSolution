@@ -56,7 +56,7 @@ public interface IOrderService
     /// <param name="start"></param>
     /// <param name="end"></param>
     /// <returns></returns>
-    Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null);
+    Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses);
 
     /// <summary>
     /// Get all orders from storage for a specific security and optional time range.
