@@ -15,8 +15,13 @@ public class Server
         _url = url;
     }
 
-    public List<Order> QueryOpenOrders()
+    internal async Task<List<Order>> GetOpenOrders()
     {
-        var sub = "orders/query-all";
+        throw new NotImplementedException();
+    }
+
+    internal async Task<Order> CancelOrder(Order order)
+    {
+        throw new NotImplementedException();
     }
 }

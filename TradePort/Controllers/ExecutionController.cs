@@ -5,6 +5,7 @@ using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils.Common;
@@ -345,32 +346,37 @@ public class ExecutionController : Controller
     }
 
     /// <summary>
-    /// Gets asset positions. Optionally can get the initial state of assets before algo engine is started.
+    /// Gets each changes of asset positions.
     /// </summary>
     /// <param name="services"></param>
     /// <param name="startStr"></param>
     /// <param name="adminPassword"></param>
     /// <param name="symbolStr"></param>
-    /// <param name="dataSourceType"></param>
-    /// <param name="isInitialPortfolio"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAssetStates)]
     public async Task<ActionResult> GetAssetStates([FromServices] IServices services,
                                                    [FromForm(Name = "admin-password")] string? adminPassword,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
-                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,TUSD,USDT")
+                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT")
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var securities = new List<Security>();
         foreach (var code in codes)
         {
             var security = services.Security.GetSecurity(code);
             if (security == null || !security.IsAsset) return BadRequest("Invalid code / missing asset security.");
+            securities.Add(security);
         }
-        return Ok(await services.Portfolio.GetAssetStates(codes, start));
+        var results = new Dictionary<string, List<AssetState>>();
+        foreach (var security in securities)
+        {
+            results[security.Code] = await services.Portfolio.GetAssetStates(security, start);
+        }
+        return Ok(results);
     }
 
     /// <summary>
@@ -479,8 +485,8 @@ public class ExecutionController : Controller
                 sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, initialAvailableQuantity);
                 break;
         }
-        var batchId = await core.Run(ep, ap, algorithm);
-        return Ok(batchId.ToString());
+        var algoBatch = await core.Run(ep, ap, algorithm);
+        return Ok(algoBatch);
     }
 
     [HttpPost(RestApiConstants.QueryRunningAlgorithms)]
@@ -504,8 +510,8 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        await core.StopAlgorithm(algoBatchId);
-        return Ok();
+        var resultCode = await core.StopAlgorithm(algoBatchId);
+        return Ok(resultCode);
     }
 
     [HttpPost(RestApiConstants.StopAllAlgorithms)]

@@ -67,7 +67,7 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     public event Action? ReachedDesignatedEndTime;
 
-    public string Id => AlgoBatch.Id;
+    public long AlgoBatchId => AlgoBatch.Id;
 
     public bool IsBackTesting { get; private set; } = true;
 
@@ -109,14 +109,14 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     public int AlgoVersionId { get; private set; }
 
-    public int AlgoBatchId { get; private set; }
-
     public AlgorithmEngine(Context context, Algorithm algorithm, EngineParameters engineParameters)
     {
+        var uniqueId = IdGenerators.Get<AlgoBatch>().NewTimeBasedId;
+        context.AlgoBatchId = uniqueId;
+
         _context = context;
         _services = context.Services;
         _persistence = _services.Persistence;
-
         EngineParameters = engineParameters;
 
         _context.SetPreferredQuoteCurrencies(EngineParameters.PreferredQuoteCurrencies);
@@ -130,7 +130,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.Trade.TradeProcessed += OnTradeProcessed;
         _services.Portfolio.PositionProcessed += OnPositionProcessed;
 
-        AlgoBatch = _context.SaveAlgoBatch();
+        AlgoBatch = _context.CreateAlgoBatch(_context.AlgoBatchId);
+        _persistence.Insert(AlgoBatch, isSynchronous: true);
 
         Algorithm = algorithm;
         Sizing = algorithm.Sizing;
@@ -542,6 +543,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
         else
             _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.SequenceId}][{actionType}][{side}]\n\t\tR:{current.Return:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+        _persistence.Insert(current);
     }
 
     private async Task ClosePositionIfNeeded()
@@ -814,13 +816,13 @@ public class AlgorithmEngine : IAlgorithmEngine
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
-            var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
-            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{algoEntry?.SequenceId}][StopLoss]\n\t\tR:{position.Return:P4}");
-
+            var current = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{current?.SequenceId}][StopLoss]\n\t\tR:{position.Return:P4}");
+            _persistence.Insert(current);
             var state = await Algorithm.CloseByTickStopLoss(position);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                Algorithm.AfterStoppedLoss(algoEntry!, position.CloseSide);
+                Algorithm.AfterStoppedLoss(current!, position.CloseSide);
             }
             else
             {
@@ -841,13 +843,13 @@ public class AlgorithmEngine : IAlgorithmEngine
         var position = _services.Portfolio.GetPositionBySecurityId(securityId);
         if (position != null && !position.IsClosed)
         {
-            var algoEntry = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
-            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{algoEntry?.SequenceId}][TakeProfit]\n\t\tR:{position.Return:P4}");
-
+            var current = _currentEntriesBySecurityId.ThreadSafeGet(securityId);
+            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{current?.SequenceId}][TakeProfit]\n\t\tR:{position.Return:P4}");
+            _persistence.Insert(current);
             var state = await Algorithm.CloseByTickTakeProfit(position);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
-                Algorithm.AfterTookProfit(algoEntry!, position.CloseSide);
+                Algorithm.AfterTookProfit(current!, position.CloseSide);
             }
         }
     }

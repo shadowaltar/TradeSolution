@@ -153,8 +153,8 @@ public interface IPortfolioService
     Task<List<Asset>> GetExternalAssets();
 
     Task<List<Asset>> GetStorageAssets();
-
-    Task<List<Asset>> GetAssetStates(string[] codes, DateTime start);
+    
+    Task<List<AssetState>> GetAssetStates(Security security, DateTime start);
 
     void Update(List<Asset> assets, bool isInitializing = false);
 

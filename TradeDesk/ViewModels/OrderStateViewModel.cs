@@ -1,12 +1,13 @@
-﻿using TradeLogicCore.Services;
+
+﻿using TradeDesk.Services;
 
 namespace TradeDesk.ViewModels;
 public class OrderStateViewModel : AbstractViewModel
 {
-    private readonly IOrderService _orderService;
+    private readonly Server _server;
 
-    public OrderStateViewModel(IOrderService orderService)
+    public OrderStateViewModel(Server server)
     {
-        _orderService = orderService;
+        _server = server;
     }
 }

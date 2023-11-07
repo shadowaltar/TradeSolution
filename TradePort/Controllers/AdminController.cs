@@ -37,8 +37,8 @@ public class AdminController : Controller
                                                            [FromServices] IAdminService adminService,
                                                            [FromForm(Name = "admin-password")] string adminPassword,
                                                            [FromForm(Name = "user-password")] string password,
-                                                           [FromQuery(Name = "user")] string userName,
-                                                           [FromQuery(Name = "account-name")] string accountName,
+                                                           [FromQuery(Name = "user")] string userName = "test",
+                                                           [FromQuery(Name = "account-name")] string accountName = "spot",
                                                            [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                                            [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
     {

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using TradeCommon.Essentials.Instruments;
@@ -11,7 +12,7 @@ public record SecurityRelatedEntry
     [DatabaseIgnore, JsonIgnore]
     public Security Security { get; set; }
 
-    [NotNull, Positive]
+    [NotNull, Positive, Column(Order = 1)]
     public int SecurityId { get; set; } = 0;
 
     [DatabaseIgnore]

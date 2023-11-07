@@ -1,25 +1,34 @@
 ﻿using System;
 using System.Threading;
-using TradeLogicCore.Services;
+using TradeDesk.Services;
 
 namespace TradeDesk.ViewModels;
 public class MainViewModel : AbstractViewModel
 {
+    private readonly Server _server;
+
     public OrderViewModel OpenOrderViewModel { get; private set; }
     public OrderViewModel ErrorOrderViewModel { get; private set; }
     public OrderViewModel CancelledOrderViewModel { get; private set; }
     public OrderStateViewModel OrderStateViewModel { get; private set; }
 
-    public MainViewModel(IOrderService orderService)
+    public MainViewModel()
     {
-        OpenOrderViewModel = new OrderViewModel(orderService);
-        OpenOrderViewModel.IsOrderToolBarVisible = true;
-        ErrorOrderViewModel = new OrderViewModel(orderService);
-        ErrorOrderViewModel.IsOrderToolBarVisible = false;
-        CancelledOrderViewModel = new OrderViewModel(orderService);
-        CancelledOrderViewModel.IsOrderToolBarVisible = false;
+        _server = new Server();
+        OpenOrderViewModel = new OrderViewModel(_server)
+        {
+            IsOrderToolBarVisible = true
+        };
+        ErrorOrderViewModel = new OrderViewModel(_server)
+        {
+            IsOrderToolBarVisible = false
+        };
+        CancelledOrderViewModel = new OrderViewModel(_server)
+        {
+            IsOrderToolBarVisible = false
+        };
 
-        OrderStateViewModel = new OrderStateViewModel(orderService);
+        OrderStateViewModel = new OrderStateViewModel(_server);
     }
 
     public async void PeriodicQuery()

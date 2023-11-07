@@ -13,7 +13,7 @@ public interface IAlgorithmEngine
 {
     event Action ReachedDesignatedEndTime;
 
-    string Id { get; }
+    long AlgoBatchId { get; }
 
     AlgorithmParameters? AlgoParameters { get; }
 

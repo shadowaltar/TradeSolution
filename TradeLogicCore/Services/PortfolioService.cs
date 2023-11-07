@@ -131,6 +131,11 @@ public class PortfolioService : IPortfolioService, IDisposable
         return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
 
+    public async Task<List<AssetState>> GetAssetStates(Security security, DateTime start)
+    {
+        return await _storage.ReadAssetStates(security, start);
+    }
+
     public async Task<bool> Initialize()
     {
         if (_context.Account == null) throw Exceptions.MustLogin();
@@ -348,9 +353,9 @@ public class PortfolioService : IPortfolioService, IDisposable
             asset.AccountId = _context.AccountId;
             if (isInitializing)
             {
-                InitialPortfolio.Add(asset with { });
+                InitialPortfolio.AddOrUpdate(asset with { });
             }
-            Portfolio.Add(asset);
+            Portfolio.AddOrUpdate(asset);
         }
     }
 
@@ -550,23 +555,21 @@ public class PortfolioService : IPortfolioService, IDisposable
     private void OnAssetsChanged(List<Asset> assets)
     {
         var account = _context.Account ?? throw Exceptions.MustLogin();
+        var states = new List<AssetState>();
         foreach (var asset in assets)
         {
             _securityService.Fix(asset);
-            var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
 
-            asset.AccountId = account.Id;
+            // basically just use the id from the existing item
+            var existingAsset = Portfolio.GetAssetBySecurityId(asset.SecurityId);
+            asset.AccountId = existingAsset?.AccountId ?? account.Id;
             asset.UpdateTime = DateTime.UtcNow;
             asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
-            if (existingAsset != null)
-            {
-                existingAsset.Quantity = asset.Quantity;
-            }
+            states.Add(AssetState.From(asset));
+
+            Portfolio.AddOrUpdate(asset);
         }
         _persistence.Insert(assets, isUpsert: true);
-        foreach (var asset in assets)
-        {
-            _persistence.Insert(asset, DatabaseNames.GetAssetStateTableName(asset.Security.SecurityType), isUpsert: false);
-        }
+        _persistence.Insert(states, isUpsert: false);
     }
 }

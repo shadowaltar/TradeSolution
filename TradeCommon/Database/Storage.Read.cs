@@ -17,6 +17,17 @@ using TradeDataCore.Essentials;
 namespace TradeCommon.Database;
 public partial class Storage
 {
+    public async Task<int> Count<T>(string? tableNameOverride = null, string? whereClause = "") where T : class, new()
+    {
+        var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>();
+        t = tableNameOverride ?? t;
+        string sql = whereClause.IsBlank() ?
+            $"SELECT COUNT(*) FROM {t}" :
+            $"SELECT COUNT(*) FROM {t} WHERE {whereClause}";
+        var (r, i) = await TryReadScalar<int>(sql, d);
+        return r ? i : 0;
+    }
+
     public async Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new()
     {
         var selectClause = SqlReader<T>.GetSelectClause();
@@ -76,6 +87,14 @@ WHERE
         return await SqlReader.ReadMany<Asset>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId));
     }
 
+    public async Task<List<AssetState>> ReadAssetStates(Security security, DateTime start)
+    {
+        var sqlPart = SqlReader<AssetState>.GetSelectClause();
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<AssetState>();
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = $Security AND Time >= $Time";
+        return await SqlReader.ReadMany<AssetState>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$Security", security.Id), ("$Time", start));
+    }
+
     public async Task<List<Order>> ReadOrders(Security security, DateTime start, DateTime end)
     {
         var sqlPart = SqlReader<Order>.GetSelectClause();
@@ -87,18 +106,16 @@ WHERE
     public async Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end)
     {
         var sqlPart = SqlReader<OrderState>.GetSelectClause();
-        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(security.SecurityType);
-        var sql = @$"{sqlPart} FROM {tableName} WHERE SecurityId = {security.Id} AND CreateTime >= $StartTime AND UpdateTime <= $EndTime";
-        return await SqlReader.ReadMany<OrderState>(tableName, dbName, _environmentString, sql, ("$StartTime", start), ("$EndTime", end));
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<OrderState>(security.SecurityType);
+        var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = {security.Id} AND Time >= $StartTime AND Time <= $EndTime";
+        return await SqlReader.ReadMany<OrderState>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$StartTime", start), ("$EndTime", end));
     }
 
     public async Task<List<Order>> ReadOrders(Security security, List<long> ids)
     {
-        var dbName = DatabaseNames.ExecutionData;
         var sqlPart = SqlReader<Order>.GetSelectClause();
         var inClause = GetInClause("Id", ids, true, false);
-        var secType = SecurityTypeConverter.Parse(security.Type);
-        var tableName = DatabaseNames.GetOrderTableName(secType);
+        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(security.SecurityType);
         var sql = @$"{sqlPart} FROM {tableName} WHERE AccountId = $AccountId AND SecurityId = {security.Id} {inClause}";
         return await SqlReader.ReadMany<Order>(tableName, dbName, _environmentString, sql, ("$AccountId", AccountId), ("$SecurityId", security.Id));
     }

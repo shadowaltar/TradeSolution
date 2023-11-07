@@ -632,7 +632,7 @@ public class OrderService : IOrderService, IDisposable
         var state = OrderState.From(order);
         var states = _orderStates.ThreadSafeGetOrCreate(state.OrderId);
         states.ThreadSafeAdd(state);
-        _persistence.Insert(state);
+        _persistence.Insert(state, isUpsert: false);
 
         OrderProcessed?.Invoke(order);
     }

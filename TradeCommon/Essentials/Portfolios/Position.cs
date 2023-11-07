@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using TradeCommon.Calculations;
 using TradeCommon.Database;
@@ -16,15 +17,31 @@ namespace TradeCommon.Essentials.Portfolios;
 /// When quantity reaches zero, another position should be created
 /// instead of modifying the closed one.
 /// </summary>
-[Storage("positions", DatabaseNames.ExecutionData)]
+[Storage("positions", DatabaseNames.ExecutionData, SortProperties = false)]
 [Unique(nameof(Id))]
 [Unique(nameof(StartOrderId), nameof(StartTradeId))]
+[Unique(nameof(SecurityId), nameof(AccountId), nameof(StartOrderId))]
 [Index(nameof(SecurityId))]
 [Index(nameof(CreateTime))]
-public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
+public sealed record Position : SecurityRelatedEntry, ILongShortEntry, IIdEntry, IComparable<Position>
 {
     [DatabaseIgnore]
     private static readonly IdGenerator _positionIdGenerator = IdGenerators.Get<Position>();
+
+    /// <summary>
+    /// Unique id of this asset asset.
+    /// </summary>
+    [NotNull, Positive]
+    public long Id { get; set; } = 0;
+
+    /// <summary>
+    /// The associated account's Id.
+    /// </summary>
+    public int AccountId { get; set; } = 0;
+
+    public DateTime CreateTime { get; set; }
+
+    public DateTime UpdateTime { get; set; }
 
     /// <summary>
     /// The time which the position is fully closed.
@@ -36,7 +53,13 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     /// The price of this position.
     /// It is the weighted average price of all the trades related to this position.
     /// </summary>
+    [DatabaseIgnore]
     public decimal Price { get; set; }
+
+    /// <summary>
+    /// Amount of quote currency held by this position.
+    /// </summary>
+    public decimal Quantity { get; set; }
 
     /// <summary>
     /// The notional amount of this position, which is price * quantity.
@@ -48,9 +71,6 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     /// The intended entering side.
     /// </summary>
     public Side Side { get; set; }
-
-    [DatabaseIgnore, JsonIgnore]
-    public Side CloseSide => Side == Side.Buy ? Side.Sell : Side == Side.Sell ? Side.Buy : Side.None;
 
     /// <summary>
     /// All the long trades' sum of quantity.
@@ -107,17 +127,23 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     /// </summary>
     public int TradeCount { get; set; }
 
+    [DatabaseIgnore, JsonIgnore]
+    public Side CloseSide => Side == Side.Buy ? Side.Sell : Side == Side.Sell ? Side.Buy : Side.None;
+
     /// <summary>
     /// Whether it is a closed position.
     /// It means quantity + "working quantity" equals to zero,
     /// or smaller than the minimum allowed residual threshold,
     /// (when <see cref="Security.MinNotional"/> is defined (!= 0)).
     /// </summary>
-    [DatabaseIgnore]
+    [DatabaseIgnore, JsonIgnore]
     public bool IsClosed => (Security == null || Security.MinQuantity == 0) ? Quantity == 0 : Math.Abs(Quantity) <= Security.MinQuantity;
 
-    [DatabaseIgnore]
+    [DatabaseIgnore, JsonIgnore]
     public bool IsNew => TradeCount == 1;
+
+    [DatabaseIgnore, JsonIgnore]
+    public decimal PnL => Notional;
 
     [DatabaseIgnore]
     public decimal Return => Side switch
@@ -180,13 +206,10 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 
             Side = trade.Side,
 
-            LockedQuantity = 0,
-
             StartOrderId = trade.OrderId,
             StartTradeId = trade.Id,
             EndOrderId = 0,
             EndTradeId = 0,
-            Price = 0, // should be handled by Apply()
             Quantity = 0, // should be handled by Apply()
             TradeCount = 0, // should be handled by Apply()
         };
@@ -222,10 +245,15 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
     public int CompareTo(Position? other)
     {
         if (other == null) return 1;
-        var r = base.CompareTo(other);
+        var r = AccountId.CompareTo(other.AccountId);
+        if (r == 0) r = CreateTime.CompareTo(other.CreateTime);
+        if (r == 0) r = UpdateTime.CompareTo(other.UpdateTime);
         if (r == 0) r = CloseTime.CompareTo(other.CloseTime);
 
-        if (r == 0) r = Price.CompareTo(other.Price);
+        if (r == 0) r = SecurityId.CompareTo(other.SecurityId);
+        if (r == 0) r = SecurityCode.CompareTo(other.SecurityCode);
+
+        if (r == 0) r = Quantity.CompareTo(other.Quantity);
         if (r == 0) r = Notional.CompareTo(other.Notional);
 
         if (r == 0) r = LongQuantity.CompareTo(other.LongQuantity);
@@ -244,7 +272,7 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
         return r;
     }
 
-    public override bool EqualsIgnoreId(IIdEntry other)
+    public bool EqualsIgnoreId(IIdEntry other)
     {
         return other is Position position && CompareTo(position) == 0;
     }
@@ -256,29 +284,33 @@ public sealed record Position : Asset, ILongShortEntry, IComparable<Position>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(base.GetHashCode(),
-                                CloseTime,
-                                HashCode.Combine(
-                                Price,
-                                Notional,
-                                LongPrice,
-                                LongQuantity,
-                                LongNotional,
-                                ShortPrice,
-                                ShortQuantity,
-                                ShortNotional),
-                                HashCode.Combine(
-                                StartOrderId,
-                                EndOrderId,
-                                StartTradeId,
-                                EndTradeId,
-                                TradeCount));
+        var hashCode = new HashCode();
+        hashCode.Add(Id);
+        hashCode.Add(AccountId);
+        hashCode.Add(CreateTime);
+        hashCode.Add(UpdateTime);
+        hashCode.Add(CloseTime);
+        hashCode.Add(Quantity);
+        hashCode.Add(Notional);
+        hashCode.Add(Side);
+        hashCode.Add(LongQuantity);
+        hashCode.Add(ShortQuantity);
+        hashCode.Add(LongPrice);
+        hashCode.Add(ShortPrice);
+        hashCode.Add(LongNotional);
+        hashCode.Add(ShortNotional);
+        hashCode.Add(StartOrderId);
+        hashCode.Add(EndOrderId);
+        hashCode.Add(StartTradeId);
+        hashCode.Add(EndTradeId);
+        hashCode.Add(TradeCount);
+        return hashCode.ToHashCode();
     }
 
     public override string ToString()
     {
         return $"ID:{Id}, Time:{{T0:{CreateTime:yyMMdd-HHmmss}, T1:{(CloseTime == DateTime.MaxValue ? "NotYet" : CloseTime.ToString("yyMMdd-HHmmss"))}}}," +
             $" SEC:{SecurityCode}, TRDCOUNT:{TradeCount}," +
-            $" DETAILS:{{SIDE:,{Side}, P:{Security.FormatPrice(Price)}, Q:{Security.FormatQuantity(Quantity)}, N:{Notional}, LN:{LongNotional}, SN:{ShortNotional}}}}}";
+            $" DETAILS:{{SIDE:,{Side}, Q:{Security.FormatQuantity(Quantity)}, N:{Notional}, LN:{LongNotional}, SN:{ShortNotional}}}}}";
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common.Attributes;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -158,56 +159,77 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
             propertyList = properties.ToList();
         }
 
+        var specialColumnOrdering = new Dictionary<string, int>();
+        var ignoredColumns = new HashSet<string>();
+        var typeStrings = new Dictionary<string, string>();
+        var requiredColumns = new HashSet<string>();
+        var autoIncreaseColumns = new HashSet<string>();
+        var defaultColumnValues = new Dictionary<string, object?>();
+        var varcharColumnLengths = new Dictionary<string, int>();
         foreach (var (name, property) in propertyList)
         {
-            var typeString = TypeConverter.ToSqliteType(property.PropertyType);
-
-            var isIgnored = false;
-            var isNotNull = false;
-            var isPrimary = false;
-            object? defaultValue = null;
-            int varcharMax = 0;
-            var attributes = property.GetCustomAttributes().ToList();
+            typeStrings[name] =TypeConverter.ToSqliteType(property.PropertyType);
+            var propAttributes = property.GetCustomAttributes().ToList();
             if (recordPropertyAttributes.TryGetValue(name, out var otherAttributes))
             {
-                attributes.AddRange(otherAttributes);
+                propAttributes.AddRange(otherAttributes);
             }
-            foreach (var attr in attributes)
+            foreach (var attr in propAttributes)
             {
+                if (attr is DatabaseIgnoreAttribute)
+                {
+                    ignoredColumns.Add(name);
+                    break;
+                }
+
                 if (attr is RequiredMemberAttribute) // system attribute
                 {
-                    isNotNull = true;
+                    requiredColumns.Add(name); // TODO not used
+                }
+                if (attr is ColumnAttribute colAttr)
+                {
+                    if (colAttr.Order != -1)
+                    {
+                        specialColumnOrdering[name] = colAttr.Order;
+                    }
                 }
 
                 if (attr is not IStorageRelatedAttribute)
                     continue;
 
-                if (attr is DatabaseIgnoreAttribute)
-                {
-                    isIgnored = true;
-                    break;
-                }
-
                 if (attr is AutoIncrementOnInsertAttribute)
                 {
-                    isPrimary = true;
+                    autoIncreaseColumns.Add(name);
                 }
                 if (attr is DefaultValueAttribute defaultAttr)
                 {
-                    defaultValue = defaultAttr.Value;
+                    defaultColumnValues[name] = defaultAttr.Value;
                 }
                 if (attr is LengthAttribute lengthAttr && lengthAttr.MaxLength > 0)
                 {
-                    varcharMax = lengthAttr.MaxLength;
+                    varcharColumnLengths[name] = lengthAttr.MaxLength;
                 }
                 if (attr is AsJsonAttribute)
                 {
-                    typeString = "TEXT";
+                    typeStrings[name] = "TEXT";
                 }
             }
+        }
+        propertyList = propertyList.Where(p => !ignoredColumns.Contains(p.Key)).ToList();
 
-            if (isIgnored) continue;
+        // handle special ordering of columns
+        foreach (var (scName, index) in specialColumnOrdering)
+        {
+            var p = propertyList.FirstOrDefault(p => p.Key == scName);
+            propertyList.Move(p, index);
+        }
 
+        // construct sql
+        foreach (var (name, property) in propertyList)
+        {
+            var varcharMax = varcharColumnLengths.GetOrDefault(name);
+            var defaultValue = defaultColumnValues.GetOrDefault(name);
+            var isNotNull = false;
             var propertyGet = property.GetGetMethod();
             if (propertyGet != null)
             {
@@ -215,13 +237,13 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
                 isNotNull = Attribute.IsDefined(returnParameter, typeof(NotNullAttribute));
             }
 
-            sb.Append(name).Append(' ').Append(typeString);
+            sb.Append(name).Append(' ').Append(typeStrings[name]);
             if (property.PropertyType == typeof(string) && varcharMax > 0)
                 sb.Append('(').Append(varcharMax).Append(')');
             else if (property.PropertyType.IsEnum)
                 sb.Append('(').Append(Consts.EnumDatabaseTypeSize).Append(')');
 
-            if (isPrimary)
+            if (autoIncreaseColumns.Contains(name))
                 sb.Append(" PRIMARY KEY");
             else if (isNotNull)
                 sb.Append(" NOT NULL");
@@ -234,6 +256,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
             }
             sb.Append(',');
         }
+
         if (primaryUniqueKeys.IsNullOrEmpty())
             sb.RemoveLast();
         else

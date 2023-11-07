@@ -5,76 +5,11 @@ using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
 
-/// <summary>
-/// An asset entry in an account (one account may hold multiple asset entries).
-/// </summary>
-
-[Storage("assets", DatabaseNames.ExecutionData)]
-[Unique(nameof(SecurityId), nameof(Time))]
-[Index(nameof(SecurityId))]
-public record AssetState : SecurityRelatedEntry, IComparable<AssetState>, IIdEntry
-{
-    /// <summary>
-    /// Unique id of this asset asset.
-    /// </summary>
-    [NotNull, Positive]
-    public long Id { get; set; } = 0;
-
-    /// <summary>
-    /// The associated account's Id.
-    /// </summary>
-    public int AccountId { get; set; } = 0;
-
-    /// <summary>
-    /// The asset state's time.
-    /// </summary>
-    public DateTime Time { get; set; }
-
-    /// <summary>
-    /// Amount of asset.
-    /// </summary>
-    public decimal Quantity { get; set; }
-
-    public override string ToString()
-    {
-        return $"[{Id}] Security[{SecurityId},{SecurityCode}], {Quantity}, {Time:yyyyMMdd-HHmmss}";
-    }
-
-    public virtual bool Equals(Asset? obj)
-    {
-        return obj != null && Id == obj.Id && CompareTo(obj) == 0;
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Id,
-                                AccountId,
-                                Time,
-                                SecurityId,
-                                Quantity);
-    }
-
-    public virtual int CompareTo(AssetState? other)
-    {
-        if (other == null) return 1;
-        var r = AccountId.CompareTo(other.AccountId);
-        if (r == 0) r = Time.CompareTo(other.Time);
-        if (r == 0) r = SecurityId.CompareTo(other.SecurityId);
-        if (r == 0) r = SecurityCode.CompareTo(other.SecurityCode);
-        if (r == 0) r = Quantity.CompareTo(other.Quantity);
-        return r;
-    }
-
-    public virtual bool EqualsIgnoreId(IIdEntry other)
-    {
-        return other is AssetState asset && CompareTo(asset) == 0;
-    }
-}
-
 [Storage("assets", DatabaseNames.ExecutionData)]
 [Unique(nameof(Id))]
+[Unique(nameof(SecurityId), nameof(AccountId))]
 [Index(nameof(SecurityId))]
-[Index(nameof(CreateTime))]
+[Index(nameof(UpdateTime))]
 public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
 {
     /// <summary>
@@ -89,6 +24,7 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
     public int AccountId { get; set; } = 0;
 
     public DateTime CreateTime { get; set; }
+
     public DateTime UpdateTime { get; set; }
 
     /// <summary>
