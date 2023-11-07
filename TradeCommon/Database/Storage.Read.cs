@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Database;
 using Microsoft.Data.Sqlite;
+using Microsoft.Identity.Client;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -144,6 +145,11 @@ WHERE
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<OrderState>(security.SecurityType);
         var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND SecurityId = {security.Id} AND Time >= $StartTime AND Time <= $EndTime";
         return await SqlReader.ReadMany<OrderState>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$StartTime", start), ("$EndTime", end));
+    }
+
+    public async Task<List<Order>> ReadOrderJoinedStates(Security security, DateTime start, DateTime end)
+    {
+        throw new NotImplementedException();
     }
 
     public async Task<Order?> ReadOrderByExternalId(long externalOrderId)

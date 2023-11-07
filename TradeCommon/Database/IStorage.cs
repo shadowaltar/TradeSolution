@@ -52,6 +52,15 @@ public interface IStorage
     Task<Order?> ReadOrderByExternalId(long externalOrderId);
     Task<List<Order>> ReadOrders(Security? security, List<long>? ids, DateTime? start, DateTime? end, params OrderStatus[] orderStatuses);
     Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end);
+
+    /// <summary>
+    /// Read order states joining with orders; output list of orders.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <returns></returns>
+    Task<List<Order>> ReadOrderJoinedStates(Security security, DateTime start, DateTime end);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
     IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);

@@ -63,7 +63,7 @@ public class SecurityService : ISecurityService
     {
         if (!IsInitialized)
             await Initialize();
-        var exchStr = exchange != ExchangeType.Unknown ? ExchangeTypeConverter.ToString(exchange) : null;
+        exchange = exchange == ExchangeType.Unknown ? _context.Exchange : exchange;
         if (requestDatabase)
         {
             var securities = await _storage.ReadSecurities(secType, exchange);
@@ -74,9 +74,7 @@ public class SecurityService : ISecurityService
         {
             lock (_securities)
             {
-                return _securities.Values
-                    .Where(s => s.Exchange == exchStr && SecurityTypeConverter.Matches(s.Type, secType))
-                    .ToList();
+                return _securities.Values.Where(s => s.ExchangeType == exchange).ToList();
             }
         }
     }

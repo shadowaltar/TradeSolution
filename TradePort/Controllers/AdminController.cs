@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common;
 using Microsoft.AspNetCore.Mvc;
 using TradeCommon.Constants;
@@ -65,6 +66,7 @@ public class AdminController : Controller
                                               [FromServices] ISecurityService securityService,
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromForm(Name = "admin-password")] string adminPassword,
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT,ETHUSDT",
                                               [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
     {
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
@@ -72,7 +74,15 @@ public class AdminController : Controller
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
         if (core.ListAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
 
-        var securities = await securityService.GetSecurities(securityType);
+        var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var securities = new List<Security>();
+        foreach (var code in codes)
+        {
+            var security = securityService.GetSecurity(code);
+            if (security == null || security.IsAsset) return BadRequest("Invalid code / missing security.");
+            securities.Add(security);
+        }
+
         var _reconciliation = new Reconcilation(adminService.Context);
         var reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
         await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);

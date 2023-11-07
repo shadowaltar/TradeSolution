@@ -126,6 +126,13 @@ public class OrderService : IOrderService, IDisposable
         return orderStates;
     }
 
+    public async Task<List<Order>> GetOrderJoinedStates(Security security, DateTime start, DateTime? end = null)
+    {
+        var orders = await _storage.ReadOrderJoinedStates(security, start, end ?? DateTime.UtcNow);
+        _securityService.Fix(orders);
+        return orders;
+    }
+
     public async Task<ExternalQueryState> SendOrder(Order order)
     {
         // this new order's id may or may not be used by external
