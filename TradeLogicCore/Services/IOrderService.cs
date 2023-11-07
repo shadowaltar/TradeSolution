@@ -55,6 +55,7 @@ public interface IOrderService
     /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
+    /// <param name="statuses"></param>
     /// <returns></returns>
     Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses);
 
@@ -64,8 +65,9 @@ public interface IOrderService
     /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
+    /// <param name="statuses"></param>
     /// <returns></returns>
-    Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null);
+    Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses);
 
     /// <summary>
     /// Get cached orders for a specific security and optional time range.
@@ -73,8 +75,9 @@ public interface IOrderService
     /// <param name="security"></param>
     /// <param name="start"></param>
     /// <param name="end"></param>
+    /// <param name="statuses"></param>
     /// <returns></returns>
-    List<Order> GetOrders(Security security, DateTime start, DateTime? end = null);
+    List<Order> GetOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses);
 
     /// <summary>
     /// Get cached open orders; when optional security is specified, only return the open orders related to that security.
@@ -84,26 +87,12 @@ public interface IOrderService
     List<Order> GetOpenOrders(Security? security = null);
 
     /// <summary>
-    /// Get stord open orders; when optional security is specified, only return the open orders related to that security.
-    /// NOTE: it will also update cache.
-    /// </summary>
-    /// <param name="security"></param>
-    /// <returns></returns>
-    Task<List<Order>> GetStoredOpenOrders(Security? security = null);
-
-    /// <summary>
     /// Get open orders from external; when optional security is specified, only return the open orders related to that security.
     /// NOTE: it will not update cache.
     /// </summary>
     /// <param name="security"></param>
     /// <returns></returns>
     Task<List<Order>> GetExternalOpenOrders(Security? security = null);
-
-    /// <summary>
-    /// Get all the orders in this execution session.
-    /// </summary> 
-    /// <returns></returns>
-    List<Order> GetOrders(Security? security = null, bool requestExternal = false);
 
     /// <summary>
     /// Get an order from cache by its external id.
@@ -143,7 +132,7 @@ public interface IOrderService
     /// Need to specify whether sync with external to get the most precise status of open orders.
     /// </summary>
     Task<bool> CancelAllOpenOrders(Security security, OrderActionType action, bool syncExternal);
-    
+
     /// <summary>
     /// Cancel all open orders immediately.
     /// </summary>

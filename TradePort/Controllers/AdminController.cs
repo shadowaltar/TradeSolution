@@ -8,7 +8,10 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
+using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
+using TradeLogicCore;
+using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using TradePort.Utils;
 
@@ -36,8 +39,8 @@ public class AdminController : Controller
     public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IComponentContext container,
                                                            [FromServices] IAdminService adminService,
                                                            [FromForm(Name = "admin-password")] string adminPassword,
-                                                           [FromForm(Name = "user-password")] string password,
                                                            [FromQuery(Name = "user")] string userName = "test",
+                                                           [FromForm(Name = "user-password")] string password = "testtest",
                                                            [FromQuery(Name = "account-name")] string accountName = "spot",
                                                            [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
                                                            [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
@@ -54,6 +57,29 @@ public class AdminController : Controller
         return result != ResultCode.LoginUserAndAccountOk
             ? BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}")
             : Ok(result);
+    }
+
+    [HttpPost("reconcile")]
+    public async Task<ActionResult> Reconcile([FromServices] Core core,
+                                              [FromServices] IAdminService adminService,
+                                              [FromServices] ISecurityService securityService,
+                                              [FromServices] IPortfolioService portfolioService,
+                                              [FromForm(Name = "admin-password")] string adminPassword,
+                                              [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
+        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
+        if (core.ListAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
+
+        var securities = await securityService.GetSecurities(securityType);
+        var _reconciliation = new Reconcilation(adminService.Context);
+        var reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
+        await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);
+
+        await portfolioService.Reload(false, true, true, true);
+
+        return Ok("Done");
     }
 
     ///// <summary>

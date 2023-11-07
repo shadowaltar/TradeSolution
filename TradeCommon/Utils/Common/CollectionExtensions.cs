@@ -6,6 +6,11 @@ public static class CollectionExtensions
 {
     private static readonly Random _random = new(DateTime.Now.Millisecond);
 
+    public static bool Contains<T>(this T[] array, T item)
+    {
+        return Array.IndexOf(array, item) >= 0;
+    }
+
     /// <summary>
     /// Get value by a key from the dictionary. If no matching key,
     /// create a new instance and save into the dictionary using the given key.

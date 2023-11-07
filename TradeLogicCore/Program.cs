@@ -358,7 +358,7 @@ public class Program
     private static async Task NewSecurityOhlcSubscriptionDemo()
     {
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
-        var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
+        var security = await securityService.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
         if (security == null) return;
         var printCount = 0;
         var dataService = Dependencies.ComponentContext.Resolve<IMarketDataService>();
@@ -401,7 +401,7 @@ public class Program
         var resultCode = await adminService.Login(_userName, _password, _accountName, environment);
         if (resultCode != ResultCode.LoginUserAndAccountOk) throw new InvalidOperationException("Login failed with code: " + resultCode);
 
-        var security = await securityService.GetSecurity("BTCTUSD", ExchangeType.Binance, SecurityType.Fx);
+        var security = await securityService.GetSecurity("BTCUSDT", ExchangeType.Binance, SecurityType.Fx);
         if (security == null)
             return;
 

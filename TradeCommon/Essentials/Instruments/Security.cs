@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
+using TradeCommon.Utils.Common;
 
 namespace TradeCommon.Essentials.Instruments;
 public class Security
@@ -163,7 +164,8 @@ public class Security
                TickSize == security.TickSize &&
                MinNotional == security.MinNotional &&
                Currency == security.Currency &&
-               EqualityComparer<Security>.Default.Equals(QuoteSecurity, security.QuoteSecurity) &&
+               (Conditions.AllNull(QuoteSecurity, security.QuoteSecurity)
+               || (Conditions.AllNotNull(QuoteSecurity, security.QuoteSecurity) && QuoteSecurity!.Id == security.QuoteSecurity!.Id)) &&
                Cusip == security.Cusip &&
                Isin == security.Isin &&
                YahooTicker == security.YahooTicker &&

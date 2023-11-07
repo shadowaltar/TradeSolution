@@ -153,14 +153,26 @@ public interface IPortfolioService
     Task<List<Asset>> GetExternalAssets();
 
     Task<List<Asset>> GetStorageAssets();
-    
+
     Task<List<AssetState>> GetAssetStates(Security security, DateTime start);
 
     void Update(List<Asset> assets, bool isInitializing = false);
 
     void Update(List<Position> positions, bool isInitializing = false);
 
-    void Reset(bool isResetPositions = true, bool isResetAssets = true, bool isInitializing = true);
+    /// <summary>
+    /// Reload service cache.
+    /// For positions, only open positions may be cached.
+    /// For assets, all asset positions will be cached.
+    /// Can either clear the cache only, or clear + reload from storage.
+    /// Can only affect position, asset, or both (or none, though useless).
+    /// Can also affect initial portfolio object.
+    /// </summary>
+    /// <param name="clearOnly"></param>
+    /// <param name="affectPositions"></param>
+    /// <param name="affectAssets"></param>
+    /// <param name="affectInitialPortfolio"></param>
+    Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio);
 
     void ClearCachedClosedPositions(bool isInitializing = false);
 

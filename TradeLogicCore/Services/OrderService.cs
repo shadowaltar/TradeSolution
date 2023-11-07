@@ -70,12 +70,6 @@ public class OrderService : IOrderService, IDisposable
         return _allOrdersByExternalId.ThreadSafeGet(externalOrderId);
     }
 
-    public List<Order> GetOrders(Security? security = null, bool requestExternal = false)
-    {
-        // TODO
-        return _allOrders.ThreadSafeValues();
-    }
-
     public async Task<List<Order>> GetExternalOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses)
     {
         var orders = new List<Order>();
@@ -86,21 +80,10 @@ public class OrderService : IOrderService, IDisposable
             order.AccountId = _context.AccountId;
         }
         Update(orders, security);
-        return orders;
-    }
 
-    public async Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null)
-    {
-        var orders = await _storage.ReadOrders(security, null, start, end);
-        Update(orders, security);
-        return orders;
-    }
-
-    public List<Order> GetOrders(Security security, DateTime start, DateTime? end = null)
-    {
-        var e = end ?? DateTime.MaxValue;
-        return _allOrders.ThreadSafeValues()
-            .Where(o => o.SecurityId == security.Id && o.CreateTime <= start && o.UpdateTime >= e).ToList();
+        if (statuses.IsNullOrEmpty())
+            return orders;
+        return orders.Where(o => statuses.Contains(o.Status)).ToList();
     }
 
     public async Task<List<Order>> GetExternalOpenOrders(Security? security = null)
@@ -113,20 +96,19 @@ public class OrderService : IOrderService, IDisposable
         return orders;
     }
 
-    public async Task<List<Order>> GetStoredOpenOrders(Security? security = null)
+    public async Task<List<Order>> GetStorageOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses)
     {
-        if (security != null) Assertion.Shall(security.ExchangeType == _context.Exchange);
-
-        var orders = await _storage.ReadOrders(security, null, null, null, OrderStatuses.Lives);
-        lock (_openOrders)
-        {
-            foreach (var openOrder in orders)
-            {
-                _openOrders[openOrder.Id] = openOrder;
-            }
-        }
+        var orders = await _storage.ReadOrders(security, null, start, end, statuses);
         Update(orders, security);
         return orders;
+    }
+
+    public List<Order> GetOrders(Security security, DateTime start, DateTime? end = null, params OrderStatus[] statuses)
+    {
+        var e = end ?? DateTime.MaxValue;
+        return _allOrders.ThreadSafeValues()
+            .Where(o => o.SecurityId == security.Id && o.CreateTime <= start && o.UpdateTime >= e && statuses.Contains(o.Status))
+            .ToList();
     }
 
     public List<Order> GetOpenOrders(Security? security = null)
@@ -140,7 +122,7 @@ public class OrderService : IOrderService, IDisposable
     public async Task<List<OrderState>> GetOrderStates(Security security, DateTime start, DateTime? end = null)
     {
         var orderStates = await _storage.ReadOrderStates(security, start, end ?? DateTime.UtcNow);
-        Update(orderStates, security);
+        Update(orderStates, security); 
         return orderStates;
     }
 

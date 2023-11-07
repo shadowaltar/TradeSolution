@@ -206,7 +206,11 @@ public static class SqlReader
     /// <param name="sql"></param>
     /// <param name="parameterValues"></param>
     /// <returns></returns>
-    public static async Task<List<T>> ReadMany<T>(string tableName, string databaseName, string environmentString, string sql, params (string key, object? value)[] parameterValues) where T : new()
+    public static async Task<List<T>> ReadMany<T>(string tableName,
+                                                  string databaseName,
+                                                  string environmentString,
+                                                  string sql,
+                                                  params (string key, object? value)[] parameterValues) where T : new()
     {
         try
         {

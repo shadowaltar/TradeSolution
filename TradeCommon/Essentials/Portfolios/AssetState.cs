@@ -47,6 +47,8 @@ public record AssetState : SecurityRelatedEntry, IComparable<AssetState>, IIdEnt
         {
             Id = _assetStateIdGen.NewTimeBasedId,
             SecurityId = asset.SecurityId,
+            Security = asset.Security,
+            SecurityCode = asset.SecurityCode,
             AccountId = asset.AccountId,
             Quantity = asset.Quantity,
             Time = asset.UpdateTime,

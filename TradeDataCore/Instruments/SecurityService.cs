@@ -29,7 +29,6 @@ public class SecurityService : ISecurityService
     {
         if (IsInitialized) return _securities.Values.ToList();
 
-        var exchangeTypes = Enum.GetValues<ExchangeType>();
         List<Security> securities = new();
         foreach (var secType in Consts.SupportedSecurityTypes)
         {

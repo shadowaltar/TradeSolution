@@ -257,7 +257,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     {
         _services.Order.Reset();
         _services.Trade.Reset();
-        _services.Portfolio.Reset(true, true, true);
+        await _services.Portfolio.Reload(true, true, true, true);
 
         var assets = await _context.Storage.ReadAssets();
         _services.Security.Fix(assets);

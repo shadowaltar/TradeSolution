@@ -70,14 +70,8 @@ public class Core
 
         _reconciliation = new Reconcilation(Context);
 
-        await _reconciliation.ReconcileAccount(user);
-        await _reconciliation.ReconcileAssets();
-
-        // check one week's historical order / trade only
-        var previousDay = startTime.AddMonths(-1);
-        await _reconciliation.ReconcileOrders(previousDay, algoParameters.SecurityPool);
-        await _reconciliation.ReconcileTrades(previousDay, algoParameters.SecurityPool);
-        await _reconciliation.ReconcilePositions(algoParameters.SecurityPool);
+        var reconcileStart = startTime.AddDays(-Consts.LookbackDayCount);
+        await _reconciliation.RunAll(user, reconcileStart, algoParameters.SecurityPool);
 
         var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
         _engines[engine.AlgoBatchId] = engine;
@@ -129,12 +123,16 @@ public class Core
         return _engines.Values.Select(e => e.AlgoBatch).ToList();
     }
 
-    public async Task StopAllAlgorithms()
+    public async Task<(int expectedCount, int successfulCount)> StopAllAlgorithms()
     {
+        var expected = _engines.Keys.Count();
+        var successful = 0;
         foreach (var guid in _engines.Keys.ToList())
         {
-            await StopAlgorithm(guid);
+            if (await StopAlgorithm(guid) == ResultCode.StopEngineOk)
+                successful++;
         }
         _log.Info("All Algorithm Engines are stopped.");
+        return (expected, successful);
     }
 }

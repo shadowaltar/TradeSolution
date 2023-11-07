@@ -71,16 +71,23 @@ public interface IStorage
     Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);
+
     Task<long> GetMax(string fieldName, string tableName, string databaseName);
+
     Task<bool> CheckTableExists(string tableName, string database);
+
     Task<DataTable> Query(string sql, string database, params TypeCode[] typeCodes);
     Task<DataTable> Query(string sql, string database);
 
     Task<int> Count<T>(string? tableNameOverride = null, string? whereClause = "") where T : class, new();
-    Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new();
+
+    Task<List<T>> Read<T>(string? tableNameOverride = null, string? whereClause = "", params (string key, object? value)[] parameterValues) where T : class, new();
+    Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "", params (string key, object? value)[] parameterValues) where T : new();
     Task<(bool, T)> TryReadScalar<T>(string sql, string database);
+
     Task<int> RunOne(string sql, string database);
     Task<int> RunMany(List<string> sqls, string database);
+
     void PurgeDatabase();
 
     void RaiseSuccess(object entry, string methodName = "");

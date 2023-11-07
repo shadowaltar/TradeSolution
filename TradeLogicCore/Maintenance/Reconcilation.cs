@@ -413,7 +413,7 @@ public class Reconcilation
         // add the initial batch of asset states if it was empty
         foreach (var asset in internalResults)
         {
-            var i = await _storage.Count<AssetState>(whereClause: $"AssetId = {asset.Id}");
+            var i = await _storage.Count<AssetState>(whereClause: $"{nameof(AssetState.SecurityId)} = {asset.SecurityId}");
             if (i == 0)
             {
                 var state = AssetState.From(asset);
@@ -713,5 +713,16 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         {
             _log.Error($"Failed to upsert one or more positions for security {securityCode}.");
         }
+    }
+
+    public async Task RunAll(User user, DateTime previousDay, List<Security> securityPool)
+    {
+        await ReconcileAccount(user);
+        await ReconcileAssets();
+
+        // check one week's historical order / trade only
+        await ReconcileOrders(previousDay, securityPool);
+        await ReconcileTrades(previousDay, securityPool);
+        await ReconcilePositions(securityPool);
     }
 }

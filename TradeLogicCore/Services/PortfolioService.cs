@@ -444,19 +444,47 @@ public class PortfolioService : IPortfolioService, IDisposable
         throw Exceptions.MissingAsset(assetId);
     }
 
-    public void Reset(bool isResetPositions = true, bool isResetAssets = true, bool isInitializing = true)
+    public async Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio)
     {
-        if (isResetPositions)
+        if (affectPositions)
         {
-            if (isInitializing)
-                InitialPortfolio.ClearPositions();
             Portfolio.ClearPositions();
+            if (affectInitialPortfolio)
+            {
+                InitialPortfolio.ClearPositions();
+            }
+            if (!clearOnly)
+            {
+                var positions = await _storage.ReadPositions(DateTime.MinValue, OpenClose.OpenOnly);
+                foreach (var position in positions)
+                {
+                    Portfolio.AddOrUpdate(position);
+                    if (affectInitialPortfolio)
+                    {
+                        InitialPortfolio.AddOrUpdate(position);
+                    }
+                }
+            }
         }
-        if (isResetAssets)
+        if (affectAssets)
         {
-            if (isInitializing)
-                InitialPortfolio.ClearAssets();
             Portfolio.ClearAssets();
+            if (affectInitialPortfolio)
+            {
+                InitialPortfolio.ClearAssets();
+            }
+            if (!clearOnly)
+            {
+                var assets = await _storage.ReadAssets();
+                foreach (var asset in assets)
+                {
+                    Portfolio.AddOrUpdate(asset);
+                    if (affectInitialPortfolio)
+                    {
+                        InitialPortfolio.AddOrUpdate(asset);
+                    }
+                }
+            }
         }
     }
 

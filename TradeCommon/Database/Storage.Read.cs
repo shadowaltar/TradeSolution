@@ -28,13 +28,20 @@ public partial class Storage
         return r ? i : 0;
     }
 
-    public async Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "") where T : new()
+    public async Task<List<T>> Read<T>(string? tableNameOverride = null, string? whereClause = "", params (string key, object? value)[] parameterValues) where T : class, new()
+    {
+        var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>();
+        t = tableNameOverride ?? t;
+        return await Read<T>(t, d, whereClause, parameterValues);
+    }
+
+    public async Task<List<T>> Read<T>(string tableName, string database, string? whereClause = "", params (string key, object? value)[] parameterValues) where T : new()
     {
         var selectClause = SqlReader<T>.GetSelectClause();
         string sql = whereClause.IsBlank() ?
             $"{selectClause} FROM {tableName}" :
             $"{selectClause} FROM {tableName} WHERE {whereClause}";
-        return await SqlReader.ReadMany<T>(tableName, database, _environmentString, sql);
+        return await SqlReader.ReadMany<T>(tableName, database, _environmentString, sql, parameterValues);
     }
 
     public async Task<(bool, T)> TryReadScalar<T>(string sql, string database)
@@ -152,40 +159,6 @@ WHERE
         }
         return null;
     }
-
-    //public async Task<List<Order>> ReadOpenOrders(Security? security = null, SecurityType securityType = SecurityType.Unknown)
-    //{
-    //    // TODO supports only fx / equity types
-    //    var sqlPart = SqlReader<Order>.GetSelectClause();
-    //    if (security == null && securityType != SecurityType.Unknown)
-    //    {
-    //        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(securityType);
-    //        var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND Status = 'LIVE' AND Type = {securityType.ToString().ToUpperInvariant()}";
-    //        return await SqlReader.ReadMany<Order>(tableName, dbName, env, sql, ("$accountId", accountId));
-    //    }
-    //    else if (security == null && securityType == SecurityType.Unknown)
-    //    {
-    //        var results = new List<Order>();
-    //        foreach (var secType in Consts.SupportedSecurityTypes)
-    //        {
-    //            var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(secType);
-    //            var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND (Status = 'LIVE' OR Status = 'PARTIALFILLED')";
-    //            results.AddRange(await SqlReader.ReadMany<Order>(tableName, dbName, env, sql, ("$accountId", accountId)));
-    //        }
-    //        return results;
-    //    }
-    //    else
-    //    {
-    //        if (security == null) throw new InvalidOperationException("Will never happen.");
-    //        if (SecurityTypeConverter.Parse(security.Type) != securityType)
-    //        {
-    //            return new List<Order>();
-    //        }
-    //        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(securityType);
-    //        var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND Status = 'LIVE' AND SecurityId = {security.Id}";
-    //        return await SqlReader.ReadMany<Order>(tableName, dbName, env, sql, ("$accountId", accountId));
-    //    }
-    //}
 
     public async Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end, bool? isOperational = false)
     {
