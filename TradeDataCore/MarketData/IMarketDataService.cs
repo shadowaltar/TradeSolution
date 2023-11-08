@@ -37,4 +37,6 @@ public interface IMarketDataService
     Task<ExternalConnectionState> SubscribeTick(Security security);
     Task<ExternalConnectionState> UnsubscribeTick(Security security);
     Task<ExternalConnectionState> UnsubscribeAllTicks();
+
+    Task PrepareOrderBookTable(Security security, int orderBookLevels);
 }

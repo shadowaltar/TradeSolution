@@ -19,6 +19,8 @@ public static class Consts
 
     public static readonly string DatabaseFolder = @"C:\Temp\Data";
 
+    public static readonly int OrderBookLevels = 5;
+
     public const int EnumDatabaseTypeSize = 20;
 
     public const decimal StopPriceRatio = 0.4m;

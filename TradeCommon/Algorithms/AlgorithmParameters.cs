@@ -9,6 +9,7 @@ public record AlgorithmParameters(bool IsBackTesting,
                                   IntervalType Interval,
                                   List<Security> SecurityPool,
                                   AlgoEffectiveTimeRange TimeRange,
-                                  OriginType StopOrderTriggerBy = OriginType.AlgorithmLogic,
+                                  bool RequiresTickData = false,
+                                  OriginType StopOrderTriggerBy = OriginType.UpfrontOrder,
                                   BidAsk TickPriceTriggerForSell = BidAsk.Bid,
                                   BidAsk TickPriceTriggerForBuy = BidAsk.Ask);

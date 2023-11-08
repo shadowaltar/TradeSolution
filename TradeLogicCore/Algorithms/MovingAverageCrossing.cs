@@ -77,10 +77,10 @@ public class MovingAverageCrossing : Algorithm
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
         Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
-        if (parameters.StopOrderTriggerBy == OriginType.AlgorithmLogic)
-            Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
-        else
+        if (parameters.StopOrderTriggerBy == OriginType.UpfrontOrder)
             Entering = entering ?? new ExternalStopOrderEnterPositionAlgoLogic(_context);
+        else
+            Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
         Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, longStopLossRatio, longTakeProfitRatio, shortStopLossRatio, shortTakeProfitRatio);
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");

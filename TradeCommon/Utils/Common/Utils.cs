@@ -1,4 +1,5 @@
 ﻿using log4net;
+using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Essentials.Instruments;
 
 namespace Common;
@@ -36,7 +37,7 @@ public static class Utils
         return default;
     }
 
-    public static bool IsValid(this Security? security)
+    public static bool IsValid([NotNullWhen(true)] this Security? security)
     {
         return security != null && security.Id.IsValid() && !security.Code.IsBlank();
     }

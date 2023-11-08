@@ -23,7 +23,9 @@ using TradeDataCore.MarketData;
 using TradeDataCore.StaticData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
+using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
@@ -242,7 +244,8 @@ public class Program
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var ep = new EngineParameters(new List<string> { "USDT" }, new List<string> { "BTC", "USDT" }, true, true, true, true, true);
-        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
+        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange,
+            RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
 
         var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
@@ -514,7 +517,8 @@ public class Program
                                                                 CleanUpNonCashOnStart: false);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange);
+                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange,
+                        RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
                     var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                     await engine.Run(algoParameters);
 

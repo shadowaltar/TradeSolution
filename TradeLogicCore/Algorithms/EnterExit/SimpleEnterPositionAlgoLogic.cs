@@ -1,8 +1,5 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
-using System.Drawing;
-using TradeCommon.Constants;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Trading;
@@ -76,21 +73,6 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             {
                 await OpenStopLossOrder(stopLossPrice, enterPrice, current, side, enterTime, size, order.Id, state);
                 await OpenTakeProfitOrder(takeProfitPrice, enterPrice, current, side, enterTime, size, order.Id, state);
-                //if (false) // unused logic
-                //{
-
-                //    if (takeProfitPrice.IsValid() && takeProfitPrice > 0)
-                //    {
-                //        if (takeProfitPrice <= enterPrice)
-                //        {
-                //            _log.Error($"Cannot create a take profit limit order where its price {takeProfitPrice} is smaller than or equals to the parent order's limit price {enterPrice}.");
-                //        }
-                //        else
-                //        {
-                //            await OpenTakeProfitOrder(current, enterPrice, side, enterTime, takeProfitPrice, size, order, state);
-                //        }
-                //    }
-                //}
             }
             return state;
         }
@@ -124,76 +106,6 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         return;
     }
 
-    //private async Task OpenStopLossOrder(AlgoEntry current,
-    //                                     decimal enterPrice,
-    //                                     Side side,
-    //                                     DateTime enterTime,
-    //                                     decimal stopLossPrice,
-    //                                     decimal size,
-    //                                     Order parentOrder,
-    //                                     ExternalQueryState parentState)
-    //{
-    //    var stopPrice = current.Security.RoundTickSize(((enterPrice - stopLossPrice) * Consts.StopPriceRatio) + stopLossPrice, enterPrice);
-    //    var slSide = side == Side.Buy ? Side.Sell : Side.Buy;
-    //    var slOrder = CreateOrder(OrderType.StopLimit, slSide, enterTime, stopLossPrice, size, current.Security,
-    //        OrderActionType.AlgoStopLoss, stopPrice, Comments.AlgoStopLossLimit);
-    //    slOrder.ParentOrderId = parentOrder.Id;
-    //    var subState = await _orderService.SendOrder(slOrder);
-    //    parentState.SubStates ??= new();
-    //    parentState.SubStates.Add(subState);
-    //    if (subState.ResultCode == ResultCode.SendOrderFailed)
-    //    {
-    //        _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{slOrder.Id}][{slOrder.SecurityCode}] STOP_P:{stopPrice}, LIMITP:{stopLossPrice}, CURRENT_P:{enterPrice}");
-    //        var slOrder2 = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security,
-    //            OrderActionType.AlgoStopLoss, stopLossPrice, comment: Comments.AlgoStopLossMarket);
-    //        slOrder2.ParentOrderId = parentOrder.Id;
-    //        var subState2 = await _orderService.SendOrder(slOrder2);
-    //        if (subState2.ResultCode == ResultCode.SendOrderFailed)
-    //        {
-    //            _log.Error($"Failed to submit stop loss market order! [{slOrder2.Id}][{slOrder2.SecurityCode}] SL_PRX:{stopLossPrice}, CURRENT_P:{enterPrice}");
-    //        }
-    //        parentState.SubStates.Add(subState2);
-    //    }
-    //}
-
-
-    //private async Task OpenTakeProfitOrder(AlgoEntry current,
-    //                                       decimal enterPrice,
-    //                                       Side side,
-    //                                       DateTime enterTime,
-    //                                       decimal takeProfitPrice,
-    //                                       decimal size,
-    //                                       Order parentOrder,
-    //                                       ExternalQueryState parentState)
-    //{
-    //    var stopPrice = ((enterPrice - takeProfitPrice) * Consts.StopPriceRatio) + takeProfitPrice;
-    //    var tpSide = side == Side.Buy ? Side.Sell : Side.Buy;
-    //    var tpOrder = CreateOrder(OrderType.TakeProfitLimit, tpSide, enterTime, takeProfitPrice, size, current.Security,
-    //        OrderActionType.AlgoTakeProfit, stopPrice, Comments.AlgoTakeProfitLimit);
-    //    tpOrder.ParentOrderId = parentOrder.Id;
-    //    var subState = await _orderService.SendOrder(tpOrder);
-    //    if (subState.ResultCode == ResultCode.SendOrderFailed)
-    //    {
-    //        _log.Error("Failed to submit take profit order! Must cancel the open order or close the open position immediately! SecurityCode: " + tpOrder.SecurityCode);
-    //    }
-    //    parentState.SubStates ??= new();
-    //    parentState.SubStates.Add(subState);
-
-    //    if (subState.ResultCode == ResultCode.SendOrderFailed)
-    //    {
-    //        _log.Error($"Failed to submit stop loss limit order! Now fallback to stop loss market order: [{tpOrder.Id}][{tpOrder.SecurityCode}] STOP_PRX:{stopPrice}, SL_PRX:{takeProfitPrice}, CURRENT_P:{enterPrice}");
-    //        var tpOrder2 = CreateOrder(OrderType.Stop, tpSide, enterTime, 0, size, current.Security,
-    //            OrderActionType.AlgoTakeProfit, takeProfitPrice, comment: Comments.AlgoTakeProfitMarket);
-    //        tpOrder2.ParentOrderId = parentOrder.Id;
-    //        var subState2 = await _orderService.SendOrder(tpOrder2);
-    //        if (subState2.ResultCode == ResultCode.SendOrderFailed)
-    //        {
-    //            _log.Error($"Failed to submit stop loss market order! [{tpOrder2.Id}][{tpOrder2.SecurityCode}] SL_PRX:{takeProfitPrice}, CURRENT_P:{enterPrice}");
-    //        }
-    //        parentState.SubStates.Add(subState2);
-    //    }
-    //}
-
     protected virtual Order CreateOrder(OrderType type,
                                         Side side,
                                         DateTime time,
@@ -213,7 +125,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         if (!security.IsValid()) throw Exceptions.Invalid<Security>(security);
         if (!security.QuoteSecurity.IsValid()) throw Exceptions.Invalid<Security>("Security's quote security is: " + security.QuoteSecurity);
         if (stopPrice != null && (!stopPrice.IsValid() || stopPrice <= 0)) throw Exceptions.Invalid<decimal>(stopPrice);
-        ;
+
         var assetPosition = _context.Services.Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
         if (assetPosition == null || !assetPosition.Security.IsValid()) throw Exceptions.Invalid<Security>("asset position security is: " + assetPosition?.Security);
         if (assetPosition.Quantity < quantity)
