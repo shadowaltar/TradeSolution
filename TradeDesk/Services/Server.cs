@@ -17,6 +17,10 @@ public class Server
     {
         _url = url.Trim('/');
     }
+    public async Task Login(string userName, string userPassword, string adminPassword)
+    {
+
+    }
 
     internal async Task<List<Order>> GetOrders()
     {

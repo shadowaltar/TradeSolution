@@ -1,0 +1,58 @@
+﻿<Window x:Class="TradeDesk.Views.LoginView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels" d:DataContext="{d:DesignInstance Type=viewmodels:LoginViewModel}"
+        mc:Ignorable="d"
+        Title="LoginView" Height="280" Width="400">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Label Grid.Row="1" Grid.Column="0" Content="Username:"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="5"
+                 Text="{Binding UserName}"/>
+        <Label Grid.Row="2" Grid.Column="0" Content="Password:"/>
+        <PasswordBox Grid.Row="2" Grid.Column="1" Margin="5"
+                     PasswordChanged="OnPasswordChanged"/>
+        <Label Grid.Row="3" Grid.Column="0" Content="Account:"/>
+        <TextBox Grid.Row="3" Grid.Column="1" Margin="5"
+                 Text="{Binding Account}"/>
+        <Label Grid.Row="4" Grid.Column="0" Content="Server URL:"/>
+        <TextBox Grid.Row="4" Grid.Column="1" Margin="5"
+                 Text="{Binding ServerUrl}"/>
+        <Label Grid.Row="5" Grid.Column="0" Content="Environment:"/>
+        <ComboBox Grid.Row="5" Grid.Column="1" Margin="5"
+                  ItemsSource="{Binding EnvironmentTypes}"
+                  SelectedItem="{Binding EnvironmentType}"/>
+        <Label Grid.Row="6" Grid.Column="0" Content="Exchange:"/>
+        <ComboBox Grid.Row="6" Grid.Column="1" Margin="5"
+                  ItemsSource="{Binding ExchangeTypes}"
+                  SelectedItem="{Binding ExchangeType}"/>
+        <Label Grid.Row="7" Grid.Column="0" Content="Admin Password:"/>
+        <PasswordBox Grid.Row="7" Grid.Column="1" Margin="5"
+                     PasswordChanged="OnAdminPasswordChanged"/>
+        <Button Grid.Row="8" Grid.Column="1" Content="Login" Margin="5"
+                Command="{Binding LoginCommand}"/>
+        
+    </Grid>
+</Window>

@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Database;
 using Microsoft.Data.Sqlite;
-using Microsoft.Identity.Client;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;

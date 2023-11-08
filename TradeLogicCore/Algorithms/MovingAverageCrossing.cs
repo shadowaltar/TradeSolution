@@ -77,7 +77,10 @@ public class MovingAverageCrossing : Algorithm
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
         Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
-        Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
+        if (parameters.StopOrderTriggerBy == OriginType.AlgorithmLogic)
+            Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);
+        else
+            Entering = entering ?? new ExternalStopOrderEnterPositionAlgoLogic(_context);
         Exiting = exiting ?? new SimpleExitPositionAlgoLogic(_context, longStopLossRatio, longTakeProfitRatio, shortStopLossRatio, shortTakeProfitRatio);
 
         _fastMa = new SimpleMovingAverage(FastParam, "FAST SMA");
@@ -275,12 +278,12 @@ public class MovingAverageCrossing : Algorithm
 
     public override async Task<ExternalQueryState> CloseByTickStopLoss(Position position)
     {
-        return await CloseByTick(position, OrderActionType.AlgoCloseAsStopLoss);
+        return await CloseByTick(position, OrderActionType.TickSignalStopLoss);
     }
 
     public override async Task<ExternalQueryState> CloseByTickTakeProfit(Position position)
     {
-        return await CloseByTick(position, OrderActionType.AlgoCloseAsTakeProfit);
+        return await CloseByTick(position, OrderActionType.TickSignalTakeProfit);
     }
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)

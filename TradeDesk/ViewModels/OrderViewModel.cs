@@ -34,8 +34,6 @@ public class OrderViewModel : AbstractViewModel
         CancelCommand = new DelegateCommand(Cancel);
         CancelAllCommand = new DelegateCommand(CancelAll);
         _server = server;
-
-        PeriodicQuery();
     }
 
     private async void CancelAll()

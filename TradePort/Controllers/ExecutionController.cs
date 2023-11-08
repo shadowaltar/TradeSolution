@@ -23,7 +23,7 @@ namespace TradePort.Controllers;
 /// Provides order execution, portfolio and account management.
 /// </summary>
 [ApiController]
-[Route(RestApiConstants.ExecutionPath)]
+[Route(RestApiConstants.ExecutionRoot)]
 public class ExecutionController : Controller
 {
     /// <summary>

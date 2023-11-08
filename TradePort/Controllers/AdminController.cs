@@ -1,7 +1,7 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
@@ -15,6 +15,7 @@ using TradeLogicCore;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using TradePort.Utils;
+using RequiredAttribute = System.ComponentModel.DataAnnotations.RequiredAttribute;
 
 namespace TradePort.Controllers;
 
@@ -28,33 +29,24 @@ public class AdminController : Controller
     /// <summary>
     /// Set application environment + login (combination of two other calls).
     /// </summary>
+    /// <param name="container"></param>
     /// <param name="adminService"></param>
-    /// <param name="adminPassword"></param>
-    /// <param name="userName"></param>
-    /// <param name="accountName"></param>
-    /// <param name="password"></param>
-    /// <param name="environment"></param>
-    /// <param name="exchange"></param>
+    /// <param name="model"></param>
     /// <returns></returns>
-    [HttpPost("login")]
+    [HttpPost(RestApiConstants.Login)]
     public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IComponentContext container,
                                                            [FromServices] IAdminService adminService,
-                                                           [FromForm(Name = "admin-password")] string adminPassword,
-                                                           [FromQuery(Name = "user")] string userName = "test",
-                                                           [FromForm(Name = "user-password")] string password = "testtest",
-                                                           [FromQuery(Name = "account-name")] string accountName = "spot",
-                                                           [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
-                                                           [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
+                                                           [FromForm] LoginModel model)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsUnknown(environment, out br)) return br;
-        if (ControllerValidator.IsUnknown(exchange, out br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
+        if (ControllerValidator.IsUnknown(model.Environment, out br)) return br;
+        if (ControllerValidator.IsUnknown(model.Exchange, out br)) return br;
 
-        var broker = ExternalNames.Convert(exchange);
+        var broker = ExternalNames.Convert(model.Exchange);
         var context = container.Resolve<Context>();
-        context.Initialize(environment, exchange, broker);
+        context.Initialize(model.Environment, model.Exchange, broker);
 
-        var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
+        var result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
         return result != ResultCode.LoginUserAndAccountOk
             ? BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}")
             : Ok(result);
@@ -90,6 +82,7 @@ public class AdminController : Controller
         await portfolioService.Reload(false, true, true, true);
 
         return Ok("Done");
+
     }
 
     ///// <summary>
@@ -498,5 +491,50 @@ public class AdminController : Controller
 
         [FromForm(Name = "environment")]
         public EnvironmentType Environment { get; set; }
+    }
+
+    public class LoginModel
+    {
+        /// <summary>
+        /// Admin password.
+        /// </summary>
+        [FromForm(Name = "admin-password")]
+        [Required]
+        public string AdminPassword { get; set; }
+
+        /// <summary>
+        /// User name.
+        /// </summary>
+        [FromForm(Name = "user")]
+        [Required, DefaultValue("test")]
+        public string UserName { get; set; } = "test";
+
+        /// <summary>
+        /// User password.
+        /// </summary>
+        [FromForm(Name = "user-password")]
+        [Required, DefaultValue("testtest")]
+        public string Password { get; set; } = "testtest";
+
+        /// <summary>
+        /// Account name; must be owned by given user.
+        /// </summary>
+        [FromForm(Name = "account-name")]
+        [Required, DefaultValue("spot")]
+        public string AccountName { get; set; } = "spot";
+
+        /// <summary>
+        /// Login environment.
+        /// </summary>
+        [FromForm(Name = "environment")]
+        [Required, DefaultValue(EnvironmentType.Uat)]
+        public EnvironmentType Environment { get; set; } = EnvironmentType.Uat;
+
+        /// <summary>
+        /// Connectivity to external system (exchange).
+        /// </summary>
+        [FromForm(Name = "exchange")]
+        [Required, DefaultValue(ExchangeType.Binance)]
+        public ExchangeType Exchange { get; set; } = ExchangeType.Binance;
     }
 }

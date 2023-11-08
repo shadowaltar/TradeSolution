@@ -1,17 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace TradeCommon.Constants;
+﻿namespace TradeCommon.Constants;
 public static class RestApiConstants
 {
-    public const string ExecutionPath = "execution";
+    public const string ExecutionRoot = "execution";
+    public const string AdminRoot = "admin";
+
     public const string SendOrder = "orders/send";
     public const string CancelOrder = "orders/cancel";
     public const string CancelAllOrders = "orders/cancel-all";
-    
+    public const string Login = "login";
+
     public const string QueryRunningAlgorithms = "algorithms/list";
     public const string QueryAlgoBatches = "algo-batches/list";
     public const string QueryAlgoEntries = "algo-entries/list";

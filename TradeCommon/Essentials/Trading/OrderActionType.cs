@@ -9,39 +9,55 @@ public enum OrderActionType
     /// </summary>
     Operational,
 
+    /// <summary>
+    /// A normal order to open a position, placed manually.
+    /// </summary>
     ManualOpen,
+    /// <summary>
+    /// A normal close position order, placed manually.
+    /// </summary>
     ManualClose,
+    /// <summary>
+    /// A normal order to adjust an open position exposure, placed manually.
+    /// </summary>
     ManualAdjust,
-    ManualCancel,
     /// <summary>
     /// A SL order placed manually.
     /// </summary>
-    ManualPlacedStopLoss,
+    ManualStopLoss,
     /// <summary>
     /// A TP order placed manually.
     /// </summary>
-    ManualPlacedTakeProfit,
+    ManualTakeProfit,
 
+    /// <summary>
+    /// A normal order to open a position, placed by algorithm.
+    /// </summary>
     AlgoOpen,
-    AlgoAdjust,
+    /// <summary>
+    /// A normal close position order placed by algorithm.
+    /// </summary>
     AlgoClose,
-    AlgoCancel,
+    /// <summary>
+    /// A normal order to adjust an open position exposure, placed by algorithm.
+    /// </summary>
+    AlgoAdjust,
     /// <summary>
     /// A SL order placed by algorithm.
     /// </summary>
-    AlgoPlacedStopLoss,
+    AlgoStopLoss,
     /// <summary>
     /// A TP order placed by algorithm.
     /// </summary>
-    AlgoPlacedTakeProfit,
+    AlgoTakeProfit,
     /// <summary>
-    /// A normal order to close position which mimics an external SL order.
+    /// A normal order to close position which is created by a tick signal.
     /// </summary>
-    AlgoCloseAsStopLoss,
+    TickSignalStopLoss,
     /// <summary>
-    /// A normal order to close position which mimics an external TP order.
+    /// A normal order to close position which is created by a tick signal.
     /// </summary>
-    AlgoCloseAsTakeProfit,
+    TickSignalTakeProfit,
 
     /// <summary>
     /// A normal order to close position in order to clean up anything opened.
