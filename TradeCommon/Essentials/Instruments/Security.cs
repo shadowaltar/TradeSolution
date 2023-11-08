@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Common;
 
 namespace TradeCommon.Essentials.Instruments;
 public class Security

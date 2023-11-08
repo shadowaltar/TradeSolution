@@ -1,10 +1,10 @@
 ﻿using Common;
+using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 using static TradeCommon.Utils.Delegates;
 
@@ -13,6 +13,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 {
     private readonly IHistoricalMarketDataService _historicalMarketDataService;
     private readonly ISecurityService _securityService;
+    private readonly IStorage _storage;
 
     public IExternalQuotationManagement External { get; }
 
@@ -25,12 +26,14 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     private readonly Dictionary<int, int> _tickSubscriptionCounters = new();
 
     public RealTimeMarketDataService(IExternalQuotationManagement external,
-        IHistoricalMarketDataService historicalMarketDataService,
-        ISecurityService securityService)
+                                     IHistoricalMarketDataService historicalMarketDataService,
+                                     ISecurityService securityService,
+                                     IStorage storage)
     {
         External = external;
         _historicalMarketDataService = historicalMarketDataService;
         _securityService = securityService;
+        _storage = storage;
         External.NextOhlc -= OnNextOhlc;
         External.NextOhlc += OnNextOhlc;
         External.NextTick -= OnNextTick;
@@ -148,7 +151,7 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
 
     public async Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null)
     {
-        return External.SubscribeOrderBook(security, 5);
+        return External.SubscribeOrderBook(security, levels ?? 5);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
@@ -197,5 +200,14 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     {
         External.NextOhlc -= OnNextOhlc;
         NextOhlc = null;
+    }
+
+    public async Task PrepareOrderBookTable(Security security, int orderBookLevels)
+    {
+        var orderBookTableName = DatabaseNames.GetOrderBookTableName(security.Code, security.ExchangeType, orderBookLevels);
+        var isExists = await _storage.IsTableExists(orderBookTableName, DatabaseNames.MarketData);
+        if (!isExists)
+            await _storage.CreateOrderBookTable(security.Code, security.ExchangeType, orderBookLevels);
+        DatabaseNames.OrderBookTableNameCache.ThreadSafeSet(security.Id, orderBookTableName);
     }
 }

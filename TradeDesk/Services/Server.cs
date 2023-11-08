@@ -19,7 +19,7 @@ public class Server
     }
     public async Task Login(string userName, string userPassword, string adminPassword)
     {
-
+        
     }
 
     internal async Task<List<Order>> GetOrders()

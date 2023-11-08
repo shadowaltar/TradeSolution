@@ -11,10 +11,4 @@
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Update="Views\NewOrderView.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-  </ItemGroup>
-
 </Project>

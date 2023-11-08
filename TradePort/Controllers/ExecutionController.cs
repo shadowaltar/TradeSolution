@@ -9,7 +9,6 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
-using TradeCommon.Utils.Common;
 using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;

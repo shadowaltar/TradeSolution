@@ -55,32 +55,41 @@ public class LoginViewModel : AbstractViewModel
     private async void Login()
     {
         var url = $"{ServerUrl.Trim('/')}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
+        try
+        {
+            using var client = HttpHelper.HttpClientWithoutCert();
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            var request = new HttpRequestMessage
+            {
+                Method = HttpMethod.Post,
+                RequestUri = new Uri(url)
+            };
+            var content = new MultipartFormDataContent
+            {
+                { new StringContent(UserName), "user" },
+                { new StringContent(UserPassword), "user-password" },
+                { new StringContent(Account), "account-name" },
+                { new StringContent(EnvironmentType.ToString()), "environment" },
+                { new StringContent(ExchangeType.ToString()), "exchange" },
+                { new StringContent(AdminPassword), "admin-password" }
+            };
+            request.Content = content;
+            var header = new ContentDispositionHeaderValue("form-data");
+            request.Content.Headers.ContentDisposition = header;
 
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        var request = new HttpRequestMessage
+            var response = await client.PostAsync(request.RequestUri.ToString(), request.Content);
+            var result = await response.Content.ReadAsStringAsync();
+            if (result.Contains(ResultCode.LoginUserAndAccountOk.ToString()))
+            {
+            }
+            else
+            {
+                MessageBoxes.Info(null, result.Trim().Trim('\"'), "Login Failed");
+            }
+        }
+        catch (Exception e)
         {
-            Method = HttpMethod.Post,
-            RequestUri = new Uri(url)
-        };
-        var content = new MultipartFormDataContent
-        {
-            { new StringContent(UserName), "user" },
-            { new StringContent(UserPassword), "user-password" },
-            { new StringContent(Account), "account-name" },
-            { new StringContent(EnvironmentType.ToString()), "environment" },
-            { new StringContent(ExchangeType.ToString()), "exchange" },
-            { new StringContent(AdminPassword), "admin-password" }
-        };
-        request.Content = content;
-        var header = new ContentDispositionHeaderValue("form-data");
-        request.Content.Headers.ContentDisposition = header;
-        var response = await client.PostAsync(request.RequestUri.ToString(), request.Content);
-        var result = await response.Content.ReadAsStringAsync();
-        if (Enum.Parse<ResultCode>(result) == ResultCode.LoginUserAndAccountOk)
-        {
-            MessageBoxes.Info(null, "Login successful!", "Login");
+            MessageBoxes.Info(null, "Error: " + e.Message, "Login Failed");
         }
     }
 }

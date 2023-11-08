@@ -1,5 +1,11 @@
-﻿using Common;
+﻿using Autofac.Core;
+using Common;
 using log4net;
+using log4net.Core;
+using Microsoft.CodeAnalysis.Text;
+using Microsoft.Diagnostics.Symbols;
+using Microsoft.Identity.Client.Extensions.Msal;
+using System;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -31,7 +37,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     private readonly int _engineThreadId;
 
     private readonly IntervalType _intervalType;
-
+    private readonly List<ExtendedOrderBook> _orderBookSavingBuffer = new();
     private IReadOnlyDictionary<int, Security>? _pickedSecurities;
 
     /// <summary>
@@ -82,6 +88,8 @@ public class AlgorithmEngine : IAlgorithmEngine
     public ISecurityScreeningAlgoLogic? Screening { get; protected set; }
 
     public int TotalPriceEventCount { get; protected set; }
+    public int TotalTickEventCount { get; protected set; }
+    public int TotalOrderBookEventCount { get; protected set; }
 
     public AlgoBatch AlgoBatch { get; private set; }
 
@@ -225,6 +233,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.MarketData.NextOhlc += OnNextOhlcPrice;
         _services.MarketData.NextTick -= OnNextTickPrice;
         _services.MarketData.NextTick += OnNextTickPrice;
+        _services.MarketData.NextOrderBook -= OnNextOrderBook;
+        _services.MarketData.NextOrderBook += OnNextOrderBook;
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
         _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
 
@@ -240,15 +250,18 @@ public class AlgorithmEngine : IAlgorithmEngine
                 _log.Warn($"Cannot trade the picked security {security.Code}; the account may not have enough free asset to trade.");
                 continue;
             }
+            await _services.MarketData.PrepareOrderBookTable(security, Consts.OrderBookLevels);
             await _services.MarketData.SubscribeOhlc(security, Interval);
-            await _services.MarketData.SubscribeTick(security);
+            await _services.MarketData.SubscribeOrderBook(security, Consts.OrderBookLevels);
+            if (AlgoParameters.RequiresTickData || AlgoParameters.StopOrderTriggerBy == OriginType.TickSignal)
+                await _services.MarketData.SubscribeTick(security);
             subscriptionCount++;
         }
         SetAlgoEffectiveTimeRange(parameters.TimeRange);
 
         // wait for the price thread to be stopped by unsubscription or forceful algo exit
         _signal.WaitOne();
-
+        _runningState = AlgoRunningState.Stopped;
         _log.Info("Algorithm Engine execution ends, processed " + TotalPriceEventCount);
         return TotalPriceEventCount;
     }
@@ -399,13 +412,71 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private async void OnNextOhlcPrice(int securityId, OhlcPrice price, bool isComplete)
     {
-        await ProcessPrice(securityId, price, isComplete);
+        if (Screening == null) throw Exceptions.Impossible("Screening logic must have been initialized.");
+
+        await ClosePositionIfNeeded();
+
+        if (!CanAcceptPrice())
+            return;
+
+        if (!isComplete)
+            return;
+
+#if DEBUG
+        var threadId = Environment.CurrentManagedThreadId;
+        Assertion.Shall(_engineThreadId != threadId);
+#endif
+
+        if (Screening.TryCheckIfChanged(out var securities) || _pickedSecurities == null)
+            _pickedSecurities = securities;
+
+        var security = _pickedSecurities?.GetOrDefault(securityId) ?? throw Exceptions.MissingSecurity();
+        _log.Info($"\n\tPRX: [{price.T:HHmmss}][{security.Code}]\n\t\tH:{security.RoundTickSize(price.H)}, L:{security.RoundTickSize(price.L)}, C:{security.RoundTickSize(price.C)}, V:{price.V}");
+
+        TotalPriceEventCount++;
+        await Update(securityId, price);
     }
 
     private async void OnNextTickPrice(int securityId, string securityCode, Tick tick)
     {
-        await TryStopLoss(securityId, tick);
-        await TryTakeProfit(securityId, tick);
+        if (_runningState != AlgoRunningState.Running)
+            return;
+
+        TotalTickEventCount++;
+        if (AlgoParameters!.StopOrderTriggerBy == OriginType.TickSignal)
+        {
+            await TryStopLoss(securityId, tick);
+            await TryTakeProfit(securityId, tick);
+        }
+    }
+
+    private void OnNextOrderBook(ExtendedOrderBook orderBook)
+    {
+        if (_runningState != AlgoRunningState.Running)
+            return;
+
+        var clone = orderBook with { };
+        clone.Bids = new();
+        foreach (var bid in orderBook.Bids)
+        {
+            clone.Bids.Add(bid with { });
+        }
+        clone.Asks = new();
+        foreach (var ask in orderBook.Asks)
+        {
+            clone.Asks.Add(ask with { });
+        }
+        _orderBookSavingBuffer.Add(clone);
+        if (_orderBookSavingBuffer.Count >= 30)
+        {
+            var orderBooks = new List<ExtendedOrderBook>(_orderBookSavingBuffer);
+            _orderBookSavingBuffer.Clear();
+
+            var orderBookTableName = DatabaseNames.OrderBookTableNameCache.ThreadSafeGet(clone.SecurityId);
+            if (orderBookTableName.IsBlank()) throw Exceptions.Impossible("Order Book table must have been prepared properly.");
+
+            _context.Storage.InsertOrderBooks(orderBooks, orderBookTableName); // fire and forget
+        }
     }
 
     /// <summary>

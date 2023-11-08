@@ -106,7 +106,7 @@ public class SqlReader<T> : IDisposable where T : new()
             : type == typeof(bool?)
             ? Reader.SafeGetBool(name)
             : type.IsEnum
-            ? Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : default
+            ? Enum.TryParse(type, Reader.SafeGetString(name), true, out var result) ? result : Activator.CreateInstance(type)
             : throw new NotImplementedException("Unsupported type: " + type.Name);
     }
 

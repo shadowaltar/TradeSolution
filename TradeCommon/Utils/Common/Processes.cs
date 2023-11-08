@@ -1,4 +1,4 @@
-﻿namespace TradeCommon.Utils;
+﻿namespace Common;
 
 public class Processes
 {

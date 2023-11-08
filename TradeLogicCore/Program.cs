@@ -242,7 +242,8 @@ public class Program
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var ep = new EngineParameters(new List<string> { "USDT" }, new List<string> { "BTC", "USDT" }, true, true, true, true, true);
-        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
+        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange,
+            RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
 
         var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
@@ -276,14 +277,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-            {
-                return await Login(services, userName, password, email, accountName, accountType, environment);
-            }
+                {
+                    return await Login(services, userName, password, email, accountName, accountType, environment);
+                }
             case ResultCode.GetAccountFailed:
-            {
-                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                return await Login(services, userName, password, email, accountName, accountType, environment);
-            }
+                {
+                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                    return await Login(services, userName, password, email, accountName, accountType, environment);
+                }
             default:
                 return result;
         }
@@ -514,7 +515,8 @@ public class Program
                                                                 CleanUpNonCashOnStart: false);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange);
+                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange,
+                        RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
                     var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                     await engine.Run(algoParameters);
 

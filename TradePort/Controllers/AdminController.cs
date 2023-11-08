@@ -23,7 +23,7 @@ namespace TradePort.Controllers;
 /// Provides admin tasks access.
 /// </summary>
 [ApiController]
-[Route("admin")]
+[Route(RestApiConstants.AdminRoot)]
 public class AdminController : Controller
 {
     /// <summary>

@@ -1,7 +1,5 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
-using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -10,7 +8,6 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
-using static System.Collections.Specialized.BitVector32;
 
 namespace TradeLogicCore.Services;
 
@@ -81,9 +78,7 @@ public class OrderService : IOrderService, IDisposable
         }
         Update(orders, security);
 
-        if (statuses.IsNullOrEmpty())
-            return orders;
-        return orders.Where(o => statuses.Contains(o.Status)).ToList();
+        return statuses.IsNullOrEmpty() ? orders : orders.Where(o => statuses.Contains(o.Status)).ToList();
     }
 
     public async Task<List<Order>> GetExternalOpenOrders(Security? security = null)
@@ -122,7 +117,7 @@ public class OrderService : IOrderService, IDisposable
     public async Task<List<OrderState>> GetOrderStates(Security security, DateTime start, DateTime? end = null)
     {
         var orderStates = await _storage.ReadOrderStates(security, start, end ?? DateTime.UtcNow);
-        Update(orderStates, security); 
+        Update(orderStates, security);
         return orderStates;
     }
 
@@ -218,7 +213,7 @@ public class OrderService : IOrderService, IDisposable
 
     public async Task<bool> CancelAllOpenOrders(Security security, OrderActionType action, bool syncExternal)
     {
-        List<Order>? openOrders = null;
+        List<Order>? openOrders;
         if (syncExternal)
         {
             var state = await _execution.GetOpenOrders(security);

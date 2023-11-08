@@ -61,6 +61,8 @@ public static class DatabaseNames
 
     private static readonly Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
 
+    public static Dictionary<int, string> OrderBookTableNameCache { get; } = new();
+
     public static string GetDatabaseName<T>()
     {
         var t = typeof(T);
