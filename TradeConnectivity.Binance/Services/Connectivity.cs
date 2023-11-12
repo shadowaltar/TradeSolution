@@ -11,7 +11,7 @@ public class Connectivity : IExternalConnectivityManagement
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly string _prodHttps = "https://api.binance.vision";
+    private readonly string _prodHttps = "https://api.binance.com";
     private readonly string _prodWs = "wss://stream.binance.com:9443";
 
     private readonly string _testHttps = "https://testnet.binance.vision";

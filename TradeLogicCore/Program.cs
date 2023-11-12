@@ -243,7 +243,13 @@ public class Program
         }
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
-        var ep = new EngineParameters(new List<string> { "USDT" }, new List<string> { "BTC", "USDT" }, true, true, true, true, true);
+        var ep = new EngineParameters(new List<string> { "USDT" },
+                                      GlobalCurrencyFilter: new List<string> { "BTC", "USDT" },
+                                      AssumeNoOpenPositionOnStart: false,
+                                      CancelOpenOrdersOnStart: true,
+                                      CloseOpenPositionsOnStop: true,
+                                      CloseOpenPositionsOnStart: true,
+                                      CleanUpNonCashOnStart: false);
         var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange,
             RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
 

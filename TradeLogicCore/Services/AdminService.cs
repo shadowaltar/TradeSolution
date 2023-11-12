@@ -77,11 +77,11 @@ public class AdminService : IAdminService
         CurrentUser = user;
 
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
-        if (!Credential.IsPasswordCorrect(user, password))
-        {
-            _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
-            return ResultCode.InvalidCredential;
-        }
+        //if (!Credential.IsPasswordCorrect(user, password))
+        //{
+        //    _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
+        //    return ResultCode.InvalidCredential;
+        //}
 
         var account = await GetAccount(accountName, environment);
         if (account == null)

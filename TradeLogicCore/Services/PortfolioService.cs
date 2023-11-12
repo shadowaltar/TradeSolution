@@ -117,7 +117,20 @@ public class PortfolioService : IPortfolioService, IDisposable
         {
             throw Exceptions.Invalid<Asset>("Failed to retrieve assets from external!");
         }
-        _securityService.Fix(assets);
+        // at least for binance, some assets are not traded and no security definition is found from binance itself.
+        var codesWithoutSecurity = new List<string>();
+        foreach (var asset in assets)
+        {
+            var sec = _securityService.GetSecurity(asset.SecurityCode);
+            if (sec == null)
+                codesWithoutSecurity.Add(asset.SecurityCode);
+            else
+                _securityService.Fix(asset, sec);
+        }
+        if (!codesWithoutSecurity.IsNullOrEmpty())
+        {
+            _log.Warn("Codes of externally-retrieved assets without security definitions: " + string.Join(", ", codesWithoutSecurity));
+        }
         return assets.Where(a => !a.IsSecurityInvalid()).ToList();
     }
 
