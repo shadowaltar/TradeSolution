@@ -1,9 +1,12 @@
 ﻿using Common;
+using Microsoft.Diagnostics.Runtime.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Windows.Input;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
@@ -78,13 +81,18 @@ public class LoginViewModel : AbstractViewModel
             request.Content.Headers.ContentDisposition = header;
 
             var response = await client.PostAsync(request.RequestUri.ToString(), request.Content);
-            var result = await response.Content.ReadAsStringAsync();
-            if (result.Contains(ResultCode.LoginUserAndAccountOk.ToString()))
+            if (response.IsSuccessStatusCode)
             {
-            }
-            else
-            {
-                MessageBoxes.Info(null, result.Trim().Trim('\"'), "Login Failed");
+                var loginContent = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+                var resultCodeStr = loginContent.GetProperty("ResultCode").GetString();
+                if (!Enum.TryParse<ResultCode>(resultCodeStr, out var resultCode))
+                {
+                    MessageBoxes.Info(null, "Result: " + resultCode, "Login Failed");
+                }
+                var token = loginContent.GetProperty("Token").GetString();
+                // must set the auth-token from now on
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
         }
         catch (Exception e)

@@ -3,11 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.6.33723.286
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeApp", "TradeApp\TradeApp.csproj", "{1B077CFA-57C8-462A-A140-BBF698A88151}"
-	ProjectSection(ProjectDependencies) = postProject
-		{94EE30D5-8C1E-4CF8-A092-2C52E823F0AD} = {94EE30D5-8C1E-4CF8-A092-2C52E823F0AD}
-	EndProjectSection
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradePort", "TradePort\TradePort.csproj", "{F88F2718-9AEA-4DBE-AEA0-8606EC40C4FF}"
 	ProjectSection(ProjectDependencies) = postProject
 		{94EE30D5-8C1E-4CF8-A092-2C52E823F0AD} = {94EE30D5-8C1E-4CF8-A092-2C52E823F0AD}
@@ -48,7 +43,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeMarketDataSaver", "TradeMarketDataSaver\TradeMarketDataSaver.csproj", "{E7C2FFBF-D90C-44C6-96EE-BAB2E7289F1B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeDesk", "TradeDesk\TradeDesk.csproj", "{3707C546-B8B1-4EE6-B4D9-19E5D44FA7C5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeDesk", "TradeDesk\TradeDesk.csproj", "{3707C546-B8B1-4EE6-B4D9-19E5D44FA7C5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -58,14 +53,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Debug|x64.ActiveCfg = Debug|x64
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Debug|x64.Build.0 = Debug|x64
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Release|x64.ActiveCfg = Release|x64
-		{1B077CFA-57C8-462A-A140-BBF698A88151}.Release|x64.Build.0 = Release|x64
 		{F88F2718-9AEA-4DBE-AEA0-8606EC40C4FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{F88F2718-9AEA-4DBE-AEA0-8606EC40C4FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F88F2718-9AEA-4DBE-AEA0-8606EC40C4FF}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -159,7 +146,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{1B077CFA-57C8-462A-A140-BBF698A88151} = {0750EA06-2FD4-4907-907B-3FFA32D77F12}
 		{F88F2718-9AEA-4DBE-AEA0-8606EC40C4FF} = {0750EA06-2FD4-4907-907B-3FFA32D77F12}
 		{61A61B08-156E-40DA-9F31-B4B24A5856BD} = {5638F6DF-53E4-475D-86C7-738CACD1C5FE}
 		{A95F5743-1CC4-440B-9E2A-1E8CDDA9C5A2} = {5638F6DF-53E4-475D-86C7-738CACD1C5FE}

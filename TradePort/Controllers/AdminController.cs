@@ -1,7 +1,12 @@
 ﻿using Autofac;
 using Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
@@ -33,10 +38,11 @@ public class AdminController : Controller
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <returns></returns>
+    [AllowAnonymous]
     [HttpPost(RestApiConstants.Login)]
     public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IComponentContext container,
                                                            [FromServices] IAdminService adminService,
-                                                           [FromForm] LoginModel model)
+                                                           [FromForm] LoginRequestModel model)
     {
         if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
         if (ControllerValidator.IsUnknown(model.Environment, out br)) return br;
@@ -47,9 +53,45 @@ public class AdminController : Controller
         context.Initialize(model.Environment, model.Exchange, broker);
 
         var result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
-        return result != ResultCode.LoginUserAndAccountOk
-            ? BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}")
-            : Ok(result);
+        if (result == ResultCode.LoginUserAndAccountOk)
+        {
+            if (context.User == null || context.Account == null) throw Exceptions.Impossible();
+            HttpContext.Session.SetString("UserName", context.User.Name);
+            HttpContext.Session.SetInt32("UserId", context.User.Id);
+            HttpContext.Session.SetString("AccountName", context.Account.Name);
+            HttpContext.Session.SetInt32("AccountId", context.Account.Id);
+
+            var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
+            var secretKey = Encoding.ASCII.GetBytes(secretStr);
+            var claims = new Claim[]
+            {
+                new Claim(ClaimTypes.Name, context.User.Name),
+                new Claim(ClaimTypes.Email, context.User.Email),
+                new Claim(ClaimTypes.Role, "Superuser"), // TODO
+            };
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddDays(7),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256Signature),
+                Issuer = "TradingPort",
+                Audience = "SpecialTradingUnicorn"
+            };
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            var tokenString = tokenHandler.WriteToken(token);
+            Ok(new LoginResponseModel(result,
+                                      context.User.Id,
+                                      context.User.Name,
+                                      context.User.Email,
+                                      context.Account.Id,
+                                      context.Account.Name,
+                                      context.Exchange,
+                                      context.Broker,
+                                      context.Environment,
+                                      tokenString));
+        }
+        return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
     }
 
     [HttpPost("reconcile")]
@@ -493,7 +535,7 @@ public class AdminController : Controller
         public EnvironmentType Environment { get; set; }
     }
 
-    public class LoginModel
+    public class LoginRequestModel
     {
         /// <summary>
         /// Admin password.
@@ -537,4 +579,15 @@ public class AdminController : Controller
         [Required, DefaultValue(ExchangeType.Binance)]
         public ExchangeType Exchange { get; set; } = ExchangeType.Binance;
     }
+
+    public record LoginResponseModel(ResultCode Result,
+                                     int UserId,
+                                     string UserName,
+                                     string Email,
+                                     int AccountId,
+                                     string AccountName,
+                                     ExchangeType Exchange,
+                                     BrokerType Broker,
+                                     EnvironmentType Environment,
+                                     string Token);
 }

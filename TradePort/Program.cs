@@ -2,6 +2,8 @@ using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Common;
 using log4net.Config;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using OfficeOpenXml;
 using System.Reflection;
 using System.Text;
@@ -16,12 +18,41 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 // create asp.net core application
 var builder = WebApplication.CreateBuilder(args);
 
+var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
+var secretKey = Encoding.ASCII.GetBytes(secretStr);
+
 // Add services to the container.
 builder.Services.AddControllers();
-
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddDirectoryBrowser();
+builder.Services
+    .AddEndpointsApiExplorer()
+    .AddDirectoryBrowser()
+    .AddDistributedMemoryCache()
+    .AddSession(o =>
+    {
+        o.Cookie.Name = "TradePort.Session";
+        o.IdleTimeout = TimeSpan.FromHours(24);
+        o.Cookie.IsEssential = true;
+        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    })
+    .AddAuthentication(x => {
+        x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(x =>
+    {
+        x.RequireHttpsMetadata = false;
+        x.SaveToken = true;
+        x.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(secretKey),
+            ValidateIssuer = true,
+            ValidIssuer = "TradingPort",
+            ValidateAudience = true,
+            ValidAudience = "SpecialTradingUnicorn",
+            ValidateLifetime = true
+        };
+    });
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -61,6 +92,7 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseStaticFiles(new StaticFileOptions
