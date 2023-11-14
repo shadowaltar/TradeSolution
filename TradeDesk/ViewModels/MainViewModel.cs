@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading;
-using TradeDesk.Services;
+﻿using TradeDesk.Services;
 
 namespace TradeDesk.ViewModels;
 public class MainViewModel : AbstractViewModel

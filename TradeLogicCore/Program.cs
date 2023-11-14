@@ -288,14 +288,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-            {
-                return await Login(services, userName, password, email, accountName, accountType, environment);
-            }
+                {
+                    return await Login(services, userName, password, email, accountName, accountType, environment);
+                }
             case ResultCode.GetAccountFailed:
-            {
-                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                return await Login(services, userName, password, email, accountName, accountType, environment);
-            }
+                {
+                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                    return await Login(services, userName, password, email, accountName, accountType, environment);
+                }
             default:
                 return result;
         }

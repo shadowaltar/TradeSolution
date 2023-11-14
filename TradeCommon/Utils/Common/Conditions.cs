@@ -1,6 +1,4 @@
-﻿using Common;
-
-namespace TradeCommon.Utils.Common;
+﻿namespace Common;
 public static class Conditions
 {
     public static bool EitherNull<T>(T v1, T v2)

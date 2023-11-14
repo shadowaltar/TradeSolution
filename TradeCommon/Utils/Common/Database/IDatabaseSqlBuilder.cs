@@ -1,6 +1,4 @@
-﻿using TradeCommon.Constants;
-
-namespace Common.Database;
+﻿namespace Common.Database;
 
 public interface IDatabaseSqlBuilder
 {
@@ -10,7 +8,7 @@ public interface IDatabaseSqlBuilder
 
     string CreateCreateTableAndIndexSql<T>(string? tableNameOverride = null) where T : class;
 
-    string CreateDeleteSql<T>(char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix,
+    string CreateDeleteSql<T>(char placeholderPrefix = '$',
                               string? tableNameOverride = null) where T : class;
 
     string GetCreateTableUniqueClause<T>();

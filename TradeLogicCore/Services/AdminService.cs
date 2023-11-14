@@ -160,11 +160,8 @@ public class AdminService : IAdminService
 
     public async Task<int> CreateAccount(Account account)
     {
-        if (account.Id <= 0) throw new ArgumentException("Invalid account type.");
         if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
-
-        account.ValidateOrThrow();
-        account.AutoCorrect();
+        _storage.SetEnvironment(account.Environment);
         return await _storage.InsertOne(account, false);
     }
 

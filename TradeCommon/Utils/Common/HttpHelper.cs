@@ -1,8 +1,12 @@
 ﻿using log4net;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
+using TradeCommon.Constants;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
 
 namespace Common;
 public static class HttpHelper
@@ -113,5 +117,16 @@ public static class HttpHelper
             log.Error($"Failed to send request to {request.RequestUri}. Error: " + e.Message, e);
             return (new HttpResponseMessage(HttpStatusCode.NotFound), swInner?.ElapsedMilliseconds ?? 0);
         }
+    }
+
+    public static HttpClient HttpClientWithoutCert()
+    {
+        return new HttpClient(new HttpClientHandler()
+        {
+            ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, cetChain, policyErrors) =>
+            {
+                return true;
+            }
+        });
     }
 }
