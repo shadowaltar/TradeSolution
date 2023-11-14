@@ -1,8 +1,4 @@
 ﻿using Common;
-using log4net.Core;
-using Microsoft.CodeAnalysis.Text;
-using Microsoft.Diagnostics.Symbols;
-using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -28,7 +24,6 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
     public event Action<int>? HistoricalPriceEnd;
 
     private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = new();
-    private readonly Dictionary<int, int> _tickSubscriptionCounters = new();
 
     public RealTimeMarketDataService(IExternalQuotationManagement external,
                                      IHistoricalMarketDataService historicalMarketDataService,
@@ -154,9 +149,14 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         return External.SubscribeTick(security);
     }
 
-    public async Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null)
+    public async Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? level = null)
     {
-        return External.SubscribeOrderBook(security, levels ?? 5);
+        var lvl = level ?? 5;
+        var table = DatabaseNames.GetOrderBookTableName(security.Code, security.ExchangeType, lvl);
+        var exists = await _storage.CheckTableExists(table, DatabaseNames.MarketData);
+        if (!exists)
+            await _storage.CreateOrderBookTable(security.Code, security.ExchangeType, lvl);
+        return External.SubscribeOrderBook(security, lvl);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
@@ -183,9 +183,9 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
         throw new NotImplementedException();
     }
 
-    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
+    public async Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
     {
-        throw new NotImplementedException();
+        return await External.UnsubscribeOrderBook(security);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval)
@@ -196,14 +196,16 @@ public class RealTimeMarketDataService : IMarketDataService, IDisposable
             : ExternalConnectionStates.StillHasSubscribedRealTimeOhlc(security, interval);
     }
 
-    public Task<ExternalConnectionState> UnsubscribeTick(Security security)
+    public async Task<ExternalConnectionState> UnsubscribeTick(Security security)
     {
-        throw new NotImplementedException();
+        return await External.UnsubscribeTick(security);
     }
 
     public void Dispose()
     {
         External.NextOhlc -= OnNextOhlc;
+        External.NextTick -= OnNextTick;
+        External.NextOrderBook -= OnNextOrderBook;
         NextOhlc = null;
     }
 

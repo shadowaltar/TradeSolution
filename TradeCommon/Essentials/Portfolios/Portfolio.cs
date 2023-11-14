@@ -1,4 +1,5 @@
 ﻿using Common;
+using log4net;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
@@ -9,6 +10,8 @@ namespace TradeCommon.Essentials.Portfolios;
 /// </summary>
 public record Portfolio
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly Dictionary<long, Position> _positions = new();
     private readonly Dictionary<long, Asset> _assets = new();
     private readonly Dictionary<int, Position> _positionsBySecurityId = new();
@@ -29,7 +32,10 @@ public record Portfolio
         foreach (var asset in assets)
         {
             if (!asset.Security.IsAsset)
-                throw Exceptions.InvalidSecurity(asset.Security.Code, "Expecting a security for asset position.");
+            {
+                _log.Error("Invalid asset position which associates to a normal security; security code is:" + asset.Security.Code);
+                continue;
+            }
             _assets.Add(asset.Id, asset);
             _assetsBySecurityId.Add(asset.SecurityId, asset);
         }

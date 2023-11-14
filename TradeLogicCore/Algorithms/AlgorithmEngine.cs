@@ -229,13 +229,9 @@ public class AlgorithmEngine : IAlgorithmEngine
         }
 
         // subscribe to events
-        _services.MarketData.NextOhlc -= OnNextOhlcPrice;
         _services.MarketData.NextOhlc += OnNextOhlcPrice;
-        _services.MarketData.NextTick -= OnNextTickPrice;
         _services.MarketData.NextTick += OnNextTickPrice;
-        _services.MarketData.NextOrderBook -= OnNextOrderBook;
         _services.MarketData.NextOrderBook += OnNextOrderBook;
-        _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
         _services.MarketData.HistoricalPriceEnd += OnHistoricalPriceEnd;
 
         // subscribe to prices
@@ -370,6 +366,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         _runningState = AlgoRunningState.Stopped;
         _services.MarketData.NextOhlc -= OnNextOhlcPrice;
         _services.MarketData.NextTick -= OnNextTickPrice;
+        _services.MarketData.NextOrderBook -= OnNextOrderBook;
         _services.MarketData.HistoricalPriceEnd -= OnHistoricalPriceEnd;
 
         _services.Order.OrderProcessed -= OnOrderProcessed;
@@ -381,6 +378,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         foreach (var security in securities.Values)
         {
             await _services.MarketData.UnsubscribeOhlc(security, Interval);
+            await _services.MarketData.UnsubscribeTick(security);
+            await _services.MarketData.UnsubscribeOrderBook(security);
         }
         // unblock the main thread and let it finish
         _signal.Set();

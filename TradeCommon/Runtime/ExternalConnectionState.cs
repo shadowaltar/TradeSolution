@@ -518,6 +518,32 @@ public static class ExternalConnectionStates
         };
     }
 
+    public static ExternalConnectionState UnsubscribedOrderBookOk(Security security)
+    {
+        return new()
+        {
+            Action = ActionType.Unsubscribe,
+            ResultCode = ResultCode.UnsubscriptionOk,
+            ExternalId = BrokerId,
+            Description = $"Unsubscribed orderbook for {security.Id}",
+            Type = SubscriptionType.OrderBook,
+            UniqueConnectionId = "",
+        };
+    }
+
+    public static ExternalConnectionState UnsubscribedOrderBookFailed(Security security)
+    {
+        return new()
+        {
+            Action = ActionType.Unsubscribe,
+            ResultCode = ResultCode.UnsubscriptionOk,
+            ExternalId = BrokerId,
+            Description = $"Failed to unsubscribe orderbook for {security.Id}",
+            Type = SubscriptionType.OrderBook,
+            UniqueConnectionId = "",
+        };
+    }
+
     public static ExternalConnectionState UnsubscribedRealTimeOhlcFailed(Security security, IntervalType interval)
     {
         return new()

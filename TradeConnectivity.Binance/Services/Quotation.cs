@@ -482,9 +482,18 @@ public class Quotation : IExternalQuotationManagement
         }
     }
 
-    public Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
+    public async Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
     {
-        throw new NotImplementedException();
+        if (!security.IsFrom(ExternalNames.Binance))
+            return ExternalConnectionStates.InvalidSecurity(SubscriptionType.OrderBook, ActionType.Unsubscribe);
+
+        var broker = _orderBookBrokers.ThreadSafeGetAndRemove(security.Id);
+        broker?.Dispose();
+        var wsName = $"{nameof(OrderBook)}_{security.Id}";
+        var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
+        return ws != null && await CloseWebSocket(ws, wsName)
+            ? ExternalConnectionStates.UnsubscribedOrderBookOk(security)
+            : ExternalConnectionStates.UnsubscribedOrderBookFailed(security);
     }
 
     /// <summary>
@@ -516,10 +525,5 @@ public class Quotation : IExternalQuotationManagement
             }
             return false;
         }
-    }
-
-    public Task<ExternalConnectionState> SubscribeOrderBook(Security security)
-    {
-        throw new NotImplementedException();
     }
 }

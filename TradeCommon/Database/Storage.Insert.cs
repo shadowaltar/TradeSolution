@@ -160,10 +160,16 @@ public partial class Storage
                 for (int i = 0; i < level; i++)
                 {
                     var idx = i + 1;
-                    command.Parameters.AddWithValue("$B" + idx, orderBook.Bids[i].Price);
-                    command.Parameters.AddWithValue("$BS" + idx, orderBook.Bids[i].Size);
-                    command.Parameters.AddWithValue("$A" + idx, orderBook.Asks[i].Price);
-                    command.Parameters.AddWithValue("$AS" + idx, orderBook.Asks[i].Size);
+                    if (orderBook.Bids.Count - 1 >= i)
+                    {
+                        command.Parameters.AddWithValue("$B" + idx, orderBook.Bids[i].Price);
+                        command.Parameters.AddWithValue("$BS" + idx, orderBook.Bids[i].Size);
+                    }
+                    if (orderBook.Asks.Count - 1 >= i)
+                    {
+                        command.Parameters.AddWithValue("$A" + idx, orderBook.Asks[i].Price);
+                        command.Parameters.AddWithValue("$AS" + idx, orderBook.Asks[i].Size);
+                    }
                 }
                 await command.ExecuteNonQueryAsync();
                 count++;

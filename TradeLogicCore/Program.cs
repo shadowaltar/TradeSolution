@@ -61,7 +61,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Uat;
+        var environment = EnvironmentType.Prod;
 
         if (environment == EnvironmentType.Uat)
         {
@@ -99,10 +99,10 @@ public class Program
         storage.SetEnvironment(environment);
 
         _log.Info("Changing Environment: " + environment);
-        if (environment == EnvironmentType.Prod)
-        {
-            Environment.Exit(1);
-        }
+        //if (environment == EnvironmentType.Prod)
+        //{
+        //    Environment.Exit(1);
+        //}
 
         await storage.CreateTable<Order>("stock_orders");
         await storage.CreateTable<OrderState>("stock_order_states");
@@ -122,8 +122,6 @@ public class Program
         await storage.CreateTable<AssetState>();
         await storage.CreateTable<AlgoEntry>();
         await storage.CreateTable<AlgoBatch>();
-        await storage.CreateAccountTable();
-        await storage.CreateUserTable();
         await storage.CreateSecurityTable(SecurityType.Fx);
         await storage.CreateSecurityTable(SecurityType.Equity);
         await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Fx);
@@ -132,40 +130,45 @@ public class Program
         await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Equity);
         await storage.CreateFinancialStatsTable();
 
-
-        var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
-        await reader.ReadAndSave(SecurityType.Fx);
-        var now = DateTime.UtcNow;
-        var user = new User
+        var createUserAccount = false;
+        if (createUserAccount)
         {
-            Name = _userName.ToLowerInvariant(),
-            Email = _email,
-            CreateTime = now,
-            UpdateTime = now,
-            Environment = Environments.ToString(environment),
-        };
-        var userPassword = _password;
-        Credential.EncryptUserPassword(user, ref userPassword);
-        await storage.InsertOne(user, true);
-        user = await storage.ReadUser(user.Name, user.Email, environment);
+            await storage.CreateAccountTable();
+            await storage.CreateUserTable();
+            var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
+            await reader.ReadAndSave(SecurityType.Fx);
+            var now = DateTime.UtcNow;
+            var user = new User
+            {
+                Name = _userName.ToLowerInvariant(),
+                Email = _email,
+                CreateTime = now,
+                UpdateTime = now,
+                Environment = Environments.ToString(environment),
+            };
+            var userPassword = _password;
+            Credential.EncryptUserPassword(user, ref userPassword);
+            await storage.InsertOne(user, true);
+            user = await storage.ReadUser(user.Name, user.Email, environment);
 
 
-        var account = new Account
-        {
-            OwnerId = user.Id,
-            Name = _accountName.ToLowerInvariant(),
-            Type = _accountType,
-            SubType = "",
-            Environment = environment,
-            BrokerId = ExternalNames.GetBrokerId(_broker),
-            CreateTime = now,
-            UpdateTime = now,
-            ExternalAccount = _accountId,
-            FeeStructure = "",
-        };
-        await storage.InsertOne(account, true);
-        account = await storage.ReadAccount(account.Name);
-        user.Accounts.Add(account);
+            var account = new Account
+            {
+                OwnerId = user.Id,
+                Name = _accountName.ToLowerInvariant(),
+                Type = _accountType,
+                SubType = "",
+                Environment = environment,
+                BrokerId = ExternalNames.GetBrokerId(_broker),
+                CreateTime = now,
+                UpdateTime = now,
+                ExternalAccount = _accountId,
+                FeeStructure = "",
+            };
+            await storage.InsertOne(account, true);
+            account = await storage.ReadAccount(account.Name);
+            user.Accounts.Add(account);
+        }
 
         Environment.Exit(0);
     }

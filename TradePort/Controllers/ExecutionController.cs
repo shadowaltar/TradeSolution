@@ -338,7 +338,7 @@ public class ExecutionController : Controller
         foreach (var code in codes)
         {
             var security = services.Security.GetSecurity(code);
-            if (security == null || !security.IsAsset) return BadRequest("Invalid code / missing asset security.");
+            if (security == null || !security.IsAsset) return BadRequest("Invalid code / missing asset security / expect asset code but security code is provided.");
             securities.Add(security);
         }
 

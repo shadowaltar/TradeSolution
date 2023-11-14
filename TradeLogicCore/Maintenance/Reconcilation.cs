@@ -419,7 +419,9 @@ public class Reconcilation
                 var state = AssetState.From(asset);
                 await _storage.InsertOne(state, false);
             }
+
         }
+        _portfolioService.Update(internalResults, false);
 
         _persistence.WaitAll();
     }
