@@ -430,55 +430,53 @@ public class Quotation : IExternalQuotationManagement
                 //    ]
                 //  ]
                 //}";
+
                 var orderBook = _orderBookPool.Lease();
                 var bids = node["bids"]?.AsArray();
                 var asks = node["asks"]?.AsArray();
-                if (!bids.IsNullOrEmpty())
-                {
-                    if (orderBook.Bids.Count != bids.Count)
-                    {
-                        orderBook.Bids.Clear();
-                        for (int i = 0; i < bids.Count; i++)
-                        {
-                            orderBook.Bids.Add(new OrderBookLevel());
-                        }
-                    }
-                    for (int i = 0; i < bids.Count; i++)
-                    {
-                        JsonNode? levelObject = bids[i];
-                        var level = levelObject?.AsArray();
-                        if (level != null)
-                        {
-                            orderBook.Bids[i].Price = level[0]?.ToString().ToDecimal() ?? 0;
-                            orderBook.Bids[i].Size = level[1]?.ToString().ToDecimal() ?? 0;
-                        }
-                    }
-                }
-                if (!asks.IsNullOrEmpty())
-                {
-                    if (orderBook.Asks.Count != asks.Count)
-                    {
-                        orderBook.Asks.Clear();
-                        for (int i = 0; i < asks.Count; i++)
-                        {
-                            orderBook.Asks.Add(new OrderBookLevel());
-                        }
-                    }
-                    for (int i = 0; i < asks.Count; i++)
-                    {
-                        JsonNode? levelObject = asks[i];
-                        var level = levelObject?.AsArray();
-                        if (level != null)
-                        {
-                            orderBook.Asks[i].Price = level[0]?.ToString().ToDecimal() ?? 0;
-                            orderBook.Asks[i].Size = level[1]?.ToString().ToDecimal() ?? 0;
-                        }
-                    }
-                }
+                var bestBid = Set(orderBook.Bids, bids, BidAsk.Bid);
+                var bestAsk = Set(orderBook.Asks, asks, BidAsk.Ask);
+                if (!bestBid.IsValid())
+                    _log.Warn("Invalid OrderBook data: best bid is not valid!");
+                if (!bestAsk.IsValid())
+                    _log.Warn("Invalid OrderBook data: best ask is not valid!");
+                if (bestBid >= bestAsk)
+                    _log.Warn("Invalid OrderBook data: best bid == best ask");
                 orderBook.SecurityId = security.Id;
                 orderBook.Time = now;
                 broker!.Enqueue(orderBook);
             }
+        }
+
+        decimal Set(List<OrderBookLevel> levels, JsonArray? levelJsons, BidAsk bidAsk)
+        {
+            var bestValue = bidAsk == BidAsk.Bid ? decimal.MinValue : decimal.MaxValue;
+            if (!levelJsons.IsNullOrEmpty())
+            {
+                if (levels.Count != levelJsons.Count)
+                {
+                    // either the depth level is changed or it was empty
+                    levels.Clear();
+                    for (int i = 0; i < levelJsons.Count; i++)
+                    {
+                        levels.Add(new OrderBookLevel());
+                    }
+                }
+                for (int i = 0; i < levelJsons.Count; i++)
+                {
+                    JsonNode? levelObject = levelJsons[i];
+                    var level = levelObject?.AsArray();
+                    if (level != null)
+                    {
+                        var price = level[0].GetDecimal();
+                        levels[i].Price = price;
+                        levels[i].Size = level[1].GetDecimal();
+                        bestValue = bidAsk == BidAsk.Bid
+                            ? Math.Max(bestValue, price) : Math.Min(bestValue, price);
+                    }
+                }
+            }
+            return bestValue;
         }
     }
 

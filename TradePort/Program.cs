@@ -83,6 +83,7 @@ var app = builder.Build();
 // both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 app.UseDeveloperExceptionPage();
+app.UseSession();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {

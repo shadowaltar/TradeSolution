@@ -159,7 +159,7 @@ WHERE
         {
             var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Order>(secType);
             var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND ExternalOrderId = $ExternalOrderId";
-            var order = await SqlReader.ReadOne<Order>(tableName, _environmentString, dbName, sql, ("$accountId", AccountId), ("$ExternalOrderId", externalOrderId));
+            var order = await SqlReader.ReadOne<Order>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$ExternalOrderId", externalOrderId));
             if (order != null)
                 return order;
         }

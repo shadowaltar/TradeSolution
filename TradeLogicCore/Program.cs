@@ -61,7 +61,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Prod;
+        var environment = EnvironmentType.Uat;
 
         if (environment == EnvironmentType.Uat)
         {
@@ -124,6 +124,8 @@ public class Program
         await storage.CreateTable<AlgoBatch>();
         await storage.CreateSecurityTable(SecurityType.Fx);
         await storage.CreateSecurityTable(SecurityType.Equity);
+        var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
+        await reader.ReadAndSave(SecurityType.Fx);
         await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Fx);
         await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Fx);
         await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Equity);
@@ -135,8 +137,6 @@ public class Program
         {
             await storage.CreateAccountTable();
             await storage.CreateUserTable();
-            var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
-            await reader.ReadAndSave(SecurityType.Fx);
             var now = DateTime.UtcNow;
             var user = new User
             {
@@ -170,7 +170,7 @@ public class Program
             user.Accounts.Add(account);
         }
 
-        Environment.Exit(0);
+        //Environment.Exit(0);
     }
 
     private static async Task RunMacMimicWebService(EnvironmentType environment)
@@ -202,7 +202,7 @@ public class Program
         var initialAvailableQuantity = 100;
 
 
-        //await ResetTables(environment);
+        await ResetTables(environment);
 
 
         var broker = ExternalNames.Convert(exchange);
@@ -246,6 +246,7 @@ public class Program
         }
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
+        var securityPool = new List<Security> { security };
         var ep = new EngineParameters(new List<string> { "USDT" },
                                       GlobalCurrencyFilter: new List<string> { "BTC", "USDT" },
                                       AssumeNoOpenPositionOnStart: false,
@@ -253,8 +254,8 @@ public class Program
                                       CloseOpenPositionsOnStop: true,
                                       CloseOpenPositionsOnStart: true,
                                       CleanUpNonCashOnStart: false);
-        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange,
-            RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
+        var ap = new AlgorithmParameters(false, interval, securityPool, securityPool.Select(s => s.Code).ToList(), algoTimeRange,
+            RequiresTickData: true, StopOrderTriggerBy: StopOrderStyleType.TickSignal);
 
         var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
@@ -288,14 +289,14 @@ public class Program
         {
             case ResultCode.GetSecretFailed:
             case ResultCode.SecretMalformed:
-                {
-                    return await Login(services, userName, password, email, accountName, accountType, environment);
-                }
+            {
+                return await Login(services, userName, password, email, accountName, accountType, environment);
+            }
             case ResultCode.GetAccountFailed:
-                {
-                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                    return await Login(services, userName, password, email, accountName, accountType, environment);
-                }
+            {
+                _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                return await Login(services, userName, password, email, accountName, accountType, environment);
+            }
             default:
                 return result;
         }
@@ -526,8 +527,8 @@ public class Program
                                                                 CleanUpNonCashOnStart: false);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, timeRange,
-                        RequiresTickData: true, StopOrderTriggerBy: OriginType.TickSignal);
+                    var algoParameters = new AlgorithmParameters(true, interval, securityPool, securityPool.Select(s => s.Code).ToList(), timeRange,
+                        RequiresTickData: true, StopOrderTriggerBy: StopOrderStyleType.TickSignal);
                     var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                     await engine.Run(algoParameters);
 
@@ -686,7 +687,12 @@ public class Program
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
-                        var algoStartParams = new AlgorithmParameters(true, interval, securityPool, timeRange);
+                        var algoStartParams = new AlgorithmParameters(true,
+                                                                      interval,
+                                                                      securityPool,
+                                                                      securityPool.Select(s => s.Code).ToList(),
+                                                                      timeRange,
+                                                                      true);
                         var algorithm = new MovingAverageCrossing(context, algoStartParams, fast, slow, stopLoss);
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;

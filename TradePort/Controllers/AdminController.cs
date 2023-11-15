@@ -80,16 +80,16 @@ public class AdminController : Controller
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
             var tokenString = tokenHandler.WriteToken(token);
-            Ok(new LoginResponseModel(result,
-                                      context.User.Id,
-                                      context.User.Name,
-                                      context.User.Email,
-                                      context.Account.Id,
-                                      context.Account.Name,
-                                      context.Exchange,
-                                      context.Broker,
-                                      context.Environment,
-                                      tokenString));
+            return Ok(new LoginResponseModel(result,
+                                             context.User.Id,
+                                             context.User.Name,
+                                             context.User.Email,
+                                             context.Account.Id,
+                                             context.Account.Name,
+                                             context.Exchange,
+                                             context.Broker,
+                                             context.Environment,
+                                             tokenString));
         }
         return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
     }

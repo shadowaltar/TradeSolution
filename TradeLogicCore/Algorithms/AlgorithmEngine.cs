@@ -249,7 +249,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             await _services.MarketData.PrepareOrderBookTable(security, Consts.OrderBookLevels);
             await _services.MarketData.SubscribeOhlc(security, Interval);
             await _services.MarketData.SubscribeOrderBook(security, Consts.OrderBookLevels);
-            if (AlgoParameters.RequiresTickData || AlgoParameters.StopOrderTriggerBy == OriginType.TickSignal)
+            if (AlgoParameters.RequiresTickData || AlgoParameters.StopOrderTriggerBy == StopOrderStyleType.TickSignal)
                 await _services.MarketData.SubscribeTick(security);
             subscriptionCount++;
         }
@@ -442,7 +442,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             return;
 
         TotalTickEventCount++;
-        if (AlgoParameters!.StopOrderTriggerBy == OriginType.TickSignal)
+        if (AlgoParameters!.StopOrderTriggerBy == StopOrderStyleType.TickSignal)
         {
             await TryStopLoss(securityId, tick);
             await TryTakeProfit(securityId, tick);

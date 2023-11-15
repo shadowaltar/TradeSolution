@@ -77,7 +77,7 @@ public class MovingAverageCrossing : Algorithm
         _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
         Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
-        if (parameters.StopOrderTriggerBy == OriginType.UpfrontOrder)
+        if (parameters.StopOrderTriggerBy == StopOrderStyleType.RealOrder)
             Entering = entering ?? new ExternalStopOrderEnterPositionAlgoLogic(_context);
         else
             Entering = entering ?? new SimpleEnterPositionAlgoLogic(_context);

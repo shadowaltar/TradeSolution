@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
@@ -170,11 +172,7 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
 
         var r = await orderService.CancelAllOpenOrders();
-        if (!r)
-        {
-            return BadRequest("Failed to cancel.");
-        }
-        return Ok("Cancelled all open orders.");
+        return !r ? BadRequest("Failed to cancel.") : Ok("Cancelled all open orders.");
     }
 
     [HttpPost(RestApiConstants.QueryOrders)]
@@ -203,17 +201,13 @@ public class ExecutionController : Controller
             : isCancelsOnly
             ? OrderStatuses.Cancels
             : Array.Empty<OrderStatus>();
-        switch (dataSourceType)
+        return dataSourceType switch
         {
-            case DataSourceType.MemoryCached:
-                return Ok(services.Order.GetOrders(security, start, null, filteringStatuses));
-            case DataSourceType.InternalStorage:
-                return Ok(await services.Order.GetStorageOrders(security, start, null, filteringStatuses));
-            case DataSourceType.External:
-                return Ok(await services.Order.GetExternalOrders(security, start, null, filteringStatuses));
-            default:
-                return BadRequest("Impossible");
-        }
+            DataSourceType.MemoryCached => Ok(services.Order.GetOrders(security, start, null, filteringStatuses)),
+            DataSourceType.InternalStorage => Ok(await services.Order.GetStorageOrders(security, start, null, filteringStatuses)),
+            DataSourceType.External => Ok(await services.Order.GetExternalOrders(security, start, null, filteringStatuses)),
+            _ => BadRequest("Impossible"),
+        };
     }
 
     [HttpPost(RestApiConstants.QueryOrderStates)]
@@ -227,9 +221,9 @@ public class ExecutionController : Controller
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var security = services.Security.GetSecurity(symbol);
-        if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
-
-        return Ok(await services.Order.GetOrderStates(security, start));
+        return security == null || security.QuoteSecurity == null
+            ? BadRequest("Invalid or missing security.")
+            : Ok(await services.Order.GetOrderStates(security, start));
     }
 
     [HttpPost(RestApiConstants.QueryTrades)]
@@ -341,27 +335,21 @@ public class ExecutionController : Controller
             securities.Add(security);
         }
 
-        object results;
-        if (!isInitialPortfolio)
-        {
-            results = dataSourceType switch
+        object results = !isInitialPortfolio
+            ? dataSourceType switch
             {
                 DataSourceType.MemoryCached => services.Portfolio.GetAssets(),
                 DataSourceType.InternalStorage => await services.Portfolio.GetStorageAssets(),
                 DataSourceType.External => await services.Portfolio.GetExternalAssets(),
                 _ => BadRequest("Impossible"),
-            };
-        }
-        else
-        {
-            results = dataSourceType switch
+            }
+            : dataSourceType switch
             {
                 DataSourceType.MemoryCached => services.Portfolio.InitialPortfolio.GetAssets(),
                 DataSourceType.InternalStorage => BadRequest("Initial portfolio assets only exists in memory, as portfolio changes are always synchronized to internal storage."),
                 DataSourceType.External => BadRequest("Initial portfolio assets only exists in memory, external asset position is always the most updated."),
                 _ => BadRequest("Impossible"),
             };
-        }
         if (results is ObjectResult r) return r;
         var assets = ((List<Asset>)results).Where(a => securities.Contains(a.Security)).ToList();
         return Ok(assets);
@@ -432,32 +420,34 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.StartAlgorithmMac)]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
                                             [FromServices] IServices services,
-                                            [FromForm(Name = "admin-password")] string adminPassword,
-                                            [FromForm(Name = "symbol")] string symbol = "BTCUSDT",
-                                            [FromForm(Name = "interval")] string intervalStr = "1m",
-                                            [FromForm(Name = "fast-ma")] int fastMa = 3,
-                                            [FromForm(Name = "slow-ma")] int slowMa = 7,
-                                            [FromForm(Name = "stop-loss")] decimal stopLoss = 0.0005m,
-                                            [FromForm(Name = "take-profit")] decimal takeProfit = 0.0005m,
-                                            [FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
-                                            [FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100,
-                                            [FromForm(Name = "preferred-quote-currencies")] string preferredQuoteCurrencies = "USDT",
-                                            [FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "BTC,USDT,BNB,USDT",
-                                            [FromForm(Name = "cancel-open-orders-on-start")] bool cancelOpenOrdersOnStart = true,
-                                            [FromForm(Name = "assume-no-open-position")] bool assumeNoOpenPositionOnStart = true,
-                                            [FromForm(Name = "close-open-position-on-start")] bool closeOpenPositionsOnStart = true,
-                                            [FromForm(Name = "close-open-position-on-stop")] bool closeOpenPositionsOnStop = true,
-                                            [FromForm(Name = "clean-up-non-cash-on-start")] bool cleanUpNonCashOnStart = false)
+                                            [FromForm] MacStartModel macParams,
+                                            [FromForm] AlgorithmStartModel algoParams)//,
+                                                                                      //[FromForm(Name = "admin-password")] string adminPassword,
+                                                                                      //[FromForm(Name = "symbol")] string symbol = "BTCUSDT",
+                                                                                      //[FromForm(Name = "interval")] string intervalStr = "1m",
+                                                                                      //[FromForm(Name = "fast-ma")] int fastMa = 3,
+                                                                                      //[FromForm(Name = "slow-ma")] int slowMa = 7,
+                                                                                      //[FromForm(Name = "stop-loss")] decimal stopLoss = 0.0005m,
+                                                                                      //[FromForm(Name = "take-profit")] decimal takeProfit = 0.0005m,
+                                                                                      //[FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
+                                                                                      //[FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100,
+                                                                                      //[FromForm(Name = "preferred-quote-currencies")] string preferredQuoteCurrencies = "FDUSD",
+                                                                                      //[FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "BTC,USDT,BNB,FDUSD",
+                                                                                      //[FromForm(Name = "cancel-open-orders-on-start")] bool cancelOpenOrdersOnStart = true,
+                                                                                      //[FromForm(Name = "assume-no-open-position")] bool assumeNoOpenPositionOnStart = true,
+                                                                                      //[FromForm(Name = "close-open-position-on-start")] bool closeOpenPositionsOnStart = true,
+                                                                                      //[FromForm(Name = "close-open-position-on-stop")] bool closeOpenPositionsOnStop = true,
+                                                                                      //[FromForm(Name = "clean-up-non-cash-on-start")] bool cleanUpNonCashOnStart = false)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(intervalStr, out IntervalType interval, out br)) return br;
-        if (ControllerValidator.IsIntNegativeOrZero(fastMa, out br)) return br;
-        if (ControllerValidator.IsIntNegativeOrZero(slowMa, out br)) return br;
-        if (ControllerValidator.IsDecimalNegative(stopLoss, out br)) return br;
-        if (ControllerValidator.IsDecimalNegative(takeProfit, out br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(algoParams.AdminPassword, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(algoParams.IntervalStr, out IntervalType interval, out br)) return br;
+        if (ControllerValidator.IsIntNegativeOrZero(macParams.FastMa, out br)) return br;
+        if (ControllerValidator.IsIntNegativeOrZero(macParams.SlowMa, out br)) return br;
+        if (ControllerValidator.IsDecimalNegative(algoParams.StopLoss, out br)) return br;
+        if (ControllerValidator.IsDecimalNegative(algoParams.TakeProfit, out br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
-        var security = services.Security.GetSecurity(symbol);
+        var security = services.Security.GetSecurity(algoParams.Symbol);
         if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
         var quoteCode = security.QuoteSecurity.Code;
 
@@ -475,36 +465,48 @@ public class ExecutionController : Controller
                 return BadRequest("Invalid environment type to start algo.");
         }
 
-        var preferredCashCodes = preferredQuoteCurrencies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var preferredCashCodes = algoParams.PreferredQuoteCurrencies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (preferredCashCodes.Count == 0)
         {
             preferredCashCodes.AddRange("USDT", "USD");
         }
 
-        var globalCodes = globalCurrencyFilter.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        globalCodes.AddRange(preferredCashCodes);
+        var whitelistCodes = algoParams.AssetCodeWhitelist.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        whitelistCodes.AddRange(preferredCashCodes);
         if (security.FxInfo?.BaseAsset != null)
-            globalCodes.Add(security.FxInfo.BaseAsset.Code);
+            whitelistCodes.Add(security.FxInfo.BaseAsset.Code);
         if (security.FxInfo?.QuoteAsset != null)
-            globalCodes.Add(security.FxInfo.QuoteAsset.Code);
-        globalCodes = globalCodes.Distinct().OrderBy(c => c).ToList();
+            whitelistCodes.Add(security.FxInfo.QuoteAsset.Code);
+        whitelistCodes = whitelistCodes.Distinct().OrderBy(c => c).ToList();
 
-        var ep = new EngineParameters(preferredCashCodes, globalCodes,
-            assumeNoOpenPositionOnStart, cancelOpenOrdersOnStart, closeOpenPositionsOnStop,
-            closeOpenPositionsOnStart, cleanUpNonCashOnStart);
-        var ap = new AlgorithmParameters(false, interval, new List<Security> { security }, algoTimeRange);
-        var algorithm = new MovingAverageCrossing(services.Context, ap, fastMa, slowMa, stopLoss, takeProfit);
+        var ep = new EngineParameters(preferredCashCodes,
+                                      whitelistCodes,
+                                      algoParams.AssumeNoOpenPositionOnStart,
+                                      algoParams.CancelOpenOrdersOnStart,
+                                      algoParams.CloseOpenPositionsOnStop,
+                                      algoParams.CloseOpenPositionsOnStart,
+                                      algoParams.CleanUpNonCashOnStart);
+        var ap = new AlgorithmParameters(IsBackTesting: false,
+                                         Interval: interval,
+                                         SecurityPool: new List<Security> { security },
+                                         SecurityCodes: new List<string> { security.Code }, // reporting purpose
+                                         TimeRange: algoTimeRange,
+                                         RequiresTickData: true,
+                                         StopOrderTriggerBy: algoParams.StopOrderStyle,
+                                         algoParams.StopLoss,
+                                         algoParams.TakeProfit);
+        var algorithm = new MovingAverageCrossing(services.Context, ap, macParams.FastMa, macParams.SlowMa, algoParams.StopLoss, algoParams.TakeProfit);
         var screening = new SingleSecurityLogic(services.Context, security);
-        var sizing = new SimplePositionSizingLogic(positionSizingMethod);
+        var sizing = new SimplePositionSizingLogic(algoParams.PositionSizingMethod);
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
-        switch (positionSizingMethod)
+        switch (algoParams.PositionSizingMethod)
         {
             case PositionSizingMethod.PreserveFixed:
-                sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, initialAvailableQuantity);
+                sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
                 break;
             case PositionSizingMethod.Fixed:
-                sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, initialAvailableQuantity);
+                sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
                 break;
         }
         var algoBatch = await core.Run(ep, ap, algorithm);
@@ -586,5 +588,133 @@ public class ExecutionController : Controller
 
         [FromForm(Name = "userPassword")]
         public string? UserPassword { get; set; }
+    }
+
+    public class MacStartModel
+    {
+        /// <summary>
+        /// Fast MA parameter.
+        /// </summary>
+        [FromForm(Name = "fast-ma")]
+        [Required, DefaultValue(3)]
+        public int FastMa { get; set; } = 3;
+
+        /// <summary>
+        /// Slow MA parameter.
+        /// </summary>
+        [FromForm(Name = "slow-ma")]
+        [Required, DefaultValue(7)]
+        public int SlowMa { get; set; } = 7;
+    }
+
+    public class AlgorithmStartModel
+    {
+        [FromForm(Name = "admin-password")]
+        [Required]
+        public string AdminPassword { get; set; } = "";
+
+        [FromForm(Name = "symbol")]
+        [Required, DefaultValue("BTCUSDT")]
+        public string Symbol { get; set; } = "BTCUSDT";
+
+        [FromForm(Name = "interval")]
+        [Required, DefaultValue("1m")]
+        public string IntervalStr { get; set; } = "1m";
+
+        /// <summary>
+        /// Stop loss ratio.
+        /// </summary>
+        [FromForm(Name = "stop-loss")]
+        [Required, DefaultValue(0)]
+        public decimal StopLoss { get; set; } = 0.0005m;
+
+        /// <summary>
+        /// Take profit ratio.
+        /// </summary>
+        [FromForm(Name = "take-profit")]
+        [Required, DefaultValue(0)]
+        public decimal TakeProfit { get; set; } = 0.0005m;
+
+        /// <summary>
+        /// Style of stop orders (SL and TP).
+        /// * <see cref="StopOrderStyleType.Manual"/>: manual style; for MAC it means no SL/TP logic at all.
+        /// * <see cref="StopOrderStyleType.RealOrder"/>: execute a pair of SL and TP order if parent order is accepted and SL/TP ratios are defined.
+        /// * <see cref="StopOrderStyleType.TickSignal"/>: execute a real sell order to mimic SL/TP if original open position order is buy (vice versa), when tick price hits threshold price calculated by SL/TP ratios.
+        /// </summary>
+        [FromForm(Name = "stop-order-style")]
+        [Required, DefaultValue(StopOrderStyleType.TickSignal)]
+        public StopOrderStyleType StopOrderStyle { get; set; } = StopOrderStyleType.TickSignal;
+
+        /// <summary>
+        /// Style of sizing, to determine the order which opens a new position.
+        /// * <see cref="PositionSizingMethod.PreserveFixed"/>: only trades what is defined by <see cref="OpenPositionQuantityHint"/>; it is as if your account only has 100 (in quote ccy) and you always trade all of it.
+        /// * <see cref="PositionSizingMethod.Fixed"/>: always trades what is defined by <see cref="OpenPositionQuantityHint"/>; if it is 100, all open position orders' quantity is 100.
+        /// * <see cref="PositionSizingMethod.All"/>: always trades everything in your asset account.
+        /// </summary>
+        [FromForm(Name = "position-sizing-method")]
+        [Required, DefaultValue(PositionSizingMethod.PreserveFixed)]
+        public PositionSizingMethod PositionSizingMethod { get; set; } = PositionSizingMethod.PreserveFixed;
+
+        /// <summary>
+        /// Defines trading quantity of orders of open position. Must be combined with <see cref="PositionSizingMethod"/> to get
+        /// the true quantity.
+        /// </summary>
+        [FromForm(Name = "initial-available-quote-quantity")]
+        [Required, DefaultValue(100)]
+        public decimal OpenPositionQuantityHint { get; set; } = 100;
+
+        /// <summary>
+        /// Only these asset codes will be tradable.
+        /// </summary>
+        [FromForm(Name = "asset-code-whitelist")]
+        [Required, DefaultValue("BTC,USDT,BNB,FDUSD")]
+        public string AssetCodeWhitelist { get; set; } = "BTC,USDT,BNB,FDUSD";
+
+        /// <summary>
+        /// In any situation if an FX quote currency is missing but an order needs to be created,
+        /// use these quote currencies. First currency has higher precedence.
+        /// </summary>
+        [FromForm(Name = "preferred-quote-currencies")]
+        [Required, DefaultValue("FDUSD")]
+        public string PreferredQuoteCurrencies { get; set; } = "FDUSD";
+
+        /// <summary>
+        /// Cancel all open orders on algo start.
+        /// </summary>
+        [FromForm(Name = "cancel-open-orders-on-start")]
+        [DefaultValue(true)]
+        public bool CancelOpenOrdersOnStart { get; set; } = true;
+
+        /// <summary>
+        /// Assumes no open positions when algo starts.
+        /// This affects <see cref="CloseOpenPositionsOnStart"/>.
+        /// </summary>
+        [FromForm(Name = "assume-no-open-position")]
+        [DefaultValue(true)]
+        public bool AssumeNoOpenPositionOnStart { get; set; } = true;
+
+        /// <summary>
+        /// Closes any open positions.
+        /// If <see cref="AssumeNoOpenPositionOnStart"/> is true, this flag becomes useless.
+        /// </summary>
+        [FromForm(Name = "close-open-position-on-start")]
+        [DefaultValue(true)]
+        public bool CloseOpenPositionsOnStart { get; set; } = true;
+
+        /// <summary>
+        /// TODO!
+        /// Closes any open positions when algo stops.
+        /// </summary>
+        [FromForm(Name = "close-open-position-on-stop")]
+        [DefaultValue(true)]
+        public bool CloseOpenPositionsOnStop { get; set; } = true;
+
+        /// <summary>
+        /// Assuming all other currencies are base currencies.
+        /// Sell everything to exchange for <see cref="PreferredQuoteCurrencies"/>.
+        /// </summary>
+        [FromForm(Name = "clean-up-non-cash-on-start")]
+        [DefaultValue(false)]
+        public bool CleanUpNonCashOnStart { get; set; } = false;
     }
 }
