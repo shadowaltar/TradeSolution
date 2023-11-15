@@ -12,6 +12,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeConnectivity.Binance.Utils;
 
 namespace TradeConnectivity.Binance.Services;
@@ -67,6 +68,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalQueryState> GetPrices(params string[] symbols)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/ticker/price";
         List<(string, string)>? parameters = symbols.IsNullOrEmpty() ? null : new(1);
@@ -132,6 +136,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalQueryState> GetAccount()
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/account";
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
@@ -155,6 +162,9 @@ public class Quotation : IExternalQuotationManagement
 
     public ExternalConnectionState SubscribeOhlc(Security security, IntervalType interval)
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         if (interval == IntervalType.Unknown)
             interval = IntervalType.OneMinute;
 
@@ -255,6 +265,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<OrderBook?> GetCurrentOrderBook(Security security)
     {
+        if (!Firewall.CanCall)
+            return null;
+
         if (!security.IsFrom(ExternalNames.Binance))
             return null;
         var url = $"{_connectivity.RootUrl}/depth?symbol={security.Code}";
@@ -292,6 +305,9 @@ public class Quotation : IExternalQuotationManagement
 
     public ExternalConnectionState SubscribeTick(Security security)
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         if (!security.IsFrom(ExternalNames.Binance))
             return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickPrice, ActionType.Subscribe);
 
@@ -364,6 +380,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> UnsubscribeTick(Security security)
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         if (!security.IsFrom(ExternalNames.Binance))
             return ExternalConnectionStates.InvalidSecurity(SubscriptionType.TickPrice, ActionType.Unsubscribe);
 
@@ -379,6 +398,9 @@ public class Quotation : IExternalQuotationManagement
 
     public ExternalConnectionState SubscribeOrderBook(Security security, int? level = null)
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         if (!security.IsFrom(ExternalNames.Binance))
             return ExternalConnectionStates.InvalidSecurity(SubscriptionType.OrderBook, ActionType.Subscribe);
 
@@ -482,6 +504,9 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> UnsubscribeOrderBook(Security security)
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         if (!security.IsFrom(ExternalNames.Binance))
             return ExternalConnectionStates.InvalidSecurity(SubscriptionType.OrderBook, ActionType.Unsubscribe);
 

@@ -1,9 +1,19 @@
-﻿using TradeDesk.Services;
+﻿using System.Windows.Input;
+using TradeDesk.Services;
+using TradeDesk.Utils;
 
 namespace TradeDesk.ViewModels;
 public class MainViewModel : AbstractViewModel
 {
     private readonly Server _server;
+    private string _url;
+    private DelegateCommand connect;
+
+    public string Url { get => _url; set => SetValue(ref _url, value); }
+
+
+    public ICommand Connect { get; }
+
 
     public OrderViewModel OpenOrderViewModel { get; private set; }
     public OrderViewModel ErrorOrderViewModel { get; private set; }
@@ -28,5 +38,12 @@ public class MainViewModel : AbstractViewModel
         };
 
         OrderStateViewModel = new OrderStateViewModel(_server);
+        Connect = new DelegateCommand(PerformConnect);
     }
+
+    private void PerformConnect()
+    {
+        OpenOrderViewModel.Initialize();
+    }
+
 }

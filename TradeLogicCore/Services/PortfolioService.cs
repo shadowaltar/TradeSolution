@@ -7,6 +7,7 @@ using TradeCommon.Essentials.Trading;
 using TradeCommon.Externals;
 using TradeCommon.Providers;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
@@ -152,6 +153,13 @@ public class PortfolioService : IPortfolioService, IDisposable
     public async Task<bool> Initialize()
     {
         if (_context.Account == null) throw Exceptions.MustLogin();
+        if (!Firewall.CanCall)
+        {
+            Portfolio = new Portfolio(_context.AccountId, new(), new());
+            InitialPortfolio = new Portfolio(_context.AccountId, new(), new());
+            return true;
+        }
+
         var state = await _execution.Subscribe();
 
         if (state.ResultCode == ResultCode.SubscriptionFailed)

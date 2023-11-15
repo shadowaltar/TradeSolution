@@ -22,7 +22,9 @@
         <DockPanel>
             <StackPanel Orientation="Horizontal">
                 <Label Content="Server URL:" VerticalAlignment="Center"/>
-                <Button Content="Connect"/>
+                <TextBox Text="{Binding Url}" Width="400"/>
+                <Button Content="Connect" VerticalAlignment="Center"
+                        Command="{Binding Connect}"/>
             </StackPanel>
         </DockPanel>
         <TabControl Grid.Row="1">

@@ -85,7 +85,7 @@ public class LoginViewModel : AbstractViewModel
             {
                 var loginContent = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-                var resultCodeStr = loginContent.GetProperty("ResultCode").GetString();
+                var resultCodeStr = loginContent.GetProperty("result").GetString();
                 if (!Enum.TryParse<ResultCode>(resultCodeStr, out var resultCode))
                 {
                     MessageBoxes.Info(null, "Result: " + resultCode, "Login Failed");

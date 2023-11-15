@@ -1,5 +1,6 @@
 ﻿using Common;
 using System.Diagnostics;
+using System.Security;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -430,6 +431,32 @@ public static class ExternalQueryStates
             Description = $"Another process is closing a position for security {securityCode}",
         };
     }
+
+    public static ExternalQueryState FirewallBlocked()
+    {
+        return new()
+        {
+            Content = null,
+            ResponsePayload = "",
+            Action = ActionType.Any,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.Failed,
+            Description = "Cannot query due to firewall rule.",
+        };
+    }
+
+    public static ExternalQueryState RemoveSubscriptionKey(string? key)
+    {
+        return new()
+        {
+            Content = null,
+            ResponsePayload = "",
+            Action = ActionType.Unsubscribe,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.Ok,
+            Description = "Removed subscription key: " + key,
+        };
+    }
 }
 
 public static class ExternalConnectionStates
@@ -640,6 +667,18 @@ public static class ExternalConnectionStates
             ResultCode = ResultCode.UnsubscriptionOk,
             ExternalId = BrokerId,
             Description = "All streams are unsubscribed",
+            Type = SubscriptionType.All,
+        };
+    }
+
+    public static ExternalConnectionState FirewallBlocked()
+    {
+        return new()
+        {
+            Action = ActionType.Any,
+            ResultCode = ResultCode.Failed,
+            ExternalId = BrokerId,
+            Description = "Cannot connect due to firewall rule.",
             Type = SubscriptionType.All,
         };
     }

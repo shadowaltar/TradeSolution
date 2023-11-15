@@ -82,6 +82,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> SendOrder(Order order)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var url = $"{_connectivity.RootUrl}/api/v3/order";
         return await SendOrder(url, order);
     }
@@ -95,6 +98,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     private async Task<ExternalQueryState> SendOrder(string url, Order order)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var isOk = false;
         var swTotal = Stopwatch.StartNew();
         var parameters = new List<(string, string)>(16)
@@ -239,6 +245,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> CancelOrder(Order order)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var isOk = false;
         var swTotal = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/order";
@@ -277,6 +286,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> CancelAllOrders(Security security)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (!ValidateSecurity(security, ActionType.CancelOrder, out var errorState))
             return errorState;
 
@@ -300,6 +312,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetMarketTrades(Security security)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (!ValidateSecurity(security, ActionType.GetTrade, out var errorState))
             return errorState;
 
@@ -374,6 +389,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetOrder(Security security, long orderId = 0, long externalOrderId = 0)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (!ValidateSecurity(security, ActionType.GetOrder, out var errorState))
             return errorState;
 
@@ -409,6 +427,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetOpenOrders(Security? security = null)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (security != null && !ValidateSecurity(security, ActionType.GetOrder, out var errorState))
             return errorState;
 
@@ -442,6 +463,9 @@ public class Execution : IExternalExecutionManagement
                                                     DateTime? start = null,
                                                     DateTime? end = null)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (!ValidateSecurity(security, ActionType.GetOrder, out var errorState))
             return errorState;
 
@@ -511,6 +535,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> UpdateOrder(Order updatedOrder)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         // TODO Not Tested
         var toCancel = updatedOrder with { };
         var cancelState = await CancelOrder(toCancel);
@@ -524,6 +551,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetOrderSpeedLimit()
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/rateLimit/order";
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
@@ -592,6 +622,9 @@ public class Execution : IExternalExecutionManagement
                                                     DateTime? start = null,
                                                     DateTime? end = null)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         if (!ValidateSecurity(security, ActionType.GetTrade, out var errorState))
             return errorState!;
 
@@ -667,6 +700,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetAssetPositions(string accountId)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/account";
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
@@ -712,6 +748,9 @@ public class Execution : IExternalExecutionManagement
     /// <returns></returns>
     public async Task<ExternalConnectionState> Subscribe()
     {
+        if (!Firewall.CanCall)
+            return ExternalConnectionStates.FirewallBlocked();
+
         var url = $"{_connectivity.RootUrl}/api/v3/userDataStream";
         using var request = _requestBuilder.BuildApiKey(HttpMethod.Post, url);
         try
@@ -752,9 +791,13 @@ public class Execution : IExternalExecutionManagement
         }
     }
 
-    public async Task Stop()
+    public async Task<ExternalQueryState> Stop()
     {
-        if (_listenKey == null || _listenKeyTimer == null) return;
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
+        if (_listenKey == null || _listenKeyTimer == null)
+            return ExternalQueryStates.Error(ActionType.Unsubscribe, ResultCode.Failed, ResultCode.Unknown, null, "", "Failed to remove subscription key: " + _listenKey);
 
         _listenKeyTimer.Dispose();
 
@@ -762,7 +805,11 @@ public class Execution : IExternalExecutionManagement
         using var request = _requestBuilder.Build(HttpMethod.Delete, url, new List<(string, string)> { ("listenKey", _listenKey) });
         var response = await _httpClient.SendAsync(request);
         if (!response.ParseJsonObject(out _, out _, out _))
+        {
             _log.Error($"Delete listen-key {_listenKey} failed.");
+            return ExternalQueryStates.Error(ActionType.Unsubscribe, ResultCode.Failed, ResultCode.Unknown, null, "", "Failed to remove subscription key: " + _listenKey);
+        }
+        return ExternalQueryStates.RemoveSubscriptionKey(_listenKey);
     }
 
     private static bool ValidateSecurity(Security? security, ActionType actionType, [NotNullWhen(false)] out ExternalQueryState? errorState)

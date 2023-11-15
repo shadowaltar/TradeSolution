@@ -3,6 +3,7 @@ using log4net;
 using System.Diagnostics;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeConnectivity.Binance.Utils;
 
 namespace TradeConnectivity.Binance.Services;
@@ -70,10 +71,14 @@ public class Connectivity : IExternalConnectivityManagement
     /// <returns></returns>
     public bool Ping()
     {
+        if (!Firewall.CanCall)
+            return true;
+
         try
         {
             _stopwatch.Restart();
             using var pingRequest = _requestBuilder.Build(HttpMethod.Get, _pingUrl);
+
             var response = _httpClient.Send(pingRequest);
             _stopwatch.Stop();
             if (response.StatusCode != System.Net.HttpStatusCode.OK)

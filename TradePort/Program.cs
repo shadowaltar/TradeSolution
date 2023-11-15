@@ -15,6 +15,9 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+// Authorization flag
+var isAuthorizationEnabled = true;
+
 // create asp.net core application
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +37,8 @@ builder.Services
         o.Cookie.IsEssential = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     })
-    .AddAuthentication(x => {
+    .AddAuthentication(x =>
+    {
         x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
@@ -53,6 +57,9 @@ builder.Services
             ValidateLifetime = true
         };
     });
+
+if (isAuthorizationEnabled)
+    builder.Services.AddAuthorization();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -94,7 +101,8 @@ app.UseSwaggerUI(c =>
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
-app.UseAuthorization();
+if (isAuthorizationEnabled)
+    app.UseAuthorization();
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -104,6 +112,5 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-app.MapControllers();
-
+app.MapControllers().RequireAuthorization();
 app.Run();

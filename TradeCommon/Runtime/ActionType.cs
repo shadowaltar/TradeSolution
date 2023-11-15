@@ -3,6 +3,8 @@
 public enum ActionType
 {
     Unknown,
+    Any,
+
     Connect,
     Disconnect,
     Subscribe,

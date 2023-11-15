@@ -5,6 +5,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 
 namespace TradeConnectivity.Binance.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
@@ -35,6 +36,9 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 
     public async Task<List<OhlcPrice>?> ReadPrices(Security security, DateTime start, DateTime end, IntervalType intervalType)
     {
+        if (!Firewall.CanCall)
+            return null;
+
         string UpdateTimeFrame(string c, string i, long s, long e) =>
             $"{_connectivity.RootUrl}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
 

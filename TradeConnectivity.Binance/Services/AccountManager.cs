@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeConnectivity.Binance.Utils;
 
 namespace TradeConnectivity.Binance.Services;
@@ -43,6 +44,9 @@ public class AccountManager : IExternalAccountManagement
     /// <returns></returns>
     public async Task<ExternalQueryState> GetAccount()
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swOuter = Stopwatch.StartNew();
         var url = $"{_connectivity.RootUrl}/api/v3/account";
         using var request = _requestBuilder.BuildSigned(HttpMethod.Get, url);
@@ -65,11 +69,14 @@ public class AccountManager : IExternalAccountManagement
     }
 
     /// <summary>
-    /// Get the account detailed info [SIGNED] [PROD ONLY].
+    /// TODO (Not Tested) Get the account detailed info [SIGNED] [PROD ONLY].
     /// </summary>
     /// <returns></returns>
     public async Task<ExternalQueryState> GetAccount(string accountType)
     {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
         var swTotal = Stopwatch.StartNew();
         var accounts = new List<Account>(_accountTypes.Count);
 

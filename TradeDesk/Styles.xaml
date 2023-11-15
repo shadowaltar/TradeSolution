@@ -9,4 +9,9 @@
     <Style TargetType="Label">
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
+    <Style TargetType="TextBox">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Height" Value="26"/>
+    </Style>
 </ResourceDictionary>

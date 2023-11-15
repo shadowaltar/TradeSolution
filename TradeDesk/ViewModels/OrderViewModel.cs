@@ -36,6 +36,11 @@ public class OrderViewModel : AbstractViewModel
         _server = server;
     }
 
+    public void Initialize()
+    {
+        
+    }
+
     private async void CancelAll()
     {
         foreach (var order in await _server.GetOpenOrders())
