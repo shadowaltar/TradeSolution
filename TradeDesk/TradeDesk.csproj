@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Syncfusion.SfChart.WPF" Version="23.1.44" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
   </ItemGroup>
 

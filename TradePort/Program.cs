@@ -15,7 +15,7 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-// Authorization flag
+// authorization flag
 var isAuthorizationEnabled = true;
 
 // create asp.net core application
@@ -24,7 +24,6 @@ var builder = WebApplication.CreateBuilder(args);
 var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
 var secretKey = Encoding.ASCII.GetBytes(secretStr);
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services
     .AddEndpointsApiExplorer()

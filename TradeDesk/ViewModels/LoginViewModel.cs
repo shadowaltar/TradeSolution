@@ -1,5 +1,4 @@
 ﻿using Common;
-using Microsoft.Diagnostics.Runtime.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -7,10 +6,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
 using TradeDesk.Utils;
+using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
 public class LoginViewModel : AbstractViewModel
@@ -20,6 +21,10 @@ public class LoginViewModel : AbstractViewModel
     private string _serverUrl;
     private string _userName;
     private EnvironmentType _environmentType;
+
+    public event Action<bool> AfterLogin;
+
+    public LoginView Window { get; internal set; }
 
     public ObservableCollection<EnvironmentType> EnvironmentTypes { get; } = new();
 
@@ -57,6 +62,9 @@ public class LoginViewModel : AbstractViewModel
 
     private async void Login()
     {
+        AfterLogin?.Invoke(true);
+        return;
+
         var url = $"{ServerUrl.Trim('/')}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
         try
         {

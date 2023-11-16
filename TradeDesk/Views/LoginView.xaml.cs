@@ -11,7 +11,10 @@ public partial class LoginView : Window
     public LoginView()
     {
         InitializeComponent();
-        DataContext = new LoginViewModel();
+        DataContext = new LoginViewModel
+        {
+            Window = this
+        };
     }
 
     public void OnPasswordChanged(object sender, RoutedEventArgs e)

@@ -94,6 +94,16 @@ public class AdminController : Controller
         return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
     }
 
+    [HttpPost(RestApiConstants.ChangeUserPassword)]
+    public async Task<ActionResult> ChangeUserPassword([FromServices] IAdminService adminService, [FromForm] ChangeUserPasswordModel model)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
+        if (model.NewPassword.IsBlank() || model.NewPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
+
+        var r = await adminService.SetPassword(model.UserName, model.NewPassword, model.Environment);
+        return r > 0 ? Ok("Password is set.") : BadRequest("Failed to set password.");
+    }
+
     [HttpPost("reconcile")]
     public async Task<ActionResult> Reconcile([FromServices] Core core,
                                               [FromServices] IAdminService adminService,
@@ -251,7 +261,7 @@ public class AdminController : Controller
         if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
 
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
-        if (model.UserPassword.Length < 6) return BadRequest("Password should at least have 6 chars.");
+        if (model.UserPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
 
         var user = await adminService.GetUser(userName, model.Environment);
         if (user != null)
@@ -494,7 +504,7 @@ public class AdminController : Controller
 
     public class UserCreationModel
     {
-        [FromForm(Name = "adminPassword")]
+        [FromForm(Name = "admin-password")]
         public string? AdminPassword { get; set; }
 
         [FromForm(Name = "userPassword")]
@@ -510,7 +520,7 @@ public class AdminController : Controller
 
     public class AccountCreationModel
     {
-        [FromForm(Name = "adminPassword")]
+        [FromForm(Name = "admin-password")]
         public string? AdminPassword { get; set; }
 
         [FromForm(Name = "ownerName")]
@@ -578,6 +588,31 @@ public class AdminController : Controller
         [FromForm(Name = "exchange")]
         [Required, DefaultValue(ExchangeType.Binance)]
         public ExchangeType Exchange { get; set; } = ExchangeType.Binance;
+    }
+
+    public class ChangeUserPasswordModel
+    {
+        [Required, FromForm(Name = "admin-password")]
+        public string? AdminPassword { get; set; }
+
+        /// <summary>
+        /// User name.
+        /// </summary>
+        [FromForm(Name = "user")]
+        [Required, DefaultValue("test")]
+        public string UserName { get; set; } = "test";
+
+        /// <summary>
+        /// New password.
+        /// </summary>
+        [Required, FromForm(Name = "new-password")]
+        public string? NewPassword { get; set; }
+
+        /// <summary>
+        /// Environment of this user.
+        /// </summary>
+        [Required, FromForm(Name = "environment"), DefaultValue(EnvironmentType.Uat)]
+        public EnvironmentType Environment { get; set; } = EnvironmentType.Uat;
     }
 
     public record LoginResponseModel(ResultCode Result,

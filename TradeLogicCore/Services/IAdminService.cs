@@ -41,4 +41,6 @@ public interface IAdminService
     Task<int> CreateAccount(Account account);
 
     Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment);
+
+    Task<int> SetPassword(string userName, string userPassword, EnvironmentType environment);
 }

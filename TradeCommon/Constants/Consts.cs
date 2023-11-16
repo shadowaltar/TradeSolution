@@ -9,6 +9,8 @@ public static class Consts
     public static readonly string[] YesStrings = { "TRUE", "true", "True", "Yes", "yes", "YES", "T", "Y", "t", "y", "1" };
     public static readonly string[] NoStrings = { "FALSE", "false", "False", "No", "no", "NO", "F", "N", "f", "n", "0" };
 
+    public const int PasswordMinLength = 6;
+
     public const int DefaultStrategyId = 0;
 
     public const int ManualTradingStrategyId = 1;

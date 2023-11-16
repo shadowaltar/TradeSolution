@@ -13,40 +13,45 @@
         <ResourceDictionary Source="../Styles.xaml"/>
     </Window.Resources>
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <DockPanel>
-            <StackPanel Orientation="Horizontal">
-                <Label Content="Server URL:" VerticalAlignment="Center"/>
-                <TextBox Text="{Binding Url}" Width="400"/>
-                <Button Content="Connect" VerticalAlignment="Center"
-                        Command="{Binding Connect}"/>
-            </StackPanel>
-        </DockPanel>
-        <TabControl Grid.Row="1">
-            <TabItem Header="Open Orders">
-                <views:OrderView DataContext="{Binding OpenOrderViewModel}"/>
-            </TabItem>
-            <TabItem Header="Order States">
-                <views:OrderStateView DataContext="{Binding OrderStateViewModel}"/>
-            </TabItem>
-            <TabItem Header="Error Orders">
-                <views:OrderView DataContext="{Binding ErrorOrderViewModel}"/>
-            </TabItem>
-            <TabItem Header="Cancelled Orders">
-                <views:OrderView DataContext="{Binding CancelledOrderViewModel}"/>
-            </TabItem>
-        </TabControl>
-        <TabControl Grid.Row="2">
-            <TabItem Header="Trades">
-                <views:TradeView/>
-            </TabItem>
-        </TabControl>
-        <TabControl Grid.Row="3">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DockPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Label Content="Server URL:" VerticalAlignment="Center"/>
+                    <TextBox Text="{Binding Url}" Width="400"/>
+                    <Button Content="Connect" VerticalAlignment="Center"
+                            Command="{Binding Connect}"/>
+                </StackPanel>
+            </DockPanel>
+            <TabControl Grid.Row="1">
+                <TabItem Header="Open Orders">
+                    <views:OrderView DataContext="{Binding OpenOrderViewModel}"/>
+                </TabItem>
+                <TabItem Header="Order States">
+                    <views:OrderStateView DataContext="{Binding OrderStateViewModel}"/>
+                </TabItem>
+                <TabItem Header="Error Orders">
+                    <views:OrderView DataContext="{Binding ErrorOrderViewModel}"/>
+                </TabItem>
+                <TabItem Header="Cancelled Orders">
+                    <views:OrderView DataContext="{Binding CancelledOrderViewModel}"/>
+                </TabItem>
+            </TabControl>
+            <TabControl Grid.Row="2">
+                <TabItem Header="Trades">
+                    <views:TradeView/>
+                </TabItem>
+            </TabControl>
+            <TabControl Grid.Row="3">
             <TabItem Header="Assets">
                 <views:AssetView/>
             </TabItem>
@@ -57,5 +62,17 @@
                 <views:PositionView/>
             </TabItem>
         </TabControl>
+        </Grid>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal">
+                <Label Content="SecurityCode:"/>
+                <ComboBox ItemsSource="{Binding SecurityPool}" Width="60"/>
+            </StackPanel>
+            <views:OverviewView Grid.Row="1"/>
+        </Grid>
     </Grid>
 </Window>

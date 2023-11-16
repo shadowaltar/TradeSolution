@@ -4,10 +4,12 @@ public static class RestApiConstants
     public const string ExecutionRoot = "execution";
     public const string AdminRoot = "admin";
 
+    public const string Login = "login";
+    public const string ChangeUserPassword = "change-password";
+
     public const string SendOrder = "orders/send";
     public const string CancelOrder = "orders/cancel";
     public const string CancelAllOrders = "orders/cancel-all";
-    public const string Login = "login";
 
     public const string QueryRunningAlgorithms = "algorithms/list";
     public const string QueryAlgoBatches = "algo-batches/list";

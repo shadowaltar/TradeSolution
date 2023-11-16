@@ -1,4 +1,5 @@
-﻿using System.Windows.Input;
+﻿using System;
+using System.Windows.Input;
 using TradeDesk.Services;
 using TradeDesk.Utils;
 
@@ -7,7 +8,7 @@ public class MainViewModel : AbstractViewModel
 {
     private readonly Server _server;
     private string _url;
-    private DelegateCommand connect;
+    private readonly DelegateCommand connect;
 
     public string Url { get => _url; set => SetValue(ref _url, value); }
 
@@ -15,11 +16,12 @@ public class MainViewModel : AbstractViewModel
     public ICommand Connect { get; }
 
 
+    public OverviewViewModel OverviewViewModel { get; private set; }
     public OrderViewModel OpenOrderViewModel { get; private set; }
     public OrderViewModel ErrorOrderViewModel { get; private set; }
     public OrderViewModel CancelledOrderViewModel { get; private set; }
     public OrderStateViewModel OrderStateViewModel { get; private set; }
-
+    public MainView Window { get; internal set; }
 
     public MainViewModel()
     {
@@ -36,8 +38,10 @@ public class MainViewModel : AbstractViewModel
         {
             IsOrderToolBarVisible = false
         };
-
         OrderStateViewModel = new OrderStateViewModel(_server);
+
+        OverviewViewModel = new OverviewViewModel(_server);
+
         Connect = new DelegateCommand(PerformConnect);
     }
 
@@ -46,4 +50,8 @@ public class MainViewModel : AbstractViewModel
         OpenOrderViewModel.Initialize();
     }
 
+    internal void Initialize(bool obj)
+    {
+
+    }
 }

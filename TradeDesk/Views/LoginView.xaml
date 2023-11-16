@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels" d:DataContext="{d:DesignInstance Type=viewmodels:LoginViewModel}"
         mc:Ignorable="d"
-        Title="LoginView" Height="280" Width="400">
+        Title="LoginView" Height="330" Width="400">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -53,6 +53,5 @@
                      PasswordChanged="OnAdminPasswordChanged"/>
         <Button Grid.Row="8" Grid.Column="1" Content="Login" Margin="5"
                 Command="{Binding LoginCommand}"/>
-        
     </Grid>
 </Window>

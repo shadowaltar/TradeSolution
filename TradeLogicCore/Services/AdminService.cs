@@ -148,6 +148,26 @@ public class AdminService : IAdminService
         return await _storage.InsertOne(user, false);
     }
 
+    public async Task<int> SetPassword(string userName, string userPassword, EnvironmentType environment)
+    {
+        if (userName.IsBlank() || userPassword.IsBlank())
+        {
+            return -1;
+        }
+        var user = await GetUser(userName, environment);
+        if (user == null)
+        {
+            return -1;
+        }
+        var now = DateTime.UtcNow;
+        user = user with
+        {
+            UpdateTime = now,
+        };
+        Credential.EncryptUserPassword(user, ref userPassword);
+        return await _storage.InsertOne(user, true);
+    }
+
     public async Task<User?> GetUser(string? userName, EnvironmentType environment)
     {
         return userName.IsBlank() ? null : await _storage.ReadUser(userName, "", environment);
