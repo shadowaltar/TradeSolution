@@ -56,30 +56,37 @@ public class AdminController : Controller
         if (result == ResultCode.LoginUserAndAccountOk)
         {
             if (context.User == null || context.Account == null) throw Exceptions.Impossible();
-            HttpContext.Session.SetString("UserName", context.User.Name);
-            HttpContext.Session.SetInt32("UserId", context.User.Id);
-            HttpContext.Session.SetString("AccountName", context.Account.Name);
-            HttpContext.Session.SetInt32("AccountId", context.Account.Id);
-
-            var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
-            var secretKey = Encoding.ASCII.GetBytes(secretStr);
-            var claims = new Claim[]
+            if (HttpContext.IsSessionAvailable())
             {
-                new Claim(ClaimTypes.Name, context.User.Name),
-                new Claim(ClaimTypes.Email, context.User.Email),
-                new Claim(ClaimTypes.Role, "Superuser"), // TODO
-            };
-            var tokenDescriptor = new SecurityTokenDescriptor
+                var session = HttpContext.Session;
+                session.SetString("UserName", context.User.Name);
+                session.SetInt32("UserId", context.User.Id);
+                session.SetString("AccountName", context.Account.Name);
+                session.SetInt32("AccountId", context.Account.Id);
+            }
+            var tokenString = "";
+            if (HttpContext.IsAuthenticationAvailable())
             {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256Signature),
-                Issuer = "TradingPort",
-                Audience = "SpecialTradingUnicorn"
-            };
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(token);
+                var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
+                var secretKey = Encoding.ASCII.GetBytes(secretStr);
+                var claims = new Claim[]
+                {
+                    new(ClaimTypes.Name, context.User.Name),
+                    new(ClaimTypes.Email, context.User.Email),
+                    new(ClaimTypes.Role, "Superuser"), // TODO
+                };
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(claims),
+                    Expires = DateTime.UtcNow.AddDays(7),
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256Signature),
+                    Issuer = "TradingPort",
+                    Audience = "SpecialTradingUnicorn"
+                };
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var token = tokenHandler.CreateToken(tokenDescriptor);
+                tokenString = tokenHandler.WriteToken(token);
+            }
             return Ok(new LoginResponseModel(result,
                                              context.User.Id,
                                              context.User.Name,

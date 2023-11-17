@@ -1,4 +1,6 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
+using TradeCommon.Essentials.Misc;
 using TradeCommon.Essentials.Quotes;
 using TradeDesk.Services;
 
@@ -15,14 +17,15 @@ public class OverviewViewModel : AbstractViewModel
     }
 
     public ObservableCollection<OhlcPrice> OhlcPrices { get; } = new();
+    public ObservableCollection<TimeAndValue> Volumes { get; } = new();
 
     public string PriceFormat { get => priceFormat; set => SetValue(ref priceFormat, value); }
 
-    private System.DateTime? chartMinDateTime;
+    private DateTime? chartMinDateTime;
 
-    public System.DateTime? ChartMinDateTime { get => chartMinDateTime; set => SetValue(ref chartMinDateTime, value); }
+    public DateTime? ChartMinDateTime { get => chartMinDateTime; set => SetValue(ref chartMinDateTime, value); }
 
-    private System.DateTime? chartMaxDateTime;
+    private DateTime? chartMaxDateTime;
 
-    public System.DateTime? ChartMaxDateTime { get => chartMaxDateTime; set => SetValue(ref chartMaxDateTime, value); }
+    public DateTime? ChartMaxDateTime { get => chartMaxDateTime; set => SetValue(ref chartMaxDateTime, value); }
 }

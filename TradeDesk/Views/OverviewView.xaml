@@ -72,15 +72,15 @@
                                          XBindingPath="T"
                                          BearFillColor="Transparent"
                                          BullFillColor="Transparent"
-                              ShowTooltip="True"
-                              EnableAnimation="False" />
+                                         ShowTooltip="True"
+                                         EnableAnimation="False" />
                 
                 <syncfusion:BarSeries x:Name="VolumeBar"
                                       ItemsSource="{Binding Volumes}"
-                                      XBindingPath="T"
-                                      YBindingPath="V"
-                              ShowTooltip="True"
-                              EnableAnimation="False" />
+                                      XBindingPath="Time"
+                                      YBindingPath="Value"
+                                      ShowTooltip="True"
+                                      EnableAnimation="False" />
                 
         </syncfusion:SfChart>
     </Grid>

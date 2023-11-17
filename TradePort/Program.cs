@@ -16,7 +16,7 @@ XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
 // authorization flag
-var isAuthorizationEnabled = true;
+var isAuthorizationEnabled = false;
 
 // create asp.net core application
 var builder = WebApplication.CreateBuilder(args);
@@ -28,19 +28,25 @@ builder.Services.AddControllers();
 builder.Services
     .AddEndpointsApiExplorer()
     .AddDirectoryBrowser()
-    .AddDistributedMemoryCache()
-    .AddSession(o =>
+    .AddDistributedMemoryCache();
+if (isAuthorizationEnabled)
+    builder.Services.AddSession(o =>
     {
         o.Cookie.Name = "TradePort.Session";
         o.IdleTimeout = TimeSpan.FromHours(24);
         o.Cookie.IsEssential = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    })
-    .AddAuthentication(x =>
-    {
-        x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
+    });
+
+
+if (isAuthorizationEnabled)
+{
+    builder.Services.AddAuthorization();
+    builder.Services.AddAuthentication(x =>
+     {
+         x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+         x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+     })
     .AddJwtBearer(x =>
     {
         x.RequireHttpsMetadata = false;
@@ -56,9 +62,7 @@ builder.Services
             ValidateLifetime = true
         };
     });
-
-if (isAuthorizationEnabled)
-    builder.Services.AddAuthorization();
+}
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -89,7 +93,6 @@ var app = builder.Build();
 // both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 app.UseDeveloperExceptionPage();
-app.UseSession();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -99,9 +102,12 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
 if (isAuthorizationEnabled)
+{
+    app.UseSession();
+    app.UseAuthentication();
     app.UseAuthorization();
+}
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -111,5 +117,8 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-app.MapControllers().RequireAuthorization();
+if (isAuthorizationEnabled)
+    app.MapControllers().RequireAuthorization();
+else
+    app.MapControllers();
 app.Run();
