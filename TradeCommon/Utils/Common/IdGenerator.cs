@@ -60,6 +60,12 @@ public class IdGenerator
 public class IdGenerators
 {
     private static readonly Dictionary<Type, IdGenerator> _idGenerators = new();
+    
+    public static IdGenerator Get()
+    {
+        return Get<object>();
+    }
+
     public static IdGenerator Get<T>()
     {
         lock (_idGenerators)

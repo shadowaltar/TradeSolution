@@ -4,32 +4,37 @@ using Common;
 using log4net.Config;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using OfficeOpenXml;
+using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using TradeLogicCore.Services;
+using TradePort.Utils;
 
-var log = Logger.New();
+var _log = Logger.New();
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 XmlConfigurator.Configure();
 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
+// to be used in callback
+IServiceProvider? services = null;
+
 // authorization flag
-var isAuthorizationEnabled = false;
+var isAuthenticationEnabled = true;
+var isSessionEnabled = true;
 
 // create asp.net core application
 var builder = WebApplication.CreateBuilder(args);
-
-var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
-var secretKey = Encoding.ASCII.GetBytes(secretStr);
-
 builder.Services.AddControllers();
 builder.Services
     .AddEndpointsApiExplorer()
     .AddDirectoryBrowser()
     .AddDistributedMemoryCache();
-if (isAuthorizationEnabled)
+if (isSessionEnabled)
+{
     builder.Services.AddSession(o =>
     {
         o.Cookie.Name = "TradePort.Session";
@@ -37,29 +42,36 @@ if (isAuthorizationEnabled)
         o.Cookie.IsEssential = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
+}
 
+builder.Services.AddAuthorization();
 
-if (isAuthorizationEnabled)
+if (isAuthenticationEnabled)
 {
-    builder.Services.AddAuthorization();
-    builder.Services.AddAuthentication(x =>
-     {
-         x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-         x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-     })
-    .AddJwtBearer(x =>
+    builder.Services.AddAuthentication(o =>
     {
-        x.RequireHttpsMetadata = false;
-        x.SaveToken = true;
-        x.TokenValidationParameters = new TokenValidationParameters
+        o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, o =>
+    {
+        o.RequireHttpsMetadata = false;
+        o.SaveToken = true;
+        o.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(secretKey),
             ValidateIssuer = true,
-            ValidIssuer = "TradingPort",
             ValidateAudience = true,
+            ValidateLifetime = true,
             ValidAudience = "SpecialTradingUnicorn",
-            ValidateLifetime = true
+            ValidIssuer = "TradePort",
+            //IssuerSigningKey = new SymmetricSecurityKey(secretKey),
+            IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+            {
+                var context = services!.GetService<Context>()!;
+                return Authentication.ValidateKey(context, s, (JwtSecurityToken)securityToken,
+                    identifier, parameters.ValidIssuer, parameters.ValidAudience);
+            }
         };
     });
 }
@@ -71,6 +83,33 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
     c.UseInlineDefinitionsForEnums();
+
+    if (isAuthenticationEnabled)
+    {
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Scheme = "bearer",
+            Description = "Please provide the token value from login response."
+        });
+
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                new string[] { }
+            }
+        });
+    }
 });
 
 builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
@@ -102,13 +141,16 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-if (isAuthorizationEnabled)
+if (isAuthenticationEnabled)
+{
+    app.UseAuthentication();
+}
+app.UseRouting();
+app.UseAuthorization();
+if (isSessionEnabled)
 {
     app.UseSession();
-    app.UseAuthentication();
-    app.UseAuthorization();
 }
-
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -117,8 +159,8 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-if (isAuthorizationEnabled)
-    app.MapControllers().RequireAuthorization();
-else
-    app.MapControllers();
+app.MapControllers().RequireAuthorization();
+
+services = app.Services;
+
 app.Run();

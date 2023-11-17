@@ -1,5 +1,4 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using log4net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -14,7 +13,6 @@ public class AdminService : IAdminService
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly IComponentContext _container;
     private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly ITradeService _tradeService;
@@ -22,6 +20,8 @@ public class AdminService : IAdminService
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
     private bool _isInitialized;
+
+    private Dictionary<string, string> _userSessionIdToToken = new();
 
     public bool IsLoggedIn { get; private set; }
 
@@ -31,8 +31,7 @@ public class AdminService : IAdminService
 
     public Context Context { get; }
 
-    public AdminService(IComponentContext container,
-                        Context context,
+    public AdminService(Context context,
                         ISecurityService securityService,
                         IPortfolioService portfolioService,
                         ITradeService tradeService,
@@ -40,7 +39,6 @@ public class AdminService : IAdminService
                         IExternalConnectivityManagement connectivity)
     {
         Context = context;
-        _container = container;
         _storage = context.Storage;
         _securityService = securityService;
         _tradeService = tradeService;
@@ -104,6 +102,7 @@ public class AdminService : IAdminService
 
         user.Accounts.Add(account);
         CurrentAccount = account;
+        CurrentUser.LoginSessionId = Guid.NewGuid().ToString();
 
         Context.User = CurrentUser;
         Context.Account = CurrentAccount;

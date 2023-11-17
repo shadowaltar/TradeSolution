@@ -5,8 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials;
@@ -34,22 +32,23 @@ public class AdminController : Controller
     /// <summary>
     /// Set application environment + login (combination of two other calls).
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="container"></param>
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <returns></returns>
     [AllowAnonymous]
     [HttpPost(RestApiConstants.Login)]
-    public async Task<ActionResult> SetEnvironmentAndLogin([FromServices] IComponentContext container,
-                                                           [FromServices] IAdminService adminService,
-                                                           [FromForm] LoginRequestModel model)
+    public async Task<ActionResult> Login([FromServices] Context context,
+                                          [FromServices] IComponentContext container,
+                                          [FromServices] IAdminService adminService,
+                                          [FromForm] LoginRequestModel model)
     {
         if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
         if (ControllerValidator.IsUnknown(model.Environment, out br)) return br;
         if (ControllerValidator.IsUnknown(model.Exchange, out br)) return br;
 
         var broker = ExternalNames.Convert(model.Exchange);
-        var context = container.Resolve<Context>();
         context.Initialize(model.Environment, model.Exchange, broker);
 
         var result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
@@ -64,28 +63,14 @@ public class AdminController : Controller
                 session.SetString("AccountName", context.Account.Name);
                 session.SetInt32("AccountId", context.Account.Id);
             }
+            SecurityToken? securityToken = null;
             var tokenString = "";
             if (HttpContext.IsAuthenticationAvailable())
             {
-                var secretStr = CryptographyUtils.Encrypt("SecuritySpell", "");
-                var secretKey = Encoding.ASCII.GetBytes(secretStr);
-                var claims = new Claim[]
-                {
-                    new(ClaimTypes.Name, context.User.Name),
-                    new(ClaimTypes.Email, context.User.Email),
-                    new(ClaimTypes.Role, "Superuser"), // TODO
-                };
-                var tokenDescriptor = new SecurityTokenDescriptor
-                {
-                    Subject = new ClaimsIdentity(claims),
-                    Expires = DateTime.UtcNow.AddDays(7),
-                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(secretKey), SecurityAlgorithms.HmacSha256Signature),
-                    Issuer = "TradingPort",
-                    Audience = "SpecialTradingUnicorn"
-                };
+                var tokenDescriptor = Authentication.GetTokenDescriptor(context);
                 var tokenHandler = new JwtSecurityTokenHandler();
-                var token = tokenHandler.CreateToken(tokenDescriptor);
-                tokenString = tokenHandler.WriteToken(token);
+                securityToken = tokenHandler.CreateToken(tokenDescriptor);
+                tokenString = tokenHandler.WriteToken(securityToken);
             }
             return Ok(new LoginResponseModel(result,
                                              context.User.Id,
@@ -96,9 +81,10 @@ public class AdminController : Controller
                                              context.Exchange,
                                              context.Broker,
                                              context.Environment,
+                                             securityToken?.ValidTo ?? DateTime.MaxValue,
                                              tokenString));
         }
-        return BadRequest($"Failed to {nameof(SetEnvironmentAndLogin)}; code: {result}");
+        return BadRequest($"Failed to {nameof(Login)}; code: {result}");
     }
 
     [HttpPost(RestApiConstants.ChangeUserPassword)]
@@ -141,50 +127,7 @@ public class AdminController : Controller
         await portfolioService.Reload(false, true, true, true);
 
         return Ok("Done");
-
     }
-
-    ///// <summary>
-    ///// Set application environment.
-    ///// </summary>
-    ///// <param name="adminService"></param>
-    ///// <param name="adminPassword"></param>
-    ///// <param name="environment"></param>
-    ///// <param name="exchange"></param>
-    ///// <returns></returns>
-    //[HttpPost("set-environment")]
-    //public ActionResult SetEnvironment([FromServices] IAdminService adminService,
-    //                                   [FromForm(Name = "admin-password")] string adminPassword,
-    //                                   [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Test,
-    //                                   [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance)
-    //{
-    //    if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-    //    if (ControllerValidator.IsUnknown(environment, out br)) return br;
-    //    if (ControllerValidator.IsUnknown(exchange, out br)) return br;
-
-    //    adminService.Initialize(environment, exchange, ExternalNames.Convert(exchange));
-    //    return Ok(environment);
-    //}
-
-    ///// <summary>
-    ///// Login.
-    ///// </summary>
-    ///// <param name="adminService"></param>
-    ///// <param name="userName"></param>
-    ///// <param name="password"></param>
-    ///// <param name="accountName"></param>
-    ///// <returns></returns>
-    //[HttpPost("login")]
-    //public async Task<ActionResult> Login([FromServices] IAdminService adminService,
-    //                                      [FromQuery(Name = "user")] string userName,
-    //                                      [FromQuery(Name = "account-name")] string accountName,
-    //                                      [FromForm(Name = "user-password")] string password)
-    //{
-    //    var result = await adminService.Login(userName, password, accountName, adminService.Context.Environment);
-    //    return result != ResultCode.LoginUserAndAccountOk
-    //        ? BadRequest($"Failed to {nameof(Login)}; code: {result}")
-    //        : Ok(new Dictionary<string, object?> { { "user", adminService.CurrentUser }, { "account", adminService.CurrentAccount } });
-    //}
 
     /// <summary>
     /// Get details of a user.
@@ -631,5 +574,6 @@ public class AdminController : Controller
                                      ExchangeType Exchange,
                                      BrokerType Broker,
                                      EnvironmentType Environment,
+                                     DateTime SessionExpiry,
                                      string Token);
 }

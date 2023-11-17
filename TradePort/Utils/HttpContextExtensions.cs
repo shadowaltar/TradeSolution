@@ -13,7 +13,7 @@ public static class HttpContextExtensions
 
     public static bool IsAuthenticationAvailable(this HttpContext httpContext)
     {
-        var authenticateResultFeature = httpContext.Features.Get<IAuthenticateResultFeature>();
+        var authenticateResultFeature = httpContext.Features.Get<IAuthenticationFeature>();
         return authenticateResultFeature != null;
     }
 }
