@@ -254,13 +254,48 @@ public class Quotation : IExternalQuotationManagement
         var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
         var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
         return ws != null && await CloseWebSocket(ws, wsName)
-            ? ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security, interval)
-            : ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security, interval);
+            ? ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security.Id, interval)
+            : ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security.Id, interval);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
     {
-        throw new NotImplementedException();
+        List<KeyValuePair<(int, IntervalType), MessageBroker<OhlcPrice>>> keyValuePairs;
+        lock (_ohlcPriceBrokers)
+        {
+            keyValuePairs = _ohlcPriceBrokers.ToList();
+        }
+        if (keyValuePairs.Count == 0)
+            return ExternalConnectionStates.Nothing();
+
+        var parentState = new ExternalConnectionState
+        {
+            Action = ActionType.Unsubscribe,
+            Type = SubscriptionType.MarketData,
+            Description = "Subscribe multiple OHLC prices",
+            ResultCode = ResultCode.SubscriptionOk,
+        };
+        parentState.SubStates = new();
+
+        foreach (var (key, broker) in keyValuePairs)
+        {
+            var (securityId, interval) = key;
+            broker?.Dispose();
+            var wsName = $"{nameof(OhlcPrice)}_{securityId}_{interval}";
+            var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
+            ExternalConnectionState? state;
+            if (ws != null && await CloseWebSocket(ws, wsName))
+            {
+                state = ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(securityId, interval);
+            }
+            else
+            {
+                state = ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(securityId, interval);
+                parentState.ResultCode = ResultCode.UnsubscriptionFailed;
+            }
+            parentState.SubStates.Add(state);
+        }
+        return parentState;
     }
 
     public async Task<OrderBook?> GetCurrentOrderBook(Security security)
@@ -408,7 +443,7 @@ public class Quotation : IExternalQuotationManagement
             throw Exceptions.NotImplemented(); // TODO, full depth book implementation
 
         var wsName = $"{nameof(OrderBook)}_{security.Id}";
-        var streamName = $"{security.Code.ToLowerInvariant()}@depth{level}";
+        var streamName = $"{security.Code.ToLowerInvariant()}@depth{level}@100ms";
         Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={streamName}");
 
         _lastOrderBooks[security.Id] = new ExtendedOrderBook();

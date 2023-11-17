@@ -506,14 +506,14 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedRealTimeOhlcOk(Security security, IntervalType interval)
+    public static ExternalConnectionState UnsubscribedRealTimeOhlcOk(int securityId, IntervalType interval)
     {
         return new()
         {
             Action = ActionType.Unsubscribe,
             ResultCode = ResultCode.UnsubscriptionOk,
             ExternalId = BrokerId,
-            Description = $"Unsubscribed OHLC price for {security.Id} with interval {interval}",
+            Description = $"Unsubscribed OHLC price for {securityId} with interval {interval}",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
         };
@@ -571,14 +571,14 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedRealTimeOhlcFailed(Security security, IntervalType interval)
+    public static ExternalConnectionState UnsubscribedRealTimeOhlcFailed(int securityId, IntervalType interval)
     {
         return new()
         {
             Action = ActionType.Unsubscribe,
             ResultCode = ResultCode.UnsubscriptionOk,
             ExternalId = BrokerId,
-            Description = $"Failed to unsubscribe OHLC price for {security.Id} with interval {interval}",
+            Description = $"Failed to unsubscribe OHLC price for {securityId} with interval {interval}",
             Type = SubscriptionType.RealTimeMarketData,
             UniqueConnectionId = "",
         };
@@ -681,5 +681,10 @@ public static class ExternalConnectionStates
             Description = "Cannot connect due to firewall rule.",
             Type = SubscriptionType.All,
         };
+    }
+
+    public static ExternalConnectionState Nothing()
+    {
+        return new();
     }
 }
