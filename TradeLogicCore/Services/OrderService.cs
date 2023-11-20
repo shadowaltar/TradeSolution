@@ -364,7 +364,8 @@ public class OrderService : IOrderService, IDisposable
             CreateTime = now,
             UpdateTime = now,
             ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
-            Price = price,
+            Price = 0,
+            LimitPrice = orderType.IsLimit()? price:0,
             Quantity = quantity,
             Type = orderType,
             Security = security,

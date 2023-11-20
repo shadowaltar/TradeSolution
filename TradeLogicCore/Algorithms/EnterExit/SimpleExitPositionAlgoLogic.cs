@@ -90,6 +90,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             Status = OrderStatus.Sending,
             TimeInForce = TimeInForceType.GoodTillCancel,
             Price = 0,
+            LimitPrice = 0, // MARKET order
             Type = OrderType.Market,
             Security = security,
             SecurityId = security.Id,

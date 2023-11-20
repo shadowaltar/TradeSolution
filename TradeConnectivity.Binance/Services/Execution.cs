@@ -86,21 +86,6 @@ public class Execution : IExternalExecutionManagement
             return ExternalQueryStates.FirewallBlocked();
 
         var url = $"{_connectivity.RootUrl}/api/v3/order";
-        return await SendOrder(url, order);
-    }
-
-    /// <summary>
-    /// Send an order. The server returns 'order is alive' response.
-    /// It is possible that the server will also attach the trade fills in the response.
-    /// </summary>
-    /// <param name="url"></param>
-    /// <param name="order"></param>
-    /// <returns></returns>
-    private async Task<ExternalQueryState> SendOrder(string url, Order order)
-    {
-        if (!Firewall.CanCall)
-            return ExternalQueryStates.FirewallBlocked();
-
         var isOk = false;
         var swTotal = Stopwatch.StartNew();
         var parameters = new List<(string, string)>(16)
@@ -113,12 +98,12 @@ public class Execution : IExternalExecutionManagement
         };
         if (order.Type is OrderType.Limit)
         {
-            parameters.Add(("price", order.Price.ToString()));
+            parameters.Add(("price", order.LimitPrice.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
         }
         else if (order.Type is OrderType.StopLimit or OrderType.TakeProfitLimit)
         {
-            parameters.Add(("price", order.Price.ToString()));
+            parameters.Add(("price", order.LimitPrice.ToString()));
             parameters.Add(("stopPrice", order.StopPrice.ToString()));
             parameters.Add(("timeInForce", order.TimeInForce.ConvertEnumToDescription()));
         }
@@ -146,8 +131,10 @@ public class Execution : IExternalExecutionManagement
             AccountId = _context.AccountId,
             CreateTime = order.CreateTime,
 
+            Type = order.Type,
             Side = order.Side,
-            Price = order.Price,
+            Price = 0, // should be zero when the order is just placed if MARKET; should be LimitPrice if LIMIT
+            LimitPrice = order.LimitPrice,
             Quantity = order.Quantity,
 
             Security = order.Security,
@@ -194,15 +181,12 @@ public class Execution : IExternalExecutionManagement
             order.ExternalCreateTime = json.GetUtcFromUnixMs("transactTime"); // TODO not sure if workingTime is useful or not
             order.FilledQuantity = json.GetDecimal("executedQty");
             order.ExternalUpdateTime = json.GetUtcFromUnixMs("workingTime");
-            order.Price = json.GetDecimal("price"); // need trades to get the price if type = MARKET
             order.UpdateTime = DateUtils.Max(order.ExternalCreateTime, order.ExternalUpdateTime);
             var isOperational = order.Action == OrderActionType.Operational;
 
             var fillsObj = json["fills"]?.AsArray();
             if (fillsObj != null && fillsObj.Count != 0)
             {
-                var averagePrice = 0m;
-                var tradedQuantity = 0m;
                 for (int i = 0; i < fillsObj.Count; i++)
                 {
                     JsonNode? item = fillsObj[i];
@@ -229,11 +213,7 @@ public class Execution : IExternalExecutionManagement
                         IsOperational = isOperational,
                     };
                     trades.Add(trade);
-                    averagePrice = ((averagePrice * tradedQuantity) + (trade.Price * trade.Quantity)) / (tradedQuantity + trade.Quantity);
-                    tradedQuantity += trade.Quantity;
                 }
-                order.Price = averagePrice;
-                order.FilledQuantity = tradedQuantity;
             }
         }
     }
@@ -850,7 +830,7 @@ public class Execution : IExternalExecutionManagement
         // 'workingTime' is similar to 'time', usually smaller than 'updateTime'
         var createTime = rootObj.GetUtcFromUnixMs("time");
         var updateTime = rootObj.GetUtcFromUnixMs("updateTime");
-        return new Order
+        var order = new Order
         {
             Id = rootObj.GetLong("clientOrderId"),
             ExternalOrderId = rootObj.GetLong("id", rootObj.GetLong("orderId")),
@@ -870,6 +850,16 @@ public class Execution : IExternalExecutionManagement
             StopPrice = rootObj.GetDecimal("stopPrice"),
             // iceberg quantity is not supported yet
         };
+        if (order.Type == OrderType.Unknown)
+        {
+            _log.Error($"Received an order without order type defined, EOID: {order.ExternalOrderId}, OID: {order.Id}");
+        }
+        else if (order.Type.IsLimit())
+        {
+            order.LimitPrice = order.Price;
+            order.Price = 0;
+        }
+        return order;
     }
 
     private Trade? ParseTrade(JsonObject? rootObj, int? securityId)
@@ -945,42 +935,42 @@ public class Execution : IExternalExecutionManagement
             switch (messageType)
             {
                 case "outboundAccountPosition": // asset changes due to trading activities
-                {
-                    var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
-                    var balanceArray = jsonNode["B"]?.AsArray();
-                    if (balanceArray == null)
                     {
-                        _log.Warn($"Unknown user-streaming account asset data."); break;
-                    }
-                    var assets = new List<Asset>();
-                    foreach (var balanceObject in balanceArray.OfType<JsonObject>())
-                    {
-                        var asset = new Asset
+                        var accountUpdateTime = jsonNode.GetUtcFromUnixMs("u");
+                        var balanceArray = jsonNode["B"]?.AsArray();
+                        if (balanceArray == null)
                         {
-                            UpdateTime = accountUpdateTime,
-                            SecurityCode = balanceObject.GetString("a"),
-                            Quantity = balanceObject.GetDecimal("f"),
-                            LockedQuantity = balanceObject.GetDecimal("l"),
-                        };
-                        assets.Add(asset);
+                            _log.Warn($"Unknown user-streaming account asset data."); break;
+                        }
+                        var assets = new List<Asset>();
+                        foreach (var balanceObject in balanceArray.OfType<JsonObject>())
+                        {
+                            var asset = new Asset
+                            {
+                                UpdateTime = accountUpdateTime,
+                                SecurityCode = balanceObject.GetString("a"),
+                                Quantity = balanceObject.GetDecimal("f"),
+                                LockedQuantity = balanceObject.GetDecimal("l"),
+                            };
+                            assets.Add(asset);
+                        }
+                        AssetsChanged?.Invoke(assets);
                     }
-                    AssetsChanged?.Invoke(assets);
-                }
-                break;
+                    break;
                 case "balanceUpdate": // asset changes due to deposit or withdrawal or fund transfer
-                {
-                    var delta = jsonNode.GetDecimal("d");
-                    var transaction = new TransferAction
                     {
-                        Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
-                        Quantity = Math.Abs(delta),
-                        AssetCode = jsonNode.GetString("a"),
-                        RequestTime = eventTime,
-                        EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
-                    };
-                    Transferred?.Invoke(transaction);
-                }
-                break;
+                        var delta = jsonNode.GetDecimal("d");
+                        var transaction = new TransferAction
+                        {
+                            Action = delta > 0 ? ActionType.Deposit : ActionType.Withdraw,
+                            Quantity = Math.Abs(delta),
+                            AssetCode = jsonNode.GetString("a"),
+                            RequestTime = eventTime,
+                            EffectiveTime = jsonNode.GetUtcFromUnixMs("T"),
+                        };
+                        Transferred?.Invoke(transaction);
+                    }
+                    break;
                 case "executionReport": // order
                     if (_log.IsDebugEnabled)
                         _log.Debug("Received streamed JSON for execution:" + Environment.NewLine + json);
@@ -989,8 +979,8 @@ public class Execution : IExternalExecutionManagement
                     var code = jsonNode.GetString("s");
                     var orderId = jsonNode.GetLong("c");
                     var side = sideString == "BUY" ? Side.Buy : sideString == "SELL" ? Side.Sell : Side.None;
-                    var orderType = jsonNode.GetString("o").ConvertDescriptionToEnum<OrderType>(OrderType.Unknown);
-                    var timeInForce = jsonNode.GetString("f").ConvertDescriptionToEnum<TimeInForceType>(TimeInForceType.Unknown);
+                    var orderType = jsonNode.GetString("o").ConvertDescriptionToEnum(OrderType.Unknown);
+                    var timeInForce = jsonNode.GetString("f").ConvertDescriptionToEnum(TimeInForceType.Unknown);
                     var orderQuantity = jsonNode.GetDecimal("q");
                     var orderPrice = jsonNode.GetDecimal("p");
                     var stopPrice = jsonNode.GetDecimal("P");
@@ -1048,11 +1038,16 @@ public class Execution : IExternalExecutionManagement
                     };
                     if (order.Status == OrderStatus.Unknown)
                     {
-
+                        _log.Warn($"Received an order without order status defined, EOID: {order.ExternalOrderId}, OID: {order.Id}");
                     }
                     if (order.Type == OrderType.Unknown)
                     {
-
+                        _log.Error($"Received an order without order type defined, EOID: {order.ExternalOrderId}, OID: {order.Id}");
+                    }
+                    else if (order.Type.IsLimit())
+                    {
+                        order.LimitPrice = orderPrice;
+                        order.Price = 0;
                     }
 
                     Trade? trade = null;

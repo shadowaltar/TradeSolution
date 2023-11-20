@@ -394,6 +394,8 @@ public class ExecutionController : Controller
     /// </summary>
     /// <param name="core"></param>
     /// <param name="services"></param>
+    /// <param name="macParams"></param>
+    /// <param name="algoParams"></param>
     /// <param name="adminPassword"></param>
     /// <param name="symbol">Single symbol for trading.</param>
     /// <param name="intervalStr">Trading time interval</param>
@@ -485,7 +487,8 @@ public class ExecutionController : Controller
                                       algoParams.CancelOpenOrdersOnStart,
                                       algoParams.CloseOpenPositionsOnStop,
                                       algoParams.CloseOpenPositionsOnStart,
-                                      algoParams.CleanUpNonCashOnStart);
+                                      algoParams.CleanUpNonCashOnStart,
+                                      algoParams.RecordOrderBookOnExecution);
         var ap = new AlgorithmParameters(IsBackTesting: false,
                                          Interval: interval,
                                          SecurityPool: new List<Security> { security },
@@ -716,5 +719,10 @@ public class ExecutionController : Controller
         [FromForm(Name = "clean-up-non-cash-on-start")]
         [DefaultValue(false)]
         public bool CleanUpNonCashOnStart { get; set; } = false;
+
+
+        [FromForm(Name = "recorder-order-book-on-execution")]
+        [DefaultValue(false)]
+        public bool RecordOrderBookOnExecution { get; set; } = true;
     }
 }

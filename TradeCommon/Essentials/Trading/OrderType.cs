@@ -74,3 +74,17 @@ public enum OrderType
     [Description("LIMIT_MAKER")]
     LimitMaker
 }
+
+public static class OrderTypeExtensions
+{
+    public static bool IsLimit(this OrderType orderType)
+    {
+        return orderType is
+            OrderType.Limit or
+            OrderType.StopLimit or
+            OrderType.TakeProfitLimit or
+            OrderType.TrailingStopLimit or
+            OrderType.LimitIfTouched or
+            OrderType.LimitMaker;
+    }
+}

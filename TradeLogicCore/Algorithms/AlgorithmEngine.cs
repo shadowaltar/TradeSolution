@@ -63,6 +63,11 @@ public class AlgorithmEngine : IAlgorithmEngine
     /// </summary>
     private readonly Dictionary<int, List<AlgoEntry>> _executionEntriesBySecurityIds = new();
 
+    /// <summary>
+    /// Caches order books.
+    /// </summary>
+    private readonly Dictionary<int, OrderBookCache> _orderBookCaches = new();
+
     private readonly IdGenerator _algoEntryIdGen;
 
     private AlgoRunningState _runningState = AlgoRunningState.NotYetStarted;
@@ -335,6 +340,8 @@ public class AlgorithmEngine : IAlgorithmEngine
             _log.Info($"\n\tPOS: [{position.UpdateTime:HHmmss}][{position.SecurityCode}][Closed]\n\t\tID:{position.Id}, TID:{trade.Id}, PNL:{position.Notional:F4}, R:{position.Return:P4}, COUNT:{position.TradeCount}, Notional:{initialQuoteAsset?.Quantity}=>{currentQuoteAsset?.Quantity}");
 
             Algorithm.AfterPositionClosed(current);
+
+            StopOrderBookRecording(current.SecurityId);
         }
         else
         {
@@ -449,30 +456,19 @@ public class AlgorithmEngine : IAlgorithmEngine
     {
         if (_runningState != AlgoRunningState.Running)
             return;
-        if (!_isRecordingOrderBook)
+        if (!EngineParameters.RecordOrderBookOnExecution)
             return;
-
-        var clone = orderBook with { };
-        clone.Bids = new();
-        foreach (var bid in orderBook.Bids)
+        try
         {
-            clone.Bids.Add(bid with { });
+            var cache = _orderBookCaches.ThreadSafeGet(orderBook.SecurityId, () => new OrderBookCache(_context.Storage, orderBook.SecurityId));
+            if (!cache.IsRecording)
+                return;
+
+            cache.Add(orderBook);
         }
-        clone.Asks = new();
-        foreach (var ask in orderBook.Asks)
+        catch (Exception e)
         {
-            clone.Asks.Add(ask with { });
-        }
-        _orderBookSavingBuffer.Add(clone);
-        if (_orderBookSavingBuffer.Count >= 30)
-        {
-            var orderBooks = new List<ExtendedOrderBook>(_orderBookSavingBuffer);
-            _orderBookSavingBuffer.Clear();
-
-            var orderBookTableName = DatabaseNames.OrderBookTableNameCache.ThreadSafeGet(clone.SecurityId);
-            if (orderBookTableName.IsBlank()) throw Exceptions.Impossible("Order Book table must have been prepared properly.");
-
-            _context.Storage.InsertOrderBooks(orderBooks, orderBookTableName); // fire and forget
+            _log.Error("Failed to prepare or add order book into cache for security id: " + orderBook.SecurityId, e);
         }
     }
 
@@ -783,7 +779,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.CanOpenLong(current))
             return false;
 
-        StartOrderBookRecording();
+        await StartOrderBookRecording(current.SecurityId);
 
         // cancel any partial filled, SL or TP orders
         await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
@@ -817,7 +813,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.CanOpenShort(current))
             return false;
 
-        StartOrderBookRecording();
+        await StartOrderBookRecording(current.SecurityId);
 
         // cancel any partial filled, SL or TP orders
         await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
@@ -859,9 +855,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             await Algorithm.Close(current, current.Security, Side.Sell, GetOhlcEndTime(ohlcPrice, intervalType), OrderActionType.AlgoClose);
 
         _persistence.Insert(current);
-
-        StopOrderBookRecording();
-
         return true;
     }
 
@@ -880,9 +873,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             await Algorithm.Close(current, current.Security, Side.Buy, GetOhlcEndTime(ohlcPrice, intervalType), OrderActionType.AlgoClose);
 
         _persistence.Insert(current);
-
-        StopOrderBookRecording();
-
         return true;
     }
 
@@ -907,8 +897,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             {
                 _log.Error($"STOP LOSS ORDER FAILURE! SecId: {securityId}");
             }
-
-            StopOrderBookRecording();
             return true;
         }
         return false;
@@ -936,8 +924,6 @@ public class AlgorithmEngine : IAlgorithmEngine
             {
                 _log.Error($"TAKE PROFIT ORDER FAILURE! SecId: {securityId}");
             }
-
-            StopOrderBookRecording();
             return true;
         }
         return false;
@@ -1021,13 +1007,21 @@ public class AlgorithmEngine : IAlgorithmEngine
         current.Notional = current.Quantity * currentPrice;
     }
 
-    private void StartOrderBookRecording()
+    private async Task StartOrderBookRecording(int securityId)
     {
-        _isRecordingOrderBook = true;
+        var cache = _orderBookCaches.ThreadSafeGet(securityId);
+        if (cache == null)
+            return;
+       await cache.StartPersistence();
     }
 
-    private void StopOrderBookRecording()
+    private void StopOrderBookRecording(int securityId)
     {
-        _isRecordingOrderBook = false;
+        // we want to record some order books after it is stopped
+        var cache = _orderBookCaches.ThreadSafeGet(securityId);
+        if (cache == null)
+            return;
+
+        cache.StopPersistenceAfterAnotherFlush();
     }
 }

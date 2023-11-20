@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using Autofac;
+﻿using Autofac;
 using Common;
 using log4net.Config;
 using System.Text;

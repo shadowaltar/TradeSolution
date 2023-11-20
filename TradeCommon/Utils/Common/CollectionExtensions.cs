@@ -318,6 +318,25 @@ public static class CollectionExtensions
     /// <typeparam name="Tv"></typeparam>
     /// <param name="dictionary"></param>
     /// <param name="key"></param>
+    /// <param name="createFunc"></param>
+    /// <param name="lock"></param>
+    /// <returns></returns>
+    public static Tv ThreadSafeGet<T, Tv>(this IDictionary<T, Tv> dictionary, T key, Func<Tv> createFunc, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock ?? dictionary;
+        lock (lockObject)
+        {
+            return dictionary!.GetOrCreate(key, createFunc);
+        }
+    }
+
+    /// <summary>
+    /// Thread-safe version of <see cref="GetOrCreate{T, Tv}(IDictionary{T, Tv}, T)"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="Tv"></typeparam>
+    /// <param name="dictionary"></param>
+    /// <param name="key"></param>
     /// <param name="lock"></param>
     /// <returns></returns>
     public static Tv ThreadSafeGetOrCreate<T, Tv>(this IDictionary<T, Tv> dictionary, T key, object? @lock = null) where T : notnull
@@ -592,5 +611,33 @@ public static class CollectionExtensions
             result.Add((T)item.Clone());
         }
         return result;
+    }
+
+    public static decimal WeightedAverage<T>(this IList<T> items, Func<T, decimal> value, Func<T, decimal> weight)
+    {
+        if (items == null)
+            throw new ArgumentNullException(nameof(items), $"{nameof(items)} is null.");
+        if (items.Count == 0)
+            return 0;
+        if (items.Count == 1)
+            return value(items[0]);
+
+        int count = 0;
+        decimal valueSum = 0;
+        decimal weightSum = 0;
+
+        foreach (var record in items)
+        {
+            count++;
+            decimal recordWeight = weight(record);
+
+            valueSum += value(record) * recordWeight;
+            weightSum += recordWeight;
+        }
+
+        if (weightSum != 0)
+            return valueSum / weightSum;
+        else
+            throw new DivideByZeroException($"Division of {valueSum} by zero.");
     }
 }

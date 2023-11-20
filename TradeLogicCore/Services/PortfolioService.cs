@@ -209,6 +209,7 @@ public class PortfolioService : IPortfolioService, IDisposable
                 ExternalUpdateTime = DateTime.MinValue,
                 ParentOrderId = 0,
                 Price = 0,
+                LimitPrice = 0, // MARKET order
                 StopPrice = 0,
                 Security = security,
                 SecurityId = security.Id,

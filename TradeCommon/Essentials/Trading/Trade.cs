@@ -73,6 +73,9 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
     [NotNull]
     public decimal Quantity { get; set; }
 
+    [DatabaseIgnore]
+    public decimal Notional => Price * Quantity;
+
     /// <summary>
     /// The fee incurred in this 
     /// </summary>

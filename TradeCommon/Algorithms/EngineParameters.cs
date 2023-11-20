@@ -19,4 +19,5 @@ public record EngineParameters(List<string> PreferredQuoteCurrencies,
                                bool CancelOpenOrdersOnStart = true,
                                bool CloseOpenPositionsOnStop = true,
                                bool CloseOpenPositionsOnStart = true,
-                               bool CleanUpNonCashOnStart = true);
+                               bool CleanUpNonCashOnStart = true,
+                               bool RecordOrderBookOnExecution = true);

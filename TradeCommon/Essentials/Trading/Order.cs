@@ -48,10 +48,15 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
     public Side Side { get; set; }
 
     /// <summary>
+    /// Actual price of an executing/ executed order.
+    /// </summary>
+    public decimal Price { get; set; } = 0;
+
+    /// <summary>
     /// Price of a limit order. For a <see cref="OrderType.Market"/> order
     /// this field is meaningless.
     /// </summary>
-    public decimal Price { get; set; } = 0;
+    public decimal LimitPrice { get; set; }
 
     /// <summary>
     /// The trigger price which when reached, a limit order (limit price specified by <see cref="Price"/>) is created.
@@ -172,6 +177,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
         if (r == 0) r = Type.CompareTo(other?.Type);
         if (r == 0) r = Side.CompareTo(other?.Side);
         if (r == 0) r = Price.CompareTo(other?.Price);
+        if (r == 0) r = LimitPrice.CompareTo(other?.LimitPrice);
         if (r == 0) r = StopPrice.CompareTo(other?.StopPrice);
         if (r == 0) r = Quantity.CompareTo(other?.Quantity);
         if (r == 0) r = FilledQuantity.CompareTo(other?.FilledQuantity);

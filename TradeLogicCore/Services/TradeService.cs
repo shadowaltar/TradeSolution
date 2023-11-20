@@ -84,33 +84,6 @@ public class TradeService : ITradeService, IDisposable
         _portfolioService.Process(trade);
     }
 
-    //private void OnTradesReceived(ListAlgoBatches<Trade> trades, bool isSameSecurity)
-    //{
-    //    if (trades.IsNullOrEmpty()) return;
-    //    var newOnes = new ListAlgoBatches<Trade>();
-    //    foreach (var trade in trades)
-    //    {
-    //        InternalOnNextTrade(trade);
-    //        newOnes.Add(trade);
-    //    }
-    //    if (newOnes.Count == 0)
-    //        return;
-
-    //    lock (_tradesByOrderId)
-    //    {
-    //        foreach (var trade in newOnes)
-    //        {
-    //            UpdateTradeByOrderId(trade);
-    //            _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P:{trade.Price}, Q:{trade.Quantity}");
-    //        }
-    //    }
-
-    //    NextTrades?.Invoke(newOnes, isSameSecurity);
-    //    _persistence.Insert(newOnes);
-
-    //    _portfolioService.Process(newOnes, isSameSecurity);
-    //}
-
     private void InternalOnNextTrade(Trade trade)
     {
         // When a trade is received from external system execution engine
@@ -127,7 +100,7 @@ public class TradeService : ITradeService, IDisposable
             return;
         }
 
-        // order is always handled before trade
+        // order shall be always handled before its trade
         var order = _orderService.GetOrderByExternalId(trade.ExternalOrderId);
         if (order == null)
         {
@@ -159,10 +132,13 @@ public class TradeService : ITradeService, IDisposable
 
         lock (_tradesByOrderId)
         {
-            if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var ts))
+            if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var trades))
             {
-                ts = _tradesByOrderId.GetOrCreate(order.Id);
-                ts.Add(trade);
+                trades = _tradesByOrderId.GetOrCreate(order.Id);
+                trades.Add(trade);
+
+                order.Price = trades.WeightedAverage(t => t.Price, t => t.Quantity);
+                order.FilledQuantity = trades.Sum(t => t.Quantity);
             }
         }
     }

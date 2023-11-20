@@ -425,7 +425,8 @@ public class Program
             SecurityCode = "BTCUSDT",
             SecurityId = security.Id,
             Security = security,
-            Price = 10000,
+            Price = 0,
+            LimitPrice = 10000, // LIMIT order
             Quantity = 0.01m,
             Side = Side.Buy,
             Type = OrderType.Limit,

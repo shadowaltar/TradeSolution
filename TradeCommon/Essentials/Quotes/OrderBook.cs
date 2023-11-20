@@ -16,6 +16,22 @@ public record OrderBook
     {
         return Json.Serialize(this);
     }
+
+    public virtual OrderBook DeepClone()
+    {
+        var clone = this with { };
+        clone.Bids = new();
+        foreach (var bid in Bids)
+        {
+            clone.Bids.Add(bid with { });
+        }
+        clone.Asks = new();
+        foreach (var ask in Asks)
+        {
+            clone.Asks.Add(ask with { });
+        }
+        return clone;
+    }
 }
 
 public record ExtendedOrderBook : OrderBook
@@ -26,5 +42,21 @@ public record ExtendedOrderBook : OrderBook
     public override string ToString()
     {
         return $"{Time:yyyyMMdd-HHmmss.fff} B/A: {Bids.FirstOrDefault()?.Price}/{Asks.FirstOrDefault()?.Price}, Size:{Bids.FirstOrDefault()?.Size}/{Asks.FirstOrDefault()?.Size}";
+    }
+
+    public override ExtendedOrderBook DeepClone()
+    {
+        var clone = this with { };
+        clone.Bids = new();
+        foreach (var bid in Bids)
+        {
+            clone.Bids.Add(bid with { });
+        }
+        clone.Asks = new();
+        foreach (var ask in Asks)
+        {
+            clone.Asks.Add(ask with { });
+        }
+        return clone;
     }
 }
