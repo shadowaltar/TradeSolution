@@ -61,12 +61,12 @@ public partial class Storage
         {
             count = await Insert<AlgoBatch>(task);
         }
-        else if (task.Type == typeof(OrderState))
-        {
-            count = await Insert<OrderState>(task);
-        }
         else
-            throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
+        {
+            count = task.Type == typeof(OrderState)
+                ? await Insert<OrderState>(task)
+                : throw new InvalidOperationException($"Persistence task type {task.Type?.Name} is not supported.");
+        }
         return count;
     }
 
@@ -330,7 +330,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public async Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
+    public async Task<(int securityId, int count)> InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -394,6 +394,63 @@ DO UPDATE SET
         await connection.CloseAsync();
 
         return (securityId, count);
+    }
+
+    public async Task<int> InsertPrice(int securityId, IntervalType interval, SecurityType securityType, OhlcPrice price)
+    {
+        var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
+        var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
+        var dailyPriceSpecificColumn2 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "$AdjClose," : "";
+        var dailyPriceSpecificColumn3 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose = excluded.AdjClose," : "";
+        string sql =
+@$"
+INSERT INTO {tableName}
+    (SecurityId, Open, High, Low, Close, Volume, {dailyPriceSpecificColumn1} StartTime)
+VALUES
+    ($SecurityId, $Open, $High, $Low, $Close, $Volume, {dailyPriceSpecificColumn2} $StartTime)
+ON CONFLICT (SecurityId, StartTime)
+DO UPDATE SET
+    Open = excluded.Open,
+    High = excluded.High,
+    Low = excluded.Low,
+    Close = excluded.Close,
+    {dailyPriceSpecificColumn3}
+    Volume = excluded.Volume;
+";
+        var count = 0;
+        using var connection = await Connect(DatabaseNames.MarketData);
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            command.CommandText = sql;
+
+            command.Parameters.Clear();
+            command.Parameters.AddWithValue("$SecurityId", securityId);
+            command.Parameters.Add(new SqliteParameter("$Open", SqliteType.Real)).Value = price.O;
+            command.Parameters.AddWithValue("$High", price.H);
+            command.Parameters.AddWithValue("$Low", price.L);
+            command.Parameters.AddWithValue("$Close", price.C);
+            if (securityType == SecurityType.Equity && interval == IntervalType.OneDay)
+                command.Parameters.AddWithValue("$AdjClose", price.AC);
+            command.Parameters.AddWithValue("$Volume", price.V);
+            command.Parameters.AddWithValue("$StartTime", price.T);
+
+            count = await command.ExecuteNonQueryAsync();
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted {count} prices into prices table.");
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to upsert into prices table.", e);
+        }
+        finally
+        {
+            command?.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return count;
     }
 
     public async Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats)

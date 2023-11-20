@@ -54,7 +54,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         _orderIdGen = IdGenerators.Get<Order>();
     }
 
-    public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)
+    public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
@@ -91,6 +91,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             TimeInForce = TimeInForceType.GoodTillCancel,
             Price = 0,
             LimitPrice = 0, // MARKET order
+            TriggerPrice = triggerPrice,
             Type = OrderType.Market,
             Security = security,
             SecurityId = security.Id,

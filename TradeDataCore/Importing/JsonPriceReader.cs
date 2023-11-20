@@ -34,7 +34,7 @@ public class JsonPriceReader
                 continue;
 
             var interval = IntervalTypeConverter.Parse(intervalStr);
-            var i = await _storage.UpsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
+            var i = await _storage.InsertPrices(security.Id, interval, secType, group.OfType<OhlcPrice>().ToList());
             results[group.Key] = i;
         }
         return results;

@@ -1,20 +1,24 @@
 ﻿using Common;
+using log4net;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Algorithms;
+
 public class OrderBookCache
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly IStorage _storage;
     private readonly string _orderBookTableName;
+
+    private readonly Queue<ExtendedOrderBook> _cache = new();
     private readonly object _locker = new();
 
     private bool _shallStopAfterAnotherFlush;
 
-    public int CacheSize { get; set; } = 20;
-
-    public Queue<ExtendedOrderBook> Cache { get; } = new();
+    public int CacheSize { get; set; } = 50;
 
     public bool IsRecording { get; private set; } = false;
 
@@ -27,23 +31,32 @@ public class OrderBookCache
         _orderBookTableName = table;
     }
 
-    public async Task<ExtendedOrderBook?> Add(ExtendedOrderBook book)
+    public void Add(ExtendedOrderBook book)
     {
-        ExtendedOrderBook? obj = null;
-        List<ExtendedOrderBook>? clonedCache = null;
         lock (_locker)
         {
-            Cache.Enqueue(book);
-            if (Cache.Count > CacheSize)
+            _cache.Enqueue(book);
+
+            if (_cache.Count <= CacheSize)
+                return;
+
+            var obj = _cache.Dequeue();
+            if (!IsRecording)
+                return;
+
+            // becomes batch mode
+            var clonedCache = new List<ExtendedOrderBook>();
+            foreach (var orderBook in _cache)
             {
-                obj = Cache.Dequeue();
-                if (IsRecording) // becomes batch mode
-                    clonedCache = CloneAndClearCache();
+                var clone = orderBook.DeepClone();
+                var last = clonedCache.LastOrDefault();
+                if (last != null && last.Time >= clone.Time)
+                    clone.Time = clone.Time.AddMilliseconds(-1 + (last.Time - clone.Time).TotalMilliseconds);
+                clonedCache.Add(clone);
             }
-        }
-        if (clonedCache != null && IsRecording)
-        {
-            await Flush(clonedCache);
+            _cache.Clear();
+            _log.Info($"Wrote OB, {clonedCache.First().Time:HHmmss.fff}->{clonedCache.Last().Time:HHmmss.fff}; Count: {clonedCache.Count}");
+            AsyncHelper.RunSync(() => _storage.InsertOrderBooks(clonedCache, _orderBookTableName));
 
             // back to continuous cache mode after one more flushing
             if (_shallStopAfterAnotherFlush)
@@ -52,7 +65,6 @@ public class OrderBookCache
                 IsRecording = false;
             }
         }
-        return obj;
     }
 
     /// <summary>
@@ -61,38 +73,14 @@ public class OrderBookCache
     /// 2. turns the continuous cache mode to batch flushing mode.
     /// </summary>
     /// <returns></returns>
-    public async Task StartPersistence()
+    public void StartPersistence()
     {
         _shallStopAfterAnotherFlush = false;
         IsRecording = true;
-        List<ExtendedOrderBook> cloned;
-        lock (_locker)
-            cloned = CloneAndClearCache();
-        await Flush(cloned);
     }
 
     public void StopPersistenceAfterAnotherFlush()
     {
         _shallStopAfterAnotherFlush = true;
-    }
-
-    private List<ExtendedOrderBook> CloneAndClearCache()
-    {
-        var clonedCache = new List<ExtendedOrderBook>();
-        lock (_locker)
-        {
-            foreach (var orderBook in Cache)
-            {
-                var clone = orderBook.DeepClone();
-                clonedCache.Add(clone);
-            }
-            Cache.Clear();
-        }
-        return clonedCache;
-    }
-
-    private async Task Flush(List<ExtendedOrderBook> clonedCache)
-    {
-        await _storage.InsertOrderBooks(clonedCache, _orderBookTableName); // fire and forget
     }
 }

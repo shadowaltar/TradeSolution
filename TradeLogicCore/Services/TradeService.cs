@@ -76,7 +76,6 @@ public class TradeService : ITradeService, IDisposable
     private void OnTradeReceived(Trade trade)
     {
         InternalOnNextTrade(trade);
-        UpdateTradeByOrderId(trade);
 
         _persistence.Insert(trade);
         TradeProcessed?.Invoke(trade);
@@ -130,16 +129,14 @@ public class TradeService : ITradeService, IDisposable
         _trades.ThreadSafeSet(trade.Id, trade);
         _tradesByExternalId.ThreadSafeSet(trade.ExternalTradeId, trade);
 
+        // update the order actual price and filled quantity
+        var trades = UpdateTradeToOrderCache(trade);
         lock (_tradesByOrderId)
         {
-            if (_tradesByOrderId.ThreadSafeTryGet(order.Id, out var trades))
-            {
-                trades = _tradesByOrderId.GetOrCreate(order.Id);
-                trades.Add(trade);
-
-                order.Price = trades.WeightedAverage(t => t.Price, t => t.Quantity);
-                order.FilledQuantity = trades.Sum(t => t.Quantity);
-            }
+            // update order info from trade
+            order.Price = trades.WeightedAverage(t => t.Price, t => t.Quantity);
+            order.FilledQuantity = trades.Sum(t => t.Quantity);
+            _persistence.Insert(order);
         }
     }
 
@@ -268,10 +265,16 @@ public class TradeService : ITradeService, IDisposable
         }
 
         foreach (var trade in trades)
-            UpdateTradeByOrderId(trade);
+            UpdateTradeToOrderCache(trade);
     }
 
-    private void UpdateTradeByOrderId(Trade trade)
+    /// <summary>
+    /// Update the trade - order cache, while key is order id.
+    /// Returns all the trades with the same order id.
+    /// </summary>
+    /// <param name="trade"></param>
+    /// <returns></returns>
+    private List<Trade> UpdateTradeToOrderCache(Trade trade)
     {
         lock (_tradesByOrderId)
         {
@@ -281,6 +284,7 @@ public class TradeService : ITradeService, IDisposable
                 trades[existingIndex] = trade;
             else
                 trades.Add(trade);
+            return trades;
         }
     }
 

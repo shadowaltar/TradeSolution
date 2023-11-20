@@ -77,7 +77,10 @@ public interface IStorage
     Task<List<Position>> ReadPositions(DateTime start, OpenClose isOpenOrClose);
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
     Task UpsertFxDefinitions(List<Security> entries);
-    Task<(int securityId, int count)> UpsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
+
+    Task<int> InsertPrice(int securityId, IntervalType interval, SecurityType securityType, OhlcPrice price);
+    Task<(int securityId, int count)> InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
+    
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);
 

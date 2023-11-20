@@ -18,7 +18,7 @@ public interface IExitPositionAlgoLogic
 
     ITransactionFeeLogic? FeeLogic { get; set; }
 
-    Task<ExternalQueryState> Close(AlgoEntry? current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType);
+    Task<ExternalQueryState> Close(AlgoEntry? current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType);
 
     void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime);
 

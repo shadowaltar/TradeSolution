@@ -175,27 +175,27 @@ public class Rumi : Algorithm
         throw new NotImplementedException();
     }
 
-    public override bool ShallStopLoss(int securityId, Tick tick)
+    public override bool ShallStopLoss(int securityId, Tick tick, out decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override bool ShallTakeProfit(int securityId, Tick tick)
+    public override bool ShallTakeProfit(int securityId, Tick tick, out decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType)
+    public override Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickStopLoss(Position position)
+    public override Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickTakeProfit(Position position)
+    public override Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }

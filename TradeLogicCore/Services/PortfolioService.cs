@@ -194,6 +194,8 @@ public class PortfolioService : IPortfolioService, IDisposable
             : new Order
             {
                 Id = _orderIdGenerator.NewTimeBasedId,
+                Action = OrderActionType.CleanUpLive,
+
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
                 Quantity = Math.Abs(quantity),
@@ -210,6 +212,7 @@ public class PortfolioService : IPortfolioService, IDisposable
                 ParentOrderId = 0,
                 Price = 0,
                 LimitPrice = 0, // MARKET order
+                TriggerPrice = 0, // it was not triggered by a price change
                 StopPrice = 0,
                 Security = security,
                 SecurityId = security.Id,

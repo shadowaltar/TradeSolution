@@ -242,9 +242,9 @@ public class SecurityService : ISecurityService
         }
     }
 
-    public async Task<(int securityId, int count)> UpsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
+    public async Task<(int securityId, int count)> InsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
     {
-        return await _storage.UpsertPrices(id, interval, secType, prices);
+        return await _storage.InsertPrices(id, interval, secType, prices);
     }
 
     public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)

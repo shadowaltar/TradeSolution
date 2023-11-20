@@ -1,6 +1,10 @@
 ﻿using Common;
 using System.Collections.Concurrent;
+using System.Dynamic;
 using System.Runtime.CompilerServices;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Database;
@@ -69,6 +73,24 @@ public class Persistence : IDisposable
         task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
         task.Type = typeof(T);
         task.TableNameOverride = tableNameOverride;
+        task.CallerInfo = callerInfo;
+        if (!isSynchronous)
+            _tasks.Enqueue(task);
+        else
+            return AsyncHelper.RunSync(() => RunTask(task));
+        return int.MinValue;
+    }
+
+    public int InsertPrice(Security security, OhlcPrice ohlcPrice, IntervalType interval, bool isUpsert = true, bool isSynchronous = false, [CallerMemberName] string callerInfo = "")
+    {
+        if (ohlcPrice == null || security == null)
+            return 0;
+
+        var task = _taskPool.Lease();
+        task.SetEntry(ohlcPrice);
+        task.Action = isUpsert ? DatabaseActionType.Upsert : DatabaseActionType.Insert;
+        task.Type = typeof(OhlcPrice);
+        task.TableNameOverride = DatabaseNames.GetPriceTableName(interval, security.SecurityType);
         task.CallerInfo = callerInfo;
         if (!isSynchronous)
             _tasks.Enqueue(task);

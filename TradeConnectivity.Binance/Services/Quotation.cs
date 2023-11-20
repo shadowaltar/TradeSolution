@@ -16,6 +16,7 @@ using TradeCommon.Utils;
 using TradeConnectivity.Binance.Utils;
 
 namespace TradeConnectivity.Binance.Services;
+
 public class Quotation : IExternalQuotationManagement
 {
     private static readonly ILog _log = Logger.New();
@@ -33,7 +34,6 @@ public class Quotation : IExternalQuotationManagement
     private readonly Dictionary<int, ExtendedTick> _lastTicks = new();
 
     private readonly Dictionary<int, MessageBroker<ExtendedOrderBook>> _orderBookBrokers = new();
-    private readonly Pool<ExtendedOrderBook> _orderBookPool = new();
     private readonly Dictionary<int, ExtendedOrderBook> _lastOrderBooks = new();
 
     public string Name => ExternalNames.Binance;
@@ -410,7 +410,6 @@ public class Quotation : IExternalQuotationManagement
     private void OnNextOrderBook(ExtendedOrderBook orderBook)
     {
         NextOrderBook?.Invoke(orderBook);
-        _orderBookPool.Return(orderBook);
     }
 
     public async Task<ExternalConnectionState> UnsubscribeTick(Security security)
@@ -488,7 +487,11 @@ public class Quotation : IExternalQuotationManagement
                 //  ]
                 //}";
 
-                var orderBook = _orderBookPool.Lease();
+                var orderBook = new ExtendedOrderBook
+                {
+                    Time = now,
+                    SecurityId = security.Id,
+                };
                 var bids = node["bids"]?.AsArray();
                 var asks = node["asks"]?.AsArray();
                 var bestBid = Set(orderBook.Bids, bids, BidAsk.Bid);
@@ -499,8 +502,7 @@ public class Quotation : IExternalQuotationManagement
                     _log.Warn("Invalid OrderBook data: best ask is not valid!");
                 if (bestBid >= bestAsk)
                     _log.Warn("Invalid OrderBook data: best bid == best ask");
-                orderBook.SecurityId = security.Id;
-                orderBook.Time = now;
+
                 broker!.Enqueue(orderBook);
             }
         }

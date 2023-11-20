@@ -48,7 +48,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
     public Side Side { get; set; }
 
     /// <summary>
-    /// Actual price of an executing/ executed order.
+    /// Actual price of an executing / executed order.
     /// </summary>
     public decimal Price { get; set; } = 0;
 
@@ -63,6 +63,11 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
     /// Only used in <see cref="OrderType.StopLimit"/> and <see cref="OrderType.TakeProfitLimit"/>.
     /// </summary>
     public decimal StopPrice { get; set; } = 0;
+
+    /// <summary>
+    /// Price which triggers an order. Useful for algorithm tracing.
+    /// </summary>
+    public decimal TriggerPrice { get; set; }
 
     /// <summary>
     /// Quantity to be traded.

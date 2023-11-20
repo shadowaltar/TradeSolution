@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -50,7 +51,7 @@ public class ExternalStopOrderEnterPositionAlgoLogic : SimpleEnterPositionAlgoLo
                 var slOrder = CreateOrder(OrderType.Stop, slSide, enterTime, 0, size, current.Security,
                     OrderActionType.AlgoStopLoss, stopLossPrice, Comments.AlgoStopLossMarket);
                 slOrder.ParentOrderId = parentOrderId;
-
+                slOrder.TriggerPrice = enterPrice;
                 var subState = await _orderService.SendOrder(slOrder);
                 parentState.SubStates ??= new();
                 parentState.SubStates.Add(subState);
@@ -83,7 +84,7 @@ public class ExternalStopOrderEnterPositionAlgoLogic : SimpleEnterPositionAlgoLo
                 var tpOrder = CreateOrder(OrderType.TakeProfit, tpSide, enterTime, 0, size, current.Security,
                     OrderActionType.AlgoTakeProfit, takeProfitPrice, Comments.AlgoTakeProfitMarket);
                 tpOrder.ParentOrderId = parentOrderId;
-
+                tpOrder.TriggerPrice = enterPrice;
                 var subState = await _orderService.SendOrder(tpOrder);
                 parentState.SubStates ??= new();
                 parentState.SubStates.Add(subState);

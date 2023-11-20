@@ -52,8 +52,8 @@ public abstract class Algorithm
     public abstract bool CanOpenShort(AlgoEntry current);
     public abstract bool CanCloseLong(AlgoEntry current);
     public abstract bool CanCloseShort(AlgoEntry current);
-    public abstract bool ShallStopLoss(int securityId, Tick tick);
-    public abstract bool ShallTakeProfit(int securityId, Tick tick);
+    public abstract bool ShallStopLoss(int securityId, Tick tick, out decimal triggerPrice);
+    public abstract bool ShallTakeProfit(int securityId, Tick tick, out decimal triggerPrice);
     public abstract bool CanCancel(AlgoEntry current);
 
     protected Algorithm()
@@ -90,9 +90,9 @@ public abstract class Algorithm
         return await Entering.Open(current, last, price, enterSide, time, sl, tp);
     }
 
-    public abstract Task<ExternalQueryState> Close(AlgoEntry current, Security security, Side exitSide, DateTime exitTime, OrderActionType actionType);
+    public abstract Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType);
 
-    public abstract Task<ExternalQueryState> CloseByTickStopLoss(Position position);
+    public abstract Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice);
 
-    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(Position position);
+    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice);
 }

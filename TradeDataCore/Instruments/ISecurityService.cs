@@ -12,7 +12,7 @@ public interface ISecurityService : ISecurityDefinitionProvider
     Task<List<Security>> Initialize();
     Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
-    Task<(int securityId, int count)> UpsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices);
+    Task<(int securityId, int count)> InsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices);
     List<Security> GetAssets(ExchangeType exchange = ExchangeType.Unknown);
     Task<List<Security>> GetSecurities(SecurityType securityType, ExchangeType exchange = ExchangeType.Unknown, bool requestExternal = false);
     Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false);

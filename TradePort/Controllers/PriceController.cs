@@ -176,7 +176,7 @@ public class PriceController : Controller
         {
             if (allPrices.TryGetValue(security.Id, out var tuple))
             {
-                await storage.UpsertPrices(security.Id, interval, secType, tuple.Prices);
+                await storage.InsertPrices(security.Id, interval, secType, tuple.Prices);
             }
         }
         return Ok(allPrices.ToDictionary(p => p.Key, p => p.Value.Prices.Count));
@@ -226,7 +226,7 @@ public class PriceController : Controller
             {
                 if (allPrices?.TryGetValue(security.Id, out var list) ?? false)
                 {
-                    await securityService.UpsertPrices(security.Id, interval, secType, list);
+                    await securityService.InsertPrices(security.Id, interval, secType, list);
                 }
             }
             return Ok(allPrices?.ToDictionary(p => p.Key, p => p.Value.Count));
@@ -245,7 +245,7 @@ public class PriceController : Controller
                 {
                     if (prices?.TryGetValue(security.Id, out var list) ?? false)
                     {
-                        var (securityId, count) = await securityService.UpsertPrices(security.Id, interval, secType, list);
+                        var (securityId, count) = await securityService.InsertPrices(security.Id, interval, secType, list);
                         var oldCount = summary.GetOrCreate(security.Code);
                         summary[security.Code] = oldCount + count;
                     }
@@ -322,7 +322,7 @@ public class PriceController : Controller
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {
-            await securityService.UpsertPrices(security.Id, interval, secType, tuple.Prices);
+            await securityService.InsertPrices(security.Id, interval, secType, tuple.Prices);
             var count = await storage.Query($"SELECT COUNT(Close) FROM {DatabaseNames.GetPriceTableName(interval, secType)} WHERE SecurityId = {security.Id}", DatabaseNames.MarketData);
             Console.WriteLine($"Code {security.Code} exchangeStr {security.Exchange} (Yahoo {security.YahooTicker}) price count: {tuple.Prices.Count}/{count}");
         }

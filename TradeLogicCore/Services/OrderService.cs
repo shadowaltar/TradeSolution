@@ -130,6 +130,11 @@ public class OrderService : IOrderService, IDisposable
 
     public async Task<ExternalQueryState> SendOrder(Order order)
     {
+        if (order.Action == OrderActionType.Unknown)
+        {
+            _log.Warn($"Sending out an order without action type defined!");
+        }
+
         // this new order's id may or may not be used by external
         // eg. binance uses it
         if (order.Id <= 0)
@@ -565,6 +570,11 @@ public class OrderService : IOrderService, IDisposable
             order.CreateTime = existingOrder.CreateTime;
             order.Comment = existingOrder.Comment;
             order.ParentOrderId = existingOrder.ParentOrderId;
+
+            order.StopPrice = existingOrder.StopPrice;
+            order.LimitPrice = existingOrder.LimitPrice;
+            order.TriggerPrice = existingOrder.TriggerPrice;
+            order.Action = existingOrder.Action;
 
             if (!order.Price.IsValid() || order.Price == 0)
             {

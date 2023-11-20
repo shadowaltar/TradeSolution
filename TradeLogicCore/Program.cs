@@ -23,9 +23,7 @@ using TradeDataCore.MarketData;
 using TradeDataCore.StaticData;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
-using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
-using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using Dependencies = TradeLogicCore.Dependencies;
@@ -193,6 +191,7 @@ public class Program
         var exchange = ExchangeType.Binance;
         var symbol = "BTCUSDT";
         var quoteCode = "USDT";
+        var whitelistCodes = new List<string> { "BTC", "USDT" };
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
@@ -202,7 +201,7 @@ public class Program
         var initialAvailableQuantity = 100;
 
 
-        await ResetTables(environment);
+        //await ResetTables(environment);
 
 
         var broker = ExternalNames.Convert(exchange);
@@ -246,16 +245,22 @@ public class Program
         }
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
-        var securityPool = new List<Security> { security };
-        var ep = new EngineParameters(new List<string> { "USDT" },
-                                      GlobalCurrencyFilter: new List<string> { "BTC", "USDT" },
+        var securityPool = new List<Security> { security! };
+        var ep = new EngineParameters(new List<string> { quoteCode },
+                                      GlobalCurrencyFilter: whitelistCodes,
                                       AssumeNoOpenPositionOnStart: false,
                                       CancelOpenOrdersOnStart: true,
                                       CloseOpenPositionsOnStop: true,
                                       CloseOpenPositionsOnStart: true,
-                                      CleanUpNonCashOnStart: false);
-        var ap = new AlgorithmParameters(false, interval, securityPool, securityPool.Select(s => s.Code).ToList(), algoTimeRange,
-            RequiresTickData: true, StopOrderTriggerBy: StopOrderStyleType.TickSignal);
+                                      CleanUpNonCashOnStart: false,
+                                      RecordOrderBookOnExecution: true);
+        var ap = new AlgorithmParameters(false,
+                                         interval,
+                                         securityPool,
+                                         securityPool.Select(s => s.Code).ToList(),
+                                         algoTimeRange,
+                                         RequiresTickData: true,
+                                         StopOrderTriggerBy: StopOrderStyleType.TickSignal);
 
         var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
@@ -427,6 +432,7 @@ public class Program
             Security = security,
             Price = 0,
             LimitPrice = 10000, // LIMIT order
+            TriggerPrice = 0,
             Quantity = 0.01m,
             Side = Side.Buy,
             Type = OrderType.Limit,

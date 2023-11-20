@@ -34,7 +34,6 @@ public class ExecutionController : Controller
     /// <param name="orderService"></param>
     /// <param name="portfolioService"></param>
     /// <param name="context"></param>
-    /// <param name="adminPassword">Required.</param>
     /// <param name="secTypeStr">Security type.</param>
     /// <param name="symbol">Symbol of security.</param>
     /// <param name="side">Side of order.</param>
@@ -48,7 +47,6 @@ public class ExecutionController : Controller
                                               [FromServices] IOrderService orderService,
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromServices] Context context,
-                                              [FromForm(Name = "admin-password")] string adminPassword,
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "side")] Side side = Side.None,
@@ -57,8 +55,7 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "quantity")] decimal quantity = 0,
                                               [FromQuery(Name = "stop-loss")] decimal stopLoss = 0.002m)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
         if (side == Side.None) return BadRequest("Invalid side.");
         if (ControllerValidator.IsDecimalNegative(price, out br)) return br;
         if (ControllerValidator.IsDecimalNegativeOrZero(quantity, out br)) return br;
@@ -132,11 +129,9 @@ public class ExecutionController : Controller
     /// <returns></returns>
     [HttpPost(RestApiConstants.CancelOrder)]
     public async Task<ActionResult> CancelOrder([FromServices] IOrderService orderService,
-                                                [FromForm(Name = "admin-password")] string adminPassword,
                                                 [FromForm(Name = "order-id")] long? orderId,
                                                 [FromForm(Name = "external-order-id")] string? externalOrderId)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (Conditions.AllNull(orderId, externalOrderId)) return BadRequest("Either order id or external order id must be specified.");
 
         object? cancelledOrder = null;
@@ -177,7 +172,6 @@ public class ExecutionController : Controller
 
     [HttpPost(RestApiConstants.QueryOrders)]
     public async Task<ActionResult> GetOrders([FromServices] IServices services,
-                                              [FromForm(Name = "admin-password")] string? adminPassword,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "is-alive-only")] bool isAliveOnly = false,
@@ -186,8 +180,7 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "is-cancel-only")] bool isCancelsOnly = false,
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var security = services.Security.GetSecurity(symbol);
@@ -212,12 +205,10 @@ public class ExecutionController : Controller
 
     [HttpPost(RestApiConstants.QueryOrderStates)]
     public async Task<ActionResult> GetOrderStates([FromServices] IServices services,
-                                                   [FromForm(Name = "admin-password")] string? adminPassword,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
                                                    [FromQuery(Name = "symbol")] string symbol = "BTCUSDT")
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var security = services.Security.GetSecurity(symbol);
@@ -228,13 +219,11 @@ public class ExecutionController : Controller
 
     [HttpPost(RestApiConstants.QueryTrades)]
     public async Task<ActionResult> GetTrades([FromServices] IServices services,
-                                              [FromForm(Name = "admin-password")] string? adminPassword,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
                                               [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var security = services.Security.GetSecurity(symbol);
@@ -258,7 +247,6 @@ public class ExecutionController : Controller
     /// Get positions. Optionally can get the initial state of positions before algo engine is started.
     /// </summary>
     /// <param name="services"></param>
-    /// <param name="adminPassword"></param>
     /// <param name="startStr"></param>
     /// <param name="symbol"></param>
     /// <param name="dataSourceType"></param>
@@ -266,14 +254,12 @@ public class ExecutionController : Controller
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryPositions)]
     public async Task<ActionResult> GetPositions([FromServices] IServices services,
-                                                 [FromForm(Name = "admin-password")] string? adminPassword,
                                                  [FromQuery(Name = "start")] string startStr = "20231101",
                                                  [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                                  [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
                                                  [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var security = services.Security.GetSecurity(symbol);
@@ -311,19 +297,16 @@ public class ExecutionController : Controller
     /// Gets asset positions. Optionally can get the initial state of assets before algo engine is started.
     /// </summary>
     /// <param name="services"></param>
-    /// <param name="adminPassword"></param>
     /// <param name="symbolStr"></param>
     /// <param name="dataSourceType"></param>
     /// <param name="isInitialPortfolio"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAssets)]
     public async Task<ActionResult> GetAssets([FromServices] IServices services,
-                                              [FromForm(Name = "admin-password")] string? adminPassword,
                                               [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT,USDT",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
                                               [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -360,17 +343,14 @@ public class ExecutionController : Controller
     /// </summary>
     /// <param name="services"></param>
     /// <param name="startStr"></param>
-    /// <param name="adminPassword"></param>
     /// <param name="symbolStr"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAssetStates)]
     public async Task<ActionResult> GetAssetStates([FromServices] IServices services,
-                                                   [FromForm(Name = "admin-password")] string? adminPassword,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
                                                    [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT")
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
 
         var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -396,53 +376,14 @@ public class ExecutionController : Controller
     /// <param name="services"></param>
     /// <param name="macParams"></param>
     /// <param name="algoParams"></param>
-    /// <param name="adminPassword"></param>
-    /// <param name="symbol">Single symbol for trading.</param>
-    /// <param name="intervalStr">Trading time interval</param>
-    /// <param name="fastMa">Fast MA parameter.</param>
-    /// <param name="slowMa">Slow MA parameter</param>
-    /// <param name="stopLoss">Stop loss in ratio.</param>
-    /// <param name="takeProfit">Take profit in ratio.</param>
-    /// <param name="positionSizingMethod">Position sizing method.
-    /// PreserveFixed: give a fixed amount of quote currency at the beginning and then only trade this part,
-    /// no matter it grows or shrinks.
-    /// Fixed: give a fixed amount of quote currency and all the trades' quantity is fixed to this amount.
-    /// </param>
-    /// <param name="initialAvailableQuantity">For PreserveFixed/Fixed position sizing, this is the initial quote quantity.</param>
-    /// <param name="preferredQuoteCurrencies">ListAlgoBatches of preferred quote currency codes (can be only one), delimited by ",",
-    ///     eg. "USDT,USDT". Used as fallback quote ccy when only base ccy or asset-security is specified</param>
-    /// <param name="globalCurrencyFilter">ListAlgoBatches of security codes which this algo can only use, delimited by ",".
-    ///     If empty, will be derived from <paramref name="symbol"/> and <paramref name="preferredQuoteCurrencies"/> input parameters.</param>
-    /// <param name="cancelOpenOrdersOnStart">Cancel any open orders in the market on engine start.</param>
-    /// <param name="assumeNoOpenPositionOnStart">Assume no open position exists on engine start.</param>
-    /// <param name="closeOpenPositionsOnStart">Close any open positions on engine start (if assume-no-open-position-on-start is false).</param>
-    /// <param name="closeOpenPositionsOnStop">Close any open positions on engine stop.</param>
-    /// <param name="cleanUpNonCashOnStart">Clean up (usually sell out) any holding assets on engine start, excluding all quote currencies.</param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.StartAlgorithmMac)]
     public async Task<ActionResult?> RunMac([FromServices] Core core,
                                             [FromServices] IServices services,
                                             [FromForm] MacStartModel macParams,
-                                            [FromForm] AlgorithmStartModel algoParams)//,
-                                                                                      //[FromForm(Name = "admin-password")] string adminPassword,
-                                                                                      //[FromForm(Name = "symbol")] string symbol = "BTCUSDT",
-                                                                                      //[FromForm(Name = "interval")] string intervalStr = "1m",
-                                                                                      //[FromForm(Name = "fast-ma")] int fastMa = 3,
-                                                                                      //[FromForm(Name = "slow-ma")] int slowMa = 7,
-                                                                                      //[FromForm(Name = "stop-loss")] decimal stopLoss = 0.0005m,
-                                                                                      //[FromForm(Name = "take-profit")] decimal takeProfit = 0.0005m,
-                                                                                      //[FromForm(Name = "position-sizing-method")] PositionSizingMethod positionSizingMethod = PositionSizingMethod.PreserveFixed,
-                                                                                      //[FromForm(Name = "initial-available-quote-quantity")] decimal initialAvailableQuantity = 100,
-                                                                                      //[FromForm(Name = "preferred-quote-currencies")] string preferredQuoteCurrencies = "FDUSD",
-                                                                                      //[FromForm(Name = "global-currency-filter")] string globalCurrencyFilter = "BTC,USDT,BNB,FDUSD",
-                                                                                      //[FromForm(Name = "cancel-open-orders-on-start")] bool cancelOpenOrdersOnStart = true,
-                                                                                      //[FromForm(Name = "assume-no-open-position")] bool assumeNoOpenPositionOnStart = true,
-                                                                                      //[FromForm(Name = "close-open-position-on-start")] bool closeOpenPositionsOnStart = true,
-                                                                                      //[FromForm(Name = "close-open-position-on-stop")] bool closeOpenPositionsOnStop = true,
-                                                                                      //[FromForm(Name = "clean-up-non-cash-on-start")] bool cleanUpNonCashOnStart = false)
+                                            [FromForm] AlgorithmStartModel algoParams)
     {
-        if (ControllerValidator.IsAdminPasswordBad(algoParams.AdminPassword, out var br)) return br;
-        if (ControllerValidator.IsBadOrParse(algoParams.IntervalStr, out IntervalType interval, out br)) return br;
+        if (ControllerValidator.IsBadOrParse(algoParams.IntervalStr, out IntervalType interval, out var br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(macParams.FastMa, out br)) return br;
         if (ControllerValidator.IsIntNegativeOrZero(macParams.SlowMa, out br)) return br;
         if (ControllerValidator.IsDecimalNegative(algoParams.StopLoss, out br)) return br;
@@ -518,10 +459,8 @@ public class ExecutionController : Controller
 
     [HttpPost(RestApiConstants.QueryRunningAlgorithms)]
     public ActionResult GetAllRunningAlgorithms([FromServices] Core core,
-                                                [FromServices] IAdminService adminService,
-                                                [FromForm(Name = "admin-password")] string? adminPassword)
+                                                [FromServices] IAdminService adminService)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
         var ids = core.ListAlgoBatches();
@@ -612,10 +551,6 @@ public class ExecutionController : Controller
 
     public class AlgorithmStartModel
     {
-        [FromForm(Name = "admin-password")]
-        [Required]
-        public string AdminPassword { get; set; } = "";
-
         [FromForm(Name = "symbol")]
         [Required, DefaultValue("BTCUSDT")]
         public string Symbol { get; set; } = "BTCUSDT";
@@ -628,15 +563,15 @@ public class ExecutionController : Controller
         /// Stop loss ratio.
         /// </summary>
         [FromForm(Name = "stop-loss")]
-        [Required, DefaultValue(0)]
-        public decimal StopLoss { get; set; } = 0.0005m;
+        [Required, DefaultValue(0.0003)]
+        public decimal StopLoss { get; set; } = 0.0003m;
 
         /// <summary>
         /// Take profit ratio.
         /// </summary>
         [FromForm(Name = "take-profit")]
-        [Required, DefaultValue(0)]
-        public decimal TakeProfit { get; set; } = 0.0005m;
+        [Required, DefaultValue(0.0006)]
+        public decimal TakeProfit { get; set; } = 0.0006m;
 
         /// <summary>
         /// Style of stop orders (SL and TP).
@@ -678,8 +613,8 @@ public class ExecutionController : Controller
         /// use these quote currencies. First currency has higher precedence.
         /// </summary>
         [FromForm(Name = "preferred-quote-currencies")]
-        [Required, DefaultValue("FDUSD")]
-        public string PreferredQuoteCurrencies { get; set; } = "FDUSD";
+        [Required, DefaultValue("USDT")]
+        public string PreferredQuoteCurrencies { get; set; } = "USDT";
 
         /// <summary>
         /// Cancel all open orders on algo start.
@@ -720,9 +655,11 @@ public class ExecutionController : Controller
         [DefaultValue(false)]
         public bool CleanUpNonCashOnStart { get; set; } = false;
 
-
+        /// <summary>
+        /// Let the engine record the order book data during order execution.
+        /// </summary>
         [FromForm(Name = "recorder-order-book-on-execution")]
-        [DefaultValue(false)]
+        [DefaultValue(true)]
         public bool RecordOrderBookOnExecution { get; set; } = true;
     }
 }
