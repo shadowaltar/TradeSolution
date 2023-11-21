@@ -266,6 +266,15 @@ public static class CollectionExtensions
         return (toCreate, toUpdate, toDelete);
     }
 
+    /// <summary>
+    /// Find differences between two lists.
+    /// Returns a tuple: the first part is items only exist in the first list; the 
+    /// second part is items only exist in the second list.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="primary"></param>
+    /// <param name="secondary"></param>
+    /// <returns></returns>
     public static (List<T>, List<T>) FindDifferences<T>(this IList<T> primary, IList<T> secondary)
         where T : IComparable<T>
     {

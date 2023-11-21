@@ -1,9 +1,12 @@
 ﻿<UserControl x:Class="TradeDesk.Views.OverviewView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:TradeDesk.Views" xmlns:syncfusion="http://schemas.syncfusion.com/wpf" xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels" d:DataContext="{d:DesignInstance Type=viewmodels:OverviewViewModel}"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+             xmlns:chart="http://schemas.syncfusion.com/wpf"
+             xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels"
+             d:DataContext="{d:DesignInstance Type=viewmodels:OverviewViewModel}"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
@@ -27,8 +30,13 @@
                 <TextBlock TextAlignment="Center"
                            Text="{Binding ChartTitle}" FontSize="17" Margin="0,10,0,0"/>
             </syncfusion:SfChart.Header>
+            <chart:SfChart.RowDefinitions>
+                <chart:ChartRowDefinition />
+                <chart:ChartRowDefinition Height="40"/>
+            </chart:SfChart.RowDefinitions>
             <syncfusion:SfChart.PrimaryAxis>
-                <syncfusion:DateTimeAxis ShowGridLines="False"
+                <syncfusion:DateTimeAxis chart:ChartBase.ColumnSpan="2"
+                                         ShowGridLines="False"
                                          LabelCreated="DateTimeAxis_LabelCreated"
                                          LabelFormat="HH:mm:ss"
                                          Minimum="{Binding ChartMinDateTime}"
@@ -63,24 +71,29 @@
                 <syncfusion:ChartZoomPanBehavior ZoomMode="X" ResetOnDoubleTap="False"/>
             </syncfusion:SfChart.Behaviors>
 
-                <syncfusion:CandleSeries x:Name="Price"
-                                         ItemsSource="{Binding OhlcPrices}"
-                                         Open="O"
-                                         High="H"    
-                                         Low="L"
-                                         Close="C"
-                                         XBindingPath="T"
-                                         BearFillColor="Transparent"
-                                         BullFillColor="Transparent"
-                                         ShowTooltip="True"
-                                         EnableAnimation="False" />
-                
-                <syncfusion:BarSeries x:Name="VolumeBar"
-                                      ItemsSource="{Binding Volumes}"
-                                      XBindingPath="Time"
-                                      YBindingPath="Value"
-                                      ShowTooltip="True"
-                                      EnableAnimation="False" />
+            <syncfusion:CandleSeries x:Name="Price"
+                                        ItemsSource="{Binding OhlcPrices}"
+                                        Open="O"
+                                        High="H"    
+                                        Low="L"
+                                        Close="C"
+                                        XBindingPath="T"
+                                        BearFillColor="Transparent"
+                                        BullFillColor="Transparent"
+                                        ShowTooltip="True"
+                                        EnableAnimation="False" />
+
+            <syncfusion:ColumnSeries x:Name="VolumeBar"
+                                     ItemsSource="{Binding Volumes}"
+                                     XBindingPath="Time"
+                                     YBindingPath="Value"
+                                     ShowTooltip="True"
+                                     EnableAnimation="False">
+                <chart:ColumnSeries.YAxis>
+                    <chart:NumericalAxis PlotOffset="10" chart:SfChart.Row="1">
+                    </chart:NumericalAxis>
+                </chart:ColumnSeries.YAxis>
+            </syncfusion:ColumnSeries>
                 
         </syncfusion:SfChart>
     </Grid>

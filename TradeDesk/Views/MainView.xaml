@@ -1,11 +1,10 @@
 ﻿<Window x:Class="TradeDesk.ViewModels.MainView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:TradeDesk"
-        xmlns:views="clr-namespace:TradeDesk.Views"
         xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels"
+        xmlns:views="clr-namespace:TradeDesk.Views"
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
@@ -17,21 +16,39 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar on the top-->
+        <DockPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                   Height="36">
+            <DockPanel>
+                <Label Content="Server URL:" DockPanel.Dock="Left" VerticalAlignment="Center"/>
+                <Button Content="Connect" DockPanel.Dock="Right" VerticalAlignment="Center"
+                        Command="{Binding Connect}"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button x:Name="CreateOrder" Content="Create" />
+                    <Button Content="Cancel" />
+                    <Button Content="Cancel All" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Export" />
+                </StackPanel>
+                <TextBox Text="{Binding ServerUrl}" IsReadOnly="True"/>
+            </DockPanel>
+        </DockPanel>
+
+        <!-- Grids on the left -->
+        <Grid Grid.Row="1" Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <DockPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Label Content="Server URL:" VerticalAlignment="Center"/>
-                    <TextBox Text="{Binding Url}" Width="400"/>
-                    <Button Content="Connect" VerticalAlignment="Center"
-                            Command="{Binding Connect}"/>
-                </StackPanel>
-            </DockPanel>
             <TabControl Grid.Row="1">
                 <TabItem Header="Open Orders">
                     <views:OrderView DataContext="{Binding OpenOrderViewModel}"/>
@@ -52,18 +69,20 @@
                 </TabItem>
             </TabControl>
             <TabControl Grid.Row="3">
-            <TabItem Header="Assets">
-                <views:AssetView/>
-            </TabItem>
-            <TabItem Header="Asset States">
-                <views:AssetStateView/>
-            </TabItem>
-            <TabItem Header="Open Positions">
-                <views:PositionView/>
-            </TabItem>
-        </TabControl>
+                <TabItem Header="Assets">
+                    <views:AssetView/>
+                </TabItem>
+                <TabItem Header="Asset States">
+                    <views:AssetStateView/>
+                </TabItem>
+                <TabItem Header="Open Positions">
+                    <views:PositionView/>
+                </TabItem>
+            </TabControl>
         </Grid>
-        <Grid Grid.Column="1">
+        
+        <!-- Main Chart on the right -->
+        <Grid Grid.Row="1" Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -72,7 +91,16 @@
                 <Label Content="SecurityCode:"/>
                 <ComboBox ItemsSource="{Binding SecurityPool}" Width="60"/>
             </StackPanel>
-            <views:OverviewView Grid.Row="1"/>
+            <views:OverviewView Grid.Row="1" Margin="5,0"/>
         </Grid>
+        
+        <!-- Status bar at the bottom -->
+        <DockPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="30">
+            <TextBlock DockPanel.Dock="Right"
+                       Margin="5,0"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       Text="{Binding Status, FallbackValue='Ready'}" />
+        </DockPanel>
     </Grid>
 </Window>

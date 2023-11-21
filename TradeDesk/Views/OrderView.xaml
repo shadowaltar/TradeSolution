@@ -20,14 +20,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <DockPanel Visibility="{Binding IsOrderToolBarVisible, Converter={StaticResource BTVC}}">
-            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="CreateOrder" Content="Create" />
-                <Button Content="Cancel" />
-                <Button Content="Cancel All" />
-            </StackPanel>
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Export" />
-            </StackPanel>
+            
         </DockPanel>
         <DataGrid Grid.Row="1" Margin="5"
                   ItemsSource="{Binding Orders}"

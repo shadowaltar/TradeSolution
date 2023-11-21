@@ -52,6 +52,7 @@
         <PasswordBox Grid.Row="7" Grid.Column="1" Margin="5"
                      PasswordChanged="OnAdminPasswordChanged"/>
         <Button Grid.Row="8" Grid.Column="1" Content="Login" Margin="5"
+                VerticalAlignment="Bottom"
                 Command="{Binding LoginCommand}"/>
     </Grid>
 </Window>

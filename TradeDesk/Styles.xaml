@@ -14,4 +14,14 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Height" Value="26"/>
     </Style>
+    <Style TargetType="ComboBox">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Height" Value="26"/>
+    </Style>
+    <Style TargetType="PasswordBox">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Height" Value="26"/>
+    </Style>
 </ResourceDictionary>

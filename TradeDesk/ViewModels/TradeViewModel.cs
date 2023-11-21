@@ -1,13 +1,12 @@
-
-using System;
+﻿using System;
 using TradeDesk.Services;
 
 namespace TradeDesk.ViewModels;
-public class OrderStateViewModel : AbstractViewModel
+public class TradeViewModel : AbstractViewModel
 {
-    private readonly Server _server;
+    private Server _server;
 
-    public OrderStateViewModel(Server server)
+    public TradeViewModel(Server server)
     {
         _server = server;
     }

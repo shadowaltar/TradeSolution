@@ -1,9 +1,8 @@
-﻿using Microsoft.Diagnostics.Runtime.Utilities;
+﻿using Common;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
@@ -16,8 +15,6 @@ public class OrderViewModel : AbstractViewModel
 {
     private bool _isOrderToolBarVisible;
     private readonly Server _server;
-
-    public bool IsOrderToolBarVisible { get => _isOrderToolBarVisible; set => SetValue(ref _isOrderToolBarVisible, value); }
 
     public ObservableCollection<Order> Orders { get; } = new();
     public Order? SelectedOrder { get; private set; }
@@ -38,7 +35,11 @@ public class OrderViewModel : AbstractViewModel
 
     public void Initialize()
     {
-        
+        Read();
+    }
+
+    private void Read()
+    {
     }
 
     private async void CancelAll()
@@ -72,7 +73,16 @@ public class OrderViewModel : AbstractViewModel
 
         while (await timer.WaitForNextTickAsync())
         {
-            _server.GetOrders();
+            var orders = await _server.GetOrders();
+            var (existingOnly, newOnly) = Orders.FindDifferences(orders);
+            foreach (var o in existingOnly)
+            {
+                Orders.Remove(o);
+            }
+            foreach (var o in newOnly)
+            {
+                Orders.Add(o);
+            }
         }
     }
 

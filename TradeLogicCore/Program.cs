@@ -149,7 +149,6 @@ public class Program
             await storage.InsertOne(user, true);
             user = await storage.ReadUser(user.Name, user.Email, environment);
 
-
             var account = new Account
             {
                 OwnerId = user.Id,

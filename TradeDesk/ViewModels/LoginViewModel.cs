@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using TradeCommon.Constants;
@@ -22,7 +23,7 @@ public class LoginViewModel : AbstractViewModel
     private string _userName;
     private EnvironmentType _environmentType;
 
-    public event Action<bool> AfterLogin;
+    public event Action<string> AfterLogin;
 
     public LoginView Window { get; internal set; }
 
@@ -62,9 +63,6 @@ public class LoginViewModel : AbstractViewModel
 
     private async void Login()
     {
-        AfterLogin?.Invoke(true);
-        return;
-
         var url = $"{ServerUrl.Trim('/')}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
         try
         {
@@ -91,16 +89,30 @@ public class LoginViewModel : AbstractViewModel
             var response = await client.PostAsync(request.RequestUri.ToString(), request.Content);
             if (response.IsSuccessStatusCode)
             {
-                var loginContent = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-                var resultCodeStr = loginContent.GetProperty("result").GetString();
-                if (!Enum.TryParse<ResultCode>(resultCodeStr, out var resultCode))
+                var loginContent = await response.Content.ReadFromJsonAsync<JsonObject>();
+                var result = loginContent.GetString("result");
+                if (!Enum.TryParse<ResultCode>(result, out var rc) || rc != ResultCode.LoginUserAndAccountOk)
                 {
-                    MessageBoxes.Info(null, "Result: " + resultCode, "Login Failed");
+                    MessageBoxes.Info(null, "Result: " + rc, "Login Failed");
+                    return;
                 }
-                var token = loginContent.GetProperty("Token").GetString();
+                var token = loginContent.GetString("token");
+
+                //var resultCodeStr = loginContent.GetProperty("result").GetString();
+                //if (!Enum.TryParse<ResultCode>(resultCodeStr, out var resultCode))
+                //{
+                //    MessageBoxes.Info(null, "Result: " + resultCode, "Login Failed");
+                //}
+                //var token = loginContent.GetProperty("Token").GetString();
                 // must set the auth-token from now on
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                //client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+              
+
+                AfterLogin?.Invoke(token);
+            }
+            else
+            {
+                MessageBoxes.Info(null, "Warn: " + response.StatusCode, "Login Failed");
             }
         }
         catch (Exception e)
