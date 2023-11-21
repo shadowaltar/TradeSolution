@@ -36,6 +36,15 @@ public class Quotation : IExternalQuotationManagement
     private readonly Dictionary<int, MessageBroker<ExtendedOrderBook>> _orderBookBrokers = new();
     private readonly Dictionary<int, ExtendedOrderBook> _lastOrderBooks = new();
 
+    private Timer _latencyTimer;
+    private double _roundTripTime;
+
+    public double LatencyRoundTrip { get; private set; }
+    public double LatencyOneSide { get; private set; }
+
+    public TimeSpan LatencyRoundTripInTimeSpan { get; private set; }
+    public TimeSpan LatencyOneSideInTimeSpan { get; private set; }
+
     public string Name => ExternalNames.Binance;
 
     public event Action<int, OhlcPrice, bool>? NextOhlc;
@@ -54,7 +63,26 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> Initialize()
     {
-        return null;
+        // run once
+        _roundTripTime = _connectivity.GetAverageLatency();
+        Process();
+
+        // check latency every 1 min
+        _latencyTimer = new Timer(_ =>
+        {
+            _roundTripTime = _connectivity.GetAverageLatency();
+            Process();
+        }, null, 60000, 60000);
+
+        return ExternalConnectionStates.Nothing();
+
+        void Process()
+        {
+            LatencyRoundTrip = _roundTripTime;
+            LatencyOneSide = _roundTripTime / 2;
+            LatencyRoundTripInTimeSpan = TimeSpan.FromMilliseconds(LatencyRoundTrip);
+            LatencyOneSideInTimeSpan = TimeSpan.FromMilliseconds(LatencyOneSide);
+        }
     }
 
     public async Task<ExternalConnectionState> Disconnect()
@@ -395,7 +423,7 @@ public class Quotation : IExternalQuotationManagement
                 tick.AskSize = aq;
                 tick.SecurityCode = s;
                 tick.SecurityId = security.Id;
-                tick.Time = now;
+                tick.Time = now - LatencyOneSideInTimeSpan;
                 broker!.Enqueue(tick);
             }
         }
@@ -445,7 +473,6 @@ public class Quotation : IExternalQuotationManagement
         var streamName = $"{security.Code.ToLowerInvariant()}@depth{level}@100ms";
         Uri uri = new($"{_connectivity.RootWebSocketUrl}/stream?streams={streamName}");
 
-        _lastOrderBooks[security.Id] = new ExtendedOrderBook();
         var broker = _orderBookBrokers.GetOrCreate(security.Id, () => new MessageBroker<ExtendedOrderBook>(security.Id), (k, v) => v.Run());
         broker.NewItem += OnNextOrderBook; // broker.Dispose() will clear this up if needed
 
@@ -465,6 +492,7 @@ public class Quotation : IExternalQuotationManagement
 
         void OnReceivedString(byte[] bytes)
         {
+            var lastOrderBook = _lastOrderBooks.GetOrCreate(security.Id);
             var now = DateTime.UtcNow;
             string json = Encoding.UTF8.GetString(bytes, 0, bytes.Length);
             var node = JsonNode.Parse(json)?.AsObject()["data"]?.AsObject();
@@ -487,9 +515,15 @@ public class Quotation : IExternalQuotationManagement
                 //  ]
                 //}";
 
+                // guarantee they are never out of order
+                var time = now - LatencyOneSideInTimeSpan;
+                if (time < lastOrderBook.Time)
+                {
+                    time = lastOrderBook.Time + TimeSpans.OneMillisecond;
+                }
                 var orderBook = new ExtendedOrderBook
                 {
-                    Time = now,
+                    Time = time,
                     SecurityId = security.Id,
                 };
                 var bids = node["bids"]?.AsArray();
@@ -503,7 +537,11 @@ public class Quotation : IExternalQuotationManagement
                 if (bestBid >= bestAsk)
                     _log.Warn("Invalid OrderBook data: best bid == best ask");
 
+                _lastOrderBooks[security.Id] = orderBook;
                 broker!.Enqueue(orderBook);
+
+                if (_log.IsDebugEnabled)
+                    _log.Debug($"OrderBook Timing, SID: {security.Id}, Time: {time:HHmmss.fff}, Now:{now:HHmmss.fff}");
             }
         }
 

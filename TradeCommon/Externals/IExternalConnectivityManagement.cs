@@ -10,5 +10,7 @@ public interface IExternalConnectivityManagement
 
     bool Ping();
 
+    double GetAverageLatency();
+
     void SetEnvironment(EnvironmentType environmentType);
 }

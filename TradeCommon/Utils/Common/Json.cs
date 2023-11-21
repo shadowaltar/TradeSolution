@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Common;
 public static class Json
@@ -19,6 +20,16 @@ public static class Json
     }
 
     public static T? Deserialize<T>(string content)
+    {
+        return JsonSerializer.Deserialize<T>(content);
+    }
+
+    public static T? Deserialize<T>(JsonArray content)
+    {
+        return JsonSerializer.Deserialize<T>(content);
+    }
+
+    public static T? Deserialize<T>(JsonElement content)
     {
         return JsonSerializer.Deserialize<T>(content);
     }

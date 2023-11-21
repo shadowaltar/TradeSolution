@@ -1,8 +1,11 @@
 ﻿using log4net;
+using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
+using System.Web;
 using TradeCommon.Constants;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
@@ -117,6 +120,41 @@ public static class HttpHelper
             log.Error($"Failed to send request to {request.RequestUri}. Error: " + e.Message, e);
             return (new HttpResponseMessage(HttpStatusCode.NotFound), swInner?.ElapsedMilliseconds ?? 0);
         }
+    }
+
+    public static async Task<JsonNode?> ParseJsonNode(this HttpResponseMessage response, ILog? log = null)
+    {
+        log ??= _log;
+        var content = await response.Content.ReadAsStringAsync();
+        try
+        {
+            return JsonNode.Parse(content) ?? new JsonObject();
+        }
+        catch (Exception e)
+        {
+            log.Error($"Received Error [{response.StatusCode}]", e);
+            return false;
+        }
+    }
+
+    public static Uri AddParameters(this Uri url, params (string Name, string Value)[] @params)
+    {
+        if (!@params.Any())
+        {
+            return url;
+        }
+
+        UriBuilder uriBuilder = new(url);
+        NameValueCollection query = HttpUtility.ParseQueryString(uriBuilder.Query);
+
+        foreach (var param in @params)
+        {
+            query[param.Name] = param.Value.Trim();
+        }
+
+        uriBuilder.Query = query.ToString();
+
+        return uriBuilder.Uri;
     }
 
     public static HttpClient HttpClientWithoutCert()

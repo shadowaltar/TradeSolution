@@ -14,6 +14,5 @@ public class OrderStateViewModel : AbstractViewModel
 
     internal void Initialize()
     {
-        throw new NotImplementedException();
     }
 }

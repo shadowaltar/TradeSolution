@@ -96,4 +96,29 @@ public class Connectivity : IExternalConnectivityManagement
             return false;
         }
     }
+
+    public double GetAverageLatency()
+    {
+        var milliseconds = new double[10];
+        Parallel.For(0, 10, i =>
+        {
+            try
+            {
+                var sw = new Stopwatch();
+                using var pingRequest = _requestBuilder.Build(HttpMethod.Get, _pingUrl);
+
+                sw.Start();
+                var response = _httpClient.Send(pingRequest);
+                sw.Stop();
+                milliseconds[i] = sw.Elapsed.TotalMilliseconds;
+            }
+            catch
+            {
+                // silently ignore
+            }
+        });
+        var average = milliseconds.Where(ms => ms < 10000).Average();
+        _log.Info("Discovered average RTT in ms: " + average);
+        return average;
+    }
 }

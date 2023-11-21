@@ -6,6 +6,7 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeDataCore.Instruments;
+using TradeDataCore.MarketData;
 using TradeDataCore.StaticData;
 
 namespace TradeLogicCore.Services;
@@ -17,11 +18,10 @@ public class AdminService : IAdminService
     private readonly ISecurityService _securityService;
     private readonly ITradeService _tradeService;
     private readonly IPortfolioService _portfolioService;
+    private readonly IMarketDataService _marketDataService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
     private bool _isInitialized;
-
-    private Dictionary<string, string> _userSessionIdToToken = new();
 
     public bool IsLoggedIn { get; private set; }
 
@@ -34,6 +34,7 @@ public class AdminService : IAdminService
     public AdminService(Context context,
                         ISecurityService securityService,
                         IPortfolioService portfolioService,
+                        IMarketDataService marketDataService,
                         ITradeService tradeService,
                         IExternalAccountManagement accountManagement,
                         IExternalConnectivityManagement connectivity)
@@ -43,6 +44,7 @@ public class AdminService : IAdminService
         _securityService = securityService;
         _tradeService = tradeService;
         _portfolioService = portfolioService;
+        _marketDataService = marketDataService;
         _accountManagement = accountManagement;
         _connectivity = connectivity;
     }
@@ -103,7 +105,6 @@ public class AdminService : IAdminService
         user.Accounts.Add(account);
         CurrentAccount = account;
         CurrentUser.LoginSessionId = Guid.NewGuid().ToString();
-
         Context.User = CurrentUser;
         Context.Account = CurrentAccount;
 
@@ -117,6 +118,8 @@ public class AdminService : IAdminService
         var result = await _portfolioService.Initialize();
         if (!result)
             return ResultCode.SubscriptionFailed;
+
+        await _marketDataService.Initialize();
 
         IsLoggedIn = true;
         return ResultCode.LoginUserAndAccountOk;

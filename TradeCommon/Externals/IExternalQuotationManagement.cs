@@ -8,6 +8,11 @@ public interface IExternalQuotationManagement
 {
     string Name { get; }
 
+    double LatencyOneSide { get; }
+    double LatencyRoundTrip { get; }
+    TimeSpan LatencyRoundTripInTimeSpan { get; }
+    TimeSpan LatencyOneSideInTimeSpan { get; }
+
     public event Action<int, OhlcPrice, bool>? NextOhlc;
 
     public event Action<ExtendedTick>? NextTick;

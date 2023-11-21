@@ -31,6 +31,6 @@ public class OverviewViewModel : AbstractViewModel
 
     internal void Initialize()
     {
-        throw new NotImplementedException();
+
     }
 }
