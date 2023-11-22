@@ -16,30 +16,18 @@ public class Authentication
     private static readonly JwtSecurityTokenHandler _tokenHandler = new JwtSecurityTokenHandler();
 
     private static readonly string _authenticationSecret = Guid.NewGuid().ToString();
-    private static readonly Dictionary<(string, string), List<SecurityKey>> _cachedKeys = new Dictionary<(string, string), List<SecurityKey>>();
+    private static readonly Dictionary<string, List<SecurityKey>> _cachedKeys = new();
 
-    public static IEnumerable<SecurityKey> ValidateKey(Context context,
+    public static IEnumerable<SecurityKey> ValidateKey(string sessionId,
                                                        string tokenString,
                                                        JwtSecurityToken tokenObject,
                                                        string keyId,
                                                        string issuer,
                                                        string audience)
     {
-        if (context.User == null)
+        if (!_cachedKeys.TryGetValue(sessionId, out var ks))
         {
-            _log.Warn("Context contains no user; try to login first.");
-            return new List<SecurityKey>();
-        }
-
-        var sessionId = tokenObject.Claims.FirstOrDefault(c => c.Type == nameof(User.LoginSessionId))!.Value;
-        if (sessionId != context.User.LoginSessionId)
-        {
-            _log.Warn("Someone attempted to login with invalid email and session id: " + context.User.Email + ", " + sessionId);
-            return new List<SecurityKey>();
-        }
-        if (!_cachedKeys.TryGetValue((context.User.Email, sessionId), out var ks))
-        {
-            ks = new List<SecurityKey> { Authentication.GetKey(context.User.Email, sessionId) };
+            ks = new List<SecurityKey> { GetKey(sessionId) };
         }
 
         return ValidateCurrentToken(tokenString, issuer, audience, ks[0]) ? ks : new List<SecurityKey>();
@@ -67,9 +55,9 @@ public class Authentication
         return true;
     }
 
-    public static SymmetricSecurityKey GetKey(string secretSalt, string uniqueSessionKeyId)
+    public static SymmetricSecurityKey GetKey(string sessionId)
     {
-        return new SymmetricSecurityKey(GetSessionSecret(secretSalt + "|" + uniqueSessionKeyId)) { KeyId = uniqueSessionKeyId };
+        return new SymmetricSecurityKey(GetSessionSecret(sessionId)) { KeyId = sessionId };
     }
 
     public static byte[] GetSessionSecret(string secretSalt)
@@ -78,7 +66,7 @@ public class Authentication
         return Encoding.UTF8.GetBytes(secret);
     }
 
-    public static SecurityTokenDescriptor GetTokenDescriptor(Context context)
+    public static SecurityTokenDescriptor GetTokenDescriptor(Context context, string sessionId)
     {
         if (context.User == null) throw Exceptions.Invalid("User has to be set into context before hand.");
 
@@ -96,9 +84,7 @@ public class Authentication
         {
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddDays(7),
-            SigningCredentials = new SigningCredentials(
-                GetKey(context.User.Email, context.User.LoginSessionId),
-                SecurityAlgorithms.HmacSha256Signature),
+            SigningCredentials = new SigningCredentials(GetKey(sessionId), SecurityAlgorithms.HmacSha256Signature),
             Issuer = "TradePort",
             Audience = "SpecialTradingUnicorn"
         };

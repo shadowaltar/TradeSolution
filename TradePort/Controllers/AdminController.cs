@@ -55,9 +55,11 @@ public class AdminController : Controller
         if (result == ResultCode.LoginUserAndAccountOk)
         {
             if (context.User == null || context.Account == null) throw Exceptions.Impossible();
+            var sessionId = "";
             if (HttpContext.IsSessionAvailable())
             {
                 var session = HttpContext.Session;
+                sessionId = session.Id;
                 session.SetString("UserName", context.User.Name);
                 session.SetInt32("UserId", context.User.Id);
                 session.SetString("AccountName", context.Account.Name);
@@ -67,7 +69,7 @@ public class AdminController : Controller
             var tokenString = "";
             if (HttpContext.IsAuthenticationAvailable())
             {
-                var tokenDescriptor = Authentication.GetTokenDescriptor(context);
+                var tokenDescriptor = Authentication.GetTokenDescriptor(context, sessionId);
                 var tokenHandler = new JwtSecurityTokenHandler();
                 securityToken = tokenHandler.CreateToken(tokenDescriptor);
                 tokenString = tokenHandler.WriteToken(securityToken);

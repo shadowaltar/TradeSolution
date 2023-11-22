@@ -38,7 +38,7 @@ public class Context : ApplicationContext
     public User? User
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _user;
-        internal set
+        public set
         {
             if (value == null)
                 throw Exceptions.Invalid<User>("User missing or invalid.");
@@ -53,7 +53,7 @@ public class Context : ApplicationContext
     public Account? Account
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _account;
-        internal set
+        public set
         {
             if (value == null)
                 throw Exceptions.InvalidAccount();

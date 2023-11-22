@@ -67,15 +67,15 @@
                        Text="{Binding TradeRelatedUpdateTime, FallbackValue='Trade Update Time'}" />
             <TabControl Grid.Row="2">
                 <TabItem Header="Trades">
-                    <views:TradeView/>
+                    <views:TradeView DataContext="{Binding TradeViewModel}" />
                 </TabItem>
             </TabControl>
             <TabControl Grid.Row="3">
                 <TabItem Header="Assets">
-                    <views:AssetView/>
+                    <views:AssetView DataContext="{Binding AssetViewModel}/>
                 </TabItem>
                 <TabItem Header="Asset States">
-                    <views:AssetStateView/>
+                    <views:AssetStateView DataContext="{Binding AssetStateViewModel}"/>
                 </TabItem>
                 <TabItem Header="Open Positions">
                     <views:PositionView/>

@@ -9,7 +9,10 @@ public class ExtendedWebSocket : IDisposable
 {
     private ClientWebSocket? _webSocket;
     private readonly ILog _log;
-    private bool _isRunning = true;
+
+    private bool _isServerRunning = false;
+
+    private bool _isClientRunning = true;
 
     public ExtendedWebSocket(ILog log)
     {
@@ -22,7 +25,7 @@ public class ExtendedWebSocket : IDisposable
         {
             do
             {
-                if (!_isRunning)
+                if (!_isClientRunning)
                     return;
 
                 _webSocket = new();
@@ -36,7 +39,7 @@ public class ExtendedWebSocket : IDisposable
                     var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), default);
                     while (!result.CloseStatus.HasValue)
                     {
-                        if (!_isRunning)
+                        if (!_isClientRunning)
                             return;
 
                         if (result.MessageType != WebSocketMessageType.Text)
@@ -47,7 +50,7 @@ public class ExtendedWebSocket : IDisposable
                         if (!result.EndOfMessage)
                             continue;
 
-                        if (!_isRunning)
+                        if (!_isClientRunning)
                             return;
 
                         parseResultCallback.Invoke(bytes.ToArray());
@@ -67,6 +70,11 @@ public class ExtendedWebSocket : IDisposable
                 _log.Info("Trying to reconnect web socket.");
             } while (true);
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
+    }
+
+    public void StartServer()
+    {
+
     }
 
     public async Task Send(Uri uri, string payload)
@@ -89,7 +97,7 @@ public class ExtendedWebSocket : IDisposable
 
     public void Dispose()
     {
-        _isRunning = false;
+        _isClientRunning = false;
         _webSocket?.Dispose();
     }
 

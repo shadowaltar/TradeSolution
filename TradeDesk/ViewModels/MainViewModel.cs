@@ -1,22 +1,22 @@
-﻿using log4net.Config;
+﻿using Common;
+using log4net.Config;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 using System.Windows.Input;
 using TradeCommon.Constants;
-using Common;
+using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
 using TradeDesk.Utils;
 using TradeDesk.Views;
-using System.Collections.Generic;
-using TradeCommon.Essentials.Trading;
-using System;
 
 namespace TradeDesk.ViewModels;
 public class MainViewModel : AbstractViewModel
 {
     private readonly Server _server;
     private string _url;
-    private readonly DelegateCommand connect;
 
     public string ServerUrl { get => _url; set => SetValue(ref _url, value); }
     public ObservableCollection<string> SecurityCodes { get; } = new();
@@ -28,6 +28,7 @@ public class MainViewModel : AbstractViewModel
     public OrderViewModel OrderViewModel { get; }
     public OrderStateViewModel OrderStateViewModel { get; }
     public TradeViewModel TradeViewModel { get; }
+    public AssetViewModel AssetViewModel { get; }
     public MainView Window { get; private set; }
 
     private string title;
@@ -49,15 +50,22 @@ public class MainViewModel : AbstractViewModel
 
     public string OrderRelatedUpdateTime { get => orderRelatedUpdateTime; set => SetValue(ref orderRelatedUpdateTime, value); }
 
+    private string tradeRelatedUpdateTime;
+
+    public string TradeRelatedUpdateTime { get => tradeRelatedUpdateTime; set => SetValue(ref tradeRelatedUpdateTime, value); }
+
     public MainViewModel()
     {
         _server = new Server();
+
         SecurityCodes.AddRange("BTCUSDT", "BTCFDUSD");
+        SelectedSecurityCode = SecurityCodes.First();
 
         OverviewViewModel = new OverviewViewModel(_server);
         OrderViewModel = new OrderViewModel(_server);
         OrderStateViewModel = new OrderStateViewModel(_server);
         TradeViewModel = new TradeViewModel(_server);
+        AssetViewModel = new AssetViewModel(_server);
 
         Connect = new DelegateCommand(PerformConnect);
     }
@@ -113,16 +121,11 @@ public class MainViewModel : AbstractViewModel
 
     private void OnTradesRefreshed(List<Trade> list, DateTime time)
     {
-        throw new NotImplementedException();
+        TradeRelatedUpdateTime = time.ToString("yyMMdd-HHmmss");
     }
 
     private void OnOrdersRefreshed(List<Order> list, DateTime time)
     {
         OrderRelatedUpdateTime = time.ToString("yyMMdd-HHmmss");
-    }
-
-    internal void Initialize(bool obj)
-    {
-
     }
 }

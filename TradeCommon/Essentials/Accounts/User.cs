@@ -33,7 +33,7 @@ public record User
     public List<Account> Accounts { get; } = new();
 
     [DatabaseIgnore]
-    public string LoginSessionId { get; set; } = "";
+    public string LoginSessionId { get; set; } 
 
     public override string ToString()
     {

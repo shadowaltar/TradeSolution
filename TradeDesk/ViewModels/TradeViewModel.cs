@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Threading;
 using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
+using TradeDesk.Utils;
 
 namespace TradeDesk.ViewModels;
 public class TradeViewModel : AbstractViewModel
@@ -43,20 +44,23 @@ public class TradeViewModel : AbstractViewModel
 
         void Process(List<Trade> trades)
         {
-            var (existingOnly, newOnly) = Trades.FindDifferences(trades);
-            foreach (var o in existingOnly)
+            Ui.Invoke(() =>
             {
-                Trades.Remove(o);
-            }
-            foreach (var o in newOnly)
-            {
-                Trades.Add(o);
-            }
+                var (existingOnly, newOnly) = Trades.FindDifferences(trades);
+                foreach (var o in existingOnly)
+                {
+                    Trades.Remove(o);
+                }
+                foreach (var o in newOnly)
+                {
+                    Trades.Add(o);
+                }
+            });
             Refreshed?.Invoke(trades, DateTime.UtcNow);
         }
     }
 
-    internal void Initialize()
+    public void Initialize()
     {
         PeriodicQuery();
     }

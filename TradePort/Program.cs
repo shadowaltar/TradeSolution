@@ -10,6 +10,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using TradeDataCore.MarketData;
 using TradeLogicCore.Services;
 using TradePort.Utils;
 
@@ -22,38 +23,30 @@ ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 // to be used in callback
 IServiceProvider? services = null;
 
-// authorization flag
-var isAuthenticationEnabled = true;
-var isSessionEnabled = true;
-
 // create asp.net core application
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services
     .AddEndpointsApiExplorer()
     .AddDirectoryBrowser()
+    .AddHttpContextAccessor()
     .AddDistributedMemoryCache();
-if (isSessionEnabled)
-{
-    builder.Services.AddSession(o =>
+builder.Services
+    .AddSession(o =>
     {
         o.Cookie.Name = "TradePort.Session";
         o.IdleTimeout = TimeSpan.FromHours(24);
         o.Cookie.IsEssential = true;
         o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    });
-}
-
-builder.Services.AddAuthorization();
-
-if (isAuthenticationEnabled)
-{
-    builder.Services.AddAuthentication(o =>
+    })
+    .AddAuthorization()
+    .AddAuthentication(o =>
     {
         o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-    }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, o =>
+    })
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, o =>
     {
         o.RequireHttpsMetadata = false;
         o.SaveToken = true;
@@ -66,50 +59,51 @@ if (isAuthenticationEnabled)
             ValidAudience = "SpecialTradingUnicorn",
             ValidIssuer = "TradePort",
             //IssuerSigningKey = new SymmetricSecurityKey(secretKey),
-            IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+            IssuerSigningKeyResolver = (tokenString, securityToken, identifier, parameters) =>
             {
-                var context = services!.GetService<Context>()!;
-                return Authentication.ValidateKey(context, s, (JwtSecurityToken)securityToken,
-                    identifier, parameters.ValidIssuer, parameters.ValidAudience);
+                IHttpContextAccessor accessor = services!.GetService<IHttpContextAccessor>()!;
+                string sessionId = accessor.HttpContext!.Session.Id;
+                return Authentication.ValidateKey(sessionId,
+                                                  tokenString,
+                                                  (JwtSecurityToken)securityToken,
+                                                  identifier,
+                                                  parameters.ValidIssuer,
+                                                  parameters.ValidAudience);
             }
         };
     });
-}
 
 builder.Services.AddSwaggerGen(c =>
 {
-    // Set the comments path for the Swagger JSON and UI.
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    // set the comments path for the Swagger JSON and UI.
+    string xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    string xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
     c.UseInlineDefinitionsForEnums();
 
-    if (isAuthenticationEnabled)
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Scheme = "bearer",
-            Description = "Please provide the token value from login response."
-        });
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Scheme = "bearer",
+        Description = "Please provide the tokenString value from login response."
+    });
 
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
+            new OpenApiSecurityScheme
             {
-                new OpenApiSecurityScheme
+                Reference = new OpenApiReference
                 {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer"
-                    }
-                },
-                new string[] { }
-            }
-        });
-    }
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
@@ -127,35 +121,51 @@ builder.Services.AddMvc().AddJsonOptions(options =>
     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+
+app.UseSession();
+app.UseWebSockets();
 
 app.UseDeveloperExceptionPage();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    //c.RoutePrefix = string.Empty;
+    //builder.RoutePrefix = string.Empty;
     c.SwaggerEndpoint("../swagger/v1/swagger.json", "Web UI");
 });
 
 app.UseHttpsRedirection();
-
-if (isAuthenticationEnabled)
-{
-    app.UseAuthentication();
-}
+app.UseAuthentication();
 app.UseRouting();
 app.UseAuthorization();
-if (isSessionEnabled)
-{
-    app.UseSession();
-}
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers.Append("Cache-Control", "$public, max-age=3600");
+    }
+});
+
+app.Use(async (context, nextFunction) =>
+{
+    var publisher = services!.GetService<MarketDataPublisher>()!;
+    if (context.Request.Path.ToString().Contains("/ws"))
+    {
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+            using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+            await publisher.Process(context.Request.Path.ToString(), webSocket);
+        }
+        else
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        }
+    }
+    else
+    {
+        await nextFunction(context);
     }
 });
 

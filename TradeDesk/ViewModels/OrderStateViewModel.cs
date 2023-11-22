@@ -12,7 +12,7 @@ public class OrderStateViewModel : AbstractViewModel
         _server = server;
     }
 
-    internal void Initialize()
+    public void Initialize()
     {
     }
 }

@@ -29,7 +29,7 @@ public class OverviewViewModel : AbstractViewModel
 
     public DateTime? ChartMaxDateTime { get => chartMaxDateTime; set => SetValue(ref chartMaxDateTime, value); }
 
-    internal void Initialize()
+    public void Initialize()
     {
 
     }

@@ -12,7 +12,7 @@ using TradeDataCore.Importing;
 using TradeDataCore.Instruments;
 using TradeDataCore.Utils;
 
-internal class Program
+public class Program
 {
     /// <summary>
     /// Run the data program.

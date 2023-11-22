@@ -5,6 +5,7 @@ using System.Diagnostics;
 namespace Common;
 public static class Logger
 {
+    public static ILog Global { get; } = Logger.New();
     public static ILog New()
     {
         var methodInfo = new StackTrace().GetFrame(1)?.GetMethod();
