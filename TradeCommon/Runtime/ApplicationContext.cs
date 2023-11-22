@@ -13,25 +13,19 @@ public class ApplicationContext
     protected static readonly ILog _log = Logger.New();
 
     protected readonly List<Security> _preferredQuoteCurrencies = new();
-    protected readonly List<Security> _globalCurrencyFilter = new();
+    protected readonly List<Security> _currencyWhitelist = new();
 
     protected IComponentContext? _container;
 
-    private EnvironmentType _environment;
-    private ExchangeType _exchange;
-    private int _exchangeId;
-    private BrokerType _broker;
-    private int _brokerId;
-
-    /// <summary>
-    /// Gets / sets algo's batch Id.
-    /// Notice that this Id will be changed when any new algo engine is started.
-    /// </summary>
-    public long AlgoBatchId { get; set; }
+    protected EnvironmentType _environment;
+    protected ExchangeType _exchange;
+    protected int _exchangeId;
+    protected BrokerType _broker;
+    protected int _brokerId;
 
     public bool IsExternalProhibited { get; private set; }
 
-    public bool IsInitialized { get; private set; }
+    public bool IsInitialized { get; protected set; }
 
     public IStorage Storage { get; }
 
@@ -43,9 +37,9 @@ public class ApplicationContext
     /// <summary>
     /// If this is set, any assets with currencies not in this filter will be ignored.
     /// </summary>
-    public IReadOnlyList<Security> GlobalCurrencyFilter => _globalCurrencyFilter;
+    public IReadOnlyList<Security> CurrencyWhitelist => _currencyWhitelist;
 
-    public bool HasGlobalCurrencyFilter => _globalCurrencyFilter.Count != 0;
+    public bool HasCurrencyWhitelist => _currencyWhitelist.Count != 0;
 
     public ApplicationContext(IComponentContext container, IStorage storage)
     {
@@ -59,7 +53,7 @@ public class ApplicationContext
     public EnvironmentType Environment
     {
         get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _environment;
-        private set => _environment = value;
+        protected set => _environment = value;
     }
 
     /// <summary>
@@ -68,7 +62,7 @@ public class ApplicationContext
     public ExchangeType Exchange
     {
         get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _exchange;
-        private set => _exchange = value;
+        protected set => _exchange = value;
     }
 
     public int UserId { get; protected set; } = 0;
@@ -80,7 +74,7 @@ public class ApplicationContext
     public int ExchangeId
     {
         get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _exchangeId;
-        private set => _exchangeId = value;
+        protected set => _exchangeId = value;
     }
 
     /// <summary>
@@ -89,7 +83,7 @@ public class ApplicationContext
     public BrokerType Broker
     {
         get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _broker;
-        private set => _broker = value;
+        protected set => _broker = value;
     }
 
     /// <summary>
@@ -98,7 +92,7 @@ public class ApplicationContext
     public int BrokerId
     {
         get => !IsInitialized ? throw Exceptions.ContextNotInitialized() : _brokerId;
-        private set => _brokerId = value;
+        protected set => _brokerId = value;
     }
 
     public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
@@ -116,15 +110,15 @@ public class ApplicationContext
         ExchangeId = ExternalNames.GetExchangeId(exchange);
         BrokerId = ExternalNames.GetBrokerId(broker);
 
-        ExternalQueryStates.Exchange = exchange;
-        ExternalQueryStates.Environment = environment;
+        ExternalQueryStates.Exchange = Exchange;
+        ExternalQueryStates.Environment = Environment;
         ExternalQueryStates.EnvironmentId = ExchangeId;
-        ExternalQueryStates.Broker = broker;
+        ExternalQueryStates.Broker = Broker;
         ExternalQueryStates.BrokerId = BrokerId;
-        ExternalConnectionStates.Exchange = exchange;
-        ExternalConnectionStates.Environment = environment;
+        ExternalConnectionStates.Exchange = Exchange;
+        ExternalConnectionStates.Environment = Environment;
         ExternalConnectionStates.EnvironmentId = ExchangeId;
-        ExternalConnectionStates.Broker = broker;
+        ExternalConnectionStates.Broker = Broker;
         ExternalConnectionStates.BrokerId = BrokerId;
     }
 }

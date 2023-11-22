@@ -3,12 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Security;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using TradeCommon.Essentials.Portfolios;
-using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
 using TradeDesk.Utils;
 
@@ -47,7 +43,7 @@ public class AssetStateViewModel : AbstractViewModel
             if (SecurityCode.IsBlank()) return;
 
             states = await _server.GetAssetStates();
-            states = states.Where(a => a.Quantity != 0 || a.LockedQuantity != 0).ToList();
+            states = states.Where(a => a.Quantity != 0).ToList();
             Process(states);
         }
 
@@ -55,17 +51,17 @@ public class AssetStateViewModel : AbstractViewModel
         {
             Ui.Invoke(() =>
             {
-                (List<Asset> existingOnly, List<Asset> newOnly) = Assets.FindDifferences(assets);
-                foreach (Asset o in existingOnly)
+                (List<AssetState> existingOnly, List<AssetState> newOnly) = AssetStates.FindDifferences(states);
+                foreach (AssetState o in existingOnly)
                 {
-                    Assets.Remove(o);
+                    AssetStates.Remove(o);
                 }
-                foreach (Asset o in newOnly)
+                foreach (AssetState o in newOnly)
                 {
-                    Assets.Add(o);
+                    AssetStates.Add(o);
                 }
             });
-            Refreshed?.Invoke(assets, DateTime.UtcNow);
+            Refreshed?.Invoke(states, DateTime.UtcNow);
         }
     }
 }

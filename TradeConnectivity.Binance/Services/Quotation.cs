@@ -282,8 +282,8 @@ public class Quotation : IExternalQuotationManagement
         var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
         var ws = _webSockets.ThreadSafeGetAndRemove(wsName);
         return ws != null && await CloseWebSocket(ws, wsName)
-            ? ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(security.Id, interval)
-            : ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(security.Id, interval);
+            ? ExternalConnectionStates.UnsubscribedOhlcOk(security.Id, interval)
+            : ExternalConnectionStates.UnsubscribedMultipleFailed(security.Id, interval, nameof(OhlcPrice));
     }
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
@@ -314,11 +314,11 @@ public class Quotation : IExternalQuotationManagement
             ExternalConnectionState? state;
             if (ws != null && await CloseWebSocket(ws, wsName))
             {
-                state = ExternalConnectionStates.UnsubscribedRealTimeOhlcOk(securityId, interval);
+                state = ExternalConnectionStates.UnsubscribedOhlcOk(securityId, interval);
             }
             else
             {
-                state = ExternalConnectionStates.UnsubscribedRealTimeOhlcFailed(securityId, interval);
+                state = ExternalConnectionStates.UnsubscribedMultipleFailed(securityId, interval, nameof(OhlcPrice));
                 parentState.ResultCode = ResultCode.UnsubscriptionFailed;
             }
             parentState.SubStates.Add(state);

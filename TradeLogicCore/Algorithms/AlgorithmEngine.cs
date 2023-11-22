@@ -121,7 +121,6 @@ public class AlgorithmEngine : IAlgorithmEngine
     public AlgorithmEngine(Context context, Algorithm algorithm, EngineParameters engineParameters)
     {
         var uniqueId = IdGenerators.Get<AlgoBatch>().NewTimeBasedId;
-        context.AlgoBatchId = uniqueId;
 
         _context = context;
         _services = context.Services;
@@ -139,7 +138,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.Trade.TradeProcessed += OnTradeProcessed;
         _services.Portfolio.PositionProcessed += OnPositionProcessed;
 
-        AlgoBatch = _context.CreateAlgoBatch(_context.AlgoBatchId);
+        AlgoBatch = _context.CreateAlgoBatch(uniqueId);
         _persistence.Insert(AlgoBatch, isSynchronous: true);
 
         Algorithm = algorithm;

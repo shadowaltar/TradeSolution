@@ -27,12 +27,16 @@ public interface IMarketDataService
     IExternalQuotationManagement External { get; }
 
     Task Initialize();
+    
+    Task Reset();
+
     Task<Dictionary<string, decimal>?> GetPrices(List<Security> securities);
     Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null);
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval);
     Task<ExternalConnectionState> UnsubscribeAllOhlcs();
     Task<ExternalConnectionState> SubscribeOrderBook(Security security, int? levels = null);
     Task<ExternalConnectionState> UnsubscribeOrderBook(Security security);
+    Task<ExternalConnectionState> UnsubscribeAllOrderBooks();
 
     Task<ExternalConnectionState> SubscribeTick(Security security);
     Task<ExternalConnectionState> UnsubscribeTick(Security security);

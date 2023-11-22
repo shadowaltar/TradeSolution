@@ -477,6 +477,15 @@ public static class CollectionExtensions
         }
     }
 
+    public static List<T> ThreadSafeToList<T>(this IEnumerable<T> collection, object? @lock = null) where T : notnull
+    {
+        object lockObject = @lock ?? collection;
+        lock (lockObject)
+        {
+            return collection.ToList();
+        }
+    }
+
     public static List<Tv> ThreadSafeValues<T, Tv>(this IDictionary<T, Tv> dictionary, object? @lock = null) where T : notnull
     {
         object lockObject = @lock ?? dictionary;

@@ -17,6 +17,8 @@ public interface IExternalExecutionManagement
     event TransferredCallback? Transferred;
 
     Task<ExternalConnectionState> Subscribe();
+    
+    Task<ExternalQueryState> Unsubscribe();
 
     Task<ExternalQueryState> SendOrder(Order order);
 

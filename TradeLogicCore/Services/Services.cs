@@ -13,7 +13,8 @@ public class Services : IServices
                     ITradeService trade,
                     ISecurityService security,
                     IHistoricalMarketDataService historicalMarketDataService,
-                    IMarketDataService marketDataService)
+                    IMarketDataService marketDataService,
+                    DataPublisher publisher)
     {
         Context = context;
         Persistence = persistence;
@@ -24,6 +25,7 @@ public class Services : IServices
         Security = security;
         HistoricalMarketData = historicalMarketDataService;
         MarketData = marketDataService;
+        Publisher = publisher;
     }
 
     public Context Context { get; }
@@ -43,4 +45,18 @@ public class Services : IServices
     public IHistoricalMarketDataService HistoricalMarketData { get; private set; }
 
     public IMarketDataService MarketData { get; private set; }
+
+    public DataPublisher Publisher { get; }
+
+    public async Task Reset()
+    {
+        Persistence.WaitAll();
+        Publisher.Reset();
+
+        await MarketData.Reset();
+        await Portfolio.Reset();
+        Trade.Reset();
+        Order.Reset();
+        Security.Reset();
+    }
 }

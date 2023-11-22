@@ -37,7 +37,7 @@ public class Dependencies
             builder.RegisterSingleton<IStorage, Storage>();
             builder.RegisterSingleton<IHistoricalMarketDataService, HistoricalMarketDataService>();
             builder.RegisterSingleton<IMarketDataService, RealTimeMarketDataService>();
-            builder.RegisterSingleton<MarketDataPublisher>();
+            builder.RegisterSingleton<DataPublisher>();
             builder.RegisterSingleton<IFinancialStatsDataService, FinancialStatsDataService>();
 
             builder.RegisterSingleton<MessageBroker<Order>>(nameof(Order));

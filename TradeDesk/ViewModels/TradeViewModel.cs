@@ -30,7 +30,7 @@ public class TradeViewModel : AbstractViewModel
         if (SecurityCode.IsBlank()) return;
         _timer?.Dispose();
 
-        var trades = await _server.GetTrades(SecurityCode, true, DateTime.UtcNow.AddDays(-1));
+        var trades = await _server.GetTrades(SecurityCode, DateTime.UtcNow.AddDays(-1));
         Process(trades);
 
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -38,7 +38,7 @@ public class TradeViewModel : AbstractViewModel
         {
             if (SecurityCode.IsBlank()) return;
 
-            trades = await _server.GetTrades(SecurityCode, false, DateTime.MinValue);
+            trades = await _server.GetTrades(SecurityCode);
             Process(trades);
         }
 

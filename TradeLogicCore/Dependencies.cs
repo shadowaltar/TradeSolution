@@ -74,6 +74,7 @@ public static class Dependencies
             //builder.RegisterSingletonInstance<Context>(context);
             //builder.RegisterSingletonInstance<ApplicationContext>(context);
             builder.RegisterSingleton<Core>();
+            builder.RegisterSingleton<DataPublisher>();
             builder.RegisterSingleton<IServices, Services.Services>();
         }
     }

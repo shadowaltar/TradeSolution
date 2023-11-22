@@ -25,36 +25,38 @@ public class SecurityService : ISecurityService
         _context = context;
     }
 
-    public async Task<List<Security>> Initialize()
+    public void Reset()
     {
-        if (IsInitialized) return _securities.Values.ToList();
-
-        List<Security> securities = new();
-        foreach (var secType in Consts.SupportedSecurityTypes)
+        lock (_securities)
         {
-            securities.AddRange(await _storage.ReadSecurities(secType, _context.Exchange));
+            _securities.Clear();
+            _securitiesByCode.Clear();
+            _mapping.Clear();
         }
-        RefreshCache(securities);
-
-        IsInitialized = true;
-        return securities;
+        IsInitialized = false;
     }
 
-    public async Task<List<Security>> GetAllSecurities(bool requestDatabase = false)
+    public async Task Initialize()
     {
+        if (IsInitialized) return;
+        await ReadStorageAndRefreshCache();
+        IsInitialized = true;
+    }
+
+    public async Task<List<Security>> GetAllSecurities(bool readStorage = false)
+    {
+        var isJustInitialized = false;
         if (!IsInitialized)
+        {
             await Initialize();
-        if (requestDatabase)
-        {
-            return await Initialize();
+            isJustInitialized = true;
         }
-        else
+
+        if (isJustInitialized || !readStorage)
         {
-            lock (_securities)
-            {
-                return _securities.Values.ToList();
-            }
+            return _securities.ThreadSafeValues();
         }
+        return await ReadStorageAndRefreshCache();
     }
 
     public async Task<List<Security>> GetSecurities(SecurityType secType,
@@ -181,10 +183,7 @@ public class SecurityService : ISecurityService
         if (!IsInitialized)
             AsyncHelper.RunSync(Initialize);
         if (baseCurrency.IsBlank() || quoteCurrency.IsBlank()) return null;
-        lock (_securities)
-        {
-            return _securities.Values.FirstOrDefault(s => s.FxInfo?.BaseCurrency == baseCurrency && s.FxInfo?.QuoteCurrency == quoteCurrency);
-        }
+        return _securities.ThreadSafeFirst(s => s.Value.FxInfo?.BaseCurrency == baseCurrency && s.Value.FxInfo?.QuoteCurrency == quoteCurrency).Value;
     }
 
     public Security GetSecurity(int securityId)
@@ -298,6 +297,17 @@ public class SecurityService : ISecurityService
             dateTimes.Add((DateTime)row["StartTime"]);
         }
         return results;
+    }
+
+    private async Task<List<Security>> ReadStorageAndRefreshCache()
+    {
+        List<Security> securities = new();
+        foreach (var secType in Consts.SupportedSecurityTypes)
+        {
+            securities.AddRange(await _storage.ReadSecurities(secType, _context.Exchange));
+        }
+        RefreshCache(securities);
+        return securities;
     }
 
     /// <summary>

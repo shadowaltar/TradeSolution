@@ -37,6 +37,11 @@ public class AccountManager : IExternalAccountManagement
         return getSecretResult == ResultCode.GetSecretOk ? ResultCode.LoginUserAndAccountOk : getSecretResult;
     }
 
+    public void Logout(User user, Account account)
+    {
+        // binance do nothing
+    }
+
     /// <summary>
     /// Get the account information [SIGNED].
     /// If a list of asset is provided, the assets will be created too.

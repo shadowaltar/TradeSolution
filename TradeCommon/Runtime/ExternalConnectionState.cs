@@ -493,20 +493,20 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState AlreadySubscribedRealTimeOhlc(Security security, IntervalType interval)
+    public static ExternalConnectionState AlreadySubscribed(Security security, IntervalType interval, string quotationKind)
     {
         return new()
         {
             Action = ActionType.Subscribe,
             ResultCode = ResultCode.AlreadySubscribed,
             ExternalId = BrokerId,
-            Description = $"Subscribed OHLC price for {security.Id} with interval {interval}",
-            Type = SubscriptionType.RealTimeMarketData,
+            Description = $"Already subscribed {quotationKind} for {security.Id} {(interval == IntervalType.Unknown ? "" : "with interval " + interval)}; request ignored",
+            Type = SubscriptionType.MarketData,
             UniqueConnectionId = "",
         };
     }
 
-    public static ExternalConnectionState UnsubscribedRealTimeOhlcOk(int securityId, IntervalType interval)
+    public static ExternalConnectionState UnsubscribedOhlcOk(int securityId, IntervalType interval)
     {
         return new()
         {
@@ -571,42 +571,43 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedRealTimeOhlcFailed(int securityId, IntervalType interval)
-    {
-        return new()
-        {
-            Action = ActionType.Unsubscribe,
-            ResultCode = ResultCode.UnsubscriptionOk,
-            ExternalId = BrokerId,
-            Description = $"Failed to unsubscribe OHLC price for {securityId} with interval {interval}",
-            Type = SubscriptionType.RealTimeMarketData,
-            UniqueConnectionId = "",
-        };
-    }
-
-    public static ExternalConnectionState UnsubscribedMultipleRealTimeOhlc(List<ExternalConnectionState> subStates)
+    public static ExternalConnectionState UnsubscribedMultiple(List<ExternalConnectionState> subStates, string quotationKind)
     {
         return new()
         {
             Action = ActionType.Subscribe,
             ResultCode = ResultCode.MultipleUnsubscriptionOk,
             ExternalId = BrokerId,
-            Description = $"Unsubscribed ({subStates.Count}) OHLC prices",
-            Type = SubscriptionType.RealTimeMarketData,
+            Description = $"Unsubscribed ({subStates.Count}) {quotationKind}",
+            Type = SubscriptionType.MarketData,
             UniqueConnectionId = "",
             SubStates = subStates,
         };
     }
 
-    public static ExternalConnectionState StillHasSubscribedRealTimeOhlc(Security security, IntervalType interval)
+    public static ExternalConnectionState UnsubscribedMultipleFailed(int securityId, IntervalType interval, string quotationKind)
+    {
+        return new()
+        {
+            Action = ActionType.Unsubscribe,
+            ResultCode = ResultCode.UnsubscriptionOk,
+            ExternalId = BrokerId,
+            Description = $"Failed to unsubscribe {quotationKind} for {securityId} {(interval == IntervalType.Unknown ? "" : "with interval " + interval)}",
+            Type = SubscriptionType.MarketData,
+            UniqueConnectionId = "",
+        };
+    }
+
+    public static ExternalConnectionState PartiallyUnsubscribedMultiple(Security security, IntervalType interval, string quotationKind)
     {
         return new()
         {
             Action = ActionType.Unsubscribe,
             ResultCode = ResultCode.StillHasSubscription,
             ExternalId = BrokerId,
-            Description = $"Will not unsubscribed OHLC price for {security.Id} with interval {interval} because of other subscribers",
-            Type = SubscriptionType.RealTimeMarketData,
+            Description =
+$"Will not unsubscribed {quotationKind} for {security.Id} {(interval == IntervalType.Unknown ? "" : "with interval " + interval)} because of other subscribers",
+            Type = SubscriptionType.MarketData,
             UniqueConnectionId = "",
         };
     }

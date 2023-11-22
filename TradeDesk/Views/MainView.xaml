@@ -72,7 +72,7 @@
             </TabControl>
             <TabControl Grid.Row="3">
                 <TabItem Header="Assets">
-                    <views:AssetView DataContext="{Binding AssetViewModel}/>
+                    <views:AssetView DataContext="{Binding AssetViewModel}"/>
                 </TabItem>
                 <TabItem Header="Asset States">
                     <views:AssetStateView DataContext="{Binding AssetStateViewModel}"/>

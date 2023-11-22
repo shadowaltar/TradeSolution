@@ -26,6 +26,8 @@ public interface IPortfolioService
     /// <returns></returns>
     Task<bool> Initialize();
 
+    Task Reset();
+    
     /// <summary>
     /// Create or update (and cache) one or more positions by a series of trades.
     /// </summary>

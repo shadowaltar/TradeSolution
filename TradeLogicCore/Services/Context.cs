@@ -1,5 +1,9 @@
 ﻿using Autofac;
 using Common;
+using Microsoft.CodeAnalysis.Text;
+using OfficeOpenXml.Style;
+using System;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
@@ -11,6 +15,7 @@ public class Context : ApplicationContext
 {
     private User? _user;
     private Account? _account;
+    private Core? _core;
     private IServices? _services;
     private Algorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
@@ -23,14 +28,9 @@ public class Context : ApplicationContext
                 ? throw Exceptions.InvalidAlgorithmEngineState()
                 : _algorithmEngine.AlgoParameters.IsBackTesting;
 
-    public IServices Services
-    {
-        get
-        {
-            _services ??= _container?.Resolve<IServices>() ?? throw Exceptions.ContextNotInitialized();
-            return _services;
-        }
-    }
+    public IServices Services => _services ??= _container?.Resolve<IServices>() ?? throw Exceptions.ContextNotInitialized();
+
+    public Core Core => _core ??= _container?.Resolve<Core>() ?? throw Exceptions.ContextNotInitialized();
 
     /// <summary>
     /// Get the current user (assigned after login).
@@ -38,7 +38,7 @@ public class Context : ApplicationContext
     public User? User
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _user;
-        public set
+        set
         {
             if (value == null)
                 throw Exceptions.Invalid<User>("User missing or invalid.");
@@ -53,7 +53,7 @@ public class Context : ApplicationContext
     public Account? Account
     {
         get => !IsInitialized ? throw Exceptions.MustLogin() : _account;
-        public set
+        set
         {
             if (value == null)
                 throw Exceptions.InvalidAccount();
@@ -66,6 +66,34 @@ public class Context : ApplicationContext
     {
         _algorithmEngine = algorithmEngine;
         _algorithm = algorithm;
+    }
+
+    public void Reset()
+    {
+        _user = null;
+        _account = null;
+        UserId = 0;
+        AccountId = 0;
+        _preferredQuoteCurrencies.Clear();
+        _currencyWhitelist.Clear();
+        _environment = EnvironmentType.Unknown;
+        _exchange = ExchangeType.Unknown;
+        _exchangeId = 0;
+        _broker = BrokerType.Unknown;
+        _brokerId = 0;
+
+        ExternalQueryStates.Exchange = Exchange;
+        ExternalQueryStates.Environment = Environment;
+        ExternalQueryStates.EnvironmentId = ExchangeId;
+        ExternalQueryStates.Broker = Broker;
+        ExternalQueryStates.BrokerId = BrokerId;
+        ExternalConnectionStates.Exchange = Exchange;
+        ExternalConnectionStates.Environment = Environment;
+        ExternalConnectionStates.EnvironmentId = ExchangeId;
+        ExternalConnectionStates.Broker = Broker;
+        ExternalConnectionStates.BrokerId = BrokerId;
+
+        IsInitialized = false;
     }
 
     public Algorithm GetAlgorithm()
@@ -125,7 +153,7 @@ public class Context : ApplicationContext
 
     public bool SetGlobalCurrencyFilter(List<string>? currencies)
     {
-        _globalCurrencyFilter.Clear();
+        _currencyWhitelist.Clear();
         if (currencies.IsNullOrEmpty())
         {
             _log.Info("No global currency filter is set.");
@@ -136,14 +164,14 @@ public class Context : ApplicationContext
             var security = Services.Security.GetSecurity(currency);
             if (security != null)
             {
-                _globalCurrencyFilter.Add(security);
+                _currencyWhitelist.Add(security);
             }
             else
             {
                 _log.Warn($"Invalid global currency filter: {currency}; it will be ignored.");
             }
         }
-        _log.Info($"Set global currency filter: " + string.Join(", ", _globalCurrencyFilter.Select(s => s.Code + "/" + s.Id)));
+        _log.Info($"Set global currency filter: " + string.Join(", ", _currencyWhitelist.Select(s => s.Code + "/" + s.Id)));
         return true;
     }
 }

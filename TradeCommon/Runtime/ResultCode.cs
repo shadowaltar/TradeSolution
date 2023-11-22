@@ -59,6 +59,10 @@ public enum ResultCode
     StartEngineFailed,
     StopEngineFailed,
 
+    AlreadyLoggedIn,
+    NotLoggedInYet,
+    ActiveAlgoBatchesExist,
+
     GetMiscFailed,
     GetUserFailed,
     GetAccountFailed,

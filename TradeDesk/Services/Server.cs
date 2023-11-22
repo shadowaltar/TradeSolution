@@ -32,7 +32,7 @@ public class Server
         try
         {
             var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
-            var uri = new Uri(url).AddParameters(("symbol", securityCode);
+            var uri = new Uri(url).AddParameters(("symbol", securityCode));
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
             else
@@ -60,7 +60,7 @@ public class Server
         try
         {
             var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryTrades}";
-            var uri = new Uri(url).AddParameters(("symbol", securityCode);
+            var uri = new Uri(url).AddParameters(("symbol", securityCode));
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
             else
@@ -107,7 +107,7 @@ public class Server
         }
     }
 
-    public async Task<List<Asset>> GetAssetStates(DateTime? startFrom = null)
+    public async Task<List<AssetState>> GetAssetStates(DateTime? startFrom = null)
     {
         try
         {
@@ -126,11 +126,11 @@ public class Server
                 _log.Error("Failed to get assets.");
                 return new();
             }
-            return Json.Deserialize<List<Asset>>(jsonArray) ?? new();
+            return Json.Deserialize<List<AssetState>>(jsonArray) ?? new();
         }
         catch (Exception e)
         {
-            _log.Error("Failed to get assets.", e);
+            _log.Error("Failed to get asset states.", e);
             return new();
         }
     }

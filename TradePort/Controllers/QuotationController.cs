@@ -12,6 +12,7 @@ using TradeCommon.Exporting;
 using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 using TradeDataCore.Instruments;
+using TradeDataCore.MarketData;
 using TradePort.Utils;
 
 namespace TradePort.Controllers;
@@ -20,8 +21,8 @@ namespace TradePort.Controllers;
 /// Provides prices access.
 /// </summary>
 [ApiController]
-[Route("prices")]
-public class PriceController : Controller
+[Route(RestApiConstants.QuotationRoot)]
+public class QuotationController : Controller
 {
     private static readonly ILog _log = Logger.New();
 
@@ -460,4 +461,25 @@ public class PriceController : Controller
         var results = await storage.ReadDailyMissingPriceSituations(interval, secType);
         return Ok(results);
     }
+
+    //[Route("/ws/{symbol}")]
+    //public async Task SubscribeOlhcPrices([FromServices] MarketDataPublisher publisher,
+    //    [FromServices] ISecurityService securityService,
+    //    [FromRoute(Name = "symbol")] string securityCode,
+    //    [FromQuery(Name = "interval")] IntervalType interval)
+    //{
+    //    if (HttpContext.WebSockets.IsWebSocketRequest)
+    //    {
+    //        var security = securityService.GetSecurity(securityCode);
+    //        if (security == null)
+    //            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+    //        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
+    //        await publisher.PublishOhlc(webSocket, security, interval);
+    //    }
+    //    else
+    //    {
+    //        HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+    //    }
+    //}
 }

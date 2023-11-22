@@ -48,6 +48,11 @@ public class AdminController : Controller
         if (ControllerValidator.IsUnknown(model.Environment, out br)) return br;
         if (ControllerValidator.IsUnknown(model.Exchange, out br)) return br;
 
+        if (adminService.IsLoggedIn)
+        {
+            return BadRequest("Please logout first.");
+        }
+
         var broker = ExternalNames.Convert(model.Exchange);
         context.Initialize(model.Environment, model.Exchange, broker);
 
@@ -89,6 +94,16 @@ public class AdminController : Controller
         return BadRequest($"Failed to {nameof(Login)}; code: {result}");
     }
 
+    [AllowAnonymous]
+    [HttpPost(RestApiConstants.Logout)]
+    public async Task<ActionResult> Logout([FromServices] IAdminService adminService,
+                                           [FromForm(Name = "admin-password")] string adminPassword)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+
+        return !adminService.IsLoggedIn ? BadRequest("Cannot log out if not logged in.") : Ok(await adminService.Logout());
+    }
+
     [HttpPost(RestApiConstants.ChangeUserPassword)]
     public async Task<ActionResult> ChangeUserPassword([FromServices] IAdminService adminService, [FromForm] ChangeUserPasswordModel model)
     {
@@ -111,7 +126,7 @@ public class AdminController : Controller
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
         if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
-        if (core.ListAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
+        if (core.GetActiveAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
 
         var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var securities = new List<Security>();

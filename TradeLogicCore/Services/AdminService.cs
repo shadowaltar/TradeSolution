@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -21,7 +22,6 @@ public class AdminService : IAdminService
     private readonly IMarketDataService _marketDataService;
     private readonly IExternalAccountManagement _accountManagement;
     private readonly IExternalConnectivityManagement _connectivity;
-    private bool _isInitialized;
 
     public bool IsLoggedIn { get; private set; }
 
@@ -49,8 +49,31 @@ public class AdminService : IAdminService
         _connectivity = connectivity;
     }
 
+    public async Task<ResultCode> Logout()
+    {
+        if (!IsLoggedIn || Context.User == null || Context.Account == null)
+            return ResultCode.NotLoggedInYet;
+        if (Context.Core.GetActiveAlgoBatches().Count > 0)
+            return ResultCode.ActiveAlgoBatchesExist;
+
+        _accountManagement.Logout(Context.User!, Context.Account!);
+        // reset everything
+        await Context.Services.Reset();
+
+        _storage.SetEnvironment(EnvironmentType.Unknown);
+        _connectivity.SetEnvironment(EnvironmentType.Unknown);
+
+        Context.Reset();
+        IsLoggedIn = false;
+        return ResultCode.Ok;
+    }
+
     public async Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment)
     {
+        if (IsLoggedIn)
+        {
+            return ResultCode.AlreadyLoggedIn;
+        }
         IsLoggedIn = false;
 
         _log.Info($"Logging in user and account: {userName}, {accountName}, {environment}");
@@ -58,23 +81,18 @@ public class AdminService : IAdminService
         if (password.IsBlank()) return ResultCode.InvalidArgument;
         if (accountName.IsBlank()) return ResultCode.InvalidArgument;
 
-        if (!_isInitialized)
-        {
-            _storage.SetEnvironment(environment);
-            _connectivity.SetEnvironment(environment);
+        _storage.SetEnvironment(environment);
+        _connectivity.SetEnvironment(environment);
+        _tradeService.Initialize();
 
-            await _securityService.Initialize();
-            _tradeService.Initialize();
-
-            _isInitialized = true;
-        }
+        await _securityService.Initialize();
 
         CurrentUser = null;
         CurrentAccount = null;
 
         var user = await GetUser(userName, Context.Environment);
-        if (user == null) return ResultCode.GetUserFailed;
-        CurrentUser = user;
+        if (user == null)
+            return ResultCode.GetUserFailed;
 
         Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
         //if (!Credential.IsPasswordCorrect(user, password))
@@ -82,6 +100,8 @@ public class AdminService : IAdminService
         //    _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
         //    return ResultCode.InvalidCredential;
         //}
+
+        CurrentUser = user;
 
         var account = await GetAccount(accountName, environment);
         if (account == null)

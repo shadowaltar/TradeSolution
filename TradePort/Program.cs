@@ -126,7 +126,10 @@ WebApplication app = builder.Build();
 // both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 app.UseSession();
-app.UseWebSockets();
+
+var webSocketOptions = new WebSocketOptions { KeepAliveInterval = TimeSpan.FromHours(1) };
+webSocketOptions.AllowedOrigins.Add("https://localhost");
+app.UseWebSockets(webSocketOptions);
 
 app.UseDeveloperExceptionPage();
 app.UseSwagger();
@@ -145,27 +148,6 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers.Append("Cache-Control", "$public, max-age=3600");
-    }
-});
-
-app.Use(async (context, nextFunction) =>
-{
-    var publisher = services!.GetService<MarketDataPublisher>()!;
-    if (context.Request.Path.ToString().Contains("/ws"))
-    {
-        if (context.WebSockets.IsWebSocketRequest)
-        {
-            using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await publisher.Process(context.Request.Path.ToString(), webSocket);
-        }
-        else
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        }
-    }
-    else
-    {
-        await nextFunction(context);
     }
 });
 

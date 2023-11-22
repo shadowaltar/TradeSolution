@@ -771,7 +771,7 @@ public class Execution : IExternalExecutionManagement
         }
     }
 
-    public async Task<ExternalQueryState> Stop()
+    public async Task<ExternalQueryState> Unsubscribe()
     {
         if (!Firewall.CanCall)
             return ExternalQueryStates.FirewallBlocked();

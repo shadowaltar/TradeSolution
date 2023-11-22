@@ -10,7 +10,7 @@ using TradeDataCore.Instruments;
 using static TradeCommon.Utils.Delegates;
 
 namespace TradeLogicCore.Services;
-public class TradeService : ITradeService, IDisposable
+public class TradeService : ITradeService
 {
     private static readonly ILog _log = Logger.New();
 
@@ -140,11 +140,6 @@ public class TradeService : ITradeService, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _execution.TradeReceived -= OnTradeReceived;
-    }
-
     public async Task<List<Trade>> GetMarketTrades(Security security)
     {
         var state = await _execution.GetMarketTrades(security);
@@ -216,9 +211,13 @@ public class TradeService : ITradeService, IDisposable
 
     public void Reset()
     {
+        _execution.TradeReceived -= OnTradeReceived;
+
         _trades.ThreadSafeClear();
         _tradesByExternalId.ThreadSafeClear();
         _tradesByOrderId.ThreadSafeClear();
+        _assetsByCode.ThreadSafeClear();
+        _assetsById.ThreadSafeClear();
     }
 
     public void Update(ICollection<Trade> trades, Security? security = null)

@@ -463,8 +463,8 @@ public class ExecutionController : Controller
     {
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var ids = core.ListAlgoBatches();
-        return Ok(ids);
+        var batches = core.GetActiveAlgoBatches();
+        return Ok(batches);
     }
 
     /// <summary>

@@ -11,7 +11,7 @@ using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
 
-public class OrderService : IOrderService, IDisposable
+public class OrderService : IOrderService
 {
     private static readonly ILog _log = Logger.New();
 
@@ -347,12 +347,6 @@ public class OrderService : IOrderService, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _execution.OrderPlaced -= OnSentOrderAccepted;
-        _execution.OrderCancelled -= OnOrderCancelled;
-    }
-
     public Order CreateManualOrder(Security security,
                                    decimal price,
                                    decimal quantity,
@@ -370,7 +364,7 @@ public class OrderService : IOrderService, IDisposable
             UpdateTime = now,
             ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
             Price = 0,
-            LimitPrice = orderType.IsLimit()? price:0,
+            LimitPrice = orderType.IsLimit() ? price : 0,
             Quantity = quantity,
             Type = orderType,
             Security = security,
@@ -386,63 +380,19 @@ public class OrderService : IOrderService, IDisposable
         return order;
     }
 
-    //public async Task<bool> SendLongMarketOrder(string securityCode,
-    //                                            decimal quantity,
-    //                                            string comment = "",
-    //                                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
-    //{
-    //    var security = _securityService.GetSecurity(securityCode);
-    //    if (security == null) return false;
-    //    var order = CreateManualOrder(security, 0, quantity, Side.Buy, OrderType.Market, comment, timeInForce);
-    //    var state = await SendOrder(order);
-    //    return state.ResultCode == ResultCode.SendOrderOk;
-    //}
-
-    //public async Task<bool> SendShortMarketOrder(string securityCode,
-    //                                             decimal quantity,
-    //                                             string comment = "",
-    //                                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
-    //{
-    //    var security = _securityService.GetSecurity(securityCode);
-    //    if (security == null) return false;
-    //    var order = CreateManualOrder(security, 0, quantity, Side.Sell, OrderType.Market, comment, timeInForce);
-    //    var state = await SendOrder(order);
-    //    return state.ResultCode == ResultCode.SendOrderOk;
-    //}
-
-    //public async Task<bool> SendLongLimitOrder(string securityCode,
-    //                                           decimal price,
-    //                                           decimal quantity,
-    //                                           string comment = "",
-    //                                           TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
-    //{
-    //    var security = _securityService.GetSecurity(securityCode);
-    //    if (security == null) return false;
-    //    var order = CreateManualOrder(security, price, quantity, Side.Buy, OrderType.Limit, comment, timeInForce);
-    //    var state = await SendOrder(order);
-    //    return state.ResultCode == ResultCode.SendOrderOk;
-    //}
-
-    //public async Task<bool> SendShortLimitOrder(string securityCode,
-    //                                            decimal price,
-    //                                            decimal quantity,
-    //                                            string comment = "",
-    //                                            TimeInForceType timeInForce = TimeInForceType.GoodTillCancel)
-    //{
-    //    var security = _securityService.GetSecurity(securityCode);
-    //    if (security == null) return false;
-    //    var order = CreateManualOrder(security, price, quantity, Side.Sell, OrderType.Limit, comment, timeInForce);
-    //    var state = await SendOrder(order);
-    //    return state.ResultCode == ResultCode.SendOrderOk;
-    //}
-
     public void Reset()
     {
-        _errorOrders.Clear();
-        _cancelledOrders.Clear();
-        _openOrders.Clear();
-        _allOrders.Clear();
-        _allOrdersByExternalId.Clear();
+        _execution.OrderPlaced -= OnSentOrderAccepted;
+        _execution.OrderCancelled -= OnOrderCancelled;
+        _execution.OrderReceived -= OnOrderReceived;
+
+        _errorOrders.ThreadSafeClear();
+        _cancelledOrders.ThreadSafeClear();
+        _openOrders.ThreadSafeClear();
+        _allOrders.ThreadSafeClear();
+        _allOrdersByExternalId.ThreadSafeClear();
+        _operationalOrders.ThreadSafeClear();
+        _orderStates.ThreadSafeClear();
     }
 
     public void Update(ICollection<Order> orders, Security? security = null)

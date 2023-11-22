@@ -26,6 +26,8 @@ public interface IAdminService
     /// <returns></returns>
     Task<ResultCode> Login(string userName, string? password, string? accountName, EnvironmentType environment);
 
+    Task<ResultCode> Logout();
+
     /// <summary>
     /// Ping external service.
     /// </summary>

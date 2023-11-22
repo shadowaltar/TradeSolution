@@ -11,7 +11,7 @@ using TradeCommon.Utils;
 using TradeDataCore.Instruments;
 
 namespace TradeLogicCore.Services;
-public class PortfolioService : IPortfolioService, IDisposable
+public class PortfolioService : IPortfolioService
 {
     private static readonly ILog _log = Logger.New();
     private readonly IdGenerator _orderIdGenerator;
@@ -24,8 +24,6 @@ public class PortfolioService : IPortfolioService, IDisposable
     private readonly Persistence _persistence;
     private readonly Dictionary<long, Position> _closedPositions = new();
     private readonly Dictionary<int, decimal> _residualByAssetSecurityId = new();
-
-    private readonly object _lock = new();
 
     public Portfolio InitialPortfolio { get; private set; }
 
@@ -69,7 +67,7 @@ public class PortfolioService : IPortfolioService, IDisposable
 
     public List<Position> GetClosedPositions()
     {
-        return _closedPositions.ThreadSafeValues(_lock);
+        return _closedPositions.ThreadSafeValues();
     }
 
     public Position? GetPosition(long id)
@@ -148,6 +146,10 @@ public class PortfolioService : IPortfolioService, IDisposable
     public async Task<List<AssetState>> GetAssetStates(Security security, DateTime start)
     {
         return await _storage.ReadAssetStates(security, start);
+    }
+
+    public async Task Unsubscribe()
+    {
     }
 
     public async Task<bool> Initialize()
@@ -259,9 +261,9 @@ public class PortfolioService : IPortfolioService, IDisposable
             return false;
         }
         // fx only logic
-        List<Asset> assetsToBeCleanedUp = !_context.HasGlobalCurrencyFilter
+        List<Asset> assetsToBeCleanedUp = !_context.HasCurrencyWhitelist
             ? assets
-            : assets.Where(a => _context.GlobalCurrencyFilter.Contains(a.Security)).ToList();
+            : assets.Where(a => _context.CurrencyWhitelist.Contains(a.Security)).ToList();
         if (assetsToBeCleanedUp.IsNullOrEmpty())
             return false;
 
@@ -384,8 +386,17 @@ public class PortfolioService : IPortfolioService, IDisposable
         }
     }
 
-    public void Dispose()
+    public async Task Reset()
     {
+        await _execution.Unsubscribe();
+
+        InitialPortfolio.ClearAssets();
+        InitialPortfolio.ClearPositions();
+        Portfolio.ClearAssets();
+        Portfolio.ClearPositions();
+
+        _closedPositions.Clear();
+        _residualByAssetSecurityId.Clear();
     }
 
     public bool Validate(Order order)

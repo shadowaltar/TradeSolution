@@ -118,7 +118,7 @@ public class Core
         }
     }
 
-    public List<AlgoBatch> ListAlgoBatches()
+    public List<AlgoBatch> GetActiveAlgoBatches()
     {
         return _engines.Values.Select(e => e.AlgoBatch).ToList();
     }

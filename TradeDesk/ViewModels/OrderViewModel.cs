@@ -11,7 +11,7 @@ using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
 
-public class OrderViewModel : AbstractViewModel, IPeriodicRefreshViewModel
+public class OrderViewModel : AbstractViewModel
 {
     protected PeriodicTimer _timer;
     private readonly Server _server;

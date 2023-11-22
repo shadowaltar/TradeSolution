@@ -17,6 +17,10 @@ public class Connectivity : IExternalConnectivityManagement
 
     private readonly string _testHttps = "https://testnet.binance.vision";
     private readonly string _testWs = "wss://testnet.binance.vision";
+
+    private readonly string _localHttps = "https://localhost";
+    private readonly string _localWs = "wss://localhost";
+
     private readonly RequestBuilder _requestBuilder;
     private readonly HttpClient _httpClient;
     private readonly Stopwatch _stopwatch;
@@ -59,6 +63,10 @@ public class Connectivity : IExternalConnectivityManagement
             case EnvironmentType.Prod:
                 RootUrl = _prodHttps;
                 RootWebSocketUrl = _prodWs;
+                break;
+            case EnvironmentType.Unknown:
+                RootUrl = _localHttps;
+                RootWebSocketUrl = _localWs;
                 break;
             default: throw new ArgumentException("Invalid environment type", nameof(environment));
         }

@@ -7,6 +7,7 @@ public interface IServices
 {
     Context Context { get; }
     Persistence Persistence { get; }
+    DataPublisher Publisher { get; }
     IAdminService Admin { get; }
     IPortfolioService Portfolio { get; }
     IOrderService Order { get; }
@@ -14,4 +15,6 @@ public interface IServices
     ISecurityService Security { get; }
     IHistoricalMarketDataService HistoricalMarketData { get; }
     IMarketDataService MarketData { get; }
+
+    Task Reset();
 }
