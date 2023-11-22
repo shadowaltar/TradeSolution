@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -717,14 +718,59 @@ SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
         }
     }
 
-    public async Task RunAll(User user, DateTime previousDay, List<Security> securityPool)
+    public async Task RunAll(User user, DateTime start, List<Security> securityPool)
     {
         await ReconcileAccount(user);
         await ReconcileAssets();
 
         // check one week's historical order / trade only
-        await ReconcileOrders(previousDay, securityPool);
-        await ReconcileTrades(previousDay, securityPool);
-        await ReconcilePositions(securityPool);
+        await ReconcileOrders(start, securityPool);
+        await ReconcileTrades(start, securityPool);
+
+        // recalculate actual price + filled quantity, must run after reconcile trades
+        await RecalculateOrderPrice(start, securityPool);
+
+        //await ReconcilePositions(securityPool);
+    }
+
+    private async Task RecalculateOrderPrice(DateTime start, List<Security> securities)
+    {
+        var changedOrders = new List<Order>();
+        foreach (var security in securities)
+        {
+            var orders = await _orderService.GetStorageOrders(security, start, null, OrderStatuses.Fills);
+            var trades = await _tradeService.GetStorageTrades(security, start, null, null);
+            var tradesByOrderId = trades.GroupBy(t => t.OrderId);
+            foreach (var order in orders)
+            {
+                var groupedTrades = tradesByOrderId.FirstOrDefault(g => g.Key == order.Id)?.ToList();
+                if (groupedTrades.IsNullOrEmpty())
+                {
+                    _log.Error("A filled order does not have any associated trades! OrderId: " + order.Id);
+                    continue;
+                }
+                var savedPrice = order.Price;
+                var savedQuantity = order.FilledQuantity;
+                var pricePrecision = savedPrice.GetDecimalPlaces();
+                order.Price = decimal.Round(groupedTrades.WeightedAverage(t => t.Price, t => t.Quantity), security.PricePrecision);
+                order.FilledQuantity = groupedTrades.Sum(t => t.Quantity);
+                if (savedPrice != order.Price || savedQuantity != order.FilledQuantity)
+                {
+                    changedOrders.Add(order);
+                }
+                // try to fix order's limit price in case it is empty
+                if (order.Type.IsLimit() && order.LimitPrice == 0)
+                {
+                    order.LimitPrice = order.Price;
+                    changedOrders.Add(order);
+                }
+            }
+        }
+
+        if (!changedOrders.IsNullOrEmpty())
+        {
+            _persistence.Insert(changedOrders);
+            _persistence.WaitAll();
+        }
     }
 }

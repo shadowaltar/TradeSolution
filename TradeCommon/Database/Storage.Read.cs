@@ -329,8 +329,8 @@ WHERE
         return statuses.IsNullOrEmpty()
             ? ""
             : statuses.Length == 1
-            ? $"{startingAnd}Status = {statuses[0]}{endingAnd}"
-            : $"{startingAnd}Status IN ({string.Join(',', statuses)}){endingAnd}";
+            ? $"{startingAnd}Status = '{statuses[0].ToString().ToUpper()}'{endingAnd}"
+            : $"{startingAnd}Status IN ('{string.Join("','", statuses).ToUpper()}'){endingAnd}";
     }
 
     public async Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null)

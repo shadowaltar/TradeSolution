@@ -134,7 +134,7 @@ public class TradeService : ITradeService
         lock (_tradesByOrderId)
         {
             // update order info from trade
-            order.Price = trades.WeightedAverage(t => t.Price, t => t.Quantity);
+            order.Price = decimal.Round(trades.WeightedAverage(t => t.Price, t => t.Quantity), order.Security.PricePrecision);
             order.FilledQuantity = trades.Sum(t => t.Quantity);
             _persistence.Insert(order);
         }
