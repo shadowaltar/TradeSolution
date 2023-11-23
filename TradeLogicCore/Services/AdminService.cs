@@ -145,6 +145,11 @@ public class AdminService : IAdminService
         return ResultCode.LoginUserAndAccountOk;
     }
 
+    public bool IsLoggedInWith(string userName, string accountName, EnvironmentType environment, ExchangeType exchange)
+    {
+        return CurrentUser?.Name == userName && CurrentAccount?.Name == accountName && Context.Environment == environment && Context.Exchange == exchange;
+    }
+
     public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)
     {
         if (userName.IsBlank() || userPassword.IsBlank() || email.IsBlank())

@@ -29,8 +29,10 @@ namespace TradePort.Controllers;
 [Route(RestApiConstants.AdminRoot)]
 public class AdminController : Controller
 {
+    private JwtSecurityTokenHandler? _tokenHandler;
+
     /// <summary>
-    /// Set application environment + login (combination of two other calls).
+    /// Login with a user and account to an environment and exchange.
     /// </summary>
     /// <param name="context"></param>
     /// <param name="container"></param>
@@ -50,100 +52,62 @@ public class AdminController : Controller
 
         if (adminService.IsLoggedIn)
         {
-            return BadRequest("Please logout first.");
+            if (!adminService.IsLoggedInWith(model.UserName, model.AccountName, model.Environment, model.Exchange))
+                return BadRequest("Please logout first.");
+
+            return Ok(CreateLoginResponseModel(ResultCode.AlreadyLoggedIn, context, HttpContext.Session));
         }
 
-        var broker = ExternalNames.Convert(model.Exchange);
+        if (!HttpContext.IsSessionAvailable())
+            throw Exceptions.Impossible("Erroneous session configuration!");
+
+        if (!HttpContext.IsAuthenticationAvailable())
+            throw Exceptions.Impossible("Erroneous authentication configuration!");
+
+        BrokerType broker = ExternalNames.Convert(model.Exchange);
         context.Initialize(model.Environment, model.Exchange, broker);
 
-        var result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
-        if (result == ResultCode.LoginUserAndAccountOk)
-        {
-            if (context.User == null || context.Account == null) throw Exceptions.Impossible();
-            var sessionId = "";
-            if (HttpContext.IsSessionAvailable())
-            {
-                var session = HttpContext.Session;
-                sessionId = session.Id;
-                session.SetString("UserName", context.User.Name);
-                session.SetInt32("UserId", context.User.Id);
-                session.SetString("AccountName", context.Account.Name);
-                session.SetInt32("AccountId", context.Account.Id);
-            }
-            SecurityToken? securityToken = null;
-            var tokenString = "";
-            if (HttpContext.IsAuthenticationAvailable())
-            {
-                var tokenDescriptor = Authentication.GetTokenDescriptor(context, sessionId);
-                var tokenHandler = new JwtSecurityTokenHandler();
-                securityToken = tokenHandler.CreateToken(tokenDescriptor);
-                tokenString = tokenHandler.WriteToken(securityToken);
-            }
-            return Ok(new LoginResponseModel(result,
-                                             context.User.Id,
-                                             context.User.Name,
-                                             context.User.Email,
-                                             context.Account.Id,
-                                             context.Account.Name,
-                                             context.Exchange,
-                                             context.Broker,
-                                             context.Environment,
-                                             securityToken?.ValidTo ?? DateTime.MaxValue,
-                                             tokenString));
-        }
-        return BadRequest($"Failed to {nameof(Login)}; code: {result}");
+        ResultCode result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
+        if (result != ResultCode.LoginUserAndAccountOk)
+            return BadRequest($"Failed to {nameof(Login)}; reason: {result}");
+
+        if (context.User == null || context.Account == null)
+            throw Exceptions.Impossible();
+
+        return Ok(CreateLoginResponseModel(result, context, HttpContext.Session));
     }
 
+    /// <summary>
+    /// Logout. It will affect all the other sessions (different apps or browsers).
+    /// Cannot be executed when there are running algorithms.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="adminPassword"></param>
+    /// <returns></returns>
     [AllowAnonymous]
     [HttpPost(RestApiConstants.Logout)]
     public async Task<ActionResult> Logout([FromServices] IAdminService adminService,
                                            [FromForm(Name = "admin-password")] string adminPassword)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out ObjectResult? br)) return br;
 
         return !adminService.IsLoggedIn ? BadRequest("Cannot log out if not logged in.") : Ok(await adminService.Logout());
     }
 
+    /// <summary>
+    /// Change a user's password.
+    /// </summary>
+    /// <param name="adminService"></param>
+    /// <param name="model"></param>
+    /// <returns></returns>
     [HttpPost(RestApiConstants.ChangeUserPassword)]
     public async Task<ActionResult> ChangeUserPassword([FromServices] IAdminService adminService, [FromForm] ChangeUserPasswordModel model)
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out ObjectResult? br)) return br;
         if (model.NewPassword.IsBlank() || model.NewPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
 
-        var r = await adminService.SetPassword(model.UserName, model.NewPassword, model.Environment);
+        int r = await adminService.SetPassword(model.UserName, model.NewPassword, model.Environment);
         return r > 0 ? Ok("Password is set.") : BadRequest("Failed to set password.");
-    }
-
-    [HttpPost("reconcile")]
-    public async Task<ActionResult> Reconcile([FromServices] Core core,
-                                              [FromServices] IAdminService adminService,
-                                              [FromServices] ISecurityService securityService,
-                                              [FromServices] IPortfolioService portfolioService,
-                                              [FromForm(Name = "admin-password")] string adminPassword,
-                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT,ETHUSDT",
-                                              [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
-    {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
-        if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
-        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
-        if (core.GetActiveAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
-
-        var codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var securities = new List<Security>();
-        foreach (var code in codes)
-        {
-            var security = securityService.GetSecurity(code);
-            if (security == null || security.IsAsset) return BadRequest("Invalid code / missing security.");
-            securities.Add(security);
-        }
-
-        var _reconciliation = new Reconcilation(adminService.Context);
-        var reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
-        await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);
-
-        await portfolioService.Reload(false, true, true, true);
-
-        return Ok("Done");
     }
 
     /// <summary>
@@ -158,7 +122,7 @@ public class AdminController : Controller
     {
         if (userName.IsBlank()) return BadRequest();
 
-        var user = await adminService.GetUser(userName, adminService.Context.Environment);
+        User? user = await adminService.GetUser(userName, adminService.Context.Environment);
         return user == null ? NotFound() : Ok(user);
     }
 
@@ -174,7 +138,7 @@ public class AdminController : Controller
                                                [FromRoute(Name = "account")] string accountName = "test",
                                                [FromQuery(Name = "request-external")] bool requestExternal = false)
     {
-        var account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
+        Account? account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
         return account == null ? BadRequest("Invalid account name.") : Ok(account);
     }
 
@@ -200,10 +164,10 @@ public class AdminController : Controller
     public async Task<ActionResult> SynchronizeAccountAndBalanceFromExternal([FromServices] IAdminService adminService,
                                                [FromRoute(Name = "account")] string accountName = "test")
     {
-        var account = await adminService.GetAccount(accountName, adminService.Context.Environment);
+        Account? account = await adminService.GetAccount(accountName, adminService.Context.Environment);
         if (account == null) return BadRequest("Invalid account name.");
 
-        var external = await adminService.GetAccount(accountName, adminService.Context.Environment, true);
+        Account? external = await adminService.GetAccount(accountName, adminService.Context.Environment, true);
 
         return Ok(account);
     }
@@ -230,13 +194,13 @@ public class AdminController : Controller
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
 
-        var user = await adminService.GetUser(userName, model.Environment);
+        User? user = await adminService.GetUser(userName, model.Environment);
         if (user != null)
         {
             return BadRequest();
         }
 
-        var result = await adminService.CreateUser(userName, model.UserPassword, model.Email, model.Environment);
+        int result = await adminService.CreateUser(userName, model.UserPassword, model.Email, model.Environment);
         model.UserPassword = "";
 
         return Ok(result);
@@ -254,7 +218,7 @@ public class AdminController : Controller
                                                   [FromForm] AccountCreationModel model,
                                                   [FromRoute(Name = "account")] string accountName = "test")
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out ObjectResult? br)) return br;
         if (accountName.IsBlank()) return BadRequest();
         if (model == null) return BadRequest("Missing creation model.");
         if (model.ExternalAccount == null) return BadRequest("Missing external account name.");
@@ -262,11 +226,11 @@ public class AdminController : Controller
         if (model.Environment == EnvironmentType.Unknown) return BadRequest("Invalid environment.");
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
-        var user = await adminService.GetUser(model.OwnerName, model.Environment);
+        User? user = await adminService.GetUser(model.OwnerName, model.Environment);
         if (user == null) return BadRequest("Invalid owner.");
-        var brokerId = ExternalNames.GetBrokerId(model.Broker);
+        int brokerId = ExternalNames.GetBrokerId(model.Broker);
 
-        var now = DateTime.UtcNow;
+        DateTime now = DateTime.UtcNow;
         var account = new Account
         {
             OwnerId = user.Id,
@@ -280,7 +244,7 @@ public class AdminController : Controller
             ExternalAccount = model.ExternalAccount,
             FeeStructure = model.FeeStructure,
         };
-        var result = await adminService.CreateAccount(account);
+        int result = await adminService.CreateAccount(account);
         return Ok(result);
     }
 
@@ -302,10 +266,10 @@ public class AdminController : Controller
             (DatabaseNames.StockDefinitionTable, DatabaseNames.StaticData),
             (DatabaseNames.FxDefinitionTable, DatabaseNames.StaticData),
         };
-        var results = await Task.WhenAll(tuples.Select(async t =>
+        (string table, bool r)[] results = await Task.WhenAll(tuples.Select(async t =>
         {
-            var (table, db) = t;
-            var r = await storage.CheckTableExists(table, db);
+            (string table, string db) = t;
+            bool r = await storage.CheckTableExists(table, db);
             return (table, r);
         }));
         return Ok(results.ToDictionary(p => p.table, p => p.r));
@@ -346,20 +310,20 @@ public class AdminController : Controller
                 (DatabaseNames.FxPrice1hTable, DatabaseNames.MarketData, IntervalType.OneHour, SecurityType.Fx),
                 (DatabaseNames.FxPrice1dTable, DatabaseNames.MarketData, IntervalType.OneDay, SecurityType.Fx),
             };
-            var results = await Task.WhenAll(tuples.Select(async t =>
+            (string table, bool r)[] results = await Task.WhenAll(tuples.Select(async t =>
             {
-                var (table, db, interval, secType) = t;
+                (string table, string db, IntervalType interval, SecurityType secType) = t;
                 await storage.CreatePriceTable(interval, secType);
-                var r = await storage.CheckTableExists(table, db);
+                bool r = await storage.CheckTableExists(table, db);
                 return (table, r);
             }));
             return Ok(results.ToDictionary(p => p.table, p => p.r));
         }
         else if (interval is IntervalType.OneMinute or IntervalType.OneHour or IntervalType.OneDay)
         {
-            var table = DatabaseNames.GetPriceTableName(interval, secType);
+            string table = DatabaseNames.GetPriceTableName(interval, secType);
             await storage.CreatePriceTable(interval, secType);
-            var r = await storage.CheckTableExists(table, DatabaseNames.MarketData);
+            bool r = await storage.CheckTableExists(table, DatabaseNames.MarketData);
             return Ok(new Dictionary<string, bool> { { table, r } });
         }
 
@@ -380,7 +344,7 @@ public class AdminController : Controller
                                                        [FromQuery(Name = "table-type")] DataType tableType,
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr = null)
     {
-        if (ControllerValidator.IsAdminPasswordBad(password, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(password, out ObjectResult? br)) return br;
 
         SecurityType secType = SecurityType.Unknown;
         if (secTypeStr != null)
@@ -431,7 +395,7 @@ public class AdminController : Controller
                 resultTableNames.Add(DatabaseNames.UserTable);
                 break;
             case DataType.AlgoEntry:
-                var (table, database) = await storage.CreateTable<AlgoEntry>();
+                (string table, string database) = await storage.CreateTable<AlgoEntry>();
                 resultTableNames.Add(table);
                 break;
         }
@@ -456,9 +420,9 @@ public class AdminController : Controller
         }
 
         var results = new Dictionary<string, bool>();
-        foreach (var tn in resultTableNames)
+        foreach (string tn in resultTableNames)
         {
-            var r = await storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
+            bool r = await storage.CheckTableExists(tn, DatabaseNames.ExecutionData);
             if (!r)
                 r = await storage.CheckTableExists(tn, DatabaseNames.StaticData);
             if (!r)
@@ -466,6 +430,23 @@ public class AdminController : Controller
             results[tn] = r;
         }
         return results;
+    }
+
+    private LoginResponseModel CreateLoginResponseModel(ResultCode result, Context context, ISession session)
+    {
+        if (context.User == null || context.Account == null)
+            throw Exceptions.Impossible();
+
+        _tokenHandler ??= new JwtSecurityTokenHandler();
+
+        session.SetString("UserName", context.User.Name);
+        session.SetInt32("UserId", context.User.Id);
+        session.SetString("AccountName", context.Account.Name);
+        session.SetInt32("AccountId", context.Account.Id);
+        var tokenDescriptor = Authentication.GetTokenDescriptor(context, session.Id);
+        var token = _tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = _tokenHandler.WriteToken(token);
+        return new LoginResponseModel(result, context.User.Id, context.User.Name, context.User.Email, context.Account.Id, context.Account.Name, context.Exchange, context.Broker, context.Environment, token.ValidTo, tokenString);
     }
 
 

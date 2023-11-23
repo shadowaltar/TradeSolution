@@ -15,6 +15,7 @@ using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using TradePort.Utils;
 
@@ -520,6 +521,49 @@ public class ExecutionController : Controller
         return Ok(new Dictionary<string, int> { { "expected", expected }, { "successful", successful } });
     }
 
+    /// <summary>
+    /// Reconcile all orders, trades, assets with external system (aka broker / exchange).
+    /// Cannot be executed when there are running algorithms.
+    /// </summary>
+    /// <param name="core"></param>
+    /// <param name="adminService"></param>
+    /// <param name="securityService"></param>
+    /// <param name="portfolioService"></param>
+    /// <param name="adminPassword"></param>
+    /// <param name="symbolStr"></param>
+    /// <param name="securityType"></param>
+    /// <returns></returns>
+    [HttpPost(RestApiConstants.Reconcile)]
+    public async Task<ActionResult> Reconcile([FromServices] Core core,
+                                              [FromServices] IAdminService adminService,
+                                              [FromServices] ISecurityService securityService,
+                                              [FromServices] IPortfolioService portfolioService,
+                                              [FromForm(Name = "admin-password")] string adminPassword,
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT,ETHUSDT",
+                                              [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out ObjectResult? br)) return br;
+        if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
+        if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
+        if (core.GetActiveAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
+
+        string[] codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var securities = new List<Security>();
+        foreach (string code in codes)
+        {
+            Security? security = securityService.GetSecurity(code);
+            if (security == null || security.IsAsset) return BadRequest("Invalid code / missing security.");
+            securities.Add(security);
+        }
+
+        var _reconciliation = new Reconcilation(adminService.Context);
+        DateTime reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
+        await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);
+
+        await portfolioService.Reload(false, true, true, true);
+
+        return Ok("Done");
+    }
     public class UserCredentialModel
     {
         [FromForm(Name = "userName")]
