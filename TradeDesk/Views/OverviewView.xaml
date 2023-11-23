@@ -4,7 +4,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
-             xmlns:chart="http://schemas.syncfusion.com/wpf"
              xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels"
              d:DataContext="{d:DesignInstance Type=viewmodels:OverviewViewModel}"
              mc:Ignorable="d" 
@@ -30,13 +29,14 @@
                 <TextBlock TextAlignment="Center"
                            Text="{Binding ChartTitle}" FontSize="17" Margin="0,10,0,0"/>
             </syncfusion:SfChart.Header>
-            <chart:SfChart.RowDefinitions>
-                <chart:ChartRowDefinition />
-                <chart:ChartRowDefinition Height="40"/>
-            </chart:SfChart.RowDefinitions>
+            <syncfusion:SfChart.RowDefinitions>
+                <syncfusion:ChartRowDefinition Height="Auto" />
+                <syncfusion:ChartRowDefinition Height="80"/>
+            </syncfusion:SfChart.RowDefinitions>
             <syncfusion:SfChart.PrimaryAxis>
-                <syncfusion:DateTimeAxis chart:ChartBase.ColumnSpan="2"
+                <syncfusion:DateTimeAxis syncfusion:ChartBase.ColumnSpan="2"
                                          ShowGridLines="False"
+                                         ShowTrackBallInfo="True"
                                          LabelCreated="DateTimeAxis_LabelCreated"
                                          LabelFormat="HH:mm:ss"
                                          Minimum="{Binding ChartMinDateTime}"
@@ -58,6 +58,7 @@
 
             <syncfusion:SfChart.SecondaryAxis>
                 <syncfusion:NumericalAxis Maximum="130" Interval="10" LabelFormat="{Binding PriceFormat}"
+                                          ShowTrackBallInfo="True"
                                           AxisLineStyle="{StaticResource lineStyle}"
                                           HeaderTemplate="{StaticResource headerTemplate2}">
                     <syncfusion:NumericalAxis.LabelStyle>
@@ -66,8 +67,8 @@
                 </syncfusion:NumericalAxis>
             </syncfusion:SfChart.SecondaryAxis>
 
-
             <syncfusion:SfChart.Behaviors>
+                <syncfusion:ChartCrossHairBehavior />
                 <syncfusion:ChartZoomPanBehavior ZoomMode="X" ResetOnDoubleTap="False"/>
             </syncfusion:SfChart.Behaviors>
 
@@ -81,20 +82,32 @@
                                         BearFillColor="Transparent"
                                         BullFillColor="Transparent"
                                         ShowTooltip="True"
-                                        EnableAnimation="False" />
+                                        EnableAnimation="False">
+            </syncfusion:CandleSeries>
 
+            <syncfusion:ScatterSeries Interior="#4A4A4A" ScatterHeight="3" ScatterWidth="3" 
+                                 ItemsSource="{Binding DataPoints}" XBindingPath="Eruptions" 
+                                 YBindingPath="WaitingTime"/>
             <syncfusion:ColumnSeries x:Name="VolumeBar"
                                      ItemsSource="{Binding Volumes}"
                                      XBindingPath="Time"
                                      YBindingPath="Value"
                                      ShowTooltip="True"
                                      EnableAnimation="False">
-                <chart:ColumnSeries.YAxis>
-                    <chart:NumericalAxis PlotOffset="10" chart:SfChart.Row="1">
-                    </chart:NumericalAxis>
-                </chart:ColumnSeries.YAxis>
+                <syncfusion:ColumnSeries.YAxis>
+                    <syncfusion:NumericalAxis PlotOffset="10" syncfusion:SfChart.Row="1"/>
+                </syncfusion:ColumnSeries.YAxis>
             </syncfusion:ColumnSeries>
-                
+
+
+            <syncfusion:SfChart.TechnicalIndicators>
+                <syncfusion:SimpleAverageIndicator ItemsSource="{Binding OhlcPrices}" Period="{Binding FastMA, FallbackValue=3}"
+                                              SignalLineColor="Brown" XBindingPath="T"
+                                              Volume="Volume" Open="O" High="H" Low="L" Close="C"/>
+                <syncfusion:SimpleAverageIndicator ItemsSource="{Binding OhlcPrices}" Period="{Binding SlowMA, FallbackValue=7}"
+                                              SignalLineColor="Magenta" XBindingPath="T"
+                                              Volume="Volume" Open="O" High="H" Low="L" Close="C"/>
+            </syncfusion:SfChart.TechnicalIndicators>
         </syncfusion:SfChart>
     </Grid>
 </UserControl>

@@ -2,6 +2,7 @@
 using Common.Web;
 using log4net;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -27,7 +28,7 @@ public class QuotationController : Controller
     private static readonly ILog _log = Logger.New();
 
     /// <summary>
-    /// 
+    /// Download single day order book data.
     /// </summary>
     /// <param name="securityService"></param>
     /// <param name="dateStr">The date of the order book data, must be in yyyyMMdd.</param>
@@ -72,6 +73,59 @@ public class QuotationController : Controller
             return BadRequest();
         }
     }
+
+    public record DownloadOhlcPriceRequestModel
+    {
+        [DefaultValue(ExchangeType.Binance)]
+        public ExchangeType Exchange { get; set; }
+
+        [DefaultValue(EnvironmentType.Prod)]
+        public EnvironmentType Environment { get; set; }
+
+        [DefaultValue("BTCFDUSD")]
+        public string SecurityCode { get; set; } = "BTCFDUSD";
+
+        [DefaultValue(IntervalType.OneMinute)]
+        public IntervalType Interval { get; set; } = IntervalType.OneMinute;
+
+        [DefaultValue("20230801")]
+        public string StartDateTime { get; set; } = "20230801";
+
+        [DefaultValue("20231120")]
+        public string EndDateTime { get; set; } = "20231120";
+    }
+
+    [HttpPost("ohlc-prices/download-csv")]
+    public async Task<ActionResult> DownloadAll([FromServices] ISecurityService securityService, [FromForm] DownloadOhlcPriceRequestModel model)
+    {
+        if (ControllerValidator.IsBadOrParse(model.StartDateTime, out DateTime start, out var br)) return br;
+        if (ControllerValidator.IsBadOrParse(model.EndDateTime, out DateTime end, out br)) return br;
+
+        var security = securityService.GetSecurity(model.SecurityCode);
+        if (security == null) return BadRequest("Missing security.");
+
+        var prices = await securityService.ReadPrices(security.Id, model.Interval, security.SecurityType, start, end);
+
+        var dataFilePath = Path.Join(Path.GetTempPath(), $"OHLC_{security.Code}_{model.Interval}_{start.ToString(Consts.DefaultDateFormat)}_{end.ToString(Consts.DefaultDateFormat)}_{security.ExchangeType}.csv");
+
+        try
+        {
+            Csv.Write(prices, dataFilePath);
+            var zipFilePath = dataFilePath.Replace(".csv", ".zip");
+            System.IO.File.Delete(zipFilePath);
+            Zip.Archive(dataFilePath, zipFilePath);
+            return System.IO.File.Exists(zipFilePath)
+                ? File(System.IO.File.OpenRead(zipFilePath), "application/octet-stream", Path.GetFileName(zipFilePath))
+                : BadRequest();
+        }
+        catch (Exception e)
+        {
+            _log.Error("Failed to write json, zip or send it.", e);
+            return BadRequest();
+        }
+    }
+
+
 
     /// <summary>
     /// Get prices given exchangeStr, code, interval and start time.

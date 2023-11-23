@@ -33,4 +33,12 @@ public class OverviewViewModel : AbstractViewModel
     {
 
     }
+
+    private object fastMovingAveragePoints;
+
+    public object FastMovingAveragePoints { get => fastMovingAveragePoints; set => SetValue(ref fastMovingAveragePoints, value); }
+
+    private object slowMovingAveragePoints;
+
+    public object SlowMovingAveragePoints { get => slowMovingAveragePoints; set => SetValue(ref slowMovingAveragePoints, value); }
 }
