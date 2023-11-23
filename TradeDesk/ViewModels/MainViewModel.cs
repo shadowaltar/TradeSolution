@@ -58,9 +58,6 @@ public class MainViewModel : AbstractViewModel
     {
         _server = new Server();
 
-        SecurityCodes.AddRange("BTCUSDT", "BTCFDUSD");
-        SelectedSecurityCode = SecurityCodes.First();
-
         OverviewViewModel = new OverviewViewModel(_server);
         OrderViewModel = new OrderViewModel(_server);
         OrderStateViewModel = new OrderStateViewModel(_server);
@@ -68,6 +65,9 @@ public class MainViewModel : AbstractViewModel
         AssetViewModel = new AssetViewModel(_server);
 
         Connect = new DelegateCommand(PerformConnect);
+
+        SecurityCodes.AddRange("BTCUSDT", "BTCFDUSD");
+        SelectedSecurityCode = SecurityCodes.First();
     }
 
     public void Initialize(MainView mainView)

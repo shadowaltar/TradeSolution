@@ -3,10 +3,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:TradeDesk.Views"
+             xmlns:local="clr-namespace:TradeDesk.Views" xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels" d:DataContext="{d:DesignInstance Type=viewmodels:AssetViewModel}"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <BooleanToVisibilityConverter x:Key="BTVC"/>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
     <Grid>
-            
+        <DataGrid Grid.Row="0" Margin="5"
+                  ItemsSource="{Binding Assets}"
+                  SelectedItem="{Binding SelectedAsset}"
+                  AutoGenerateColumns="True"
+                  IsReadOnly="True"
+                  VerticalGridLinesBrush="Transparent"
+                  VerticalScrollBarVisibility="Visible"
+                  CanUserAddRows="False"
+                  CanUserReorderColumns="False"/>
     </Grid>
 </UserControl>

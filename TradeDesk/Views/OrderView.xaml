@@ -15,14 +15,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <DockPanel Visibility="{Binding IsOrderToolBarVisible, Converter={StaticResource BTVC}}">
-            
-        </DockPanel>
-        <DataGrid Grid.Row="1" Margin="5"
+        <DataGrid Grid.Row="0" Margin="5"
                   ItemsSource="{Binding Orders}"
                   AutoGenerateColumns="True"
                   IsReadOnly="True"

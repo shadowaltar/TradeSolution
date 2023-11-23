@@ -3,12 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Security;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using TradeCommon.Essentials.Portfolios;
-using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
 using TradeDesk.Utils;
 
@@ -17,6 +13,11 @@ public class AssetViewModel : AbstractViewModel
 {
     private PeriodicTimer _timer;
     private readonly Server _server;
+
+    private Asset selectedAsset;
+
+    public Asset SelectedAsset { get => selectedAsset; set => SetValue(ref selectedAsset, value); }
+
     public ObservableCollection<Asset> Assets { get; } = new();
 
     public event Action<List<Asset>, DateTime> Refreshed;
