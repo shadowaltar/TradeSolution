@@ -25,15 +25,18 @@ public class OrderViewModel : AbstractViewModel
 
     public event Action<List<Order>, DateTime> Refreshed;
 
-    public string? SecurityCode { get; set; }
+    public string? SecurityCode { get; private set; }
 
-    public OrderViewModel(Server server)
+    public OrderViewModel(MainViewModel mainViewModel, Server server)
     {
         SelectedCommand = new DelegateCommand(Select);
         CreateCommand = new DelegateCommand(CreateOrder);
         CancelCommand = new DelegateCommand(Cancel);
         CancelAllCommand = new DelegateCommand(CancelAll);
         _server = server;
+
+
+        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
     }
 
     public void Initialize()
@@ -104,5 +107,10 @@ public class OrderViewModel : AbstractViewModel
 
     private void Select()
     {
+    }
+
+    private void OnSecurityCodeChanged(string code)
+    {
+        SecurityCode = code;
     }
 }

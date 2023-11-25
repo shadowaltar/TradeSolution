@@ -461,25 +461,4 @@ public class QuotationController : Controller
         var results = await storage.ReadDailyMissingPriceSituations(interval, secType);
         return Ok(results);
     }
-
-    //[Route("/ws/{symbol}")]
-    //public async Task SubscribeOlhcPrices([FromServices] MarketDataPublisher publisher,
-    //    [FromServices] ISecurityService securityService,
-    //    [FromRoute(Name = "symbol")] string securityCode,
-    //    [FromQuery(Name = "interval")] IntervalType interval)
-    //{
-    //    if (HttpContext.WebSockets.IsWebSocketRequest)
-    //    {
-    //        var security = securityService.GetSecurity(securityCode);
-    //        if (security == null)
-    //            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-
-    //        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-    //        await publisher.PublishOhlc(webSocket, security, interval);
-    //    }
-    //    else
-    //    {
-    //        HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-    //    }
-    //}
 }

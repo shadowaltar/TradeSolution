@@ -1,5 +1,12 @@
-﻿using Syncfusion.UI.Xaml.Charts;
+﻿using ScottPlot;
+using ScottPlot.Plottable;
+using System;
+using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Quotes;
+using TradeDesk.ViewModels;
 
 namespace TradeDesk.Views;
 /// <summary>
@@ -7,38 +14,45 @@ namespace TradeDesk.Views;
 /// </summary>
 public partial class OverviewView : UserControl
 {
+    public OHLC[] OhlcData { get; }
+
+    private readonly FinancePlot _candlePlot;
+    private Timer _timer;
+
     public OverviewView()
     {
         InitializeComponent();
+
+        OhlcData = new OHLC[100];
+        _candlePlot = mainPlot.Plot.AddCandlesticks(OhlcData);
     }
 
-    private void DateTimeAxis_LabelCreated(object sender, LabelCreatedEventArgs e)
+    public void StartLive()
     {
-        DateTimeAxisLabel dateTimeLabel = (DateTimeAxisLabel)e.AxisLabel;
-        bool isTransition = dateTimeLabel.IsTransition;
+        _timer?.Dispose();
+        _timer = new Timer(TimerRender, null, 0, 100);
+    }
 
-        switch (dateTimeLabel.IntervalType)
-        {
-            case DateTimeIntervalType.Days:
-                {
-                    if (isTransition)
-                        e.AxisLabel.LabelContent = dateTimeLabel.Position.FromOADate().ToString("MMM-dd");
-                    else
-                        e.AxisLabel.LabelContent = dateTimeLabel.Position.FromOADate().ToString("dd");
-                }
-                break;
+    private void TimerRender(object? state)
+    {
+        mainPlot.Refresh();
+    }
 
-            case DateTimeIntervalType.Hours:
-                {
-                    if (isTransition)
-                        e.AxisLabel.LabelContent =
-                        dateTimeLabel.Position.FromOADate().ToString("MMM-dd");
+    public void StopLive()
+    {
+        _timer?.Dispose();
+    }
 
-                    else
-                        e.AxisLabel.LabelContent =
-                        dateTimeLabel.Position.FromOADate().ToString("dd");
-                }
-                break;
-        }
+    private void ViewDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        var vm = (OverviewViewModel)DataContext;
+        vm.View = this;
+    }
+
+    public void UpdateOhlc(OhlcPrice price, TimeSpan timeSpan)
+    {
+        var candle = new OHLC((double)price.O, (double)price.H, (double)price.L, (double)price.C, price.T, timeSpan);
+        Array.Copy(OhlcData, 1, OhlcData, 0, OhlcData.Length - 1);
+        OhlcData[^1] = candle;
     }
 }

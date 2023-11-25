@@ -1,44 +1,67 @@
 ﻿using System;
-using System.Collections.ObjectModel;
-using TradeCommon.Essentials.Misc;
+using System.Windows.Input;
+using TradeCommon.Essentials;
 using TradeCommon.Essentials.Quotes;
 using TradeDesk.Services;
+using TradeDesk.Utils;
+using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
 public class OverviewViewModel : AbstractViewModel
 {
     private readonly Server _server;
 
-    private string priceFormat;
+    private DelegateCommand _startLive;
+    private bool _isLive;
 
-    public OverviewViewModel(Server server)
+    private IntervalType _selectedInterval;
+
+    public IntervalType SelectedInterval { get => _selectedInterval; set => SetValue(ref _selectedInterval, value, v => SelectedIntervalTimeSpan = v.ToTimeSpan()); }
+
+    public ICommand StartLive => _startLive ??= new DelegateCommand(PerformStartLive);
+
+    public bool IsLive { get => _isLive; set => SetValue(ref _isLive, value); }
+
+    public OverviewView View { get; internal set; }
+
+    public OverviewViewModel(MainViewModel mainViewModel, Server server)
     {
         _server = server;
+        _server.OhlcReceived += OnNextOhlc;
+
+        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
     }
-
-    public ObservableCollection<OhlcPrice> OhlcPrices { get; } = new();
-    public ObservableCollection<TimeAndValue> Volumes { get; } = new();
-
-    public string PriceFormat { get => priceFormat; set => SetValue(ref priceFormat, value); }
-
-    private DateTime? chartMinDateTime;
-
-    public DateTime? ChartMinDateTime { get => chartMinDateTime; set => SetValue(ref chartMinDateTime, value); }
-
-    private DateTime? chartMaxDateTime;
-
-    public DateTime? ChartMaxDateTime { get => chartMaxDateTime; set => SetValue(ref chartMaxDateTime, value); }
 
     public void Initialize()
     {
 
     }
 
-    private object fastMovingAveragePoints;
+    private void OnSecurityCodeChanged(string securityCode)
+    {
+        View.StopLive();
+    }
 
-    public object FastMovingAveragePoints { get => fastMovingAveragePoints; set => SetValue(ref fastMovingAveragePoints, value); }
+    private void OnNextOhlc(OhlcPrice price)
+    {
+        View.UpdateOhlc(price, SelectedIntervalTimeSpan);
+    }
 
-    private object slowMovingAveragePoints;
+    private void PerformStartLive()
+    {
+        if (IsLive)
+        {
+            _server.UnsubscribeOhlc();
+            View.StopLive();
+            IsLive = false;
+        }
+        else
+        {
+            IsLive = true;
+            View.StartLive();
+            _server.SubscribeOhlc();
+        }
+    }
 
-    public object SlowMovingAveragePoints { get => slowMovingAveragePoints; set => SetValue(ref slowMovingAveragePoints, value); }
+    public TimeSpan SelectedIntervalTimeSpan { get; private set; }
 }

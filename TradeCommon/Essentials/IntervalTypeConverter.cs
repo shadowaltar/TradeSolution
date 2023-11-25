@@ -28,7 +28,7 @@ public static class IntervalTypeConverter
         };
     }
 
-    public static string ToYahooIntervalString(IntervalType interval)
+    public static string ToYahooIntervalString(this IntervalType interval)
     {
         return interval switch
         {
@@ -50,7 +50,7 @@ public static class IntervalTypeConverter
         };
     }
 
-    public static string ToIntervalString(IntervalType interval)
+    public static string ToIntervalString(this IntervalType interval)
     {
         return interval switch
         {
@@ -72,7 +72,7 @@ public static class IntervalTypeConverter
         };
     }
 
-    public static TimeSpan ToTimeSpan(IntervalType interval)
+    public static TimeSpan ToTimeSpan(this IntervalType interval)
     {
         return interval switch
         {

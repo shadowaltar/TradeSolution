@@ -107,6 +107,9 @@ public class Connectivity : IExternalConnectivityManagement
 
     public double GetAverageLatency()
     {
+        if (!Firewall.CanCall)
+            return -1;
+
         var milliseconds = new double[10];
         Parallel.For(0, 10, i =>
         {

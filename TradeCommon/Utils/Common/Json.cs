@@ -4,10 +4,7 @@ using System.Text.Json.Nodes;
 namespace Common;
 public static class Json
 {
-    private static readonly JsonSerializerOptions _option = new JsonSerializerOptions()
-    {
-        WriteIndented = true
-    };
+    private static readonly JsonSerializerOptions _option = new() { WriteIndented = true };
 
     public static T? Clone<T>(T obj)
     {

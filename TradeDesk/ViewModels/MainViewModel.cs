@@ -41,8 +41,10 @@ public class MainViewModel : AbstractViewModel
     {
         get => selectedSecurityCode; set
         {
-            SetValue(ref selectedSecurityCode, value);
-            OrderViewModel.SecurityCode = SelectedSecurityCode;
+            if (SetValue(ref selectedSecurityCode, value))
+            {
+                SecurityCodeChanged?.Invoke(value);
+            }
         }
     }
 
@@ -54,12 +56,16 @@ public class MainViewModel : AbstractViewModel
 
     public string TradeRelatedUpdateTime { get => tradeRelatedUpdateTime; set => SetValue(ref tradeRelatedUpdateTime, value); }
 
+    public event Action<string>? SecurityCodeChanged;
+
     public MainViewModel()
     {
         _server = new Server();
 
-        OverviewViewModel = new OverviewViewModel(_server);
-        OrderViewModel = new OrderViewModel(_server);
+        OverviewViewModel = new OverviewViewModel(this, _server);
+
+        OrderViewModel = new OrderViewModel(this, _server);
+
         OrderStateViewModel = new OrderStateViewModel(_server);
         TradeViewModel = new TradeViewModel(_server);
         AssetViewModel = new AssetViewModel(_server);
@@ -102,6 +108,11 @@ public class MainViewModel : AbstractViewModel
             Title = $"Trading Desk [{Session.Environment}] [{Session.Exchange}] [{ServerUrl}]";
             Window.Show();
         }
+    }
+
+    public void Reset()
+    {
+        SecurityCodeChanged = null;
     }
 
     private void PerformConnect()

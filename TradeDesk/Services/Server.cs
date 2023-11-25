@@ -4,11 +4,14 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.WebSockets;
 using System.Security;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using TradeCommon.Constants;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
+using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -20,6 +23,10 @@ public class Server
     private string _token;
     private string _url;
     private readonly HttpClient _client = new HttpClient();
+    private ClientWebSocket? _ohlCWebSocket;
+
+
+    public event Action<OhlcPrice>? OhlcReceived;
 
     public void Setup(string rootUrl, string token)
     {
@@ -64,7 +71,7 @@ public class Server
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
             else
-                uri.AddParameters(("start", startFrom.Value.ToString("yyyyMMdd")), ("where", DataSourceType.InternalStorage.ToString()));            
+                uri.AddParameters(("start", startFrom.Value.ToString("yyyyMMdd")), ("where", DataSourceType.InternalStorage.ToString()));
             var request = new HttpRequestMessage(HttpMethod.Post, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             var response = await _client.SendAsync(request);
@@ -159,7 +166,16 @@ public class Server
 
     }
 
-    public void SubscribeOhlcPrice()
+    public void SubscribeOhlc()
+    {
+        _ohlCWebSocket?.Dispose();
+        
+        _ohlCWebSocket = new ClientWebSocket();
+
+        var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
+    }
+
+    public void UnsubscribeOhlc()
     {
 
     }
