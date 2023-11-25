@@ -128,8 +128,6 @@ public class Connectivity : IExternalConnectivityManagement
                 // silently ignore
             }
         });
-        var average = milliseconds.Where(ms => ms < 10000).Average();
-        _log.Info("Discovered average RTT in ms: " + average);
-        return average;
+        return milliseconds.Where(ms => ms < 10000).Average();
     }
 }
