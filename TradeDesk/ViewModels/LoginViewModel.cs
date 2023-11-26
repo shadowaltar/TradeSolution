@@ -5,12 +5,11 @@ using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
+using TradeDesk.Services;
 using TradeDesk.Utils;
 using TradeDesk.Views;
 
@@ -22,6 +21,7 @@ public class LoginViewModel : AbstractViewModel
     private string _serverUrl;
     private string _userName;
     private EnvironmentType _environmentType;
+    private readonly Server _server;
 
     public event Action<string> AfterLogin;
 
@@ -47,8 +47,9 @@ public class LoginViewModel : AbstractViewModel
 
     public ICommand LoginCommand { get; }
 
-    public LoginViewModel()
+    public LoginViewModel(Services.Server server)
     {
+        _server = server;
         LoginCommand = new DelegateCommand(Login);
         ((IList<EnvironmentType>)EnvironmentTypes).AddRange(Enum.GetValues<EnvironmentType>());
         ((IList<ExchangeType>)ExchangeTypes).AddRange(Enum.GetValues<ExchangeType>());
@@ -66,13 +67,6 @@ public class LoginViewModel : AbstractViewModel
         var url = $"{ServerUrl.Trim('/')}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
         try
         {
-            using var client = HttpHelper.HttpClientWithoutCert();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            var request = new HttpRequestMessage
-            {
-                Method = HttpMethod.Post,
-                RequestUri = new Uri(url)
-            };
             var content = new MultipartFormDataContent
             {
                 { new StringContent(UserName), "user" },
@@ -82,37 +76,10 @@ public class LoginViewModel : AbstractViewModel
                 { new StringContent(ExchangeType.ToString()), "exchange" },
                 { new StringContent(AdminPassword), "admin-password" }
             };
-            request.Content = content;
-            var header = new ContentDispositionHeaderValue("form-data");
-            request.Content.Headers.ContentDisposition = header;
-
-            var response = await client.PostAsync(request.RequestUri.ToString(), request.Content);
-            if (response.IsSuccessStatusCode)
+            var token = await _server.Login(url, content);
+            if (!token.IsBlank())
             {
-                var loginContent = await response.Content.ReadFromJsonAsync<JsonObject>();
-                var result = loginContent.GetString("result");
-                if (!Enum.TryParse<ResultCode>(result, out var rc) || rc != ResultCode.LoginUserAndAccountOk)
-                {
-                    MessageBoxes.Info(null, "Result: " + rc, "Login Failed");
-                    return;
-                }
-                var token = loginContent.GetString("token");
-
-                //var resultCodeStr = loginContent.GetProperty("result").GetString();
-                //if (!Enum.TryParse<ResultCode>(resultCodeStr, out var resultCode))
-                //{
-                //    MessageBoxes.Info(null, "Result: " + resultCode, "Login Failed");
-                //}
-                //var token = loginContent.GetProperty("Token").GetString();
-                // must set the auth-token from now on
-                //client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-              
-
                 AfterLogin?.Invoke(token);
-            }
-            else
-            {
-                MessageBoxes.Info(null, "Warn: " + response.StatusCode, "Login Failed");
             }
         }
         catch (Exception e)

@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Input;
 using TradeCommon.Essentials;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeDesk.Services;
 using TradeDesk.Utils;
@@ -15,6 +18,7 @@ public class OverviewViewModel : AbstractViewModel
     private bool _isLive;
 
     private IntervalType _selectedInterval;
+    private Security _security;
 
     public IntervalType SelectedInterval { get => _selectedInterval; set => SetValue(ref _selectedInterval, value, v => SelectedIntervalTimeSpan = v.ToTimeSpan()); }
 
@@ -37,18 +41,23 @@ public class OverviewViewModel : AbstractViewModel
 
     }
 
-    private void OnSecurityCodeChanged(string securityCode)
+    private async void OnSecurityCodeChanged(string securityCode)
     {
+        if (View == null) return;
         View.StopLive();
+        var securities = await _server.GetSecurities();
+        _security = securities.FirstOrDefault(s => s.Code == securityCode);
     }
 
     private void OnNextOhlc(OhlcPrice price)
     {
+        if (View == null) return;
         View.UpdateOhlc(price, SelectedIntervalTimeSpan);
     }
 
     private void PerformStartLive()
     {
+        if (View == null) return;
         if (IsLive)
         {
             _server.UnsubscribeOhlc();
@@ -58,8 +67,8 @@ public class OverviewViewModel : AbstractViewModel
         else
         {
             IsLive = true;
-            View.StartLive();
-            _server.SubscribeOhlc();
+            View.StartLive(SelectedIntervalTimeSpan);
+            _server.SubscribeOhlc(_security, SelectedInterval);
         }
     }
 

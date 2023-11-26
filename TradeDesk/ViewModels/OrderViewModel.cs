@@ -35,7 +35,6 @@ public class OrderViewModel : AbstractViewModel
         CancelAllCommand = new DelegateCommand(CancelAll);
         _server = server;
 
-
         mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
     }
 
