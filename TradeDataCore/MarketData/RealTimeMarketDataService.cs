@@ -43,9 +43,9 @@ public class RealTimeMarketDataService : IMarketDataService
         External.NextOrderBook += OnNextOrderBook;
     }
 
-    private void OnNextOhlc(int securityId, OhlcPrice price, bool isComplete)
+    private void OnNextOhlc(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
-        NextOhlc?.Invoke(securityId, price, isComplete);
+        NextOhlc?.Invoke(securityId, price, interval, isComplete);
     }
 
     private void OnNextTick(ExtendedTick tick)

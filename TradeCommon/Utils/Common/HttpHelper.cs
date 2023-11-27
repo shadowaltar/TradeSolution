@@ -1,15 +1,10 @@
 ﻿using log4net;
 using System.Collections.Specialized;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 using System.Web;
-using TradeCommon.Constants;
-using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
-using TradeCommon.Runtime;
 
 namespace Common;
 public static class HttpHelper
@@ -147,24 +142,13 @@ public static class HttpHelper
         UriBuilder uriBuilder = new(url);
         NameValueCollection query = HttpUtility.ParseQueryString(uriBuilder.Query);
 
-        foreach (var param in @params)
+        foreach (var (Name, Value) in @params)
         {
-            query[param.Name] = param.Value.Trim();
+            query[Name] = Value.Trim();
         }
 
         uriBuilder.Query = query.ToString();
 
         return uriBuilder.Uri;
-    }
-
-    public static HttpClient HttpClientWithoutCert()
-    {
-        return new HttpClient(new HttpClientHandler()
-        {
-            ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, cetChain, policyErrors) =>
-            {
-                return true;
-            }
-        });
     }
 }

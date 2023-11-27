@@ -1,5 +1,8 @@
 ﻿using Common;
+using Microsoft.Diagnostics.Runtime.Utilities;
+using System;
 using System.Collections.Concurrent;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using TradeCommon.Essentials;
@@ -10,7 +13,7 @@ namespace TradeDataCore.MarketData;
 public class DataPublisher
 {
     private readonly IMarketDataService _marketDataService;
-    private readonly Dictionary<(string, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = new();
+    private readonly Dictionary<(int, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = new();
     public DataPublisher(IMarketDataService marketDataService)
     {
         _marketDataService = marketDataService;
@@ -41,31 +44,50 @@ public class DataPublisher
     {
     }
 
-    private void OnOhlcPriceReceived(int securityId, OhlcPrice price, bool isComplete)
+    private void OnOhlcPriceReceived(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
+        var queue = _ohlcQueues.ThreadSafeGetOrCreate((securityId, interval));
     }
 
     public async Task PublishOhlc(WebSocket webSocket, Security security, IntervalType interval)
     {
-        var receiveResult = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+        var queue = _ohlcQueues.ThreadSafeGetOrCreate((security.Id, interval));
+        
+        var receiveBuffer = new ArraySegment<byte>(new Byte[8192]);
 
-        var queue = _ohlcQueues.ThreadSafeGetOrCreate((security.Code, interval));
+        using var ms = new MemoryStream();
 
-        while (!receiveResult.CloseStatus.HasValue)
+        WebSocketReceiveResult? receiveResult = null;
+        while (receiveResult == null || !receiveResult.CloseStatus.HasValue)
         {
             if (webSocket.State != WebSocketState.Open)
                 continue;
 
-            var item = queue.Take();            
+            var item = queue.Take();
+
             var bytes = Encoding.UTF8.GetBytes(Json.Serialize(item));
             var outwardBytes = new ArraySegment<byte>(bytes);
+            await webSocket.SendAsync(outwardBytes, WebSocketMessageType.Text, true, CancellationToken.None);
 
-            await webSocket.SendAsync(outwardBytes,
-                                      receiveResult.MessageType,
-                                      receiveResult.EndOfMessage,
-                                      CancellationToken.None);
-            //var inwardBytes = new ArraySegment<byte>(buffer);
-            //receiveResult = await webSocket.ReceiveAsync(inwardBytes, CancellationToken.None);
+            do
+            {
+                receiveResult = await webSocket.ReceiveAsync(receiveBuffer, CancellationToken.None);
+                ms.Write(receiveBuffer.Array, receiveBuffer.Offset, receiveBuffer.Count);
+            }
+            while (!receiveResult.EndOfMessage);
+
+            switch(receiveResult.MessageType)
+            {
+                case WebSocketMessageType.Text:
+                    var text = Encoding.UTF8.GetString(ms.ToArray());
+                    break;
+                case WebSocketMessageType.Binary:
+                    break;
+                case WebSocketMessageType.Close:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         await webSocket.CloseAsync(receiveResult.CloseStatus.Value,

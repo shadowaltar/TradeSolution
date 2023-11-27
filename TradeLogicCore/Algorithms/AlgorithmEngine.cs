@@ -411,7 +411,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         }
     }
 
-    private async void OnNextOhlcPrice(int securityId, OhlcPrice price, bool isComplete)
+    private async void OnNextOhlcPrice(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
         if (Screening == null) throw Exceptions.Impossible("Screening logic must have been initialized.");
 

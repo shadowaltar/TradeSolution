@@ -14,6 +14,7 @@ using TradeCommon.Externals;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
 using TradeConnectivity.Binance.Utils;
+using static TradeCommon.Utils.Delegates;
 
 namespace TradeConnectivity.Binance.Services;
 
@@ -47,7 +48,7 @@ public class Quotation : IExternalQuotationManagement
 
     public string Name => ExternalNames.Binance;
 
-    public event Action<int, OhlcPrice, bool>? NextOhlc;
+    public event OhlcPriceReceivedCallback? NextOhlc;
     public event Action<ExtendedOrderBook>? NextOrderBook;
     public event Action<ExtendedTick>? NextTick;
 
@@ -209,7 +210,7 @@ public class Quotation : IExternalQuotationManagement
         var broker = _ohlcPriceBrokers.GetOrCreate((security.Id, interval),
             () => new MessageBroker<OhlcPrice>(security.Id),
             (k, v) => v.Run());
-        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price, isComplete); // broker.Dispose() will clear this up if needed
+        broker.NewItem += price => NextOhlc?.Invoke(security.Id, price, interval, isComplete); // broker.Dispose() will clear this up if needed
 
         string message = "";
         var webSocket = new ExtendedWebSocket(_log);

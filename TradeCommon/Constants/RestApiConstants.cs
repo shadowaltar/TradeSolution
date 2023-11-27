@@ -4,11 +4,13 @@ public static class RestApiConstants
     public const string ExecutionRoot = "execution";
     public const string AdminRoot = "admin";
     public const string QuotationRoot = "quotation";
+    public const string Static = "static";
 
     public const string Login = "login";
     public const string Logout = "logout";
     public const string ChangeUserPassword = "change-password";
     public const string Reconcile = "reconcile";
+    public const string Securities = "securities";
 
     public const string SendOrder = "orders/send";
     public const string CancelOrder = "orders/cancel";
