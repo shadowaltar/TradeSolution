@@ -16,7 +16,7 @@ public partial class OverviewView : UserControl
 {
     public OHLC[] OhlcData { get; }
 
-    private readonly FinancePlot _candlePlot;
+    private FinancePlot _candlePlot;
     private Timer _timer;
 
     public OverviewView()
@@ -24,11 +24,11 @@ public partial class OverviewView : UserControl
         InitializeComponent();
 
         OhlcData = new OHLC[100];
-        _candlePlot = mainPlot.Plot.AddCandlesticks(OhlcData);
     }
 
     public void StartLive()
     {
+        _candlePlot ??= mainPlot.Plot.AddCandlesticks(OhlcData);
         _timer?.Dispose();
         _timer = new Timer(TimerRender, null, 0, 100);
     }

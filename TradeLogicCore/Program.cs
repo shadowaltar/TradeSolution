@@ -389,7 +389,7 @@ public class Program
         }
         await dataService.UnsubscribeOhlc(security, interval);
 
-        void OnNewOhlc(int securityId, OhlcPrice price, bool isComplete)
+        void OnNewOhlc(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
         {
             printCount++;
             if (security != null && security.Id != securityId)

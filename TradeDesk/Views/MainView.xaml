@@ -78,7 +78,7 @@
                     <views:AssetStateView DataContext="{Binding AssetStateViewModel}"/>
                 </TabItem>
                 <TabItem Header="Open Positions">
-                    <views:PositionView/>
+                    <views:PositionView DataContext="{Binding PositionViewModel}"/>
                 </TabItem>
             </TabControl>
         </Grid>
@@ -89,7 +89,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <views:OverviewView Grid.Row="1" Margin="5,0"/>
+            <views:OverviewView Grid.Row="1" Margin="5,0" DataContext="{Binding OverviewViewModel}"/>
         </Grid>
         
         <!-- Status bar at the bottom -->

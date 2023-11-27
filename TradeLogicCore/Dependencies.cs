@@ -3,6 +3,7 @@ using Common;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
+using TradeDataCore.MarketData;
 using TradeLogicCore.Instruments;
 using TradeLogicCore.Services;
 

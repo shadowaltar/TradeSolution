@@ -29,6 +29,8 @@ public class MainViewModel : AbstractViewModel
     public OrderStateViewModel OrderStateViewModel { get; }
     public TradeViewModel TradeViewModel { get; }
     public AssetViewModel AssetViewModel { get; }
+    public AssetStateViewModel AssetStateViewModel { get; }
+    public PositionViewModel PositionViewModel { get; }
     public MainView Window { get; private set; }
 
     private string title;
@@ -69,6 +71,7 @@ public class MainViewModel : AbstractViewModel
         OrderStateViewModel = new OrderStateViewModel(_server);
         TradeViewModel = new TradeViewModel(_server);
         AssetViewModel = new AssetViewModel(_server);
+        AssetStateViewModel = new AssetStateViewModel(_server);
 
         Connect = new DelegateCommand(PerformConnect);
 

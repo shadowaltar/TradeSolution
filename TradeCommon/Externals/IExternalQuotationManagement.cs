@@ -2,6 +2,7 @@
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
+using static TradeCommon.Utils.Delegates;
 
 namespace TradeCommon.Externals;
 public interface IExternalQuotationManagement
@@ -13,7 +14,7 @@ public interface IExternalQuotationManagement
     TimeSpan LatencyRoundTripInTimeSpan { get; }
     TimeSpan LatencyOneSideInTimeSpan { get; }
 
-    public event Action<int, OhlcPrice, bool>? NextOhlc;
+    public event OhlcPriceReceivedCallback? NextOhlc;
 
     public event Action<ExtendedTick>? NextTick;
 
