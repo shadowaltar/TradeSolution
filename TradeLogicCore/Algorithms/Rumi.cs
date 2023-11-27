@@ -209,6 +209,11 @@ public class Rumi : Algorithm
     {
         throw new NotImplementedException();
     }
+
+    public override string PrintAlgorithmParameters()
+    {
+        throw new NotImplementedException();
+    }
 }
 
 public record RumiVariables : IAlgorithmVariables

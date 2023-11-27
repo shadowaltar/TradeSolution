@@ -1,5 +1,6 @@
 ﻿using Common;
 using log4net;
+using System.Text;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
 using TradeCommon.Constants;
@@ -435,6 +436,14 @@ public class MovingAverageCrossing : Algorithm
         return $"Algo - Moving Average Crossing: Fast [{_fastMa.GetType().Name}:{FastParam}], Slow [{_slowMa.GetType().Name}:{SlowParam}]," +
             $" LongSL% [{LongStopLossRatio.NAIfInvalid()}], LongTP% [{LongTakeProfitRatio.NAIfInvalid()}]," +
             $" ShortSL% [{ShortStopLossRatio.NAIfInvalid()}], ShortTP% [{ShortTakeProfitRatio.NAIfInvalid()}]";
+    }
+
+    public override string PrintAlgorithmParameters()
+    {
+        var sb = new StringBuilder();
+        sb.Append("\"FastMA\":\"").Append(FastParam).AppendLine("\",");
+        sb.Append("\"SlowMA\":\"").Append(SlowParam).AppendLine("\",");
+        return sb.ToString();
     }
 }
 

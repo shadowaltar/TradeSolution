@@ -120,7 +120,9 @@ public class Context : ApplicationContext
             AccountId = AccountId,
             Environment = Environment,
             AlgorithmParameters = _algorithm.AlgorithmParameters,
+            AlgorithmParametersInString = _algorithm.AlgorithmParameters.ToString() + _algorithm.PrintAlgorithmParameters(),
             EngineParameters = _algorithmEngine.EngineParameters,
+            EngineParametersInString = _algorithmEngine.EngineParameters.ToString(),
             StartTime = DateTime.UtcNow,
         };
         return algoBatch;

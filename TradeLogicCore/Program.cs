@@ -167,7 +167,7 @@ public class Program
             user.Accounts.Add(account);
         }
 
-        //Environment.Exit(0);
+        Environment.Exit(0);
     }
 
     private static async Task RunMacMimicWebService(EnvironmentType environment)

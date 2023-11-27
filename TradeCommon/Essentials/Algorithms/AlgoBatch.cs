@@ -59,12 +59,15 @@ public record AlgoBatch()
     /// <summary>
     /// Algorithm execution's engine parameters.
     /// </summary>
-    [AsJson]
+    [DatabaseIgnore]
     public EngineParameters? EngineParameters { get; set; }
 
     /// <summary>
     /// Algorithm's parameters.
     /// </summary>
-    [AsJson]
+    [DatabaseIgnore]
     public AlgorithmParameters? AlgorithmParameters { get; set; }
+
+    public string EngineParametersInString { get; set; }
+    public string AlgorithmParametersInString { get; set; }
 }
