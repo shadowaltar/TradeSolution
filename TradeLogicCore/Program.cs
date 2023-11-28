@@ -142,10 +142,10 @@ public class Program
                 Email = _email,
                 CreateTime = now,
                 UpdateTime = now,
-                Environment = Environments.ToString(environment),
             };
             var userPassword = _password;
-            Credential.EncryptUserPassword(user, ref userPassword);
+            var envStr = Environments.ToString(environment).ToUpperInvariant();
+            Credential.EncryptUserPassword(user, envStr, ref userPassword);
             await storage.InsertOne(user, true);
             user = await storage.ReadUser(user.Name, user.Email, environment);
 
@@ -155,7 +155,6 @@ public class Program
                 Name = _accountName.ToLowerInvariant(),
                 Type = _accountType,
                 SubType = "",
-                Environment = environment,
                 BrokerId = ExternalNames.GetBrokerId(_broker),
                 CreateTime = now,
                 UpdateTime = now,
@@ -346,7 +345,7 @@ public class Program
                 throw new InvalidOperationException();
             }
         }
-        var account = await services.Admin.GetAccount(an, et);
+        var account = await services.Admin.GetAccount(an);
         if (account == null)
         {
             var count = await services.Admin.CreateAccount(new Account
@@ -358,11 +357,10 @@ public class Program
                 BrokerId = ExternalNames.GetBrokerId(_broker),
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
-                Environment = et,
                 ExternalAccount = an,
                 FeeStructure = "",
             });
-            account = await services.Admin.GetAccount(an, et);
+            account = await services.Admin.GetAccount(an);
             if (count == 0 || account == null)
             {
                 _log.Error("Failed to create test account.");
@@ -440,7 +438,7 @@ public class Program
         };
         await Task.Run(async () =>
         {
-            await adminService.GetAccount(_accountName, environment, false);
+            await adminService.GetAccount(_accountName, false);
             await orderService.SendOrder(order);
         });
 

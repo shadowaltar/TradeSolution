@@ -137,7 +137,7 @@ public partial class AdminController : Controller
                                                [FromRoute(Name = "account")] string accountName = "test",
                                                [FromQuery(Name = "request-external")] bool requestExternal = false)
     {
-        Account? account = await adminService.GetAccount(accountName, adminService.Context.Environment, requestExternal);
+        Account? account = await adminService.GetAccount(accountName, requestExternal);
         return account == null ? BadRequest("Invalid account name.") : Ok(account);
     }
 
@@ -163,10 +163,10 @@ public partial class AdminController : Controller
     public async Task<ActionResult> SynchronizeAccountAndBalanceFromExternal([FromServices] IAdminService adminService,
                                                [FromRoute(Name = "account")] string accountName = "test")
     {
-        Account? account = await adminService.GetAccount(accountName, adminService.Context.Environment);
+        Account? account = await adminService.GetAccount(accountName);
         if (account == null) return BadRequest("Invalid account name.");
 
-        Account? external = await adminService.GetAccount(accountName, adminService.Context.Environment, true);
+        Account? external = await adminService.GetAccount(accountName, true);
 
         return Ok(account);
     }
@@ -226,10 +226,9 @@ public partial class AdminController : Controller
         if (model == null) return BadRequest("Missing creation model.");
         if (model.ExternalAccount == null) return BadRequest("Missing external account name.");
         if (model.Broker == BrokerType.Unknown) return BadRequest("Invalid broker.");
-        if (model.Environment == EnvironmentType.Unknown) return BadRequest("Invalid _environment.");
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
-        User? user = await adminService.GetUser(model.OwnerName, model.Environment);
+        User? user = await adminService.GetUser(model.OwnerName, context.Environment);
         if (user == null) return BadRequest("Invalid owner.");
         int brokerId = ExternalNames.GetBrokerId(model.Broker);
 
@@ -240,7 +239,6 @@ public partial class AdminController : Controller
             Name = accountName,
             Type = model.Type,
             SubType = model.SubType,
-            Environment = model.Environment,
             BrokerId = brokerId,
             CreateTime = now,
             UpdateTime = now,

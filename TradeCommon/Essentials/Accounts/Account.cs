@@ -10,7 +10,7 @@ namespace TradeCommon.Essentials.Accounts;
 /// on either client or broker/exchange side.
 /// </summary>
 [Storage(DatabaseNames.AccountTable, DatabaseNames.StaticData)]
-[Unique(nameof(Name), nameof(Environment))]
+[Unique(nameof(Name))]
 public class Account : ITimeRelatedEntry
 {
     /// <summary>
@@ -56,12 +56,6 @@ public class Account : ITimeRelatedEntry
     public string? SubType { get; set; }
 
     /// <summary>
-    /// Trading environment like production or paper trading.
-    /// </summary>
-    [NotUnknown]
-    public EnvironmentType Environment { get; set; }
-
-    /// <summary>
     /// Fee structure of this account. Some brokers may have different levels of feed structure.
     /// </summary>
     public string? FeeStructure { get; set; }
@@ -72,7 +66,7 @@ public class Account : ITimeRelatedEntry
 
     public override string ToString()
     {
-        return $"[{Id}] {Name}, Owner: {OwnerId}, Env: {Environment}, Type: {Type}, External: {ExternalAccount}";
+        return $"[{Id}] {Name}, Owner: {OwnerId}, Type: {Type}, External: {ExternalAccount}";
     }
 
     public override bool Equals(object? obj)
@@ -85,7 +79,6 @@ public class Account : ITimeRelatedEntry
                && BrokerId == account.BrokerId
                && Type == account.Type
                && (SubType == account.SubType || Conditions.BothBlank(SubType, account.SubType))
-               && Environment == account.Environment
                && (FeeStructure == account.FeeStructure || Conditions.BothBlank(FeeStructure, account.FeeStructure))
                && CreateTime == account.CreateTime
                && UpdateTime == account.UpdateTime;
@@ -93,17 +86,17 @@ public class Account : ITimeRelatedEntry
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Id,
-            Name,
-            OwnerId,
-            ExternalAccount,
-            BrokerId,
-            Type,
-            SubType,
-            HashCode.Combine(
-                Environment,
-                FeeStructure,
-                CreateTime,
-                UpdateTime));
+        var hc = new HashCode();
+        hc.Add(Id);
+        hc.Add(Name);
+        hc.Add(OwnerId);
+        hc.Add(ExternalAccount);
+        hc.Add(BrokerId);
+        hc.Add(Type);
+        hc.Add(SubType);
+        hc.Add(FeeStructure);
+        hc.Add(CreateTime);
+        hc.Add(UpdateTime);
+        return hc.ToHashCode();
     }
 }

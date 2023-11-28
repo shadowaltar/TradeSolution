@@ -35,15 +35,14 @@ public class KeyManager
     /// </summary>
     /// <param name="user"></param>
     /// <returns></returns>
-    public ResultCode Use(User user, Account account)
+    public ResultCode Use(User user, Account account, EnvironmentType environment)
     {
-        Assertion.ShallNever(Environments.Parse(user.Environment) != account.Environment);
         Assertion.ShallNever(user == null);
 
-        var secretFileName = $"{user!.Environment}_{user.Name}_{account.Name}";
+        var secretFileName = $"{user.Name}_{account.Name}";
         try
         {
-            var path = Path.Combine(_secretFolder, Environments.ToString(account.Environment), secretFileName);
+            var path = Path.Combine(_secretFolder, Environments.ToString(environment), secretFileName);
             var lines = File.ReadAllLines(path);
             if (lines.Length != 3)
             {
@@ -62,7 +61,7 @@ public class KeyManager
 
             Dictionary<int, string[]> apiKeysByAccount;
             Dictionary<int, HMACSHA256> secretHashersByAccount;
-            switch (account.Environment)
+            switch (environment)
             {
                 case EnvironmentType.Test:
                     apiKeysByAccount = _testApiKeys.GetOrCreate(user.Id);
@@ -89,7 +88,7 @@ public class KeyManager
             // currently only single user / account is implemented.
             _currentUserId = user.Id;
             _currentAccountId = account.Id;
-            _currentEnvironment = account.Environment;
+            _currentEnvironment = environment;
 
             return ResultCode.GetSecretOk;
         }

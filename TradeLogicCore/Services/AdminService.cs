@@ -94,16 +94,15 @@ public class AdminService : IAdminService
         if (user == null)
             return ResultCode.GetUserFailed;
 
-        Assertion.Shall(Environments.Parse(user.Environment) == environment);
-        if (!Credential.IsPasswordCorrect(user, password, Environments.Parse(user.Environment)))
+        if (!Credential.IsPasswordCorrect(user, password, environment))
         {
-            _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
+            _log.Error($"Failed to login user {user.Name} in env {environment}.");
             return ResultCode.InvalidCredential;
         }
 
         CurrentUser = user;
 
-        var account = await GetAccount(accountName, environment);
+        var account = await GetAccount(accountName);
         if (account == null)
         {
             _log.Error($"Account {accountName} does not exist or is not associated with user {user.Name}.");
@@ -120,7 +119,7 @@ public class AdminService : IAdminService
             _log.Error($"Failed to login account {accountName} with user {user.Name}.");
             return externalLoginResult;
         }
-        _log.Info($"Logged in user {user.Name} in env {user.Environment} with account {accountName}");
+        _log.Info($"Logged in user {user.Name} in env {environment} with account {accountName}");
 
         user.Accounts.Add(account);
         CurrentAccount = account;
@@ -166,9 +165,9 @@ public class AdminService : IAdminService
             Email = email,
             CreateTime = now,
             UpdateTime = now,
-            Environment = Environments.ToString(environment),
         };
-        Credential.EncryptUserPassword(user, ref userPassword);
+        var envStr = Environments.ToString(environment).ToUpperInvariant();
+        Credential.EncryptUserPassword(user, envStr, ref userPassword);
 
         user.ValidateOrThrow();
         user.AutoCorrect();
@@ -191,7 +190,8 @@ public class AdminService : IAdminService
         {
             UpdateTime = now,
         };
-        Credential.EncryptUserPassword(user, ref userPassword);
+        var envStr = Environments.ToString(environment).ToUpperInvariant();
+        Credential.EncryptUserPassword(user, envStr, ref userPassword);
         return await _storage.InsertOne(user, true);
     }
 
@@ -208,24 +208,21 @@ public class AdminService : IAdminService
     public async Task<int> CreateAccount(Account account)
     {
         if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
-        _storage.SetEnvironment(account.Environment);
         return await _storage.InsertOne(account, false);
     }
 
-    public async Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false)
+    public async Task<Account?> GetAccount(string? accountName, bool requestExternal = false)
     {
         if (CurrentUser == null) throw new InvalidOperationException("Must get user before get account.");
 
         if (accountName.IsBlank()) return null;
-
-        var assets = _securityService.GetAssets(Context.Exchange);
 
         if (!requestExternal)
         {
             var account = await _storage.ReadAccount(accountName);
             if (account == null)
             {
-                _log.Error($"Failed to read account by name {accountName} from database in {environment}.");
+                _log.Error($"Failed to read account by name {accountName} from database.");
                 return null;
             }
             return account;
@@ -249,8 +246,6 @@ public class AdminService : IAdminService
                     account.OwnerId = CurrentUser.Id;
                 if (account.Name.IsBlank())
                     account.Name = CurrentAccount.Name;
-                if (account.Environment == EnvironmentType.Unknown)
-                    account.Environment = Context.Environment;
                 if (account.BrokerId <= 0)
                     account.BrokerId = Context.BrokerId;
             }

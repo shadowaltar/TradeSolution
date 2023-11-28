@@ -22,7 +22,7 @@ public class Credential
         var encryptedPassword =
             CryptographyUtils.Encrypt(user.Name + password, PasswordSalt)
             + CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt)
-            + CryptographyUtils.Encrypt(user.Environment.ToUpperInvariant() + password, PasswordSalt);
+            + CryptographyUtils.Encrypt(environment + password, PasswordSalt);
         return encryptedPassword == user.EncryptedPassword;
     }
 
@@ -33,7 +33,7 @@ public class Credential
         return !password.IsBlank() && CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
     }
 
-    public static void EncryptUserPassword(User user, ref string password)
+    public static void EncryptUserPassword(User user, string environmentString, ref string password)
     {
         if (user == null) throw new ArgumentNullException(nameof(user));
         if (user.Name.IsBlank()) throw new ArgumentNullException(nameof(user.Name));
@@ -41,7 +41,7 @@ public class Credential
 
         var encrypted1 = CryptographyUtils.Encrypt(user.Name + password, PasswordSalt);
         var encrypted2 = CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt);
-        var encrypted3 = CryptographyUtils.Encrypt(user.Environment.ToUpperInvariant() + password, PasswordSalt);
+        var encrypted3 = CryptographyUtils.Encrypt(environmentString + password, PasswordSalt);
         user.EncryptedPassword = encrypted1 + encrypted2 + encrypted3;
 
         // erase the original one

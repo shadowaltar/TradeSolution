@@ -36,7 +36,7 @@ public interface IAdminService
     /// <returns></returns>
     Task<bool> Ping();
 
-    Task<Account?> GetAccount(string? accountName, EnvironmentType environment, bool requestExternal = false);
+    Task<Account?> GetAccount(string? accountName, bool requestExternal = false);
 
     Task<User?> GetUser(string? userName, EnvironmentType environment);
 

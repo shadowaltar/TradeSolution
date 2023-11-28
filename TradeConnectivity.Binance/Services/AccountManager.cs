@@ -14,6 +14,7 @@ public class AccountManager : IExternalAccountManagement
     private static readonly ILog _log = Logger.New();
     private static readonly List<string> _accountTypes = new() { "SPOT", "MARGIN", "FUTURES" };
     private readonly IExternalConnectivityManagement _connectivity;
+    private readonly ApplicationContext _context;
     private readonly HttpClient _httpClient;
     private readonly KeyManager _keyManager;
     private readonly RequestBuilder _requestBuilder;
@@ -25,13 +26,14 @@ public class AccountManager : IExternalAccountManagement
     {
         _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
+        _context = context;
         _keyManager = keyManager;
         _requestBuilder = new RequestBuilder(keyManager, Constants.ReceiveWindowMsString);
     }
 
     public ResultCode Login(User user, Account account)
     {
-        var getSecretResult = _keyManager.Use(user, account);
+        var getSecretResult = _keyManager.Use(user, account, _context.Environment);
         if (getSecretResult != ResultCode.GetSecretOk)
             _log.Error("Failed to get secret. ResultCode: " + getSecretResult);
         return getSecretResult == ResultCode.GetSecretOk ? ResultCode.LoginUserAndAccountOk : getSecretResult;

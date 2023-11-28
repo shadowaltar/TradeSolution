@@ -319,7 +319,7 @@ public class Reconcilation
         _log.Info($"Reconciling internal vs external accounts and asset assets for account {_context.Account?.Name} for broker {_context.Broker} in environment {_context.Environment}.");
         foreach (var account in user.Accounts)
         {
-            var externalAccount = await _adminService.GetAccount(account.Name, account.Environment, true);
+            var externalAccount = await _adminService.GetAccount(account.Name, true);
             if (account == null && externalAccount != null)
             {
                 _log.Warn("Internally stored account is missing; will sync with external one.");

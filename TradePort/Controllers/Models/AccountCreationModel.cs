@@ -26,7 +26,4 @@ public class AccountCreationModel
 
     [FromForm(Name = "feeStructure")]
     public string? FeeStructure { get; set; }
-
-    [FromForm(Name = "environment")]
-    public EnvironmentType Environment { get; set; }
 }

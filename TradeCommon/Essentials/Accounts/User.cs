@@ -1,12 +1,11 @@
 ﻿using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
-using TradeCommon.Constants;
 using TradeCommon.Database;
 
 namespace TradeCommon.Essentials.Accounts;
 
 [Storage(DatabaseNames.UserTable, DatabaseNames.StaticData)]
-[Unique(nameof(Name), nameof(Environment)), Unique(nameof(Email))]
+[Unique(nameof(Name)), Unique(nameof(Email))]
 public record User
 {
     [AutoIncrementOnInsert]
@@ -17,9 +16,6 @@ public record User
 
     [NotNull, Length(MinLength = 5, MaxLength = 100), AlwaysLowerCase]
     public string Email { get; set; } = "";
-
-    [NotNull, NotUnknown]
-    public string Environment { get; set; } = Environments.Unknown;
 
     [NotNull, Length(MaxLength = 512)]
     public string EncryptedPassword { get; set; } = "";
@@ -33,10 +29,10 @@ public record User
     public List<Account> Accounts { get; } = new();
 
     [DatabaseIgnore]
-    public string LoginSessionId { get; set; } 
+    public string LoginSessionId { get; set; }
 
     public override string ToString()
     {
-        return $"[{Id}] {Name}, {Environment}";
+        return $"[{Id}] {Name} {Email}";
     }
 }

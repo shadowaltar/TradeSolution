@@ -38,7 +38,8 @@ public class StaticDataController : Controller
     /// Get all security definitions in exchangeStr.
     /// </summary>
     /// <param name="storage"></param>
-    /// <param name="secTypeStr"></param>
+    /// <param name="exchange"></param>
+    /// <param name="securityType"></param>
     /// <param name="limit"></param>
     /// <returns></returns>
     [HttpGet(RestApiConstants.Securities)]
