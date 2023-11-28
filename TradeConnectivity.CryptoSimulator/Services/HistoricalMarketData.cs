@@ -4,15 +4,19 @@ using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Externals;
+using TradeCommon.Runtime;
+using TradeCommon.Utils;
 
 namespace TradeConnectivity.CryptoSimulator.Services;
 public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 {
     private static readonly ILog _log = Logger.New();
     private readonly IExternalConnectivityManagement _connectivity;
+    private readonly HttpClient _httpClient;
 
-    public HistoricalMarketData(IExternalConnectivityManagement connectivity)
+    public HistoricalMarketData(IExternalConnectivityManagement connectivity, HttpClient httpClient, ApplicationContext context)
     {
+        _httpClient = context.IsExternalProhibited ? new FakeHttpClient() : httpClient;
         _connectivity = connectivity;
     }
 
@@ -32,6 +36,9 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
 
     public async Task<List<OhlcPrice>?> ReadPrices(Security security, DateTime start, DateTime end, IntervalType intervalType)
     {
+        if (!Firewall.CanCall)
+            return null;
+
         string UpdateTimeFrame(string c, string i, long s, long e) =>
             $"{_connectivity.RootUrl}/klines?symbol={c}&interval={i}&startTime={s}&endTime={e}";
 
@@ -45,13 +52,12 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         var endMs = end.ToUnixMs();
 
         string url = UpdateTimeFrame(code, intervalStr, startMs, endMs);
-        using var httpClient = new HttpClient();
 
         var prices = new List<OhlcPrice>();
         long lastEndMs = 0l;
         while (lastEndMs < endMs)
         {
-            var jo = await httpClient.ReadJsonArray(url, _log);
+            var jo = await _httpClient.ReadJsonArray(url, _log);
             if (jo == null || jo.Count == 0)
                 break;
 

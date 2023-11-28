@@ -1,4 +1,5 @@
 ﻿using Common;
+using System.Text;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
@@ -95,4 +96,6 @@ public abstract class Algorithm
     public abstract Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice);
 
     public abstract Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice);
+
+    public abstract string PrintAlgorithmParameters();
 }

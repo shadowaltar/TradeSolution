@@ -19,7 +19,6 @@ public class Dependencies : Module
 
         builder.RegisterSingleton<KeyManager>();
         builder.RegisterSingleton<IExternalQuotationManagement, Quotation>();
-        builder.RegisterSingleton<IExternalReferenceManagement, Reference>();
         builder.RegisterSingleton<IExternalExecutionManagement, Execution>();
         builder.RegisterSingleton<IExternalAccountManagement, AccountManager>();
         builder.RegisterSingleton<IExternalHistoricalMarketDataManagement, HistoricalMarketData>();

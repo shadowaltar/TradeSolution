@@ -43,10 +43,8 @@ public class MainViewModel : AbstractViewModel
     {
         get => selectedSecurityCode; set
         {
-            if (SetValue(ref selectedSecurityCode, value))
-            {
-                SecurityCodeChanged?.Invoke(value);
-            }
+            SetValue(ref selectedSecurityCode, value);
+            SecurityCodeChanged?.Invoke(value);
         }
     }
 
@@ -89,7 +87,7 @@ public class MainViewModel : AbstractViewModel
         Window.Hide();
 
         var lv = new LoginView();
-        var lvm = new LoginViewModel();
+        var lvm = new LoginViewModel(_server);
         lv.DataContext = lvm;
         lvm.AfterLogin += OnLoggedIn;
         lv.ShowDialog();
@@ -109,6 +107,10 @@ public class MainViewModel : AbstractViewModel
                           ExternalNames.Convert(lvm.ExchangeType),
                           token);
             Title = $"Trading Desk [{Session.Environment}] [{Session.Exchange}] [{ServerUrl}]";
+
+            // refresh the data in subviews
+            SecurityCodeChanged?.Invoke(SelectedSecurityCode);
+
             Window.Show();
         }
     }

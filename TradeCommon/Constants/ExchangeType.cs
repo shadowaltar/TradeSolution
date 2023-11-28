@@ -14,4 +14,7 @@ public enum ExchangeType
 
     [Description(ExternalNames.Okex)]
     Okex,
+
+    [Description(ExternalNames.Simulator)]
+    Simulator,
 }

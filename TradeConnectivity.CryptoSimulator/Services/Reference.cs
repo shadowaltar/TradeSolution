@@ -1,69 +1,97 @@
 ﻿using Common;
 using log4net;
-using System.Text.Json.Nodes;
 using TradeCommon.Constants;
-using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Externals;
 
 namespace TradeConnectivity.CryptoSimulator.Services;
 
+[Obsolete]
 public class Reference : IExternalReferenceManagement
 {
     private static readonly ILog _log = Logger.New();
 
-    public async Task<List<Security>> ReadAndPersistSecurities(SecurityType type)
-    {
-        const string url = "https://data-api.binance.vision/api/v3/exchangeInfo";
+    //public async Task<List<Security>> ReadAndPersistSecurities(SecurityType type)
+    //{
+    //    var btc = new Security
+    //    {
+    //        Id = 2,
+    //        Code = "BTC",
+    //        Name = "BTC",
+    //        Exchange = ExternalNames.Simulator.ToUpperInvariant(),
+    //        Type = SecurityTypes.Fx,
+    //        SecurityType = SecurityType.Fx,
+    //        SubType = SecurityTypes.Crypto,
+    //        LotSize = 0,
+    //        Currency = "",
+    //        FxInfo = new FxSecurityInfo
+    //        {
+    //            BaseCurrency = "BTC",
+    //            QuoteCurrency = "",
+    //            IsMarginTradingAllowed = true,
+    //            MaxLotSize = 1000,                
+    //        },
+    //        TickSize = 0,            
+    //        ExchangeType = ExchangeType.Simulator,
+    //        MinNotional = 0,
+    //        MinQuantity = 0.0001m,
+    //        PricePrecision = 8,
+    //        QuantityPrecision = 8,
+    //    };
+    //    var usdt = new Security
+    //    {
+    //        Id = 3,
+    //        Code = "USDT",
+    //        Name = "USDT",
+    //        Exchange = ExternalNames.Simulator.ToUpperInvariant(),
+    //        Type = SecurityTypes.Fx,
+    //        SecurityType = SecurityType.Fx,
+    //        SubType = SecurityTypes.Crypto,
+    //        LotSize = 0,
+    //        Currency = "",
+    //        FxInfo = new FxSecurityInfo
+    //        {
+    //            BaseCurrency = "USDT",
+    //            QuoteCurrency = "",
+    //            IsMarginTradingAllowed = true,
+    //            MaxLotSize = 1000,                
+    //        },
+    //        TickSize = 0,            
+    //        ExchangeType = ExchangeType.Simulator,
+    //        MinNotional = 0,
+    //        MinQuantity = 0.0001m,
+    //        PricePrecision = 8,
+    //        QuantityPrecision = 8,
+    //    };
+    //    var btcusdt = new Security
+    //    {
+    //        Id = 1,
+    //        Code = "BTCUSDT",
+    //        Name = "BTCUSDT",
+    //        Type = SecurityTypes.Fx,
+    //        Exchange = ExternalNames.Simulator.ToUpperInvariant(),
+    //        ExchangeType = ExchangeType.Simulator,
+    //        SubType = SecurityTypes.Crypto,
+    //        LotSize = 0.00005m,
+    //        TickSize = 0.01m,
+    //        Currency = "USDT",
+    //        FxInfo = new FxSecurityInfo
+    //        {
+    //            BaseCurrency = "BTC",
+    //            QuoteCurrency = "USDT",
+    //            BaseAsset = btc,
+    //            QuoteAsset = usdt,
+    //            MaxLotSize = 9000,
+    //        },
+    //        QuoteSecurity = usdt,
+    //        MinNotional = 5m,
+    //        PricePrecision = 8,
+    //        QuantityPrecision = 8,
+    //    };
 
-        var jo = await HttpHelper.ReadJson(url, _log);
-        if (jo == null)
-            return new();
-        var securities = new List<Security>();
-        var assetNames = new HashSet<string>();
-        var symbolsObj = jo["symbols"]!.AsArray();
-        foreach (JsonObject symbolObj in symbolsObj.Cast<JsonObject>())
-        {
-            if (symbolObj!["status"].ParseString() != "TRADING")
-                continue;
-
-            var baseAsset = symbolObj["baseAsset"].ParseString();
-            var quoteAsset = symbolObj["quoteAsset"].ParseString();
-            var symbol = symbolObj["symbol"].ParseString();
-            var security = new Security
-            {
-                Code = symbol,
-                Name = symbol,
-                Exchange = ExternalNames.Binance.ToUpperInvariant(),
-                Type = SecurityTypes.Fx,
-                SubType = SecurityTypes.Crypto,
-                LotSize = 0,
-                Currency = "",
-                FxInfo = new FxSecurityInfo
-                {
-                    BaseCurrency = baseAsset,
-                    QuoteCurrency = quoteAsset,
-                }
-            };
-            securities.Add(security);
-
-            if (assetNames.Add(baseAsset))
-            {
-                var asset = CreateAsset(baseAsset);
-                securities.Add(asset);
-            }
-
-            if (assetNames.Add(quoteAsset))
-            {
-                var asset = CreateAsset(quoteAsset);
-                securities.Add(asset);
-            }
-        }
-
-        securities = securities.Where(e => SecurityTypeConverter.Matches(e.Type, type)).ToList();
-        await Storage.UpsertFxDefinitions(securities);
-        return securities;
-    }
+    //    await Storage.UpsertFxDefinitions(new List<Security> { btcusdt, btc, usdt });
+    //    return securities;
+    //}
 
     private static Security CreateAsset(string assetName)
     {

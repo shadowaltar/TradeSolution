@@ -3,7 +3,6 @@ using Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
-using System.ComponentModel;
 using System.IdentityModel.Tokens.Jwt;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -12,13 +11,10 @@ using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
-using TradeDataCore.Instruments;
 using TradeDataCore.StaticData;
-using TradeLogicCore;
-using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
+using TradePort.Controllers.Models;
 using TradePort.Utils;
-using RequiredAttribute = System.ComponentModel.DataAnnotations.RequiredAttribute;
 
 namespace TradePort.Controllers;
 
@@ -27,7 +23,7 @@ namespace TradePort.Controllers;
 /// </summary>
 [ApiController]
 [Route(RestApiConstants.AdminRoot)]
-public class AdminController : Controller
+public partial class AdminController : Controller
 {
     private JwtSecurityTokenHandler? _tokenHandler;
 
@@ -448,130 +444,4 @@ public class AdminController : Controller
         var tokenString = _tokenHandler.WriteToken(token);
         return new LoginResponseModel(result, context.User.Id, context.User.Name, context.User.Email, context.Account.Id, context.Account.Name, context.Exchange, context.Broker, context.Environment, token.ValidTo, tokenString);
     }
-
-
-    public class UserCreationModel
-    {
-        [FromForm(Name = "admin-password")]
-        public string? AdminPassword { get; set; }
-
-        [FromForm(Name = "userPassword")]
-        public string? UserPassword { get; set; }
-
-        [FromForm(Name = "email")]
-        public string? Email { get; set; }
-
-        [FromForm(Name = "environment")]
-        public EnvironmentType Environment { get; set; }
-    }
-
-
-    public class AccountCreationModel
-    {
-        [FromForm(Name = "admin-password")]
-        public string? AdminPassword { get; set; }
-
-        [FromForm(Name = "ownerName")]
-        public string? OwnerName { get; set; }
-
-        [FromForm(Name = "brokerType")]
-        public BrokerType Broker { get; set; }
-
-        [FromForm(Name = "externalAccount")]
-        public string? ExternalAccount { get; set; }
-
-        [FromForm(Name = "type")]
-        public string? Type { get; set; }
-
-        [FromForm(Name = "subType")]
-        public string? SubType { get; set; }
-
-        [FromForm(Name = "feeStructure")]
-        public string? FeeStructure { get; set; }
-
-        [FromForm(Name = "environment")]
-        public EnvironmentType Environment { get; set; }
-    }
-
-    public class LoginRequestModel
-    {
-        /// <summary>
-        /// Admin password.
-        /// </summary>
-        [FromForm(Name = "admin-password")]
-        [Required]
-        public string AdminPassword { get; set; }
-
-        /// <summary>
-        /// User name.
-        /// </summary>
-        [FromForm(Name = "user")]
-        [Required, DefaultValue("test")]
-        public string UserName { get; set; } = "test";
-
-        /// <summary>
-        /// User password.
-        /// </summary>
-        [FromForm(Name = "user-password")]
-        [Required, DefaultValue("testtest")]
-        public string Password { get; set; } = "testtest";
-
-        /// <summary>
-        /// Account name; must be owned by given user.
-        /// </summary>
-        [FromForm(Name = "account-name")]
-        [Required, DefaultValue("spot")]
-        public string AccountName { get; set; } = "spot";
-
-        /// <summary>
-        /// Login environment.
-        /// </summary>
-        [FromForm(Name = "environment")]
-        [Required, DefaultValue(EnvironmentType.Uat)]
-        public EnvironmentType Environment { get; set; } = EnvironmentType.Uat;
-
-        /// <summary>
-        /// Connectivity to external system (exchange).
-        /// </summary>
-        [FromForm(Name = "exchange")]
-        [Required, DefaultValue(ExchangeType.Binance)]
-        public ExchangeType Exchange { get; set; } = ExchangeType.Binance;
-    }
-
-    public class ChangeUserPasswordModel
-    {
-        [Required, FromForm(Name = "admin-password")]
-        public string? AdminPassword { get; set; }
-
-        /// <summary>
-        /// User name.
-        /// </summary>
-        [FromForm(Name = "user")]
-        [Required, DefaultValue("test")]
-        public string UserName { get; set; } = "test";
-
-        /// <summary>
-        /// New password.
-        /// </summary>
-        [Required, FromForm(Name = "new-password")]
-        public string? NewPassword { get; set; }
-
-        /// <summary>
-        /// Environment of this user.
-        /// </summary>
-        [Required, FromForm(Name = "environment"), DefaultValue(EnvironmentType.Uat)]
-        public EnvironmentType Environment { get; set; } = EnvironmentType.Uat;
-    }
-
-    public record LoginResponseModel(ResultCode Result,
-                                     int UserId,
-                                     string UserName,
-                                     string Email,
-                                     int AccountId,
-                                     string AccountName,
-                                     ExchangeType Exchange,
-                                     BrokerType Broker,
-                                     EnvironmentType Environment,
-                                     DateTime SessionExpiry,
-                                     string Token);
 }

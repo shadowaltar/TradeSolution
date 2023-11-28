@@ -18,24 +18,33 @@ public partial class OverviewView : UserControl
 
     private FinancePlot _candlePlot;
     private Timer _timer;
+    private int _candleCount = 100;
 
+    public int CandleCount
+    {
+        get => _candleCount; set
+        {
+            _candleCount = value;
+        }
+    }
     public OverviewView()
     {
         InitializeComponent();
 
-        OhlcData = new OHLC[100];
+        OhlcData = new OHLC[CandleCount];
     }
 
-    public void StartLive()
+    public void StartLive(TimeSpan interval)
     {
-        _candlePlot ??= mainPlot.Plot.AddCandlesticks(OhlcData);
+        var lastTime = DateTime.Now;
+
         _timer?.Dispose();
         _timer = new Timer(TimerRender, null, 0, 100);
     }
 
     private void TimerRender(object? state)
     {
-        mainPlot.Refresh();
+        mainPlot?.Refresh();
     }
 
     public void StopLive()
@@ -51,8 +60,27 @@ public partial class OverviewView : UserControl
 
     public void UpdateOhlc(OhlcPrice price, TimeSpan timeSpan)
     {
-        var candle = new OHLC((double)price.O, (double)price.H, (double)price.L, (double)price.C, price.T, timeSpan);
+        // init logic
+        if (OhlcData[^1] == null)
+        {
+            var lastTime = price.T;
+            for (int i = OhlcData.Length - 1; i >= 0; i--)
+            {
+                lastTime -= timeSpan;
+                OhlcData[i] = new OHLC(0, 0, 0, 0, lastTime, timeSpan);
+            }
+
+            _candlePlot ??= mainPlot.Plot.AddCandlesticks(OhlcData);
+        }
+
+        var candle = Convert(price, timeSpan);
+
         Array.Copy(OhlcData, 1, OhlcData, 0, OhlcData.Length - 1);
         OhlcData[^1] = candle;
+    }
+
+    public OHLC Convert(OhlcPrice price, TimeSpan timeSpan)
+    {
+        return new OHLC((double)price.O, (double)price.H, (double)price.L, (double)price.C, price.T, timeSpan);
     }
 }

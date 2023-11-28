@@ -6,11 +6,9 @@ using TradeDataCore.MarketData;
 
 namespace TradePort.Controllers;
 
-[ApiController]
-[Route("/ws")]
-public class StreamingQuotationController : Controller
+public class StreamingQuotationController : ControllerBase
 {
-    [HttpGet("/ohlc/{signature}")]
+    [Route("/stream/ohlc/{signature}")]
     public async Task<IActionResult> SubscribeOhlcPrices([FromServices] DataPublisher publisher,
         [FromServices] ISecurityService securityService,
         [FromRoute(Name = "signature")] string signature)
@@ -21,7 +19,7 @@ public class StreamingQuotationController : Controller
         var security = securityService.GetSecurity(securityCode);
         if (security == null)
             return BadRequest("Invalid security.");
-        
+
         if (HttpContext.WebSockets.IsWebSocketRequest)
         {
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();

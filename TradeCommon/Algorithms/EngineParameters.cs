@@ -1,4 +1,6 @@
-﻿namespace TradeCommon.Algorithms;
+﻿using System.Text;
+
+namespace TradeCommon.Algorithms;
 
 /// <summary>
 /// Algo engine parameters.
@@ -20,4 +22,20 @@ public record EngineParameters(List<string> PreferredQuoteCurrencies,
                                bool CloseOpenPositionsOnStop = true,
                                bool CloseOpenPositionsOnStart = true,
                                bool CleanUpNonCashOnStart = true,
-                               bool RecordOrderBookOnExecution = true);
+                               bool RecordOrderBookOnExecution = true)
+{
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        sb.Append("\"PreferredQuoteCurrencies\":\"").AppendJoin(",", PreferredQuoteCurrencies).AppendLine("\",");
+        sb.Append("\"GlobalCurrencyFilter\":\"").AppendJoin(",", GlobalCurrencyFilter ?? new List<string>()).AppendLine("\",");
+        sb.Append("\"AssumeNoOpenPositionOnStart\":").Append(AssumeNoOpenPositionOnStart).AppendLine(",");
+        sb.Append("\"CancelOpenOrdersOnStart\":").Append(CancelOpenOrdersOnStart).AppendLine(",");
+        sb.Append("\"CloseOpenPositionsOnStop\":").Append(CloseOpenPositionsOnStop).AppendLine(",");
+        sb.Append("\"CloseOpenPositionsOnStart\":").Append(CloseOpenPositionsOnStart).AppendLine(",");
+        sb.Append("\"CleanUpNonCashOnStart\":").Append(CleanUpNonCashOnStart).AppendLine(",");
+        sb.Append("\"RecordOrderBookOnExecution\":").Append(RecordOrderBookOnExecution).AppendLine(",");
+
+        return sb.ToString();
+    }
+}

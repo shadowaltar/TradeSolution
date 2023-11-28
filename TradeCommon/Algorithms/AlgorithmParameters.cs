@@ -1,4 +1,5 @@
 ﻿using Common.Attributes;
+using System.Text;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
@@ -21,4 +22,23 @@ public record AlgorithmParameters(bool IsBackTesting,
                                   decimal ShortTakeProfitRatio = 0,
                                   IAlgorithmVariables? OtherVariables = null,
                                   BidAsk TickPriceTriggerForSell = BidAsk.Bid,
-                                  BidAsk TickPriceTriggerForBuy = BidAsk.Ask);
+                                  BidAsk TickPriceTriggerForBuy = BidAsk.Ask)
+{
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+        sb.Append("\"Interval\":\"").Append(Interval).AppendLine("\",");
+        sb.Append("\"SecurityCodes\":\"").AppendJoin(",", SecurityCodes).AppendLine("\",");
+        sb.Append("\"RequiresTickData\":").Append(RequiresTickData).AppendLine(",");
+        sb.Append("\"StopOrderTriggerBy\":\"").Append(StopOrderTriggerBy.ToString()).AppendLine("\",");
+        sb.Append("\"LongStopLossRatio\":").Append(LongStopLossRatio).AppendLine(",");
+        sb.Append("\"LongTakeProfitRatio\":").Append(LongTakeProfitRatio).AppendLine(",");
+        sb.Append("\"ShortStopLossRatio\":").Append(ShortStopLossRatio).AppendLine(",");
+        sb.Append("\"ShortTakeProfitRatio\":").Append(ShortTakeProfitRatio).AppendLine(",");
+        sb.Append(OtherVariables?.ToString());
+       
+        return sb.ToString();
+    }
+
+}

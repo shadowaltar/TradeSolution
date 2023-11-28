@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Common;
+using log4net;
+using Microsoft.AspNetCore.Mvc;
 
 namespace TradePort.Controllers;
 
 [ApiController]
-[Route("logic/back-testing")]
+[Route("back-testing")]
 public class BackTestingController : Controller
 {
-    //private static readonly ILog _log = Logger.New();
+    private static readonly ILog _log = Logger.New();
 
     //private static readonly string rootFolder = @"C:\Temp";
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Input;
 using TradeCommon.Essentials;
@@ -66,7 +67,7 @@ public class OverviewViewModel : AbstractViewModel
         else
         {
             IsLive = true;
-            View.StartLive();
+            View.StartLive(SelectedIntervalTimeSpan);
             _server.SubscribeOhlc(_security, SelectedInterval);
         }
     }

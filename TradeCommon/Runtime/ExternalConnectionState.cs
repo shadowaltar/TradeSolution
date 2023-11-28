@@ -457,6 +457,32 @@ public static class ExternalQueryStates
             Description = "Removed subscription key: " + key,
         };
     }
+
+    public static ExternalQueryState Simulation<T>(T content)
+    {
+        return new()
+        {
+            Content = content,
+            ResponsePayload = "",
+            Action = ActionType.Any,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.Ok,
+            Description = "Returns simulated result for " + typeof(T).Name,
+        };
+    }
+
+    public static ExternalQueryState SimulationOfError(ActionType action)
+    {
+        return new()
+        {
+            Content = null,
+            ResponsePayload = "",
+            Action = action,
+            ExternalId = BrokerId,
+            ResultCode = ResultCode.Failed,
+            Description = "Returns simulated error result.",
+        };
+    }
 }
 
 public static class ExternalConnectionStates
@@ -687,5 +713,17 @@ $"Will not unsubscribed {quotationKind} for {security.Id} {(interval == Interval
     public static ExternalConnectionState Nothing()
     {
         return new();
+    }
+
+    public static ExternalConnectionState Simulation(SubscriptionType type)
+    {
+        return new()
+        {
+            Action = ActionType.Any,
+            ResultCode = ResultCode.Ok,
+            ExternalId = BrokerId,
+            Description = "Simulation of connection",
+            Type = type,
+        };
     }
 }
