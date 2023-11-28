@@ -37,7 +37,7 @@
         <Label Grid.Row="3" Grid.Column="0" Content="Account:"/>
         <TextBox Grid.Row="3" Grid.Column="1" Margin="5"
                  Text="{Binding Account}"/>
-        <Label Grid.Row="4" Grid.Column="0" Content="Server URL:"/>
+        <Label Grid.Row="4" Grid.Column="0" Content="Server (No Port):"/>
         <TextBox Grid.Row="4" Grid.Column="1" Margin="5"
                  Text="{Binding ServerUrl}"/>
         <Label Grid.Row="5" Grid.Column="0" Content="Environment:"/>

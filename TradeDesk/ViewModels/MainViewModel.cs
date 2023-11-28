@@ -97,9 +97,9 @@ public class MainViewModel : AbstractViewModel
             lvm.AfterLogin -= OnLoggedIn;
             lv.Close();
 
-            _server.Setup(lvm.ServerUrl, token);
+            _server.Setup(lvm.ServerUrlWithPort, token);
 
-            ServerUrl = lvm.ServerUrl;
+            ServerUrl = lvm.ServerUrlWithPort;
             Session = new(lvm.UserName,
                           lvm.Account,
                           lvm.EnvironmentType,
@@ -108,7 +108,7 @@ public class MainViewModel : AbstractViewModel
                           token);
             Title = $"Trading Desk [{Session.Environment}] [{Session.Exchange}] [{ServerUrl}]";
 
-            // refresh the data in subviews
+            // refresh the data in sub-views
             SecurityCodeChanged?.Invoke(SelectedSecurityCode);
 
             Window.Show();
