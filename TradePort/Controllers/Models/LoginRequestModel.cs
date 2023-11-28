@@ -35,18 +35,4 @@ public class LoginRequestModel
     [FromForm(Name = "account-name")]
     [Required, DefaultValue("spot")]
     public string AccountName { get; set; } = "spot";
-
-    /// <summary>
-    /// Login environment.
-    /// </summary>
-    [FromForm(Name = "environment")]
-    [Required, DefaultValue(EnvironmentType.Uat)]
-    public EnvironmentType Environment { get; set; } = EnvironmentType.Uat;
-
-    /// <summary>
-    /// Connectivity to external system (exchange).
-    /// </summary>
-    [FromForm(Name = "exchange")]
-    [Required, DefaultValue(ExchangeType.Binance)]
-    public ExchangeType Exchange { get; set; } = ExchangeType.Binance;
 }

@@ -7,16 +7,21 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OfficeOpenXml;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using TradeCommon.Constants;
 using TradeCommon.Runtime;
+using TradeLogicCore.Services;
 using TradePort.Utils;
 
 public class Program
 {
     private static readonly ILog _log = Logger.New();
+    private static WebApplication _app;
+    private static EnvironmentType _environment;
 
     static Program()
     {
@@ -27,13 +32,28 @@ public class Program
 
     private static void Main(string[] args)
     {
-        // to be used in callback
-        IServiceProvider? services = null;
+        var envString = args.IsNullOrEmpty() ? "PROD" : args[0].ToUpperInvariant();
+        _environment = TradeCommon.Constants.Environments.Parse(envString);
+        _log.Info("Selected environment: " + _environment);
 
-        // create asp.net core application
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-        builder.WebHost.UseUrls(args[0]);
-               
+        switch (_environment)
+        {
+            case EnvironmentType.Prod:
+                builder.Configuration.AddJsonFile("appsettings.prod.json");
+                break;
+            case EnvironmentType.Uat:
+                builder.Configuration.AddJsonFile("appsettings.uat.json");
+                break;
+            case EnvironmentType.Simulation:
+                builder.Configuration.AddJsonFile("appsettings.sim.json");
+                break;
+            case EnvironmentType.Test:
+                builder.Configuration.AddJsonFile("appsettings.test.json");
+                break;
+            default:
+                throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
+        }
 
         builder.Services.AddControllers();
         builder.Services
@@ -71,7 +91,7 @@ public class Program
                     //IssuerSigningKey = new SymmetricSecurityKey(secretKey),
                     IssuerSigningKeyResolver = (tokenString, securityToken, identifier, parameters) =>
                     {
-                        IHttpContextAccessor accessor = services!.GetService<IHttpContextAccessor>()!;
+                        IHttpContextAccessor accessor = _app.Services.GetService<IHttpContextAccessor>()!;
                         string sessionId = accessor.HttpContext!.Session.Id;
                         return Authentication.ValidateKey(sessionId,
                                                           tokenString,
@@ -90,7 +110,7 @@ public class Program
             string xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
             c.IncludeXmlComments(xmlPath);
             c.UseInlineDefinitionsForEnums();
-
+            c.DocumentFilter<TitleFilter>();
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.Http,
@@ -99,28 +119,40 @@ public class Program
                 Scheme = "bearer",
                 Description = "Please provide the tokenString value from login response."
             });
-
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                    },
+                    Array.Empty<string>()
                 }
-            },
-            Array.Empty<string>()
-        }
             });
         });
 
         builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
             .ConfigureContainer<ContainerBuilder>(builder =>
             {
-                // TODO need to use multiple asp.net core instances for different external systems
-                builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                switch (_environment)
+                {
+                    case EnvironmentType.Simulation:
+                        builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+                        _log.Info("Loaded module for: " + nameof(TradeConnectivity.CryptoSimulator));
+                        break;
+                    case EnvironmentType.Test:
+                    case EnvironmentType.Uat:
+                    case EnvironmentType.Prod:
+                        builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
+                        _log.Info("Loaded module for: " + nameof(TradeConnectivity.Binance));
+                        break;
+                    default:
+                        throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
+                }
                 builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
                 builder.RegisterModule<TradeLogicCore.Dependencies.DependencyModule>();
             });
@@ -131,28 +163,46 @@ public class Program
             options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         });
 
-        WebApplication app = builder.Build();
+        _app = builder.Build();
 
-        // both prod and dev have SwaggerUI enabled. if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+        // both prod and dev have SwaggerUI enabled. if (_app.Environment.IsDevelopment() || _app.Environment.IsProduction())
 
-        app.UseSession();
-
-        var webSocketOptions = new WebSocketOptions { KeepAliveInterval = TimeSpan.FromHours(1) };
-        app.UseWebSockets(webSocketOptions);
-
-        app.UseDeveloperExceptionPage();
-        app.UseSwagger();
-        app.UseSwaggerUI(c =>
+        _app.UseSession();
+        _app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromHours(1) });
+        _app.UseDeveloperExceptionPage();
+        _app.UseSwagger();
+        _app.UseSwaggerUI(c =>
         {
             //builder.RoutePrefix = string.Empty;
-            c.SwaggerEndpoint("../swagger/v1/swagger.json", "Web UI");
+            c.SwaggerEndpoint("v1/swagger.json", "Trade Port");
+
+            switch (_environment)
+            {
+                case EnvironmentType.Simulation:
+                    c.DocumentTitle = "SIMULATION";
+                    c.InjectStylesheet("/swagger-custom/sim-styles.css");
+                    break;
+                case EnvironmentType.Test:
+                    c.InjectStylesheet("/swagger-custom/test-styles.css");
+                    break;
+                case EnvironmentType.Uat:
+                    c.InjectStylesheet("/swagger-custom/uat-styles.css");
+                    break;
+                case EnvironmentType.Prod:
+                    c.DocumentTitle = "PRODUCTION";
+
+                    c.InjectStylesheet("/swagger-custom/prod-styles.css");
+                    break;
+                default:
+                    throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
+            }
         });
 
-        app.UseHttpsRedirection();
-        app.UseAuthentication();
-        app.UseRouting();
-        app.UseAuthorization();
-        app.UseStaticFiles(new StaticFileOptions
+        _app.UseHttpsRedirection();
+        _app.UseAuthentication();
+        _app.UseRouting();
+        _app.UseAuthorization();
+        _app.UseStaticFiles(new StaticFileOptions
         {
             OnPrepareResponse = ctx =>
             {
@@ -160,10 +210,37 @@ public class Program
             }
         });
 
-        app.MapControllers().RequireAuthorization();
+        _app.MapControllers().RequireAuthorization();
 
-        services = app.Services;
+        // TODO supports Binance only now
+        var context = _app.Services.GetService<Context>();
+        var exchange = _environment == EnvironmentType.Simulation ? ExchangeType.Simulator : ExchangeType.Binance;
+        var broker = _environment == EnvironmentType.Simulation ? BrokerType.Simulator : ExternalNames.Convert(exchange);
+        context!.Initialize(_environment, exchange, broker);
+        _app.Run();
+    }
 
-        app.Run();
+    private class TitleFilter : IDocumentFilter
+    {
+        public void Apply(OpenApiDocument doc, DocumentFilterContext context)
+        {
+            switch (_environment)
+            {
+                case EnvironmentType.Simulation:
+                    doc.Info.Title = "TradePort (SIMULATION)";
+                    break;
+                case EnvironmentType.Test:
+                    doc.Info.Title = "TradePort (TEST)";
+                    break;
+                case EnvironmentType.Uat:
+                    doc.Info.Title = "TradePort (UAT)";
+                    break;
+                case EnvironmentType.Prod:
+                    doc.Info.Title = "TradePort (PRODUCTION)";
+                    break;
+                default:
+                    throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
+            }
+        }
     }
 }

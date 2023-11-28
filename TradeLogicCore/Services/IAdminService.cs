@@ -28,7 +28,7 @@ public interface IAdminService
 
     Task<ResultCode> Logout();
 
-    bool IsLoggedInWith(string userName, string accountName, EnvironmentType environment, ExchangeType exchange);
+    bool IsLoggedInWith(string userName, string accountName);
 
     /// <summary>
     /// Ping external service.

@@ -94,12 +94,12 @@ public class AdminService : IAdminService
         if (user == null)
             return ResultCode.GetUserFailed;
 
-        Assertion.Shall(Enum.Parse<EnvironmentType>(user.Environment, true) == environment);
-        //if (!Credential.IsPasswordCorrect(user, password))
-        //{
-        //    _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
-        //    return ResultCode.InvalidCredential;
-        //}
+        Assertion.Shall(Environments.Parse(user.Environment) == environment);
+        if (!Credential.IsPasswordCorrect(user, password, Environments.Parse(user.Environment)))
+        {
+            _log.Error($"Failed to login user {user.Name} in env {user.Environment}.");
+            return ResultCode.InvalidCredential;
+        }
 
         CurrentUser = user;
 
@@ -145,9 +145,9 @@ public class AdminService : IAdminService
         return ResultCode.LoginUserAndAccountOk;
     }
 
-    public bool IsLoggedInWith(string userName, string accountName, EnvironmentType environment, ExchangeType exchange)
+    public bool IsLoggedInWith(string userName, string accountName)
     {
-        return CurrentUser?.Name == userName && CurrentAccount?.Name == accountName && Context.Environment == environment && Context.Exchange == exchange;
+        return CurrentUser?.Name == userName && CurrentAccount?.Name == accountName;
     }
 
     public async Task<int> CreateUser(string userName, string userPassword, string email, EnvironmentType environment)

@@ -47,7 +47,7 @@ public class LoginViewModel : AbstractViewModel
 
     public ICommand LoginCommand { get; }
 
-    public LoginViewModel(Services.Server server)
+    public LoginViewModel(Server server)
     {
         _server = server;
         LoginCommand = new DelegateCommand(Login);

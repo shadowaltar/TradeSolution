@@ -1,5 +1,6 @@
 ﻿using Common;
 using TradeCommon.Essentials.Accounts;
+using TradeCommon.Runtime;
 
 namespace TradeDataCore.StaticData;
 public class Credential
@@ -12,8 +13,10 @@ public class Credential
         return !input.IsBlank() && !hash.IsBlank() && CryptographyUtils.Encrypt(input, PasswordSalt) == hash;
     }
 
-    public static bool IsPasswordCorrect(User user, string password)
+    public static bool IsPasswordCorrect(User user, string password, EnvironmentType environment)
     {
+        if (environment == EnvironmentType.Simulation)
+            return true;
         if (password.IsBlank()) return false;
         if (user == null) throw new ArgumentNullException(nameof(user));
         var encryptedPassword =
@@ -23,8 +26,10 @@ public class Credential
         return encryptedPassword == user.EncryptedPassword;
     }
 
-    public static bool IsAdminPasswordCorrect(string password)
+    public static bool IsAdminPasswordCorrect(string password, EnvironmentType environment)
     {
+        if (environment == EnvironmentType.Simulation)
+            return true;
         return !password.IsBlank() && CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
     }
 

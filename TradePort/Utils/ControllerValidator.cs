@@ -13,10 +13,10 @@ namespace TradePort.Utils;
 
 public static class ControllerValidator
 {
-    public static bool IsAdminPasswordBad(string? password, [NotNullWhen(true)] out ObjectResult? result)
+    public static bool IsAdminPasswordBad(string? password, EnvironmentType environment, [NotNullWhen(true)] out ObjectResult? result)
     {
         result = null;
-        if (password.IsBlank() || !Credential.IsAdminPasswordCorrect(password))
+        if (password.IsBlank() || !Credential.IsAdminPasswordCorrect(password, environment))
         {
             result = new BadRequestObjectResult("Invalid admin password.");
             return true;

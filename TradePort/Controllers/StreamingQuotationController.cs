@@ -6,6 +6,7 @@ using TradeDataCore.MarketData;
 
 namespace TradePort.Controllers;
 
+[ApiExplorerSettings(IgnoreApi = true)]
 public class StreamingQuotationController : ControllerBase
 {
     [Route("/stream/ohlc/{signature}")]

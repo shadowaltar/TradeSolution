@@ -42,13 +42,11 @@ public partial class AdminController : Controller
                                           [FromServices] IAdminService adminService,
                                           [FromForm] LoginRequestModel model)
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out var br)) return br;
-        if (ControllerValidator.IsUnknown(model.Environment, out br)) return br;
-        if (ControllerValidator.IsUnknown(model.Exchange, out br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out var br)) return br;
 
         if (adminService.IsLoggedIn)
         {
-            if (!adminService.IsLoggedInWith(model.UserName, model.AccountName, model.Environment, model.Exchange))
+            if (!adminService.IsLoggedInWith(model.UserName, model.AccountName))
                 return BadRequest("Please logout first.");
 
             return Ok(CreateLoginResponseModel(ResultCode.AlreadyLoggedIn, context, HttpContext.Session));
@@ -60,8 +58,8 @@ public partial class AdminController : Controller
         if (!HttpContext.IsAuthenticationAvailable())
             throw Exceptions.Impossible("Erroneous authentication configuration!");
 
-        BrokerType broker = ExternalNames.Convert(model.Exchange);
-        context.Initialize(model.Environment, model.Exchange, broker);
+        // not initialized here but during web app start up
+        // context.Initialize(model.Environment, model.Exchange, broker);
 
         ResultCode result = await adminService.Login(model.UserName, model.Password, model.AccountName, adminService.Context.Environment);
         if (result != ResultCode.LoginUserAndAccountOk)
@@ -77,15 +75,17 @@ public partial class AdminController : Controller
     /// Logout. It will affect all the other sessions (different apps or browsers).
     /// Cannot be executed when there are running algorithms.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="adminService"></param>
     /// <param name="adminPassword"></param>
     /// <returns></returns>
     [AllowAnonymous]
     [HttpPost(RestApiConstants.Logout)]
-    public async Task<ActionResult> Logout([FromServices] IAdminService adminService,
+    public async Task<ActionResult> Logout([FromServices] Context context,
+                                           [FromServices] IAdminService adminService,
                                            [FromForm(Name = "admin-password")] string adminPassword)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out ObjectResult? br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out ObjectResult? br)) return br;
 
         return !adminService.IsLoggedIn ? BadRequest("Cannot log out if not logged in.") : Ok(await adminService.Logout());
     }
@@ -93,13 +93,16 @@ public partial class AdminController : Controller
     /// <summary>
     /// Change a user's password.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.ChangeUserPassword)]
-    public async Task<ActionResult> ChangeUserPassword([FromServices] IAdminService adminService, [FromForm] ChangeUserPasswordModel model)
+    public async Task<ActionResult> ChangeUserPassword([FromServices] Context context,
+                                                       [FromServices] IAdminService adminService,
+                                                       [FromForm] ChangeUserPasswordModel model)
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out ObjectResult? br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out ObjectResult? br)) return br;
         if (model.NewPassword.IsBlank() || model.NewPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
 
         int r = await adminService.SetPassword(model.UserName, model.NewPassword, model.Environment);
@@ -171,12 +174,14 @@ public partial class AdminController : Controller
     /// <summary>
     /// Create a new user.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <param name="userName"></param>
     /// <returns></returns>
     [HttpPost("users/{user}")]
-    public async Task<ActionResult> CreateUser([FromServices] IAdminService adminService,
+    public async Task<ActionResult> CreateUser([FromServices] Context context,
+                                               [FromServices] IAdminService adminService,
                                                [FromForm] UserCreationModel model,
                                                [FromRoute(Name = "user")] string userName)
     {
@@ -185,7 +190,7 @@ public partial class AdminController : Controller
         if (model.UserPassword.IsBlank()) return BadRequest();
         if (model.AdminPassword.IsBlank()) return BadRequest();
         if (model.Email.IsBlank() || !model.Email.IsValidEmail()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(model.AdminPassword, context.Environment)) return BadRequest();
 
         if (userName.Length < 3) return BadRequest("User name should at least have 3 chars.");
         if (model.UserPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
@@ -205,21 +210,23 @@ public partial class AdminController : Controller
     /// <summary>
     /// Create a new account.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <param name="accountName"></param>
     /// <returns></returns>
     [HttpPost("accounts/{account}")]
-    public async Task<ActionResult> CreateAccount([FromServices] IAdminService adminService,
+    public async Task<ActionResult> CreateAccount([FromServices] Context context,
+                                                  [FromServices] IAdminService adminService,
                                                   [FromForm] AccountCreationModel model,
                                                   [FromRoute(Name = "account")] string accountName = "test")
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, out ObjectResult? br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out ObjectResult? br)) return br;
         if (accountName.IsBlank()) return BadRequest();
         if (model == null) return BadRequest("Missing creation model.");
         if (model.ExternalAccount == null) return BadRequest("Missing external account name.");
         if (model.Broker == BrokerType.Unknown) return BadRequest("Invalid broker.");
-        if (model.Environment == EnvironmentType.Unknown) return BadRequest("Invalid environment.");
+        if (model.Environment == EnvironmentType.Unknown) return BadRequest("Invalid _environment.");
         if (accountName.Length < 3) return BadRequest("Account name should at least have 3 chars.");
 
         User? user = await adminService.GetUser(model.OwnerName, model.Environment);
@@ -249,10 +256,12 @@ public partial class AdminController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpPost("rebuild-security-definition-tables")]
-    public async Task<ActionResult> RebuildSecurityDefinitionTables([FromServices] IStorage storage, [FromForm(Name = "admin-password")] string password)
+    public async Task<ActionResult> RebuildSecurityDefinitionTables([FromServices] Context context,
+                                                                    [FromServices] IStorage storage,
+                                                                    [FromForm(Name = "admin-password")] string password)
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password, context.Environment)) return BadRequest();
 
         await storage.CreateSecurityTable(SecurityType.Equity);
         await storage.CreateSecurityTable(SecurityType.Fx);
@@ -274,19 +283,21 @@ public partial class AdminController : Controller
     /// <summary>
     /// WARNING, this will erase all the data. Rebuild all the price tables.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="storage"></param>
     /// <param name="password">Mandatory</param>
     /// <param name="intervalStr">Must be used along with <paramref name="secTypeStr"/>. Only supports 1m, 1h or 1d. If not set, all will be rebuilt.</param>
     /// <param name="secTypeStr">Must be used along with <paramref name="intervalStr"/>.</param>
     /// <returns></returns>
     [HttpPost("rebuild-price-tables")]
-    public async Task<ActionResult> RebuildPriceTables([FromServices] IStorage storage,
+    public async Task<ActionResult> RebuildPriceTables([FromServices] Context context,
+                                                       [FromServices] IStorage storage,
                                                        [FromForm(Name = "admin-password")] string password,
                                                        [FromQuery(Name = "interval")] string? intervalStr,
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr)
     {
         if (password.IsBlank()) return BadRequest();
-        if (!Credential.IsAdminPasswordCorrect(password)) return BadRequest();
+        if (!Credential.IsAdminPasswordCorrect(password, context.Environment)) return BadRequest();
 
         IntervalType interval = IntervalType.Unknown;
         SecurityType secType = SecurityType.Unknown;
@@ -329,18 +340,20 @@ public partial class AdminController : Controller
     /// <summary>
     /// WARNING, this will erase all the data. Rebuild tables with specific type.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="storage"></param>
     /// <param name="password"></param>
     /// <param name="secTypeStr">Only Order, Trade, Position and Price tables support security type.</param>
     /// <param name="tableType">Unknown to create everything; or else Order, Trade, Position, FinancialStat, etc.</param>
     /// <returns></returns>
     [HttpPost("rebuild-tables-except-prices")]
-    public async Task<ActionResult> RebuildOtherTables([FromServices] IStorage storage,
+    public async Task<ActionResult> RebuildOtherTables([FromServices] Context context,
+                                                       [FromServices] IStorage storage,
                                                        [FromForm(Name = "admin-password")] string password,
                                                        [FromQuery(Name = "table-type")] DataType tableType,
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr = null)
     {
-        if (ControllerValidator.IsAdminPasswordBad(password, out ObjectResult? br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(password, context.Environment, out ObjectResult? br)) return br;
 
         SecurityType secType = SecurityType.Unknown;
         if (secTypeStr != null)
@@ -367,6 +380,12 @@ public partial class AdminController : Controller
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
         }
         return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.") : Ok(results);
+    }
+    [AllowAnonymous]
+    [HttpGet("ping")]
+    public async Task<ActionResult> Ping()
+    {
+        return Ok("{\"pong\":true}");
     }
 
     private async Task<Dictionary<string, bool>?> CreateTables(IStorage storage, DataType dataType, SecurityType secType = SecurityType.Unknown)

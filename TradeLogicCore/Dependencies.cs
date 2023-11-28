@@ -13,28 +13,6 @@ public static class Dependencies
     [NotNull]
     public static IComponentContext? ComponentContext { get; private set; }
 
-    public static Context UpdateBrokerModule(IComponentContext existingContainer, BrokerType broker)
-    {
-        var scope = (Autofac.Core.Lifetime.LifetimeScope)existingContainer;
-        scope.BeginLifetimeScope(builder =>
-        {
-            switch (broker)
-            {
-                case BrokerType.Binance:
-                    builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
-                    break;
-                    //case BrokerType.Futu:
-                    //    _builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
-                    //    break;
-                    //case BrokerType.Simulator:
-                    //    _builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
-                    //    break;
-            }
-        }); // should not dispose this!
-        ComponentContext = existingContainer;
-        return existingContainer.Resolve<Context>();
-    }
-
     public static Context Register(BrokerType broker)
     {
         var builder = new ContainerBuilder();
@@ -45,12 +23,9 @@ public static class Dependencies
             case BrokerType.Binance:
                 builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
                 break;
-                //case BrokerType.Futu:
-                //    _builder.RegisterModule<TradeConnectivity.Futu.Dependencies>();
-                //    break;
-                //case BrokerType.Simulator:
-                //    _builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
-                //    break;
+            case BrokerType.Simulator:
+                builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+                break;
         }
 
         var container = builder.Build();

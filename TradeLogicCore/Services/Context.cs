@@ -1,8 +1,5 @@
 ﻿using Autofac;
 using Common;
-using Microsoft.CodeAnalysis.Text;
-using OfficeOpenXml.Style;
-using System;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
@@ -127,7 +124,6 @@ public class Context : ApplicationContext
         };
         return algoBatch;
     }
-
 
     public bool SetPreferredQuoteCurrencies(List<string>? currencies)
     {

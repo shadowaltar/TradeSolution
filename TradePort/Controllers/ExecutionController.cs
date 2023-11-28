@@ -162,10 +162,11 @@ public class ExecutionController : Controller
     /// </summary>
     /// <returns></returns>
     [HttpPost(RestApiConstants.CancelAllOrders)]
-    public async Task<ActionResult> CancelAllOrders([FromServices] IOrderService orderService,
+    public async Task<ActionResult> CancelAllOrders([FromServices] Context context,
+                                                    [FromServices] IOrderService orderService,
                                                     [FromForm(Name = "admin-password")] string adminPassword)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
 
         var r = await orderService.CancelAllOpenOrders();
         return !r ? BadRequest("Failed to cancel.") : Ok("Cancelled all open orders.");
@@ -496,12 +497,13 @@ public class ExecutionController : Controller
     }
 
     [HttpPost(RestApiConstants.StopAlgorithm)]
-    public async Task<ActionResult> StopAlgorithm([FromServices] Core core,
+    public async Task<ActionResult> StopAlgorithm([FromServices] Context context,
+                                                  [FromServices] Core core,
                                                   [FromServices] IAdminService adminService,
                                                   [FromForm(Name = "admin-password")] string? adminPassword,
                                                   [FromQuery(Name = "algo-batch-id")] long algoBatchId)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
         var resultCode = await core.StopAlgorithm(algoBatchId);
@@ -509,14 +511,14 @@ public class ExecutionController : Controller
     }
 
     [HttpPost(RestApiConstants.StopAllAlgorithms)]
-    public async Task<ActionResult> StopAllAlgorithms([FromServices] IComponentContext container,
+    public async Task<ActionResult> StopAllAlgorithms([FromServices] Context context,
+                                                      [FromServices] Core core,
                                                       [FromServices] IAdminService adminService,
                                                       [FromForm(Name = "admin-password")] string? adminPassword)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out var br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var core = container.Resolve<Core>();
         var (expected, successful) = await core.StopAllAlgorithms();
         return Ok(new Dictionary<string, int> { { "expected", expected }, { "successful", successful } });
     }
@@ -525,6 +527,7 @@ public class ExecutionController : Controller
     /// Reconcile all orders, trades, assets with external system (aka broker / exchange).
     /// Cannot be executed when there are running algorithms.
     /// </summary>
+    /// <param name="context"></param>
     /// <param name="core"></param>
     /// <param name="adminService"></param>
     /// <param name="securityService"></param>
@@ -534,7 +537,8 @@ public class ExecutionController : Controller
     /// <param name="securityType"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.Reconcile)]
-    public async Task<ActionResult> Reconcile([FromServices] Core core,
+    public async Task<ActionResult> Reconcile([FromServices] Context context,
+                                              [FromServices] Core core,
                                               [FromServices] IAdminService adminService,
                                               [FromServices] ISecurityService securityService,
                                               [FromServices] IPortfolioService portfolioService,
@@ -542,7 +546,7 @@ public class ExecutionController : Controller
                                               [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT,ETHUSDT",
                                               [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, out ObjectResult? br)) return br;
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out ObjectResult? br)) return br;
         if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
         if (core.GetActiveAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");

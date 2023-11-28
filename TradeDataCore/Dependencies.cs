@@ -24,6 +24,9 @@ public class Dependencies
                 case ExternalNames.Binance:
                     builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
                     break;
+                case ExternalNames.Simulator:
+                    builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
+                    break;
             }
         }
 

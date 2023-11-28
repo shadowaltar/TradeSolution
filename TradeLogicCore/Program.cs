@@ -59,9 +59,9 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Uat;
+        var environment = EnvironmentType.Simulation;
 
-        if (environment == EnvironmentType.Uat)
+        if (environment is EnvironmentType.Uat or EnvironmentType.Test or EnvironmentType.Simulation)
         {
             _userName = "test";
             _password = "testtest";
@@ -187,7 +187,7 @@ public class Program
         var password = _password;
         var email = _email;
 
-        var exchange = ExchangeType.Binance;
+        var exchange = ExchangeType.Simulator;
         var symbol = "BTCUSDT";
         var quoteCode = "USDT";
         var whitelistCodes = new List<string> { "BTC", "USDT" };
