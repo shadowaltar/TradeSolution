@@ -40,21 +40,18 @@ public class StaticDataController : Controller
     /// <param name="storage"></param>
     /// <param name="exchange"></param>
     /// <param name="securityType"></param>
-    /// <param name="limit"></param>
     /// <returns></returns>
+    [Produces("text/plain")]
     [HttpGet(RestApiConstants.Securities)]
     public async Task<IActionResult> GetSecurities([FromServices] IStorage storage,
                                                    [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
-                                                   [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx,
-                                                   [FromQuery(Name = "limit")] int limit = 100)
+                                                   [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
     {
-
         if (ControllerValidator.IsUnknown(exchange, out var br)) return br;
         if (ControllerValidator.IsUnknown(securityType, out br)) return br;
 
         var securities = await storage.ReadSecurities(securityType, exchange);
-
-        return Ok(securities.Take(limit));
+        return Ok(Common.Json.Serialize(securities));
     }
 
     /// <summary>

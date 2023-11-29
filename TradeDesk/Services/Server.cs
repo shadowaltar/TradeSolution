@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Web;
 using log4net;
-using ScottPlot.Renderable;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -10,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using TradeCommon.Constants;
@@ -27,7 +27,8 @@ public class Server
     private static readonly ILog _log = Logger.New();
 
     private string _token;
-    private string _url;
+    private string _restUrl;
+    private string _webSocketUrl;
     private ClientWebSocket? _ohlcWebSocket;
 
     private static readonly CookieContainer _cookieContainer = new();
@@ -48,14 +49,15 @@ public class Server
     public void Setup(string rootUrl, string token)
     {
         _token = token;
-        _url = rootUrl.Trim('/');
+        _restUrl = $"https://{rootUrl.Trim('/')}";
+        _webSocketUrl = $"ws://{rootUrl.Trim('/')}";
     }
 
     public async Task<List<Security>> GetSecurities()
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.Static}/{RestApiConstants.Securities}";
+            var url = $"{_restUrl}/{RestApiConstants.Static}/{RestApiConstants.Securities}";
             var uri = new Uri(url).AddParameters(("exchange", ExternalNames.Binance), ("sec-type", SecurityType.Fx.ToString()), ("limit", 50000.ToString()));
             var request = new HttpRequestMessage(HttpMethod.Get, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
@@ -79,7 +81,7 @@ public class Server
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
+            var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
             var uri = new Uri(url).AddParameters(("symbol", securityCode));
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
@@ -107,7 +109,7 @@ public class Server
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryTrades}";
+            var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryTrades}";
             var uri = new Uri(url).AddParameters(("symbol", securityCode));
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
@@ -135,7 +137,7 @@ public class Server
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryAssets}";
+            var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryAssets}";
             var uri = new Uri(url).AddParameters(("where", DataSourceType.MemoryCached.ToString()));
             var request = new HttpRequestMessage(HttpMethod.Post, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
@@ -159,7 +161,7 @@ public class Server
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryAssetStates}";
+            var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryAssetStates}";
             var uri = new Uri(url);
             if (startFrom == null)
                 uri.AddParameters(("where", DataSourceType.MemoryCached.ToString()));
@@ -187,7 +189,7 @@ public class Server
     {
         try
         {
-            var url = $"{_url}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
+            var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
             var json = await _client.GetStringAsync(url);
             return Json.Deserialize<List<Order>>(json) ?? new();
         }
@@ -213,7 +215,7 @@ public class Server
         _ohlcWebSocket = new ClientWebSocket();
         var wsName = $"{nameof(OhlcPrice)}_{security.Id}_{interval}";
 
-        var url = $"{_url}/ws/ohlc/{wsName}";
+        var url = $"{_webSocketUrl}/stream/ohlc/{wsName}";
         var ws = new ExtendedWebSocket(_log);
         var message = "";
         ws.Listen(new Uri(url), bytes =>
