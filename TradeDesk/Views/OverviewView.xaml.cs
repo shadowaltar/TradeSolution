@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Quotes;
+using TradeDesk.Utils;
 using TradeDesk.ViewModels;
 
 namespace TradeDesk.Views;
@@ -44,7 +45,7 @@ public partial class OverviewView : UserControl
 
     private void TimerRender(object? state)
     {
-        mainPlot?.Refresh();
+        Ui.Invoke(() => mainPlot?.Refresh());
     }
 
     public void StopLive()

@@ -56,7 +56,7 @@ public class LoginViewModel : AbstractViewModel
 
     public string ServerUrl { get => _serverUrl; set => SetValue(ref _serverUrl, value); }
 
-    public string ServerUrlWithPort => ServerUrl.Trim('/') + ":" + _port;
+    public string ServerUrlWithPort => ServerUrl.Trim('/').Replace("https://", "") + ":" + _port;
 
     public string UserName { get => _userName; set => SetValue(ref _userName, value); }
 
@@ -76,14 +76,14 @@ public class LoginViewModel : AbstractViewModel
         UserName = "test";
         UserPassword = "testtest";
         Account = "spot";
-        ServerUrl = "https://localhost";
+        ServerUrl = "localhost";
         EnvironmentType = EnvironmentType.Simulation;
         ExchangeType = ExchangeType.Simulator;
     }
 
     private async void Login()
     {
-        var url = $"{ServerUrl.Trim('/')}:{_port}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
+        var url = $"https://{ServerUrl.Trim('/')}:{_port}/{RestApiConstants.AdminRoot}/{RestApiConstants.Login}";
         try
         {
             var content = new MultipartFormDataContent
