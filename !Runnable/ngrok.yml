@@ -1,0 +1,17 @@
+version: "2"
+api_key: 2Yr9xh5zgGi3gPnhzILhJIXLCmP_2HCs5i8sMmeHdRGJgaayF
+authtoken: 2XRaHROyB53EqZXyYOMIXmVPoLS_6q5i1ENKW2fHm7LKAHNZc
+log: c:\apps\ngrok\ngrok.log
+tunnels:
+  prod:
+    addr: 50493
+    proto: https
+  uat:
+    addr: 50715
+    proto: https
+  test:
+    addr: 55325
+    proto: https
+  sim:
+    addr: 50287
+    proto: https
