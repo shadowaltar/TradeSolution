@@ -29,6 +29,6 @@ public class StandardDeviationTests
 
         var expression = new Expression($"std({string.Join(',', initialDecimalValues.Take(5))})");
         double expected = expression.calculate();
-        Assert.IsTrue(expected.ApproxEquals(expectedDecimalResults[4].ToDouble()));
+        Assert.That(expected, Is.EqualTo(expectedDecimalResults[4].ToDouble()));
     }
 }

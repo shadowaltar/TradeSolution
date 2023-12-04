@@ -108,6 +108,7 @@ public class ApplicationContext
         Broker = broker;
         ExchangeId = ExternalNames.GetExchangeId(exchange);
         BrokerId = ExternalNames.GetBrokerId(broker);
+        Storage.SetEnvironment(environment);
 
         ExternalQueryStates.Exchange = Exchange;
         ExternalQueryStates.Environment = Environment;

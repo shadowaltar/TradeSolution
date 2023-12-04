@@ -17,7 +17,7 @@ public class ObjectPoolTests
         {
             var obj = pool.Lease();
             obj.Id = i.ToString();
-            Assert.IsNotNull(obj);
+            Assert.That(obj, Is.Null);
         }
     }
 

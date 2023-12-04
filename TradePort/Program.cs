@@ -53,7 +53,7 @@ public class Program
         builder.Services
             .AddSession(o =>
             {
-                o.Cookie.Name = "TradePort.Session";
+                o.Cookie.Name = _envConfigs[_environment].CookieName;
                 o.IdleTimeout = TimeSpan.FromHours(24);
                 o.Cookie.IsEssential = true;
                 o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
@@ -84,8 +84,6 @@ public class Program
                         string sessionId = accessor.HttpContext!.Session.Id;
                         return Authentication.ValidateKey(sessionId,
                                                           tokenString,
-                                                          (JwtSecurityToken)securityToken,
-                                                          identifier,
                                                           parameters.ValidIssuer,
                                                           parameters.ValidAudience);
                     }

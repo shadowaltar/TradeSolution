@@ -20,8 +20,6 @@ public class Authentication
 
     public static IEnumerable<SecurityKey> ValidateKey(string sessionId,
                                                        string tokenString,
-                                                       JwtSecurityToken tokenObject,
-                                                       string keyId,
                                                        string issuer,
                                                        string audience)
     {
@@ -30,7 +28,7 @@ public class Authentication
             ks = new List<SecurityKey> { GetKey(sessionId) };
         }
 
-        return ValidateCurrentToken(tokenString, issuer, audience, ks[0]) ? ks : new List<SecurityKey>();
+        return ValidateCurrentToken(tokenString, issuer, audience, ks[0]) ? ks : [];
     }
 
     public static bool ValidateCurrentToken(string token, string issuer, string audience, SecurityKey key)

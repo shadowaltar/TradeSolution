@@ -39,6 +39,11 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{98D69C24-E544-405D-BD91-5A2BFD18B9E7}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		ngrok.txt = ngrok.txt
+		!Runnable\StartProd.cmd = !Runnable\StartProd.cmd
+		!Runnable\StartSim.cmd = !Runnable\StartSim.cmd
+		!Runnable\StartTest.cmd = !Runnable\StartTest.cmd
+		!Runnable\StartUat.cmd = !Runnable\StartUat.cmd
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeMarketDataSaver", "TradeMarketDataSaver\TradeMarketDataSaver.csproj", "{E7C2FFBF-D90C-44C6-96EE-BAB2E7289F1B}"

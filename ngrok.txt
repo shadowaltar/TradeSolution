@@ -1,0 +1,1 @@
+.\ngrok.exe http https://localhost:40000 --host-header="localhost:40000"

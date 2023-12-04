@@ -1,4 +1,5 @@
 ﻿using Common;
+using TradeCommon.Constants;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Runtime;
 
@@ -19,10 +20,12 @@ public class Credential
             return true;
         if (password.IsBlank()) return false;
         if (user == null) throw new ArgumentNullException(nameof(user));
+
+        var envStr = Environments.ToString(environment).ToUpperInvariant();
         var encryptedPassword =
             CryptographyUtils.Encrypt(user.Name + password, PasswordSalt)
             + CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt)
-            + CryptographyUtils.Encrypt(environment + password, PasswordSalt);
+            + CryptographyUtils.Encrypt(envStr + password, PasswordSalt);
         return encryptedPassword == user.EncryptedPassword;
     }
 
@@ -33,15 +36,16 @@ public class Credential
         return !password.IsBlank() && CryptographyUtils.Encrypt(password, PasswordSalt) == HashedCredential;
     }
 
-    public static void EncryptUserPassword(User user, string environmentString, ref string password)
+    public static void EncryptUserPassword(User user, EnvironmentType environment, ref string password)
     {
         if (user == null) throw new ArgumentNullException(nameof(user));
         if (user.Name.IsBlank()) throw new ArgumentNullException(nameof(user.Name));
         if (password.IsBlank()) throw new ArgumentNullException(nameof(password));
 
+        var envStr = Environments.ToString(environment).ToUpperInvariant();
         var encrypted1 = CryptographyUtils.Encrypt(user.Name + password, PasswordSalt);
         var encrypted2 = CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt);
-        var encrypted3 = CryptographyUtils.Encrypt(environmentString + password, PasswordSalt);
+        var encrypted3 = CryptographyUtils.Encrypt(envStr + password, PasswordSalt);
         user.EncryptedPassword = encrypted1 + encrypted2 + encrypted3;
 
         // erase the original one

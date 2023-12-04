@@ -16,6 +16,7 @@ public record EnvironmentConfig
     public string SubUrl { get; }
     public string AppSettingsFileName { get; }
     public string CustomStylePath { get; }
+    public string CookieName { get; }
 
     public EnvironmentConfig(EnvironmentType environmentType)
     {
@@ -33,6 +34,7 @@ public record EnvironmentConfig
         AppSettingsFileName = $"appsettings.{EnvironmentName}.json";
         Title = $"TradePort ({EnvironmentName.ToUpperInvariant()})";
         CustomStylePath = $"{EnvironmentName}/swagger-custom/{EnvironmentName}-styles.css";
+        CookieName = $"TradePort.{EnvironmentName.ToUpperInvariant()}";
     }
 
     public void RegisterDependencyModule(ContainerBuilder builder)

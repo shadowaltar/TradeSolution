@@ -144,8 +144,7 @@ public class Program
                 UpdateTime = now,
             };
             var userPassword = _password;
-            var envStr = Environments.ToString(environment).ToUpperInvariant();
-            Credential.EncryptUserPassword(user, envStr, ref userPassword);
+            Credential.EncryptUserPassword(user, environment, ref userPassword);
             await storage.InsertOne(user, true);
             user = await storage.ReadUser(user.Name, user.Email, environment);
 

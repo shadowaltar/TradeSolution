@@ -2,7 +2,9 @@
 using Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Client.Extensions.Msal;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -97,6 +99,7 @@ public partial class AdminController : Controller
     /// <param name="adminService"></param>
     /// <param name="model"></param>
     /// <returns></returns>
+    [AllowAnonymous]
     [HttpPost(RestApiConstants.ChangeUserPassword)]
     public async Task<ActionResult> ChangeUserPassword([FromServices] Context context,
                                                        [FromServices] IAdminService adminService,
@@ -104,8 +107,7 @@ public partial class AdminController : Controller
     {
         if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out ObjectResult? br)) return br;
         if (model.NewPassword.IsBlank() || model.NewPassword.Length < Consts.PasswordMinLength) return BadRequest("Password should at least have 6 chars.");
-
-        int r = await adminService.SetPassword(model.UserName, model.NewPassword, model.Environment);
+        int r = await adminService.SetPassword(model.UserName, model.NewPassword, context.Environment);
         return r > 0 ? Ok("Password is set.") : BadRequest("Failed to set password.");
     }
 

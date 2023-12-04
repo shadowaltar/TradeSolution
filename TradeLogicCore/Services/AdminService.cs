@@ -60,7 +60,6 @@ public class AdminService : IAdminService
         // reset everything
         await Context.Services.Reset();
 
-        _storage.SetEnvironment(EnvironmentType.Unknown);
         _connectivity.SetEnvironment(EnvironmentType.Unknown);
 
         Context.Reset();
@@ -94,11 +93,11 @@ public class AdminService : IAdminService
         if (user == null)
             return ResultCode.GetUserFailed;
 
-        if (!Credential.IsPasswordCorrect(user, password, environment))
-        {
-            _log.Error($"Failed to login user {user.Name} in env {environment}.");
-            return ResultCode.InvalidCredential;
-        }
+        //if (!Credential.IsPasswordCorrect(user, password, environment))
+        //{
+        //    _log.Error($"Failed to login user {user.Name} in env {environment}.");
+        //    return ResultCode.InvalidCredential;
+        //}
 
         CurrentUser = user;
 
@@ -166,8 +165,7 @@ public class AdminService : IAdminService
             CreateTime = now,
             UpdateTime = now,
         };
-        var envStr = Environments.ToString(environment).ToUpperInvariant();
-        Credential.EncryptUserPassword(user, envStr, ref userPassword);
+        Credential.EncryptUserPassword(user, environment, ref userPassword);
 
         user.ValidateOrThrow();
         user.AutoCorrect();
@@ -190,8 +188,7 @@ public class AdminService : IAdminService
         {
             UpdateTime = now,
         };
-        var envStr = Environments.ToString(environment).ToUpperInvariant();
-        Credential.EncryptUserPassword(user, envStr, ref userPassword);
+        Credential.EncryptUserPassword(user, environment, ref userPassword);
         return await _storage.InsertOne(user, true);
     }
 
