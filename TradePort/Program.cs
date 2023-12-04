@@ -17,9 +17,12 @@ using TradeCommon.Runtime;
 using TradeLogicCore.Services;
 using TradePort.Utils;
 
+namespace TradePort;
+
 public class Program
 {
     private static readonly ILog _log = Logger.New();
+    private static readonly Dictionary<EnvironmentType, EnvironmentConfig> _envConfigs;
     private static WebApplication _app;
     private static EnvironmentType _environment;
 
@@ -28,6 +31,9 @@ public class Program
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+        _envConfigs = Enum.GetValues<EnvironmentType>().Where(t => t != EnvironmentType.Unknown)
+            .ToDictionary(e => e, e => new EnvironmentConfig(e));
     }
 
     private static void Main(string[] args)
@@ -37,24 +43,7 @@ public class Program
         _log.Info("Selected environment: " + _environment);
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-        switch (_environment)
-        {
-            case EnvironmentType.Prod:
-                builder.Configuration.AddJsonFile("appsettings.prod.json");
-                break;
-            case EnvironmentType.Uat:
-                builder.Configuration.AddJsonFile("appsettings.uat.json");
-                break;
-            case EnvironmentType.Simulation:
-                builder.Configuration.AddJsonFile("appsettings.sim.json");
-                break;
-            case EnvironmentType.Test:
-                builder.Configuration.AddJsonFile("appsettings.test.json");
-                break;
-            default:
-                throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
-        }
-
+        builder.Configuration.AddJsonFile(_envConfigs[_environment].AppSettingsFileName);
         builder.Services.AddControllers();
         builder.Services
             .AddEndpointsApiExplorer()
@@ -138,21 +127,7 @@ public class Program
         builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
             .ConfigureContainer<ContainerBuilder>(builder =>
             {
-                switch (_environment)
-                {
-                    case EnvironmentType.Simulation:
-                        builder.RegisterModule<TradeConnectivity.CryptoSimulator.Dependencies>();
-                        _log.Info("Loaded module for: " + nameof(TradeConnectivity.CryptoSimulator));
-                        break;
-                    case EnvironmentType.Test:
-                    case EnvironmentType.Uat:
-                    case EnvironmentType.Prod:
-                        builder.RegisterModule<TradeConnectivity.Binance.Dependencies>();
-                        _log.Info("Loaded module for: " + nameof(TradeConnectivity.Binance));
-                        break;
-                    default:
-                        throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
-                }
+                _envConfigs[_environment].RegisterDependencyModule(builder);
                 builder.RegisterModule<TradeDataCore.Dependencies.DependencyModule>();
                 builder.RegisterModule<TradeLogicCore.Dependencies.DependencyModule>();
             });
@@ -170,32 +145,25 @@ public class Program
         _app.UseSession();
         _app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromHours(1) });
         _app.UseDeveloperExceptionPage();
-        _app.UseSwagger();
+        _app.UseSwagger(c =>
+        {
+            var subPath = _envConfigs[_environment].SubUrl;
+            c.PreSerializeFilters.Add((swagger, httpReq) =>
+            {
+                var oldPaths = swagger.Paths.ToDictionary(e => e.Key, e => e.Value);
+                foreach (var path in oldPaths)
+                {
+                    var newPath = Path.Join(subPath, path.Key); // must start with '/'
+                    swagger.Paths.Remove(path.Key);
+                    swagger.Paths.Add(newPath, path.Value);
+                }
+            });
+        });
         _app.UseSwaggerUI(c =>
         {
-            //builder.RoutePrefix = string.Empty;
-            c.SwaggerEndpoint("v1/swagger.json", "Trade Port");
-
-            switch (_environment)
-            {
-                case EnvironmentType.Simulation:
-                    c.DocumentTitle = "SIMULATION";
-                    c.InjectStylesheet("/swagger-custom/sim-styles.css");
-                    break;
-                case EnvironmentType.Test:
-                    c.InjectStylesheet("/swagger-custom/test-styles.css");
-                    break;
-                case EnvironmentType.Uat:
-                    c.InjectStylesheet("/swagger-custom/uat-styles.css");
-                    break;
-                case EnvironmentType.Prod:
-                    c.DocumentTitle = "PRODUCTION";
-
-                    c.InjectStylesheet("/swagger-custom/prod-styles.css");
-                    break;
-                default:
-                    throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
-            }
+            var config = _envConfigs[_environment];
+            c.DocumentTitle = config.Title;
+            c.InjectStylesheet(config.CustomStylePath);
         });
 
         _app.UseHttpsRedirection();
@@ -224,23 +192,7 @@ public class Program
     {
         public void Apply(OpenApiDocument doc, DocumentFilterContext context)
         {
-            switch (_environment)
-            {
-                case EnvironmentType.Simulation:
-                    doc.Info.Title = "TradePort (SIMULATION)";
-                    break;
-                case EnvironmentType.Test:
-                    doc.Info.Title = "TradePort (TEST)";
-                    break;
-                case EnvironmentType.Uat:
-                    doc.Info.Title = "TradePort (UAT)";
-                    break;
-                case EnvironmentType.Prod:
-                    doc.Info.Title = "TradePort (PRODUCTION)";
-                    break;
-                default:
-                    throw Exceptions.Invalid<EnvironmentType>("Invalid environment.");
-            }
+            doc.Info.Title = _envConfigs[_environment].Title;
         }
     }
 }
