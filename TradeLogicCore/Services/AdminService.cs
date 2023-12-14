@@ -169,7 +169,7 @@ public class AdminService : IAdminService
 
         user.ValidateOrThrow();
         user.AutoCorrect();
-        return await _storage.InsertOne(user, false);
+        return await _storage.InsertOne(user);
     }
 
     public async Task<int> SetPassword(string userName, string userPassword, EnvironmentType environment)
@@ -189,7 +189,7 @@ public class AdminService : IAdminService
             UpdateTime = now,
         };
         Credential.EncryptUserPassword(user, environment, ref userPassword);
-        return await _storage.InsertOne(user, true);
+        return await _storage.UpsertOne(user);
     }
 
     public async Task<User?> GetUser(string? userName, EnvironmentType environment)
@@ -205,7 +205,7 @@ public class AdminService : IAdminService
     public async Task<int> CreateAccount(Account account)
     {
         if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
-        return await _storage.InsertOne(account, false);
+        return await _storage.InsertOne(account);
     }
 
     public async Task<Account?> GetAccount(string? accountName, bool requestExternal = false)

@@ -145,7 +145,7 @@ public class Program
             };
             var userPassword = _password;
             Credential.EncryptUserPassword(user, environment, ref userPassword);
-            await storage.InsertOne(user, true);
+            await storage.InsertOne(user);
             user = await storage.ReadUser(user.Name, user.Email, environment);
 
             var account = new Account
@@ -160,7 +160,7 @@ public class Program
                 ExternalAccount = _accountId,
                 FeeStructure = "",
             };
-            await storage.InsertOne(account, true);
+            await storage.InsertOne(account);
             account = await storage.ReadAccount(account.Name);
             user.Accounts.Add(account);
         }

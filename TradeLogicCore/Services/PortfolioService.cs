@@ -446,14 +446,14 @@ public class PortfolioService : IPortfolioService
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
             };
-            return await _storage.InsertOne(asset, false) > 0
+            return await _storage.InsertOne(asset) > 0
                 ? asset
                 : Portfolio.AccountId == accountId ? throw Exceptions.MissingAsset(assetId) : null;
         }
         else
         {
             asset.Quantity += quantity;
-            return await _storage.InsertOne(asset, true) > 0
+            return await _storage.UpsertOne(asset) > 0
                 ? asset
                 : Portfolio.AccountId == accountId ? throw Exceptions.MissingAsset(assetId) : null;
         }

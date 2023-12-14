@@ -115,7 +115,7 @@ public class Reconcilation
                     }
 
                     // use upsert, because it is possible for an external order which has the same id vs internal, but with different values
-                    await _storage.InsertOne(order, true, tableNameOverride: table);
+                    await _storage.UpsertOne(order, tableNameOverride: table);
                 }
             }
             if (!toUpdate.IsNullOrEmpty())
@@ -208,7 +208,7 @@ public class Reconcilation
                 if (i == 0)
                 {
                     var state = OrderState.From(order);
-                    await _storage.InsertOne(state, false);
+                    await _storage.UpsertOne(state);
                 }
             }
 
@@ -286,7 +286,7 @@ public class Reconcilation
                 foreach (var trade in trades)
                 {
                     var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
-                    await _storage.InsertOne(trade, true, tableNameOverride: table);
+                    await _storage.UpsertOne(trade, tableNameOverride: table);
                 }
             }
             if (!toDelete.IsNullOrEmpty())
@@ -323,13 +323,12 @@ public class Reconcilation
             if (account == null && externalAccount != null)
             {
                 _log.Warn("Internally stored account is missing; will sync with external one.");
-                await _storage.InsertOne(externalAccount, true);
-
+                await _storage.InsertOne(externalAccount);
             }
             else if (externalAccount != null && !externalAccount.Equals(account))
             {
                 _log.Warn("Internally stored account does not exactly match the external account; will sync with external one.");
-                await _storage.InsertOne(externalAccount, true);
+                await _storage.UpsertOne(externalAccount);
             }
         }
     }
@@ -418,7 +417,7 @@ public class Reconcilation
             if (i == 0)
             {
                 var state = AssetState.From(asset);
-                await _storage.InsertOne(state, false);
+                await _storage.InsertOne(state);
             }
 
         }

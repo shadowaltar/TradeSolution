@@ -67,7 +67,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         _environmentString = environmentString;
     }
 
-    public async Task<int> InsertOne<T1>(T1 entry, bool isUpsert, string? tableNameOverride = null)
+    public async Task<int> InsertOne<T1>(T1 entry, string? tableNameOverride = null)
     {
         var result = 0;
         if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
@@ -80,7 +80,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         try
         {
             command = connection.CreateCommand();
-            var sql = GetInsertSql(isUpsert, tableName);
+            var sql = GetInsertSql(tableName);
             command.CommandText = sql;
             var e = (T)(object)entry;
 
@@ -106,6 +106,48 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         return result;
     }
 
+    public async Task<int> UpsertOne<T1>(T1 entry, string? tableNameOverride = null)
+    {
+        var result = 0;
+        if (typeof(T1) != typeof(T)) throw new InvalidOperationException();
+        if (entry == null)
+            return 0;
+
+        var tableName = tableNameOverride ?? _defaultTableName;
+        using var connection = await Connect();
+        using var transaction = connection.BeginTransaction();
+        SqliteCommand? command = null;
+        try
+        {
+            command = connection.CreateCommand();
+            var sql = GetUpsertSql(tableName);
+            command.CommandText = sql;
+            var e = (T)(object)entry;
+
+            SetCommandParameters(command, e);
+            result = await command.ExecuteNonQueryAsync();
+
+            if (_log.IsDebugEnabled)
+                _log.Debug($"Upserted 1 {typeof(T).Name} entry into {tableName} table.");
+
+            transaction.Commit();
+            RaiseSuccess(entry);
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Failed to upsert into {tableName} table.", e);
+            transaction.Rollback();
+            RaiseFailed(entry, e);
+        }
+        finally
+        {
+            command?.Dispose();
+        }
+
+        await connection.CloseAsync();
+        return result;
+    }
+
     public async Task<int> InsertMany<T1>(IList<T1> entries, bool isUpsert, string? tableNameOverride = null)
     {
         var result = 0;
@@ -119,7 +161,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         try
         {
             command = connection.CreateCommand();
-            var sql = GetInsertSql(isUpsert, tableName);
+            var sql = isUpsert ? GetUpsertSql(tableName) : GetInsertSql(tableName);
             command.CommandText = sql;
             foreach (object? entry in entries)
             {
@@ -167,7 +209,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             var e = (T)(object)entry;
 
             insertCommand = connection.CreateCommand();
-            var insertSql = GetInsertSql(isUpsert, toTableName);
+            var insertSql = GetUpsertSql(toTableName);
             insertCommand.CommandText = insertSql;
             SetCommandParameters(insertCommand, e);
             result = await insertCommand.ExecuteNonQueryAsync();
@@ -334,35 +376,36 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         return deleteSql;
     }
 
-    private string GetInsertSql(bool isUpsert, string? tableName = null)
+    private string GetInsertSql(string? tableName = null)
     {
         if (_properties.IsNullOrEmpty())
             return "";
 
         tableName ??= _defaultTableName;
 
-        if (isUpsert && UpsertSqls.TryGetValue(tableName, out var upsertSql) && !upsertSql.IsBlank())
-        {
-            return upsertSql;
-        }
-
-        if (!isUpsert && InsertSqls.TryGetValue(tableName, out var insertSql) && !insertSql.IsBlank())
+        if (InsertSqls.TryGetValue(tableName, out var insertSql) && !insertSql.IsBlank())
         {
             return insertSql;
         }
 
-        if (isUpsert)
-        {
-            upsertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
-            UpsertSqls[tableName] = upsertSql;
+        insertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, tableName);
+        InsertSqls[tableName] = insertSql;
+        return insertSql;
+    }
+
+    private string GetUpsertSql(string? tableName = null)
+    {
+        if (_properties.IsNullOrEmpty())
+            return "";
+
+        tableName ??= _defaultTableName;
+
+        if (UpsertSqls.TryGetValue(tableName, out var upsertSql) && !upsertSql.IsBlank())
             return upsertSql;
-        }
-        else
-        {
-            insertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, isUpsert, tableName);
-            InsertSqls[tableName] = insertSql;
-            return insertSql;
-        }
+
+        upsertSql = _storage.SqlHelper.CreateUpsertSql<T>(_placeholderPrefix, tableName);
+        UpsertSqls[tableName] = upsertSql;
+        return upsertSql;
     }
 
     private bool TryAutoIncrement(string name, out long newValue)
@@ -418,7 +461,8 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
 public interface ISqlWriter
 {
-    Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null);
+    Task<int> UpsertOne<T>(T entry, string? tableNameOverride = null);
+    Task<int> InsertOne<T>(T entry, string? tableNameOverride = null);
     Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null);
     Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null);
     Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null);

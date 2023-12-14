@@ -21,7 +21,18 @@
     },
     "PROD": {
       "commandName": "Project",
-      "commandLineArgs": "PROD",
+      "commandLineArgs": "PROD true",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": ""
+    },
+    "UAT": {
+      "commandName": "Project",
+      "commandLineArgs": "UAT true",
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {

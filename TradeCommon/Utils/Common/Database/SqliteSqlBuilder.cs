@@ -12,7 +12,7 @@ namespace Common.Database;
 
 public class SqliteSqlBuilder : IDatabaseSqlBuilder
 {
-    public string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null) where T : class
+    public string CreateInsertSql<T>(char placeholderPrefix, string? tableNameOverride = null) where T : class
     {
         var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
         if (attr == null) throw new InvalidOperationException("Must provide table name.");
@@ -46,44 +46,10 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
             sb.Append(targetFieldNamePlaceHolders[name]).Append(",");
         }
         sb.RemoveLast();
-        sb.Append(')').AppendLine();
-
-        if (isUpsert)
-        {
-            for (int i = 0; i < uniqueKeyTuples.Count; i++)
-            {
-                UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
-                var uniqueKeyNames = uniqueKeyTuple.FieldNames;
-                if (uniqueKeyNames.IsNullOrEmpty())
-                    continue;
-
-                // ON CONFLICT (...)
-                sb.Append("ON CONFLICT (");
-                foreach (var fn in uniqueKeyNames)
-                {
-                    sb.Append(fn).Append(',');
-                }
-                sb.RemoveLast();
-                sb.Append(')').AppendLine();
-
-                // DO UPDATE SET ...
-                sb.Append("DO UPDATE SET ");
-                foreach (var fn in targetFieldNames)
-                {
-                    if (ignoreFieldNames.Contains(fn))
-                        continue;
-                    if (uniqueKeyNames.Contains(fn))
-                        continue;
-
-                    sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
-                }
-                sb.RemoveLast();
-                sb.AppendLine();
-            }
-        }
+        sb.Append(')');
         return sb.ToString();
     }
-    
+
     // TODO
     public string CreateUpsertSql<T>(char placeholderPrefix, string? tableNameOverride = null) where T : class
     {
@@ -121,38 +87,35 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
         sb.RemoveLast();
         sb.Append(')').AppendLine();
 
-        if (isUpsert)
+        for (int i = 0; i < uniqueKeyTuples.Count; i++)
         {
-            for (int i = 0; i < uniqueKeyTuples.Count; i++)
+            UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
+            var uniqueKeyNames = uniqueKeyTuple.FieldNames;
+            if (uniqueKeyNames.IsNullOrEmpty())
+                continue;
+
+            // ON CONFLICT (...)
+            sb.Append("ON CONFLICT (");
+            foreach (var fn in uniqueKeyNames)
             {
-                UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
-                var uniqueKeyNames = uniqueKeyTuple.FieldNames;
-                if (uniqueKeyNames.IsNullOrEmpty())
+                sb.Append(fn).Append(',');
+            }
+            sb.RemoveLast();
+            sb.Append(')').AppendLine();
+
+            // DO UPDATE SET ...
+            sb.Append("DO UPDATE SET ");
+            foreach (var fn in targetFieldNames)
+            {
+                if (ignoreFieldNames.Contains(fn))
+                    continue;
+                if (uniqueKeyNames.Contains(fn))
                     continue;
 
-                // ON CONFLICT (...)
-                sb.Append("ON CONFLICT (");
-                foreach (var fn in uniqueKeyNames)
-                {
-                    sb.Append(fn).Append(',');
-                }
-                sb.RemoveLast();
-                sb.Append(')').AppendLine();
-
-                // DO UPDATE SET ...
-                sb.Append("DO UPDATE SET ");
-                foreach (var fn in targetFieldNames)
-                {
-                    if (ignoreFieldNames.Contains(fn))
-                        continue;
-                    if (uniqueKeyNames.Contains(fn))
-                        continue;
-
-                    sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
-                }
-                sb.RemoveLast();
-                sb.AppendLine();
+                sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
             }
+            sb.RemoveLast();
+            sb.AppendLine();
         }
         return sb.ToString();
     }

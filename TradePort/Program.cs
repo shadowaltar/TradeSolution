@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OfficeOpenXml;
 using Swashbuckle.AspNetCore.SwaggerGen;
-using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -36,9 +35,22 @@ public class Program
             .ToDictionary(e => e, e => new EnvironmentConfig(e));
     }
 
-    private static void Main(string[] args)
+    private static int Main(string[] args)
     {
+        if (args.Length == 0)
+        {
+            _log.Error("Must specify environment string.");
+            return -1;
+        }
         var envString = args.IsNullOrEmpty() ? "PROD" : args[0].ToUpperInvariant();
+
+        // if true, do not append env string to the path
+        var skipEnvStringInApiPath = false;
+        if (args.Length == 2 && bool.TryParse(args[1], out var trueThenSkip) && trueThenSkip)
+        {
+            skipEnvStringInApiPath = true;
+        }
+
         _environment = TradeCommon.Constants.Environments.Parse(envString);
         _log.Info("Selected environment: " + _environment);
 
@@ -148,12 +160,15 @@ public class Program
             var subPath = _envConfigs[_environment].SubUrl;
             c.PreSerializeFilters.Add((swagger, httpReq) =>
             {
-                var oldPaths = swagger.Paths.ToDictionary(e => e.Key, e => e.Value);
-                foreach (var path in oldPaths)
+                if (skipEnvStringInApiPath) return;
+
+                var oldPaths = swagger.Paths.Select(e => (e.Key, e.Value)).ToList();
+                foreach (var (path, pathItem) in oldPaths)
                 {
-                    var newPath = Path.Join(subPath, path.Key); // must start with '/'
-                    swagger.Paths.Remove(path.Key);
-                    swagger.Paths.Add(newPath, path.Value);
+                    var newPath = path;
+                    newPath = Path.Join(subPath, newPath); // must start with '/'
+                    swagger.Paths.Remove(path);
+                    swagger.Paths.Add(newPath, pathItem);
                 }
             });
         });
@@ -184,6 +199,7 @@ public class Program
         var broker = _environment == EnvironmentType.Simulation ? BrokerType.Simulator : ExternalNames.Convert(exchange);
         context!.Initialize(_environment, exchange, broker);
         _app.Run();
+        return 0;
     }
 
     private class TitleFilter : IDocumentFilter

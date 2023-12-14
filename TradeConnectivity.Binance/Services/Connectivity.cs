@@ -110,8 +110,8 @@ public class Connectivity : IExternalConnectivityManagement
         if (!Firewall.CanCall)
             return -1;
 
-        var milliseconds = new double[10];
-        Parallel.For(0, 10, i =>
+        var milliseconds = new double[5];
+        Parallel.For(0, 5, i =>
         {
             try
             {

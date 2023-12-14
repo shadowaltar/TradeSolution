@@ -35,7 +35,8 @@ public interface IStorage
     Task<int> MoveToError<T>(T entry) where T : SecurityRelatedEntry, new();
 
     Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null) where T : class, new();
-    Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null) where T : class, new();
+    Task<int> InsertOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
+    Task<int> UpsertOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
     Task<int> Insert(PersistenceTask task);
     Task<int> Insert<T>(PersistenceTask task) where T : class, new();
     Task<int> InsertOrderBooks(List<ExtendedOrderBook> orderBooks, string tableName);

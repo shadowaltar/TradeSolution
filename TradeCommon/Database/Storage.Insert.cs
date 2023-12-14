@@ -77,10 +77,11 @@ public partial class Storage
             _log.Warn("Invalid db action type.");
             return 0;
         }
+        var isUpsert = task.Action == DatabaseActionType.Upsert;
         var entry = task.GetEntry<T>();
         if (entry != null)
         {
-            var count = await InsertOne(entry, task.Action == DatabaseActionType.Upsert);
+            var count = isUpsert ? await UpsertOne(entry) : await InsertOne(entry);
             if (_log.IsDebugEnabled)
                 _log.Debug($"Persisted {count} entry into database: {typeof(T).Name}");
             return count;
@@ -89,7 +90,7 @@ public partial class Storage
         var entries = task.GetEntries<T>();
         if (!entries.IsNullOrEmpty())
         {
-            var count = await InsertMany(entries, task.Action == DatabaseActionType.Upsert);
+            var count = await InsertMany(entries, isUpsert);
             if (_log.IsDebugEnabled)
                 _log.Debug($"Persisted {count} entries into database: {typeof(T).Name}");
             return count;
@@ -97,11 +98,18 @@ public partial class Storage
         throw Exceptions.Impossible();
     }
 
-    public async Task<int> InsertOne<T>(T entry, bool isUpsert, string? tableNameOverride = null) where T : class, new()
+    public async Task<int> InsertOne<T>(T entry, string? tableNameOverride = null) where T : class, new()
     {
         var writer = _writers.Get<T>();
         var (t, _) = DatabaseNames.GetTableAndDatabaseName(entry);
-        return await writer.InsertOne(entry, isUpsert, tableNameOverride ?? t);
+        return await writer.InsertOne(entry, tableNameOverride ?? t);
+    }
+
+    public async Task<int> UpsertOne<T>(T entry, string? tableNameOverride = null) where T : class, new()
+    {
+        var writer = _writers.Get<T>();
+        var (t, _) = DatabaseNames.GetTableAndDatabaseName(entry);
+        return await writer.UpsertOne(entry, tableNameOverride ?? t);
     }
 
     public async Task<int> InsertMany<T>(IList<T> entries, bool isUpsert, string? tableNameOverride = null) where T : class, new()

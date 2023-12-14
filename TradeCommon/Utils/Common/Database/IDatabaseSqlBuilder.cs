@@ -2,7 +2,9 @@
 
 public interface IDatabaseSqlBuilder
 {
-    string CreateInsertSql<T>(char placeholderPrefix, bool isUpsert, string? tableNameOverride = null) where T : class;
+    string CreateUpsertSql<T>(char placeholderPrefix, string? tableNameOverride = null) where T : class;
+
+    string CreateInsertSql<T>(char placeholderPrefix, string? tableNameOverride = null) where T : class;
 
     string CreateDropTableAndIndexSql<T>(string? tableNameOverride = null) where T : class;
 

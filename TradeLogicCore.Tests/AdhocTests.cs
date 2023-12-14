@@ -36,41 +36,41 @@ public class AdhocTests
         cmd.CommandText = createSql;
         await cmd.ExecuteNonQueryAsync();
 
-        var sql = sqlBuilder.CreateInsertSql<TestObject>(placeholderPrefix, true);
+        var sql = sqlBuilder.CreateInsertSql<TestObject>(placeholderPrefix);
         var objects = new List<TestObject> { object1, objectIdConflict, objectExIdConflict };
         cmd.CommandText = sql;
 
-//        var t1 = @"INSERT INTO Tests
-//            (Id,ExternalId,Result)
-//VALUES
-//(1,2,'tt1')
-//ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-//ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-//ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-//        cmd.CommandText = t1;
-//        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
+        //        var t1 = @"INSERT INTO Tests
+        //            (Id,ExternalId,Result)
+        //VALUES
+        //(1,2,'tt1')
+        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
+        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
+        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
+        //        cmd.CommandText = t1;
+        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
 
-//        var t2 = @"INSERT INTO Tests
-//            (Id,ExternalId,Result)
-//VALUES
-//(2,2,'tt2')
-//ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-//ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-//ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-//        cmd.CommandText = t2;
-//        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
+        //        var t2 = @"INSERT INTO Tests
+        //            (Id,ExternalId,Result)
+        //VALUES
+        //(2,2,'tt2')
+        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
+        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
+        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
+        //        cmd.CommandText = t2;
+        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
 
-//        var t3 = @"INSERT INTO Tests
-//            (Id,ExternalId,Result)
-//VALUES
-//(2,3,'tt3')
-//ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-//ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-//ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-//        cmd.CommandText = t3;
-//        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
-        
-        
+        //        var t3 = @"INSERT INTO Tests
+        //            (Id,ExternalId,Result)
+        //VALUES
+        //(2,3,'tt3')
+        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
+        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
+        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
+        //        cmd.CommandText = t3;
+        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
+
+
 
         foreach (var obj in objects)
         {
