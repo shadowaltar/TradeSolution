@@ -19,8 +19,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
 
         var tableName = tableNameOverride ?? attr.TableName;
         var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        var uniqueKeyNames = typeof(T).GetDistinctAttributes<UniqueAttribute>()
-            .FirstOrDefault()?.FieldNames ?? Array.Empty<string>();
+        var uniqueKeyTuples = typeof(T).GetDistinctAttributes<UniqueAttribute>();
         var targetFieldNames = properties.Select(pair => pair.Key).ToList();
         var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
 
@@ -39,7 +38,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
         sb.Append(')').AppendLine();
 
         // VALUES (...)
-        sb.AppendLine("VALUES").AppendLine().Append('(');
+        sb.AppendLine("VALUES").Append('(');
         foreach (var name in targetFieldNames)
         {
             if (ignoreFieldNames.Contains(name))
@@ -49,29 +48,111 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
         sb.RemoveLast();
         sb.Append(')').AppendLine();
 
-        if (isUpsert && !uniqueKeyNames.IsNullOrEmpty())
+        if (isUpsert)
         {
-            // ON CONFLICT (...)
-            sb.Append("ON CONFLICT (");
-            foreach (var fn in uniqueKeyNames)
+            for (int i = 0; i < uniqueKeyTuples.Count; i++)
             {
-                sb.Append(fn).Append(',');
-            }
-            sb.RemoveLast();
-            sb.Append(')').AppendLine();
-
-            // DO UPDATE SET ...
-            sb.Append("DO UPDATE SET ");
-            foreach (var fn in targetFieldNames)
-            {
-                if (ignoreFieldNames.Contains(fn))
-                    continue;
-                if (uniqueKeyNames.Contains(fn))
+                UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
+                var uniqueKeyNames = uniqueKeyTuple.FieldNames;
+                if (uniqueKeyNames.IsNullOrEmpty())
                     continue;
 
-                sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
+                // ON CONFLICT (...)
+                sb.Append("ON CONFLICT (");
+                foreach (var fn in uniqueKeyNames)
+                {
+                    sb.Append(fn).Append(',');
+                }
+                sb.RemoveLast();
+                sb.Append(')').AppendLine();
+
+                // DO UPDATE SET ...
+                sb.Append("DO UPDATE SET ");
+                foreach (var fn in targetFieldNames)
+                {
+                    if (ignoreFieldNames.Contains(fn))
+                        continue;
+                    if (uniqueKeyNames.Contains(fn))
+                        continue;
+
+                    sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
+                }
+                sb.RemoveLast();
+                sb.AppendLine();
             }
-            sb.RemoveLast();
+        }
+        return sb.ToString();
+    }
+    
+    // TODO
+    public string CreateUpsertSql<T>(char placeholderPrefix, string? tableNameOverride = null) where T : class
+    {
+        var attr = typeof(T).GetCustomAttribute<StorageAttribute>();
+        if (attr == null) throw new InvalidOperationException("Must provide table name.");
+
+        var tableName = tableNameOverride ?? attr.TableName;
+        var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
+        var uniqueKeyTuples = typeof(T).GetDistinctAttributes<UniqueAttribute>();
+        var targetFieldNames = properties.Select(pair => pair.Key).ToList();
+        var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
+
+        var ignoreFieldNames = ReflectionUtils.GetAttributeInfo<T>().DatabaseIgnoredPropertyNames;
+
+        // INSERT INTO (...)
+        var sb = new StringBuilder()
+            .Append("INSERT INTO ").AppendLine(tableName).Append('(');
+        foreach (var name in targetFieldNames)
+        {
+            if (ignoreFieldNames.Contains(name))
+                continue;
+            sb.Append(name).Append(",");
+        }
+        sb.RemoveLast();
+        sb.Append(')').AppendLine();
+
+        // VALUES (...)
+        sb.AppendLine("VALUES").Append('(');
+        foreach (var name in targetFieldNames)
+        {
+            if (ignoreFieldNames.Contains(name))
+                continue;
+            sb.Append(targetFieldNamePlaceHolders[name]).Append(",");
+        }
+        sb.RemoveLast();
+        sb.Append(')').AppendLine();
+
+        if (isUpsert)
+        {
+            for (int i = 0; i < uniqueKeyTuples.Count; i++)
+            {
+                UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
+                var uniqueKeyNames = uniqueKeyTuple.FieldNames;
+                if (uniqueKeyNames.IsNullOrEmpty())
+                    continue;
+
+                // ON CONFLICT (...)
+                sb.Append("ON CONFLICT (");
+                foreach (var fn in uniqueKeyNames)
+                {
+                    sb.Append(fn).Append(',');
+                }
+                sb.RemoveLast();
+                sb.Append(')').AppendLine();
+
+                // DO UPDATE SET ...
+                sb.Append("DO UPDATE SET ");
+                foreach (var fn in targetFieldNames)
+                {
+                    if (ignoreFieldNames.Contains(fn))
+                        continue;
+                    if (uniqueKeyNames.Contains(fn))
+                        continue;
+
+                    sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
+                }
+                sb.RemoveLast();
+                sb.AppendLine();
+            }
         }
         return sb.ToString();
     }
@@ -168,7 +249,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
         var varcharColumnLengths = new Dictionary<string, int>();
         foreach (var (name, property) in propertyList)
         {
-            typeStrings[name] =TypeConverter.ToSqliteType(property.PropertyType);
+            typeStrings[name] = TypeConverter.ToSqliteType(property.PropertyType);
             var propAttributes = property.GetCustomAttributes().ToList();
             if (recordPropertyAttributes.TryGetValue(name, out var otherAttributes))
             {
@@ -265,7 +346,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
 
         foreach (var attr in uniqueAttributes)
         {
-            sb.Append($"CREATE UNIQUE INDEX ")
+            sb.Append($"CREATE UNIQUE INDEX IF NOT EXISTS ")
                 .Append("UX_").Append(table).Append('_')
                 .AppendJoin('_', attr.FieldNames)
                 .AppendLine()

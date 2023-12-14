@@ -205,7 +205,7 @@ public static class StringExtensions
         var trimmedEmail = email.Trim();
 
         return !trimmedEmail.EndsWith(".") && !trimmedEmail.Contains(' ')
-&& MailAddress.TryCreate(email, out var addr) && addr.Address == trimmedEmail;
+            && MailAddress.TryCreate(email, out var addr) && addr.Address == trimmedEmail;
     }
 
     public static StringBuilder RemoveLast(this StringBuilder sb)

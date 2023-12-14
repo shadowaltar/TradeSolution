@@ -54,9 +54,6 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
         _placeholderPrefix = placeholderPrefix;
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
-        // only the 'primary' (the 1st) unique attribute will be used as the members
-        // for UNIQUE() clause
-        // the other unique attributes are only for indexes
         _uniqueKeyNames = ReflectionUtils.GetAttributeInfo<T>().PrimaryUniqueKey.ToArray();
         _targetFieldNames = _properties.Select(pair => pair.Key).ToArray();
         _targetFieldNamePlaceHolders = _targetFieldNames.ToDictionary(fn => fn, fn => _placeholderPrefix + fn);

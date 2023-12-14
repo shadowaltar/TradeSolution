@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     UpdateTime DATE,
     UNIQUE(Name, Environment)
 );
-CREATE UNIQUE INDEX IX_{tableName}_name_environment
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_name_environment
     ON {tableName} (Name, Environment);
-CREATE UNIQUE INDEX IX_{tableName}_email_environment
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_email_environment
     ON {tableName} (Email, Environment);
 ";
 
@@ -97,9 +97,9 @@ CREATE TABLE IF NOT EXISTS {DatabaseNames.AccountTable} (
     UpdateTime DATE,
     UNIQUE(Name, Environment)
 );
-CREATE UNIQUE INDEX IX_{DatabaseNames.AccountTable}_name_environment
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{DatabaseNames.AccountTable}_name_environment
     ON {DatabaseNames.AccountTable} (Name, Environment);
-CREATE UNIQUE INDEX IX_{DatabaseNames.AccountTable}_ownerId
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{DatabaseNames.AccountTable}_ownerId
     ON {DatabaseNames.AccountTable} (OwnerId);
 ";
 
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     LocalEndDate DATE NOT NULL,
     UNIQUE(Code, Exchange)
 );
-CREATE UNIQUE INDEX IX_{tableName}_Code_Exchange
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_Code_Exchange
     ON {tableName} (Code, Exchange);
 ";
         await DropThenCreate(dropSql, createSql, tableName, DatabaseNames.StaticData);
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     QuantityPrecision REAL,
     UNIQUE(Code, BaseCurrency, QuoteCurrency, Exchange)
 );
-CREATE UNIQUE INDEX IX_{tableName}_Code_Exchange
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_Code_Exchange
     ON {tableName} (Code, Exchange);
 ";
 
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     StartTime INT NOT NULL,
     UNIQUE(SecurityId, StartTime)
 );
-CREATE UNIQUE INDEX IX_{tableName}_SecurityId_StartTime
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_SecurityId_StartTime
 ON {tableName} (SecurityId, StartTime);
 CREATE INDEX IX_{tableName}_SecurityId
 ON {tableName} (SecurityId);
@@ -290,7 +290,7 @@ CREATE TABLE IF NOT EXISTS {tableName} (
     Time DATE NOT NULL,
 {bidPart}{askPart}    UNIQUE (SecurityId, Time)
 );
-CREATE UNIQUE INDEX UX_{tableName}_SecurityId_Time
+CREATE UNIQUE INDEX IF NOT EXISTS UX_{tableName}_SecurityId_Time
     ON {tableName} (SecurityId, Time);
 CREATE INDEX UX_{tableName}_SecurityId
     ON {tableName} (SecurityId);
@@ -368,7 +368,7 @@ DROP INDEX IF EXISTS IX_{DatabaseNames.FinancialStatsTable}_SecurityId;
     SecurityId INTEGER NOT NULL,
     MarketCap REAL NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX IX_{DatabaseNames.FinancialStatsTable}_SecurityId
+CREATE UNIQUE INDEX IF NOT EXISTS IX_{DatabaseNames.FinancialStatsTable}_SecurityId
 ON {DatabaseNames.FinancialStatsTable} (SecurityId);
 ";
 

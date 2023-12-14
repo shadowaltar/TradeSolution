@@ -55,7 +55,6 @@ public class OrderBookCache
                 clonedCache.Add(clone);
             }
             _cache.Clear();
-            _log.Info($"Wrote OB, {clonedCache.First().Time:HHmmss.fff}->{clonedCache.Last().Time:HHmmss.fff}; Count: {clonedCache.Count}");
             AsyncHelper.RunSync(() => _storage.InsertOrderBooks(clonedCache, _orderBookTableName));
 
             // back to continuous cache mode after one more flushing

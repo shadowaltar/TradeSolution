@@ -281,8 +281,9 @@ public static class DatabaseNames
 
             var table = storageAttr.TableName;
             var database = storageAttr.DatabaseName;
-            if (table.IsBlank() || database.IsBlank()) throw Exceptions.InvalidStorageDefinition();
-            if (!database.EndsWith(DatabaseSuffix))
+            if (table.IsBlank())
+                throw Exceptions.InvalidStorageDefinition();
+            if (!database.IsBlank() && !database.EndsWith(DatabaseSuffix))
                 database += DatabaseSuffix;
             existing = (table, database);
             _tableDatabaseNamesByType[type] = existing;
