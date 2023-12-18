@@ -347,12 +347,12 @@ CREATE INDEX UX_{tableName}_Time
         return tableNames;
     }
 
-    public async Task<long> GetMax(string fieldName, string tableName, string databaseName)
+    public long GetMax(string fieldName, string tableName, string databaseName)
     {
-        using var connection = await Connect(databaseName);
+        using var connection = Connect(databaseName);
         using var command = connection.CreateCommand();
         command.CommandText = $"SELECT MAX({fieldName}) FROM {tableName}";
-        object? r = await command.ExecuteScalarAsync();
+        object? r = command.ExecuteScalar();
         return r is long maxId ? maxId : long.MinValue;
     }
 
@@ -377,7 +377,7 @@ ON {DatabaseNames.FinancialStatsTable} (SecurityId);
 
     private async Task DropThenCreate(string dropSql, string createSql, string tableName, string databaseName)
     {
-        using var connection = await Connect(databaseName);
+        using var connection = await ConnectAsync(databaseName);
         using var dropCommand = connection.CreateCommand();
         dropCommand.CommandText = dropSql;
         await dropCommand.ExecuteNonQueryAsync();

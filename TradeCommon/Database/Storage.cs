@@ -48,7 +48,7 @@ public partial class Storage : IStorage
     {
         if (databaseNames.Length == 0)
             throw Exceptions.Invalid("At least one database must be specified");
-        var connection = await Connect(databaseNames[0]);
+        var connection = await ConnectAsync(databaseNames[0]);
         if (databaseNames.Length > 1)
         {
             using var cmd = connection.CreateCommand();
@@ -87,7 +87,7 @@ public partial class Storage : IStorage
     {
         var entries = new DataTable();
 
-        using var connection = await Connect(database);
+        using var connection = await ConnectAsync(database);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
 
@@ -141,7 +141,7 @@ public partial class Storage : IStorage
     {
         var entries = new DataTable();
 
-        using var connection = await Connect(database);
+        using var connection = await ConnectAsync(database);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
 
@@ -182,7 +182,7 @@ public partial class Storage : IStorage
     /// <returns></returns>
     public async Task<int> RunOne(string sql, string database)
     {
-        using var connection = await Connect(database);
+        using var connection = await ConnectAsync(database);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
 
@@ -196,7 +196,7 @@ public partial class Storage : IStorage
     public async Task<int> RunMany(List<string> sqls, string database)
     {
         var count = 0;
-        using var connection = await Connect(database);
+        using var connection = await ConnectAsync(database);
         using var transaction = connection.BeginTransaction();
         try
         {
@@ -229,11 +229,11 @@ public partial class Storage : IStorage
     {
         if (tableName.IsBlank()) return false;
         if (database.IsBlank()) return false;
-        const string sql = $"SELECT name FROM sqlite_master WHERE type='table' AND name=@Name;";
-        using var conn = await Connect(database);
+        const string sql = $"SELECT name FROM sqlite_master WHERE type='table' AND name=$Name;";
+        using var conn = await ConnectAsync(database);
         using var command = conn.CreateCommand();
         command.CommandText = sql;
-        command.Parameters.AddWithValue("@Name", tableName);
+        command.Parameters.AddWithValue("$Name", tableName);
         object? r = await command.ExecuteScalarAsync();
         return r != null;
     }
@@ -264,10 +264,24 @@ public partial class Storage : IStorage
         return $"Data Source={Path.Combine(Consts.DatabaseFolder, _environmentString, databaseName)}.db";
     }
 
-    private async Task<SqliteConnection> Connect(string database)
+    private async Task<SqliteConnection> ConnectAsync(string databaseName)
+    {
+        var conn = new SqliteConnection(GetConnectionString(databaseName));
+        await conn.OpenAsync();
+        return conn;
+    }
+
+    private SqliteConnection Connect(string database)
     {
         var conn = new SqliteConnection(GetConnectionString(database));
-        await conn.OpenAsync();
+        conn.Open();
+        return conn;
+    }
+
+    private SqliteConnection ConnectToDatabaseFile(string databaseFilePath)
+    {
+        var conn = new SqliteConnection($"Data Source={databaseFilePath}");
+        conn.Open();
         return conn;
     }
 

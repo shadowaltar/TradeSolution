@@ -60,63 +60,36 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
         var properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
         var uniqueKeyTuples = typeof(T).GetDistinctAttributes<UniqueAttribute>();
         var targetFieldNames = properties.Select(pair => pair.Key).ToList();
-        var targetFieldNamePlaceHolders = targetFieldNames.ToDictionary(fn => fn, fn => placeholderPrefix + fn);
-
         var ignoreFieldNames = ReflectionUtils.GetAttributeInfo<T>().DatabaseIgnoredPropertyNames;
 
-        // INSERT INTO (...)
+        // DELETE the uniques
         var sb = new StringBuilder()
-            .Append("INSERT INTO ").AppendLine(tableName).Append('(');
-        foreach (var name in targetFieldNames)
-        {
-            if (ignoreFieldNames.Contains(name))
-                continue;
-            sb.Append(name).Append(",");
-        }
-        sb.RemoveLast();
-        sb.Append(')').AppendLine();
-
-        // VALUES (...)
-        sb.AppendLine("VALUES").Append('(');
-        foreach (var name in targetFieldNames)
-        {
-            if (ignoreFieldNames.Contains(name))
-                continue;
-            sb.Append(targetFieldNamePlaceHolders[name]).Append(",");
-        }
-        sb.RemoveLast();
-        sb.Append(')').AppendLine();
+            .Append("DELETE FROM ").AppendLine(tableName).Append('\t').Append("WHERE ");
 
         for (int i = 0; i < uniqueKeyTuples.Count; i++)
         {
-            UniqueAttribute? uniqueKeyTuple = uniqueKeyTuples[i];
-            var uniqueKeyNames = uniqueKeyTuple.FieldNames;
-            if (uniqueKeyNames.IsNullOrEmpty())
-                continue;
-
-            // ON CONFLICT (...)
-            sb.Append("ON CONFLICT (");
-            foreach (var fn in uniqueKeyNames)
+            UniqueAttribute? uniqueAttr = uniqueKeyTuples[i];
+            var names = uniqueAttr.FieldNames;
+            sb.Append('(');
+            for (int j = 0; j < names.Length; j++)
             {
-                sb.Append(fn).Append(',');
+                string? name = names[j];
+                sb.Append(name).Append(" = ").Append(placeholderPrefix).Append(name);
+                if (j != names.Length - 1)
+                {
+                    sb.Append(" AND ");
+                }
             }
-            sb.RemoveLast();
-            sb.Append(')').AppendLine();
-
-            // DO UPDATE SET ...
-            sb.Append("DO UPDATE SET ");
-            foreach (var fn in targetFieldNames)
+            sb.Append(')');
+            if (i != uniqueKeyTuples.Count - 1)
             {
-                if (ignoreFieldNames.Contains(fn))
-                    continue;
-                if (uniqueKeyNames.Contains(fn))
-                    continue;
-
-                sb.Append(fn).Append(" = excluded.").Append(fn).Append(',');
+                sb.Append(" OR ");
             }
-            sb.RemoveLast();
-            sb.AppendLine();
         }
+        sb.Append(';').AppendLine();
+
+        var insertSql = CreateInsertSql<T>(placeholderPrefix, tableName);
+        sb.Append(insertSql).Append(';');
         return sb.ToString();
     }
 

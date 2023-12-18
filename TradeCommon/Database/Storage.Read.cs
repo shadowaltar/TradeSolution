@@ -53,7 +53,7 @@ public partial class Storage
 
     public async Task<User?> ReadUser(string userName, string email, EnvironmentType environment)
     {
-        var un = userName.ToLowerInvariant().Trim();
+        var un = userName.ToUpperInvariant().Trim();
         var em = email.ToLowerInvariant().Trim();
         if (un.IsBlank() && em.IsBlank())
         {
@@ -81,6 +81,7 @@ WHERE
 
     public async Task<Account?> ReadAccount(string accountName)
     {
+        accountName = accountName.ToUpperInvariant();
         var sqlPart = SqlReader<Account>.GetSelectClause();
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Account>();
         var sql = @$"{sqlPart} FROM {tableName} WHERE Name = $Name";
@@ -498,7 +499,7 @@ WHERE
         if (end != null)
             sql += $" AND StartTime <= $EndTime";
 
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
 
         using var command = connection.CreateCommand();
         command.CommandText = sql;
@@ -542,7 +543,7 @@ WHERE
 LIMIT $EntryCount
 ";
 
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
 
         using var command = connection.CreateCommand();
         command.CommandText = sql;
@@ -594,7 +595,7 @@ WHERE
         var securityMap = securities.ToDictionary(s => s.Id, s => s);
         sql = sql + "(" + string.Join(",", ids.Select(p => p.param)) + ")";
 
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("$StartTime", start);
@@ -636,7 +637,7 @@ WHERE
     public async Task<List<ExtendedOrderBook>> ReadOrderBooks(Security security, int level, DateTime date)
     {
         var tableName = DatabaseNames.GetOrderBookTableName(security.Code, security.ExchangeType, level);
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
         using var command = connection.CreateCommand();
         command.CommandText = $"SELECT * FROM {tableName} WHERE SecurityId = {security.Id} AND DATE(Time) = '{date:yyyy-MM-dd}'";
         using var r = await command.ExecuteReaderAsync();

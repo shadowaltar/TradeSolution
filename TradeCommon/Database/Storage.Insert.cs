@@ -128,7 +128,7 @@ public partial class Storage
         var first = orderBooks[0];
         var level = first.Bids.Count; // assuming all order books have the same level of depth.
 
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
         using var transaction = connection.BeginTransaction();
 
         var count = 0;
@@ -226,7 +226,7 @@ DO UPDATE SET
 ;
 ";
 
-        using var connection = await Connect(DatabaseNames.StaticData);
+        using var connection = await ConnectAsync(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
 
         try
@@ -288,7 +288,7 @@ DO UPDATE SET
 ;
 ";
 
-        using var connection = await Connect(DatabaseNames.StaticData);
+        using var connection = await ConnectAsync(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
 
         var count = 0;
@@ -360,7 +360,7 @@ DO UPDATE SET
     Volume = excluded.Volume;
 ";
         var count = 0;
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
         using var transaction = connection.BeginTransaction();
 
         SqliteCommand? command = null;
@@ -426,7 +426,7 @@ DO UPDATE SET
     Volume = excluded.Volume;
 ";
         var count = 0;
-        using var connection = await Connect(DatabaseNames.MarketData);
+        using var connection = await ConnectAsync(DatabaseNames.MarketData);
         SqliteCommand? command = null;
         try
         {
@@ -474,7 +474,7 @@ VALUES
 ON CONFLICT (SecurityId)
 DO UPDATE SET MarketCap = excluded.MarketCap;
 ";
-        using var connection = await Connect(DatabaseNames.StaticData);
+        using var connection = await ConnectAsync(DatabaseNames.StaticData);
         using var transaction = connection.BeginTransaction();
 
         SqliteCommand? command = null;

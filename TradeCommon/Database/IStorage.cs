@@ -1,5 +1,4 @@
-﻿using Common.Database;
-using System.Data;
+﻿using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Accounts;
@@ -13,11 +12,8 @@ using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 
 namespace TradeCommon.Database;
-public interface IStorage
+public interface IStorage : IDatabase
 {
-    event Action<object, string> Success;
-    event Action<object, Exception, string> Failed;
-    IDatabaseSqlBuilder SqlHelper { get; }
     void SetEnvironment(EnvironmentType environment);
     Task<bool> IsTableExists(string tableName, string databaseName);
     Task CreateAccountTable();
@@ -84,8 +80,6 @@ public interface IStorage
     
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);
-
-    Task<long> GetMax(string fieldName, string tableName, string databaseName);
 
     Task<bool> CheckTableExists(string tableName, string database);
 

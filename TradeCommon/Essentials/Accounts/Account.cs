@@ -20,7 +20,7 @@ public class Account : ITimeRelatedEntry
     public int Id { get; set; } = 0;
 
     /// <summary>
-    /// Name of account;
+    /// Name of account; it must be stored in UPPER-CASE internally.
     /// </summary>
     [NotBlank]
     public string Name { get; set; } = "";

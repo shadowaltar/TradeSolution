@@ -2,12 +2,13 @@
 using Common.Attributes;
 using Common.Database;
 using Microsoft.Data.Sqlite;
-using NUnit.Framework;
+using Moq;
+using TradeCommon.Database;
 
 namespace TradeLogicCore.Tests;
 
 [TestFixture()]
-public class AdhocTests
+public class DatabaseCaseTests
 {
     [Test()]
     public async Task MultiUniqueAttrSqliteUpsertTest()
@@ -20,57 +21,38 @@ public class AdhocTests
         var sqlBuilder = new SqliteSqlBuilder();
         var valueGetter = ReflectionUtils.GetValueGetter<TestObject>();
 
-        using var conn = new SqliteConnection("Data Source=C:\\TEMP\\test.db");
+        var dbMock = new Mock<IDatabase>();
+        dbMock.Setup(x => x.SqlHelper).Returns(new SqliteSqlBuilder());
+        var db = dbMock.Object;
+        var sqlWriter = new SqlWriter<TestObject>(db, "test");
+        string dropSql = db.SqlHelper.CreateDropTableAndIndexSql<TestObject>();
+        string createSql = db.SqlHelper.CreateCreateTableAndIndexSql<TestObject>();
+
+        using var conn = new SqliteConnection(sqlWriter.ConnectionString);
         await conn.OpenAsync();
         using var cmd = conn.CreateCommand();
-
-        cmd.CommandText = "SELECT sqlite_version()";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            Console.Out.WriteLine(reader[0]);
-        }
-        reader.Close();
-
-        var createSql = sqlBuilder.CreateCreateTableAndIndexSql<TestObject>();
+        cmd.CommandText = dropSql;
+        await cmd.ExecuteNonQueryAsync(); 
         cmd.CommandText = createSql;
-        await cmd.ExecuteNonQueryAsync();
+        await cmd.ExecuteNonQueryAsync(); // re-create table
 
-        var sql = sqlBuilder.CreateInsertSql<TestObject>(placeholderPrefix);
+        var sql = sqlBuilder.CreateUpsertSql<TestObject>(placeholderPrefix);
         var objects = new List<TestObject> { object1, objectIdConflict, objectExIdConflict };
         cmd.CommandText = sql;
 
-        //        var t1 = @"INSERT INTO Tests
-        //            (Id,ExternalId,Result)
-        //VALUES
-        //(1,2,'tt1')
-        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-        //        cmd.CommandText = t1;
-        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
+        // upsert one by one
+        foreach (var @object in objects)
+        {
+            var result = await sqlWriter.UpsertOne(@object);
 
-        //        var t2 = @"INSERT INTO Tests
-        //            (Id,ExternalId,Result)
-        //VALUES
-        //(2,2,'tt2')
-        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-        //        cmd.CommandText = t2;
-        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
-
-        //        var t3 = @"INSERT INTO Tests
-        //            (Id,ExternalId,Result)
-        //VALUES
-        //(2,3,'tt3')
-        //ON CONFLICT (Id) DO UPDATE SET ExternalId = excluded.ExternalId,Result = excluded.Result
-        //ON CONFLICT (ExternalId) DO UPDATE SET Id = excluded.Id,Result = excluded.Result
-        //ON CONFLICT (Id, ExternalId) DO UPDATE SET Result = excluded.Result";
-        //        cmd.CommandText = t3;
-        //        Console.WriteLine(await cmd.ExecuteNonQueryAsync());
-
-
+            cmd.CommandText = "SELECT Id, ExternalId, Result FROM " + sqlWriter.DefaultTableName;
+            using var reader = cmd.ExecuteReader();
+            Assert.That(reader.Read(), Is.True);
+            Assert.That(reader[0], Is.EqualTo(@object.Id));
+            Assert.That(reader[1], Is.EqualTo(@object.ExternalId));
+            Assert.That(reader[2], Is.EqualTo(@object.Result));
+            Assert.That(reader.Read(), Is.False);
+        }
 
         foreach (var obj in objects)
         {

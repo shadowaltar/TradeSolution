@@ -22,15 +22,17 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
     public List<string> AutoIncrementOnInsertFieldNames { get; }
 
-    private readonly IStorage _storage;
+    private readonly IDatabase _db;
     private readonly string _environmentString;
-    private readonly string _defaultTableName;
     private readonly string _databasePath;
     private readonly string _databaseName;
     private readonly char _placeholderPrefix;
 
     public event Action<object, string> Success;
     public event Action<object, Exception, string> Failed;
+
+    public virtual string ConnectionString { get; protected set; }
+    public virtual string DefaultTableName { get; protected set; }
 
     public Dictionary<string, string> InsertSqls { get; } = new();
 
@@ -42,16 +44,20 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
     public Dictionary<string, string> CreateTableAndIndexSqls { get; } = new();
 
-    public SqlWriter(IStorage storage, string environmentString, char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
+    public SqlWriter(IDatabase db, string environmentString, char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
     {
         var (t, d) = DatabaseNames.GetTableAndDatabaseName<T>();
-        _defaultTableName = t ?? throw new ArgumentNullException("Default table name");
+        DefaultTableName = t ?? throw new ArgumentNullException("Default table name");
         _databasePath = Consts.DatabaseFolder;
         _databaseName = d;
 
         if (!Directory.Exists(_databasePath))
             Directory.CreateDirectory(_databasePath);
 
+        _db = db;
+        _environmentString = environmentString;
+
+        ConnectionString = $"Data Source={Path.Combine(_databasePath, _environmentString, _databaseName)}.db";
         _placeholderPrefix = placeholderPrefix;
         _properties = ReflectionUtils.GetPropertyToName(typeof(T)).ShallowCopy();
         _uniqueKeyNames = ReflectionUtils.GetAttributeInfo<T>().PrimaryUniqueKey.ToArray();
@@ -62,9 +68,6 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             .Select(pair => pair.Key).ToList();
 
         _valueGetter = ReflectionUtils.GetValueGetter<T>();
-
-        _storage = storage;
-        _environmentString = environmentString;
     }
 
     public async Task<int> InsertOne<T1>(T1 entry, string? tableNameOverride = null)
@@ -74,7 +77,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         if (entry == null)
             return 0;
 
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         using var connection = await Connect();
         SqliteCommand? command = null;
         try
@@ -113,7 +116,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         if (entry == null)
             return 0;
 
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         using var connection = await Connect();
         using var transaction = connection.BeginTransaction();
         SqliteCommand? command = null;
@@ -156,7 +159,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         using var connection = await Connect();
         using var transaction = connection.BeginTransaction();
 
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         SqliteCommand? command = null;
         try
         {
@@ -257,7 +260,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             return 0;
 
         var result = 0;
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         using var connection = await Connect();
         SqliteCommand? command = null;
         try
@@ -294,7 +297,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         using var connection = await Connect();
         using var transaction = connection.BeginTransaction();
 
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         SqliteCommand? command = null;
         try
         {
@@ -339,26 +342,21 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
 
     public string GetDropTableAndIndexSql(string? tableNameOverride = null)
     {
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         if (DropTableAndIndexSqls.TryGetValue(tableName, out var dropSql) && !dropSql.IsBlank())
         {
             return dropSql;
         }
-        dropSql = _storage.SqlHelper.CreateDropTableAndIndexSql<T>(tableName);
+        dropSql = _db.SqlHelper.CreateDropTableAndIndexSql<T>(tableName);
         DropTableAndIndexSqls[tableName] = dropSql;
         return dropSql;
     }
 
     protected virtual async Task<SqliteConnection> Connect()
     {
-        var conn = new SqliteConnection(GetConnectionString());
+        var conn = new SqliteConnection(ConnectionString);
         await conn.OpenAsync();
         return conn;
-    }
-
-    protected virtual string? GetConnectionString()
-    {
-        return $"Data Source={Path.Combine(_databasePath, _environmentString, _databaseName)}.db";
     }
 
     private string GetDeleteSql(string? tableNameOverride = null)
@@ -366,12 +364,12 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         if (_uniqueKeyNames.IsNullOrEmpty())
             throw new InvalidOperationException("Auto SQL generation for DELETE is not supported if a type has no unique key columns.");
 
-        var tableName = tableNameOverride ?? _defaultTableName;
+        var tableName = tableNameOverride ?? DefaultTableName;
         if (DeleteSqls.TryGetValue(tableName, out var deleteSql) && !deleteSql.IsBlank())
         {
             return deleteSql;
         }
-        deleteSql = _storage.SqlHelper.CreateDeleteSql<T>(tableNameOverride: tableName);
+        deleteSql = _db.SqlHelper.CreateDeleteSql<T>(tableNameOverride: tableName);
         DeleteSqls[tableName] = deleteSql;
         return deleteSql;
     }
@@ -381,14 +379,14 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         if (_properties.IsNullOrEmpty())
             return "";
 
-        tableName ??= _defaultTableName;
+        tableName ??= DefaultTableName;
 
         if (InsertSqls.TryGetValue(tableName, out var insertSql) && !insertSql.IsBlank())
         {
             return insertSql;
         }
 
-        insertSql = _storage.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, tableName);
+        insertSql = _db.SqlHelper.CreateInsertSql<T>(_placeholderPrefix, tableName);
         InsertSqls[tableName] = insertSql;
         return insertSql;
     }
@@ -398,12 +396,12 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         if (_properties.IsNullOrEmpty())
             return "";
 
-        tableName ??= _defaultTableName;
+        tableName ??= DefaultTableName;
 
         if (UpsertSqls.TryGetValue(tableName, out var upsertSql) && !upsertSql.IsBlank())
             return upsertSql;
 
-        upsertSql = _storage.SqlHelper.CreateUpsertSql<T>(_placeholderPrefix, tableName);
+        upsertSql = _db.SqlHelper.CreateUpsertSql<T>(_placeholderPrefix, tableName);
         UpsertSqls[tableName] = upsertSql;
         return upsertSql;
     }
@@ -413,13 +411,19 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
         newValue = long.MinValue;
         if (AutoIncrementOnInsertFieldNames.Contains(name))
         {
-            var maxId = AsyncHelper.RunSync(() => _storage.GetMax(name, _defaultTableName, _databaseName));
+            var maxId = _db.GetMax(name, DefaultTableName, _databaseName);
             newValue = maxId.IsValid() ? maxId + 1 : 1;
             return true;
         }
         return false;
     }
 
+    /// <summary>
+    /// Set db command parameters using reflection with field names and values in the <paramref name="entry"/>.
+    /// </summary>
+    /// <param name="command"></param>
+    /// <param name="entry"></param>
+    /// <param name="targetFieldNames"></param>
     private void SetCommandParameters(DbCommand command, T entry, params string[] targetFieldNames)
     {
         targetFieldNames = targetFieldNames.IsNullOrEmpty() ? _targetFieldNames : targetFieldNames;

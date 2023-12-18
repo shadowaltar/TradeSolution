@@ -59,7 +59,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Simulation;
+        var environment = EnvironmentType.Prod;
 
         if (environment is EnvironmentType.Uat or EnvironmentType.Test or EnvironmentType.Simulation)
         {
@@ -185,10 +185,9 @@ public class Program
         var password = _password;
         var email = _email;
 
-        var exchange = ExchangeType.Simulator;
-        var symbol = "BTCUSDT";
-        var quoteCode = "USDT";
-        var whitelistCodes = new List<string> { "BTC", "USDT" };
+        var symbol = "BTCFDUSD";
+        var quoteCode = "FDUSDT";
+        var whitelistCodes = new List<string> { "BTC", "FDUSD" };
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
         var fastMa = 3;
@@ -201,9 +200,9 @@ public class Program
         //await ResetTables(environment);
 
 
-        var broker = ExternalNames.Convert(exchange);
+        var broker = ExternalNames.Convert(_exchange);
         var context = Dependencies.Register(broker);
-        context.Initialize(environment, exchange, broker);
+        context.Initialize(environment, _exchange, broker);
 
         var securityService = Dependencies.ComponentContext.Resolve<ISecurityService>();
         var portfolioService = Dependencies.ComponentContext.Resolve<IPortfolioService>();
@@ -296,8 +295,12 @@ public class Program
                 }
             case ResultCode.GetAccountFailed:
                 {
-                    _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
-                    return await Login(services, userName, password, email, accountName, accountType, environment);
+                    if (environment != EnvironmentType.Prod)
+                    {
+                        _ = await CheckTestUserAndAccount(services, userName, password, email, accountName, accountType, environment);
+                        return await Login(services, userName, password, email, accountName, accountType, environment);
+                    }
+                    return ResultCode.GetAccountFailed;
                 }
             default:
                 return result;

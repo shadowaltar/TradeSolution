@@ -11,9 +11,15 @@ public record User
     [AutoIncrementOnInsert]
     public int Id { get; set; } = 0;
 
+    /// <summary>
+    /// Name of the user; it must be stored in UPPER-CASE internally.
+    /// </summary>
     [NotNull, Length(MinLength = 3, MaxLength = 100)]
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// Email of the user; it must be stored in lower-case internally.
+    /// </summary>
     [NotNull, Length(MinLength = 5, MaxLength = 100), AlwaysLowerCase]
     public string Email { get; set; } = "";
 

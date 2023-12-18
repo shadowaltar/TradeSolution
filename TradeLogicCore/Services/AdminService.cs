@@ -75,6 +75,9 @@ public class AdminService : IAdminService
         }
         IsLoggedIn = false;
 
+        userName = userName.ToUpperInvariant();
+        accountName = accountName?.ToUpperInvariant();
+
         _log.Info($"Logging in user and account: {userName}, {accountName}, {environment}");
         if (userName.IsBlank()) return ResultCode.InvalidArgument;
         if (password.IsBlank()) return ResultCode.InvalidArgument;
@@ -93,11 +96,11 @@ public class AdminService : IAdminService
         if (user == null)
             return ResultCode.GetUserFailed;
 
-        //if (!Credential.IsPasswordCorrect(user, password, environment))
-        //{
-        //    _log.Error($"Failed to login user {user.Name} in env {environment}.");
-        //    return ResultCode.InvalidCredential;
-        //}
+        if (!Credential.IsPasswordCorrect(user, password, environment))
+        {
+            _log.Error($"Failed to login user {user.Name} in env {environment}.");
+            return ResultCode.InvalidCredential;
+        }
 
         CurrentUser = user;
 
@@ -154,7 +157,9 @@ public class AdminService : IAdminService
         {
             return -1;
         }
-        userName = userName.Trim().ToLowerInvariant();
+        
+        userName = userName.Trim().ToUpperInvariant();
+
         userPassword = userPassword.Trim().ToLowerInvariant();
         email = email.Trim().ToLowerInvariant();
         var now = DateTime.UtcNow;
@@ -204,6 +209,8 @@ public class AdminService : IAdminService
 
     public async Task<int> CreateAccount(Account account)
     {
+        account.Name = account.Name.ToUpperInvariant();
+
         if (account.Type.IsBlank()) throw new ArgumentException("Invalid account type.");
         return await _storage.InsertOne(account);
     }
