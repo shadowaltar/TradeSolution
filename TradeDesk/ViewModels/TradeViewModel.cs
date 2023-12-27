@@ -2,36 +2,32 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Threading;
 using TradeCommon.Essentials.Trading;
 using TradeDesk.Services;
 using TradeDesk.Utils;
 
 namespace TradeDesk.ViewModels;
-public class TradeViewModel : AbstractViewModel
+public class TradeViewModel(Server server) : AbstractViewModel
 {
-    private readonly Server _server;
-    private PeriodicTimer _timer;
+    private readonly Server _server = server;
+    private PeriodicTimer? _timer;
 
-    public event Action<List<Trade>, DateTime> Refreshed;
+    public event Action<List<Trade>, DateTime>? Refreshed;
 
-    public ObservableCollection<Trade> Trades { get; } = new();
+    public ObservableCollection<Trade> Trades { get; } = [];
 
     public string? SecurityCode { get; set; }
 
-    public TradeViewModel(Server server)
-    {
-        _server = server;
-    }
-
     public async void PeriodicQuery()
     {
-        if (SecurityCode.IsBlank()) return;
         _timer?.Dispose();
-
-        var trades = await _server.GetTrades(SecurityCode, DateTime.UtcNow.AddDays(-1));
-        Process(trades);
+        List<Trade> trades;
+        if (!SecurityCode.IsBlank())
+        {
+            trades = await _server.GetTrades(SecurityCode, DateTime.UtcNow.AddDays(-1));
+            Process(trades);
+        }
 
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (await _timer.WaitForNextTickAsync())
@@ -58,10 +54,17 @@ public class TradeViewModel : AbstractViewModel
             });
             Refreshed?.Invoke(trades, DateTime.UtcNow);
         }
+
     }
 
-    public void Initialize()
+    public void Initialize(MainViewModel mainViewModel)
     {
+        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
         PeriodicQuery();
+    }
+
+    private void OnSecurityCodeChanged(string code)
+    {
+        SecurityCode = code;
     }
 }

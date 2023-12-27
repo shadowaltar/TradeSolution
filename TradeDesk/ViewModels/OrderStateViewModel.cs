@@ -1,5 +1,3 @@
-
-using System;
 using TradeDesk.Services;
 
 namespace TradeDesk.ViewModels;
@@ -12,7 +10,7 @@ public class OrderStateViewModel : AbstractViewModel
         _server = server;
     }
 
-    public void Initialize()
+    public void Initialize(MainViewModel mainViewModel)
     {
     }
 }

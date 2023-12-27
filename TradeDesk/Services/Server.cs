@@ -9,7 +9,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using TradeCommon.Constants;
@@ -26,9 +25,9 @@ public class Server
 {
     private static readonly ILog _log = Logger.New();
 
-    private string _token;
-    private string _restUrl;
-    private string _webSocketUrl;
+    private string? _token;
+    private string? _restUrl;
+    private string? _webSocketUrl;
     private ClientWebSocket? _ohlcWebSocket;
 
     private static readonly CookieContainer _cookieContainer = new();
@@ -46,7 +45,7 @@ public class Server
 
     public event Action<OhlcPrice>? OhlcReceived;
 
-    public void Setup(string rootUrl, string token)
+    public void Initialize(string rootUrl, string token)
     {
         _token = token;
         _restUrl = $"https://{rootUrl.Trim('/')}";
@@ -66,14 +65,14 @@ public class Server
             if (jsonNode is not JsonArray jsonArray)
             {
                 _log.Error("Failed to get orders.");
-                return new();
+                return [];
             }
-            return Json.Deserialize<List<Security>>(jsonArray) ?? new();
+            return Json.Deserialize<List<Security>>(jsonArray) ?? [];
         }
         catch (Exception e)
         {
             _log.Error("Failed to get orders.", e);
-            return new();
+            return [];
         }
     }
 
@@ -94,14 +93,14 @@ public class Server
             if (jsonNode is not JsonArray jsonArray)
             {
                 _log.Error("Failed to get orders.");
-                return new();
+                return [];
             }
-            return Json.Deserialize<List<Order>>(jsonArray) ?? new();
+            return Json.Deserialize<List<Order>>(jsonArray) ?? [];
         }
         catch (Exception e)
         {
             _log.Error("Failed to get orders.", e);
-            return new();
+            return [];
         }
     }
 
@@ -122,14 +121,14 @@ public class Server
             if (jsonNode is not JsonArray jsonArray)
             {
                 _log.Error("Failed to get trades.");
-                return new();
+                return [];
             }
-            return Json.Deserialize<List<Trade>>(jsonArray) ?? new();
+            return Json.Deserialize<List<Trade>>(jsonArray) ?? [];
         }
         catch (Exception e)
         {
             _log.Error("Failed to get trades.", e);
-            return new();
+            return [];
         }
     }
 
@@ -146,14 +145,14 @@ public class Server
             if (jsonNode is not JsonArray jsonArray)
             {
                 _log.Error("Failed to get assets.");
-                return new();
+                return [];
             }
-            return Json.Deserialize<List<Asset>>(jsonArray) ?? new();
+            return Json.Deserialize<List<Asset>>(jsonArray) ?? [];
         }
         catch (Exception e)
         {
             _log.Error("Failed to get assets.", e);
-            return new();
+            return [];
         }
     }
 
@@ -174,14 +173,14 @@ public class Server
             if (jsonNode is not JsonArray jsonArray)
             {
                 _log.Error("Failed to get assets.");
-                return new();
+                return [];
             }
-            return Json.Deserialize<List<AssetState>>(jsonArray) ?? new();
+            return Json.Deserialize<List<AssetState>>(jsonArray) ?? [];
         }
         catch (Exception e)
         {
             _log.Error("Failed to get asset states.", e);
-            return new();
+            return [];
         }
     }
 
@@ -191,11 +190,11 @@ public class Server
         {
             var url = $"{_restUrl}/{RestApiConstants.ExecutionRoot}/{RestApiConstants.QueryOrders}";
             var json = await _client.GetStringAsync(url);
-            return Json.Deserialize<List<Order>>(json) ?? new();
+            return Json.Deserialize<List<Order>>(json) ?? [];
         }
         catch (Exception e)
         {
-            return new();
+            return [];
         }
     }
 

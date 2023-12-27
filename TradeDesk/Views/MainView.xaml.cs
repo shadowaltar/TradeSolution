@@ -1,17 +1,14 @@
-﻿using System.Windows;
+﻿using Syncfusion.Windows.Shared;
 
-namespace TradeDesk.ViewModels;
+namespace TradeDesk.Views;
+
 /// <summary>
 /// Interaction logic for MainView.xaml
 /// </summary>
-public partial class MainView : Window
+public partial class MainView : ChromelessWindow
 {
     public MainView()
     {
         InitializeComponent();
-
-        var viewModel = new MainViewModel();
-        DataContext = viewModel;
-        viewModel.Initialize(this);
     }
 }

@@ -159,7 +159,6 @@ public partial class AdminController : Controller
     /// </summary>
     /// <param name="adminService"></param>
     /// <param name="accountName"></param>
-    /// <param name="requestExternal"></param>
     /// <returns></returns>
     [HttpPost("accounts/{account}/sync")]
     public async Task<ActionResult> SynchronizeAccountAndBalanceFromExternal([FromServices] IAdminService adminService,
@@ -381,6 +380,7 @@ public partial class AdminController : Controller
         }
         return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.") : Ok(results);
     }
+
     [AllowAnonymous]
     [HttpGet("ping")]
     public async Task<ActionResult> Ping()

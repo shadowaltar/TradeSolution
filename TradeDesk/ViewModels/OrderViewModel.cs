@@ -13,7 +13,7 @@ namespace TradeDesk.ViewModels;
 
 public class OrderViewModel : AbstractViewModel
 {
-    protected PeriodicTimer _timer;
+    protected PeriodicTimer? _timer;
     private readonly Server _server;
 
     public ObservableCollection<Order> Orders { get; } = new();
@@ -23,34 +23,35 @@ public class OrderViewModel : AbstractViewModel
     public ICommand CancelCommand { get; }
     public ICommand CancelAllCommand { get; }
 
-    public event Action<List<Order>, DateTime> Refreshed;
+    public event Action<List<Order>, DateTime>? Refreshed;
 
     public string? SecurityCode { get; private set; }
 
-    public OrderViewModel(MainViewModel mainViewModel, Server server)
+    public OrderViewModel(Server server)
     {
+        _server = server;
         SelectedCommand = new DelegateCommand(Select);
         CreateCommand = new DelegateCommand(CreateOrder);
         CancelCommand = new DelegateCommand(Cancel);
         CancelAllCommand = new DelegateCommand(CancelAll);
-        _server = server;
-
-        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
     }
 
-    public void Initialize()
+    public void Initialize(MainViewModel mainViewModel)
     {
+        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
         PeriodicQuery();
     }
 
     public async void PeriodicQuery()
     {
-        if (SecurityCode.IsBlank()) return;
-
         _timer?.Dispose();
 
-        List<Order> orders = await _server.GetOrders(SecurityCode, DateTime.UtcNow.AddDays(-1));
-        Process(orders);
+        List<Order> orders;
+        if (!SecurityCode.IsBlank())
+        {
+            orders = await _server.GetOrders(SecurityCode, DateTime.UtcNow.AddDays(-1));
+            Process(orders);
+        }
 
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (await _timer.WaitForNextTickAsync())

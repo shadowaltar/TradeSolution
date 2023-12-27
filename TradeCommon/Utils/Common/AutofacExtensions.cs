@@ -25,6 +25,11 @@ public static class AutofacExtensions
         return builder.RegisterInstance(instance).As<T>().SingleInstance();
     }
 
+    public static IRegistrationBuilder<object, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton(this ContainerBuilder builder, Type type)
+    {
+        return builder.RegisterType(type).As(type).SingleInstance();
+    }
+
     public static IRegistrationBuilder<T, ConcreteReflectionActivatorData, SingleRegistrationStyle> RegisterSingleton<T>(this ContainerBuilder builder, object key)
         where T : notnull
     {

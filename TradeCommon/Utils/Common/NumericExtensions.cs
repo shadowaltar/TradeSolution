@@ -31,8 +31,8 @@ public static class NumericExtensions
 
     public static int GetDecimalPlaces(this decimal n)
     {
-        n = Math.Abs(n); //make sure it is positive.
-        n -= (int)n;     //remove the integer part of the number.
+        n = Math.Abs(n); // make sure it is positive.
+        n -= (int)n;     // remove the integer part of the number.
         var decimalPlaces = 0;
         while (n > 0)
         {
@@ -41,6 +41,20 @@ public static class NumericExtensions
             n -= (int)n;
         }
         return decimalPlaces;
+    }
+
+    public static int GetSignificantDigits(this long value)
+    {
+        int significantDigits = 0;
+        long tempValue = Math.Abs(value);
+
+        while (tempValue != 0)
+        {
+            tempValue /= 10;
+            significantDigits++;
+        }
+
+        return significantDigits;
     }
 
     public static bool IsNaN(this double value)

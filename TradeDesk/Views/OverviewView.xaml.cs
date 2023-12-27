@@ -53,12 +53,6 @@ public partial class OverviewView : UserControl
         _timer?.Dispose();
     }
 
-    private void ViewDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
-    {
-        var vm = (OverviewViewModel)DataContext;
-        vm.View = this;
-    }
-
     public void UpdateOhlc(OhlcPrice price, TimeSpan timeSpan)
     {
         // init logic

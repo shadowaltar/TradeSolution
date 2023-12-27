@@ -1,28 +1,28 @@
 ﻿using Common;
-using log4net.Config;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 using System.Windows.Input;
-using TradeCommon.Constants;
 using TradeCommon.Essentials.Trading;
+using TradeCommon.Runtime;
 using TradeDesk.Services;
 using TradeDesk.Utils;
-using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
 public class MainViewModel : AbstractViewModel
 {
     private readonly Server _server;
-    private string _url;
+    private string _url = "";
+    private string _title = "";
+    private string _selectedSecurityCode = "";
+    private string _orderRelatedUpdateTime = "";
+    private string _tradeRelatedUpdateTime = "";
 
     public string ServerUrl { get => _url; set => SetValue(ref _url, value); }
-    public ObservableCollection<string> SecurityCodes { get; } = new();
+    public ObservableCollection<string> SecurityCodes { get; } = [];
     public ClientSession? Session { get; private set; }
     public ICommand Connect { get; }
-
 
     public OverviewViewModel OverviewViewModel { get; }
     public OrderViewModel OrderViewModel { get; }
@@ -31,88 +31,54 @@ public class MainViewModel : AbstractViewModel
     public AssetViewModel AssetViewModel { get; }
     public AssetStateViewModel AssetStateViewModel { get; }
     public PositionViewModel PositionViewModel { get; }
-    public MainView Window { get; private set; }
 
-    private string title;
-
-    public string Title { get => title; set => SetValue(ref title, value); }
-
-    private string selectedSecurityCode;
+    public string Title { get => _title; set => SetValue(ref _title, value); }
 
     public string SelectedSecurityCode
     {
-        get => selectedSecurityCode; set
+        get => _selectedSecurityCode; set
         {
-            SetValue(ref selectedSecurityCode, value);
+            SetValue(ref _selectedSecurityCode, value);
             SecurityCodeChanged?.Invoke(value);
         }
     }
 
-    private string orderRelatedUpdateTime;
+    public string OrderRelatedUpdateTime { get => _orderRelatedUpdateTime; set => SetValue(ref _orderRelatedUpdateTime, value); }
 
-    public string OrderRelatedUpdateTime { get => orderRelatedUpdateTime; set => SetValue(ref orderRelatedUpdateTime, value); }
-
-    private string tradeRelatedUpdateTime;
-
-    public string TradeRelatedUpdateTime { get => tradeRelatedUpdateTime; set => SetValue(ref tradeRelatedUpdateTime, value); }
+    public string TradeRelatedUpdateTime { get => _tradeRelatedUpdateTime; set => SetValue(ref _tradeRelatedUpdateTime, value); }
 
     public event Action<string>? SecurityCodeChanged;
 
-    public MainViewModel()
+    public MainViewModel(Server server,
+                         OverviewViewModel overviewViewModel,
+                         OrderViewModel orderViewModel,
+                         OrderStateViewModel orderStateViewModel,
+                         TradeViewModel tradeViewModel,
+                         AssetViewModel assetViewModel,
+                         AssetStateViewModel assetStateViewModel,
+                         PositionViewModel positionViewModel)
     {
-        _server = new Server();
-
-        OverviewViewModel = new OverviewViewModel(this, _server);
-
-        OrderViewModel = new OrderViewModel(this, _server);
-
-        OrderStateViewModel = new OrderStateViewModel(_server);
-        TradeViewModel = new TradeViewModel(_server);
-        AssetViewModel = new AssetViewModel(_server);
-        AssetStateViewModel = new AssetStateViewModel(_server);
-
+        _server = server;
+        OverviewViewModel = overviewViewModel;
+        OrderViewModel = orderViewModel;
+        OrderStateViewModel = orderStateViewModel;
+        TradeViewModel = tradeViewModel;
+        AssetViewModel = assetViewModel;
+        AssetStateViewModel = assetStateViewModel;
+        PositionViewModel = positionViewModel;
         Connect = new DelegateCommand(PerformConnect);
 
         SecurityCodes.AddRange("BTCUSDT", "BTCFDUSD");
         SelectedSecurityCode = SecurityCodes.First();
     }
 
-    public void Initialize(MainView mainView)
+    public void Initialize(string serverUrlWithPort, ClientSession session)
     {
-        Window = mainView;
+        ServerUrl = serverUrlWithPort ?? throw Exceptions.Impossible();
+        Session = session ?? throw Exceptions.Impossible();
 
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        XmlConfigurator.Configure();
-
-        Window.Hide();
-
-        var lv = new LoginView();
-        var lvm = new LoginViewModel(_server);
-        lv.DataContext = lvm;
-        lvm.AfterLogin += OnLoggedIn;
-        lv.ShowDialog();
-
-        void OnLoggedIn(string token)
-        {
-            lvm.AfterLogin -= OnLoggedIn;
-            lv.Close();
-
-            _server.Setup(lvm.ServerUrlWithPort, token);
-
-            ServerUrl = lvm.ServerUrlWithPort;
-            Session = new(lvm.UserName,
-                          lvm.Account,
-                          lvm.EnvironmentType,
-                          lvm.ExchangeType,
-                          ExternalNames.Convert(lvm.ExchangeType),
-                          token);
-            Title = $"Trading Desk [{Session.Environment}] [{Session.Exchange}] [{ServerUrl}]";
-
-            // refresh the data in sub-views
-            SecurityCodeChanged?.Invoke(SelectedSecurityCode);
-
-            Window.Show();
-        }
+        _server.Initialize(ServerUrl, session.SessionToken);
+        Title = $"Trading Desk [{Session.Environment}] [{Session.Exchange}] [{ServerUrl}]";
     }
 
     public void Reset()
@@ -124,15 +90,15 @@ public class MainViewModel : AbstractViewModel
     {
         OrderViewModel.Refreshed -= OnOrdersRefreshed;
         OrderViewModel.Refreshed += OnOrdersRefreshed;
-        OrderViewModel.Initialize();
-
-        OverviewViewModel.Initialize();
-
-        OrderStateViewModel.Initialize();
-
+        OrderViewModel.Initialize(this);
         TradeViewModel.Refreshed -= OnTradesRefreshed;
         TradeViewModel.Refreshed += OnTradesRefreshed;
-        TradeViewModel.Initialize();
+        TradeViewModel.Initialize(this);
+
+        OverviewViewModel.Initialize(this);
+        OrderStateViewModel.Initialize(this);
+
+        SecurityCodeChanged?.Invoke(SelectedSecurityCode);
     }
 
     private void OnTradesRefreshed(List<Trade> list, DateTime time)

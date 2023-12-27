@@ -323,6 +323,23 @@ public static class ReflectionUtils
         return ami;
     }
 
+    public static Assembly[] GetAssemblies()
+    {
+        return AppDomain.CurrentDomain.GetAssemblies();
+    }
+
+    public static List<Type> GetTypes(string @namespace)
+    {
+        var types = new List<Type>();
+        var assemblies = GetAssemblies();
+        foreach (var asm in assemblies)
+        {
+            types.AddRange(asm.GetTypes().Where(p => p.Namespace == @namespace));
+        }
+        return types;
+    }
+
+
     private static void InitializeMetaInfo<T>(Type t, out ReflectionMetaInfo<T> rmi, out AttributeMetaInfo ami)
     {
         // get cached or initialize reflection related meta info

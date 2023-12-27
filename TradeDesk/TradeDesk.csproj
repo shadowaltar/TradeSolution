@@ -5,15 +5,22 @@
     <TargetFramework>net8.0-windows7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <StartupObject>TradeDesk.App</StartupObject>
+    <EnableSourceControlManagerQueries>true</EnableSourceControlManagerQueries>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Autofac" Version="7.1.0" />
     <PackageReference Include="ScottPlot.WPF" Version="4.1.69" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
     <ProjectReference Include="..\TradeLogicCore\TradeLogicCore.csproj" />
+	<PackageReference Include="Syncfusion.Licensing" Version="23.2.7" />
+	<PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" Version="23.2.7" />
+	<PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="23.2.7" />
+	<PackageReference Include="Syncfusion.Shared.WPF" Version="23.2.7" />
+	<PackageReference Include="Syncfusion.Themes.Windows11Light.WPF" Version="23.2.7" />
   </ItemGroup>
-
 </Project>

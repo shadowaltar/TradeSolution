@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Input;
 using TradeCommon.Essentials;
@@ -10,35 +9,34 @@ using TradeDesk.Utils;
 using TradeDesk.Views;
 
 namespace TradeDesk.ViewModels;
-public class OverviewViewModel : AbstractViewModel
+public class OverviewViewModel : AbstractViewModel, IHasView<OverviewView>
 {
     private readonly Server _server;
 
-    private DelegateCommand _startLive;
     private bool _isLive;
 
     private IntervalType _selectedInterval;
-    private Security _security;
+    private Security? _security;
+
+    public TimeSpan SelectedIntervalTimeSpan { get; private set; }
+    public OverviewView? View { get; set; }
+    public ICommand StartLive { get; }
 
     public IntervalType SelectedInterval { get => _selectedInterval; set => SetValue(ref _selectedInterval, value, v => SelectedIntervalTimeSpan = v.ToTimeSpan()); }
 
-    public ICommand StartLive => _startLive ??= new DelegateCommand(PerformStartLive);
-
     public bool IsLive { get => _isLive; set => SetValue(ref _isLive, value); }
 
-    public OverviewView View { get; internal set; }
 
-    public OverviewViewModel(MainViewModel mainViewModel, Server server)
+    public OverviewViewModel(Server server)
     {
         _server = server;
         _server.OhlcReceived += OnNextOhlc;
-
-        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
+        StartLive = new DelegateCommand(PerformStartLive);
     }
 
-    public void Initialize()
+    public void Initialize(MainViewModel mainViewModel)
     {
-
+        mainViewModel.SecurityCodeChanged += OnSecurityCodeChanged;
     }
 
     private async void OnSecurityCodeChanged(string securityCode)
@@ -46,7 +44,7 @@ public class OverviewViewModel : AbstractViewModel
         if (View == null) return;
         View.StopLive();
         var securities = await _server.GetSecurities();
-        _security = securities.FirstOrDefault(s => s.Code == securityCode);
+        _security = securities?.FirstOrDefault(s => s.Code == securityCode);
     }
 
     private void OnNextOhlc(OhlcPrice price)
@@ -58,6 +56,8 @@ public class OverviewViewModel : AbstractViewModel
     private void PerformStartLive()
     {
         if (View == null) return;
+        if (_security == null) return;
+
         if (IsLive)
         {
             _server.UnsubscribeOhlc();
@@ -71,6 +71,4 @@ public class OverviewViewModel : AbstractViewModel
             _server.SubscribeOhlc(_security, SelectedInterval);
         }
     }
-
-    public TimeSpan SelectedIntervalTimeSpan { get; private set; }
 }
