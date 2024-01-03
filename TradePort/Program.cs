@@ -179,6 +179,9 @@ public class Program
             c.InjectStylesheet(config.CustomStylePath);
         });
 
+        _app.UseSession();
+        _app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromHours(1) });
+        _app.UseDeveloperExceptionPage();
         _app.UseHttpsRedirection();
         _app.UseAuthentication();
         _app.UseRouting();
