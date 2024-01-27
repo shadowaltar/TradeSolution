@@ -1,7 +1,5 @@
 ﻿using Common;
 using log4net;
-using System;
-using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Externals;
@@ -53,8 +51,8 @@ public class AdminService : IAdminService
     {
         if (!IsLoggedIn || Context.User == null || Context.Account == null)
             return ResultCode.NotLoggedInYet;
-        if (Context.Core.GetActiveAlgoBatches().Count > 0)
-            return ResultCode.ActiveAlgoBatchesExist;
+        if (Context.Core.GetActiveAlgoSessions().Count > 0)
+            return ResultCode.ActiveAlgoSessionsExist;
 
         _accountManagement.Logout(Context.User!, Context.Account!);
         // reset everything
@@ -129,7 +127,7 @@ public class AdminService : IAdminService
         Context.User = CurrentUser;
         Context.Account = CurrentAccount;
 
-        var isExternalAvailable = await Ping();
+        var (isExternalAvailable, _) = await Ping();
         if (!isExternalAvailable)
         {
             return ResultCode.ConnectionFailed;
@@ -157,7 +155,7 @@ public class AdminService : IAdminService
         {
             return -1;
         }
-        
+
         userName = userName.Trim().ToUpperInvariant();
 
         userPassword = userPassword.Trim().ToLowerInvariant();
@@ -257,8 +255,9 @@ public class AdminService : IAdminService
         }
     }
 
-    public async Task<bool> Ping()
+    public async Task<(bool result, string url)> Ping()
     {
-        return _connectivity.Ping();
+        var r = _connectivity.Ping(out var url);
+        return (r, url);
     }
 }

@@ -13,8 +13,8 @@ public record DownloadOhlcPriceRequestModel
     [DefaultValue(EnvironmentType.Prod)]
     public EnvironmentType Environment { get; set; }
 
-    [DefaultValue("BTCUSDT")]
-    public string SecurityCode { get; set; } = "BTCUSDT";
+    [DefaultValue("BTCFDUSD")]
+    public string SecurityCode { get; set; } = "BTCFDUSD";
 
     [DefaultValue(IntervalType.OneMinute)]
     public IntervalType Interval { get; set; } = IntervalType.OneMinute;

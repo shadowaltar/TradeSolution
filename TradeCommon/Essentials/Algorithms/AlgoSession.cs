@@ -5,11 +5,11 @@ using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Algorithms;
 
-[Storage("algo_batches", DatabaseNames.AlgorithmData, SortProperties = false)]
+[Storage("algorithm_sessions", DatabaseNames.AlgorithmData, SortProperties = false)]
 [Unique(nameof(Id))]
 [Index(nameof(AlgoId))]
 [Index(nameof(StartTime))]
-public record AlgoBatch()
+public record AlgoSession()
 {
     /// <summary>
     /// Unique Id which is different for every algo execution. It should be in UUID format.

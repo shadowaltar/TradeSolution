@@ -16,8 +16,8 @@ public static class RestApiConstants
     public const string CancelOrder = "orders/cancel";
     public const string CancelAllOrders = "orders/cancel-all";
 
-    public const string QueryRunningAlgorithms = "algorithms/list";
-    public const string QueryAlgoBatches = "algo-batches/list";
+    public const string QueryRunningAlgoSessions = "algorithms/list";
+    public const string QueryAlgoSessions = "algo-sessions/list";
     public const string QueryAlgoEntries = "algo-entries/list";
     public const string StartAlgorithmMac = "algorithms/mac/start";
     public const string StopAlgorithm = "algorithms/stop";

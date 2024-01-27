@@ -39,7 +39,7 @@ public partial class QuotationController : Controller
     [HttpPost("order-books/download-json")]
     public async Task<ActionResult> GetOrderBookHistory([FromServices] ISecurityService securityService,
                                                         [FromQuery(Name = "date")] string dateStr,
-                                                        [FromQuery(Name = "security-code")] string securityCode = "BTCUSDT",
+                                                        [FromQuery(Name = "security-code")] string securityCode = "BTCFDUSD",
                                                         [FromQuery(Name = "exchange")] ExchangeType exchange = ExchangeType.Binance,
                                                         [FromQuery(Name = "environment")] EnvironmentType environment = EnvironmentType.Prod,
                                                         [FromQuery(Name = "level")] int level = 5)
@@ -226,7 +226,7 @@ public partial class QuotationController : Controller
         if (security == null) return BadRequest("Missing security.");
 
         var prices = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage)
-            .ReadYahooPrices(new List<Security> { security }, interval, range);
+            .ReadYahooPrices([security], interval, range);
         return Ok(prices);
     }
 
@@ -297,7 +297,7 @@ public partial class QuotationController : Controller
                                                             [FromQuery(Name = "external-name")] string externalName = ExternalNames.Binance,
                                                             [FromQuery(Name = "sec-type")] string secTypeStr = "fx",
                                                             [FromQuery(Name = "interval")] string intervalStr = "1h",
-                                                            [FromQuery(Name = "symbols")] string? concatenatedSymbols = "BTCUSDT,ETHUSDT,BTCTUSD,BNBUSDT",
+                                                            [FromQuery(Name = "symbols")] string? concatenatedSymbols = "BTCFDUSD",
                                                             [FromQuery(Name = "start")] string startStr = "20220101",
                                                             [FromQuery(Name = "end")] string? endStr = null)
     {
@@ -420,7 +420,7 @@ public partial class QuotationController : Controller
         if (security == null) return BadRequest("Missing security.");
 
         var priceReader = new TradeDataCore.Importing.Yahoo.HistoricalPriceReader(storage);
-        var allPrices = await priceReader.ReadYahooPrices(new List<Security> { security }, interval, range);
+        var allPrices = await priceReader.ReadYahooPrices([security], interval, range);
 
         if (allPrices.TryGetValue(security.Id, out var tuple))
         {

@@ -11,8 +11,8 @@ namespace TradeCommon.Essentials.Algorithms;
 /// Class which records prop algo execution.
 /// </summary>
 [Storage("algorithm_entries", "algorithm")]
-[Unique(nameof(AlgoBatchId), nameof(SequenceId), nameof(Time))]
-[Index(nameof(AlgoBatchId))]
+[Unique(nameof(SessionId), nameof(SequenceId), nameof(Time))]
+[Index(nameof(SessionId))]
 public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
 {
     /// <summary>
@@ -20,7 +20,7 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// </summary>
     public int SequenceId { get; set; }
 
-    public long AlgoBatchId { get; set; }
+    public long SessionId { get; set; }
 
     /// <summary>
     /// The id which indicates a position's existence over multiple algo-entries

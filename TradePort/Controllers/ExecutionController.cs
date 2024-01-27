@@ -49,7 +49,7 @@ public class ExecutionController : Controller
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromServices] Context context,
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
                                               [FromQuery(Name = "side")] Side side = Side.None,
                                               [FromQuery(Name = "order-type")] OrderType orderType = OrderType.Limit,
                                               [FromQuery(Name = "price")] decimal price = 0,
@@ -175,7 +175,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryOrders)]
     public async Task<ActionResult> GetOrders([FromServices] IServices services,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
                                               [FromQuery(Name = "is-alive-only")] bool isAliveOnly = false,
                                               [FromQuery(Name = "is-fills-only")] bool isFillsOnly = false,
                                               [FromQuery(Name = "is-error-only")] bool isErrorsOnly = false,
@@ -208,7 +208,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryOrderStates)]
     public async Task<ActionResult> GetOrderStates([FromServices] IServices services,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
-                                                   [FromQuery(Name = "symbol")] string symbol = "BTCUSDT")
+                                                   [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD")
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
@@ -222,7 +222,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryTrades)]
     public async Task<ActionResult> GetTrades([FromServices] IServices services,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
@@ -257,7 +257,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryPositions)]
     public async Task<ActionResult> GetPositions([FromServices] IServices services,
                                                  [FromQuery(Name = "start")] string startStr = "20231101",
-                                                 [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
+                                                 [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
                                                  [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
                                                  [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
@@ -305,7 +305,7 @@ public class ExecutionController : Controller
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAssets)]
     public async Task<ActionResult> GetAssets([FromServices] IServices services,
-                                              [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT,USDT",
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTC,FDUSD",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
                                               [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
@@ -350,7 +350,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryAssetStates)]
     public async Task<ActionResult> GetAssetStates([FromServices] IServices services,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
-                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT")
+                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,FDUSD")
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
@@ -413,7 +413,7 @@ public class ExecutionController : Controller
         var preferredCashCodes = algoParams.PreferredQuoteCurrencies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (preferredCashCodes.Count == 0)
         {
-            preferredCashCodes.AddRange("USDT", "USD");
+            preferredCashCodes.AddRange("FDUSD");
         }
 
         var whitelistCodes = algoParams.AssetCodeWhitelist.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -434,8 +434,8 @@ public class ExecutionController : Controller
                                       algoParams.RecordOrderBookOnExecution);
         var ap = new AlgorithmParameters(IsBackTesting: false,
                                          Interval: interval,
-                                         SecurityPool: new List<Security> { security },
-                                         SecurityCodes: new List<string> { security.Code }, // reporting purpose
+                                         SecurityPool: [security],
+                                         SecurityCodes: [security.Code], // reporting purpose
                                          TimeRange: algoTimeRange,
                                          RequiresTickData: true,
                                          StopOrderTriggerBy: algoParams.StopOrderStyle,
@@ -455,68 +455,100 @@ public class ExecutionController : Controller
                 sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
                 break;
         }
-        var algoBatch = await core.Run(ep, ap, algorithm);
-        return Ok(algoBatch);
+        var algoSession = await core.Run(ep, ap, algorithm);
+        var result = new Dictionary<string, object>
+        {
+            {"algo-session-id", algoSession.Id.ToString()}, // to avoid swagger UI's json long type lost precision issue
+            {"algo-session", algoSession }
+        };
+        return Ok(result);
     }
 
-    [HttpPost(RestApiConstants.QueryRunningAlgorithms)]
-    public ActionResult GetAllRunningAlgorithms([FromServices] Core core,
-                                                [FromServices] IAdminService adminService)
+    /// <summary>
+    /// Only lists running algo sessions.
+    /// </summary>
+    /// <param name="core"></param>
+    /// <param name="adminService"></param>
+    /// <returns></returns>
+    [HttpPost(RestApiConstants.QueryRunningAlgoSessions)]
+    public ActionResult GetRunningAlgoSessions([FromServices] Core core,
+                                               [FromServices] IAdminService adminService)
     {
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var batches = core.GetActiveAlgoBatches();
-        return Ok(batches);
+        var sessions = core.GetActiveAlgoSessions();
+
+        var results = new List<Dictionary<string, object>>();
+        foreach (var session in sessions)
+        {
+            var result = new Dictionary<string, object>
+            {
+                {"algo-session-id", session.Id.ToString()}, // to avoid swagger UI's json long type lost precision issue
+                {"algo-session", session }
+            };
+            results.Add(result);
+        }
+        return Ok(results);
     }
 
     /// <summary>
-    /// Lists all algo batches.
+    /// Lists all algo sessions.
     /// </summary>
     /// <param name="context"></param>
     /// <returns></returns>
-    [HttpPost(RestApiConstants.QueryAlgoBatches)]
-    public async Task<ActionResult> GetAlgoBatches([FromServices] Context context)
+    [HttpPost(RestApiConstants.QueryAlgoSessions)]
+    public async Task<ActionResult> GetAllAlgoSessions([FromServices] Context context)
     {
         if (!context.Services.Admin.IsLoggedIn) return BadRequest("Must login user and account first.");
-        var batches = await context.Storage.Read<AlgoBatch>();
-        return Ok(batches);
+        var sessions = await context.Storage.Read<AlgoSession>();
+
+        var results = new List<Dictionary<string, object>>();
+        foreach (var session in sessions)
+        {
+            var result = new Dictionary<string, object>
+            {
+                {"algo-session-id", session.Id.ToString()}, // to avoid swagger UI's json long type lost precision issue
+                {"algo-session", session }
+            };
+            results.Add(result);
+        }
+        return Ok(results);
     }
 
     /// <summary>
-    /// Gets all algo entries associated to a specific algo batch.
+    /// Gets all algo entries associated to a specific algo session.
     /// </summary>
     /// <param name="context"></param>
-    /// <param name="batchId"></param>
+    /// <param name="sessionId"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAlgoEntries)]
-    public async Task<ActionResult> GetAlgoEntries([FromServices] Context context, [FromQuery(Name = "batch-id")] long batchId)
+    public async Task<ActionResult> GetAlgoEntries([FromServices] Context context, [FromQuery(Name = "session-id")] long sessionId)
     {
         if (!context.Services.Admin.IsLoggedIn) return BadRequest("Must login user and account first.");
-        var batches = await context.Storage.Read<AlgoEntry>(null, whereClause: $"{nameof(AlgoEntry.AlgoBatchId)} = $BatchId", ("$BatchId", batchId));
-        return Ok(batches);
+        var entries = await context.Storage.Read<AlgoEntry>(null, whereClause: $"{nameof(AlgoEntry.SessionId)} = $SessionId", ("$SessionId", sessionId));
+        return Ok(entries);
     }
 
     [HttpPost(RestApiConstants.StopAlgorithm)]
-    public async Task<ActionResult> StopAlgorithm([FromServices] Context context,
-                                                  [FromServices] Core core,
+    public async Task<ActionResult> StopAlgorithm([FromServices] Core core,
                                                   [FromServices] IAdminService adminService,
-                                                  [FromForm(Name = "admin-password")] string? adminPassword,
-                                                  [FromQuery(Name = "algo-batch-id")] long algoBatchId)
+                                                  [FromQuery(Name = "session-id")] long sessionId)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
-        var resultCode = await core.StopAlgorithm(algoBatchId);
-        return Ok($"AlgoBatchId: {algoBatchId}, Result: {resultCode}");
+        var resultCode = await core.StopAlgorithm(sessionId);
+        var result = new Dictionary<string, string>
+        {
+            {"algo-session-id", sessionId.ToString()},
+            {"result", resultCode.ToString()},
+        };
+        return Ok(result);
     }
 
     [HttpPost(RestApiConstants.StopAllAlgorithms)]
-    public async Task<ActionResult> StopAllAlgorithms([FromServices] Context context,
-                                                      [FromServices] Core core,
-                                                      [FromServices] IAdminService adminService,
-                                                      [FromForm(Name = "admin-password")] string? adminPassword)
+    public async Task<ActionResult> StopAllAlgorithms([FromServices] Core core,
+                                                      [FromServices] IAdminService adminService)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
 
         var (expected, successful) = await core.StopAllAlgorithms();
@@ -527,29 +559,24 @@ public class ExecutionController : Controller
     /// Reconcile all orders, trades, assets with external system (aka broker / exchange).
     /// Cannot be executed when there are running algorithms.
     /// </summary>
-    /// <param name="context"></param>
     /// <param name="core"></param>
     /// <param name="adminService"></param>
     /// <param name="securityService"></param>
     /// <param name="portfolioService"></param>
-    /// <param name="adminPassword"></param>
     /// <param name="symbolStr"></param>
     /// <param name="securityType"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.Reconcile)]
-    public async Task<ActionResult> Reconcile([FromServices] Context context,
-                                              [FromServices] Core core,
+    public async Task<ActionResult> Reconcile([FromServices] Core core,
                                               [FromServices] IAdminService adminService,
                                               [FromServices] ISecurityService securityService,
                                               [FromServices] IPortfolioService portfolioService,
-                                              [FromForm(Name = "admin-password")] string adminPassword,
-                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT,ETHUSDT",
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCFDUSD",
                                               [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out ObjectResult? br)) return br;
         if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
         if (!adminService.IsLoggedIn) return BadRequest("Must login user and account first.");
-        if (core.GetActiveAlgoBatches().Count > 0) return BadRequest("Must not have any running algorithms.");
+        if (core.GetActiveAlgoSessions().Count > 0) return BadRequest("Must not have any running algorithms.");
 
         string[] codes = symbolStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var securities = new List<Security>();
@@ -600,8 +627,8 @@ public class ExecutionController : Controller
     public class AlgorithmStartModel
     {
         [FromForm(Name = "symbol")]
-        [Required, DefaultValue("BTCUSDT")]
-        public string Symbol { get; set; } = "BTCUSDT";
+        [Required, DefaultValue("BTCFDUSD")]
+        public string Symbol { get; set; } = "BTCFDUSD";
 
         [FromForm(Name = "interval")]
         [Required, DefaultValue("1m")]
@@ -661,8 +688,8 @@ public class ExecutionController : Controller
         /// use these quote currencies. First currency has higher precedence.
         /// </summary>
         [FromForm(Name = "preferred-quote-currencies")]
-        [Required, DefaultValue("USDT")]
-        public string PreferredQuoteCurrencies { get; set; } = "USDT";
+        [Required, DefaultValue("FDUSD")]
+        public string PreferredQuoteCurrencies { get; set; } = "FDUSD";
 
         /// <summary>
         /// Cancel all open orders on algo start.

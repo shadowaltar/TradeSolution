@@ -31,10 +31,10 @@ public interface IAdminService
     bool IsLoggedInWith(string userName, string accountName);
 
     /// <summary>
-    /// Ping external service.
+    /// Ping external service, returns result and ping url.
     /// </summary>
     /// <returns></returns>
-    Task<bool> Ping();
+    Task<(bool result, string url)> Ping();
 
     Task<Account?> GetAccount(string? accountName, bool requestExternal = false);
 

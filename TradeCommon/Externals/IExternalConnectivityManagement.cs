@@ -8,7 +8,7 @@ public interface IExternalConnectivityManagement
 
     string RootWebSocketUrl { get; }
 
-    bool Ping();
+    bool Ping(out string url);
 
     double GetAverageLatency();
 

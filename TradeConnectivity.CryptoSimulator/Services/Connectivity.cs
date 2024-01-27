@@ -24,8 +24,9 @@ public class Connectivity : IExternalConnectivityManagement
         }
     }
 
-    public bool Ping()
+    public bool Ping(out string url)
     {
+        url = "localhost/ping";
         return true;
     }
 

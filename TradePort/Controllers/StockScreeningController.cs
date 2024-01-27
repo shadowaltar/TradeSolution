@@ -20,7 +20,7 @@ public class StockScreeningController : Controller
     /// <param name="count">Count of securities to be filtered in.</param>
     /// <param name="endStr">End date in yyyyMMdd or yyyyMMdd-HHmmss.</param>
     /// <param name="lookBackPeriod">OHLC entry count to trace backwards from end date.</param>
-    /// <param name="excludedCodeStr">ListAlgoBatches of excluded stock codes, delimited by ",". Eg.: 00001,00002 </param>
+    /// <param name="excludedCodeStr">List of excluded stock codes, delimited by ",". Eg.: 00001,00002 </param>
     /// <param name="exchangeStr">Exchange of the security.</param>
     /// <param name="intervalStr">Interval of the OHLC entry like 1h/1d.</param>
     /// <param name="secTypeStr">Security type like Equity/Fx.</param>

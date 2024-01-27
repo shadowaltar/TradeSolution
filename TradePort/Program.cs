@@ -45,6 +45,7 @@ public class Program
         var envString = args.IsNullOrEmpty() ? "PROD" : args[0].ToUpperInvariant();
 
         // if true, do not append env string to the path
+        // if need to run under nginx, DO NOT set to true
         var skipEnvStringInApiPath = false;
         if (args.Length == 2 && bool.TryParse(args[1], out var trueThenSkip) && trueThenSkip)
         {

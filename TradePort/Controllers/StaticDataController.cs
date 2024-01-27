@@ -65,7 +65,7 @@ public class StaticDataController : Controller
     [HttpGet("securities/{exchangeStr}/{code}")]
     public async Task<IActionResult> GetSecurity([FromServices] IStorage storage,
                                                  string exchangeStr = ExternalNames.Binance,
-                                                 string code = "BTCUSDT",
+                                                 string code = "BTCFDUSD",
                                                  [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
@@ -86,7 +86,7 @@ public class StaticDataController : Controller
     [HttpGet("financial-stats/{exchangeStr}/{code}")]
     public async Task<IActionResult> GetFinancialStats([FromServices] IStorage storage,
                                                        string exchangeStr = ExternalNames.Binance,
-                                                       string code = "BTCUSDT",
+                                                       string code = "BTCFDUSD",
                                                        [FromQuery(Name = "sec-type")] string? secTypeStr = "fx")
     {
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;

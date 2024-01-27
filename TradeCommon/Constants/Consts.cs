@@ -15,7 +15,7 @@ public static class Consts
 
     public const int ManualTradingStrategyId = 1;
 
-    public const int LookbackDayCount = 60;
+    public const int LookbackDayCount = 30;
 
     public const char SqlCommandPlaceholderPrefix = '$';
 

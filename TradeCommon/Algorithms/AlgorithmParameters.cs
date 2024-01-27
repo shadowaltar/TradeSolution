@@ -10,8 +10,7 @@ namespace TradeCommon.Algorithms;
 
 public record AlgorithmParameters(bool IsBackTesting,
                                   IntervalType Interval,
-                                  [DatabaseIgnore]
-                                  List<Security> SecurityPool,
+                                  [property: DatabaseIgnore] List<Security> SecurityPool,
                                   List<string> SecurityCodes,
                                   AlgoEffectiveTimeRange TimeRange,
                                   bool RequiresTickData,
@@ -37,7 +36,7 @@ public record AlgorithmParameters(bool IsBackTesting,
         sb.Append("\"ShortStopLossRatio\":").Append(ShortStopLossRatio).AppendLine(",");
         sb.Append("\"ShortTakeProfitRatio\":").Append(ShortTakeProfitRatio).AppendLine(",");
         sb.Append(OtherVariables?.ToString());
-       
+
         return sb.ToString();
     }
 

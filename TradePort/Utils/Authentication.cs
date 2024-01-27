@@ -16,7 +16,7 @@ public class Authentication
     private static readonly JwtSecurityTokenHandler _tokenHandler = new JwtSecurityTokenHandler();
 
     private static readonly string _authenticationSecret = Guid.NewGuid().ToString();
-    private static readonly Dictionary<string, List<SecurityKey>> _cachedKeys = new();
+    private static readonly Dictionary<string, List<SecurityKey>> _cachedKeys = [];
 
     public static IEnumerable<SecurityKey> ValidateKey(string sessionId,
                                                        string tokenString,
@@ -25,7 +25,7 @@ public class Authentication
     {
         if (!_cachedKeys.TryGetValue(sessionId, out var ks))
         {
-            ks = new List<SecurityKey> { GetKey(sessionId) };
+            ks = [GetKey(sessionId)];
         }
 
         return ValidateCurrentToken(tokenString, issuer, audience, ks[0]) ? ks : [];

@@ -2,9 +2,7 @@
 using Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Identity.Client.Extensions.Msal;
 using Microsoft.IdentityModel.Tokens;
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -79,16 +77,14 @@ public partial class AdminController : Controller
     /// </summary>
     /// <param name="context"></param>
     /// <param name="adminService"></param>
-    /// <param name="adminPassword"></param>
     /// <returns></returns>
     [AllowAnonymous]
     [HttpPost(RestApiConstants.Logout)]
     public async Task<ActionResult> Logout([FromServices] Context context,
-                                           [FromServices] IAdminService adminService,
-                                           [FromForm(Name = "admin-password")] string adminPassword)
+                                           [FromServices] IAdminService adminService)
     {
-        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out ObjectResult? br)) return br;
-
+        if (context.Core.HasRunningAlgorithm)
+            return BadRequest("Cannot log out if there are running algorithms. Stop them first.");
         return !adminService.IsLoggedIn ? BadRequest("Cannot log out if not logged in.") : Ok(await adminService.Logout());
     }
 
@@ -365,7 +361,7 @@ public partial class AdminController : Controller
         }
         else if (tableType == DataType.Unknown && secTypeStr.IsBlank())
         {
-            results = new();
+            results = [];
             results.AddRange(await CreateTables(storage, DataType.User));
             results.AddRange(await CreateTables(storage, DataType.Account));
             results.AddRange(await CreateTables(storage, DataType.Asset));
@@ -378,19 +374,44 @@ public partial class AdminController : Controller
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Fx));
             results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
         }
-        return results.IsNullOrEmpty() ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.") : Ok(results);
+        return results.IsNullOrEmpty()
+            ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.")
+            : Ok(results);
     }
 
+    /// <summary>
+    /// Ping our service.
+    /// </summary>
+    /// <returns></returns>
     [AllowAnonymous]
     [HttpGet("ping")]
-    public async Task<ActionResult> Ping()
+    public ActionResult Ping()
     {
-        return Ok("{\"pong\":true}");
+        var r = true;
+        return Ok("{\"pong\":" + r + "}");
+    }
+
+    /// <summary>
+    /// Ping external system.
+    /// </summary>
+    /// <param name="admin"></param>
+    /// <returns></returns>
+    [AllowAnonymous]
+    [HttpGet("ping-external")]
+    public async Task<ActionResult> PingExternal(IAdminService admin)
+    {
+        var r = await admin.Ping();
+        var result = new Dictionary<string, object>
+        {
+            { "pong", r.result },
+            { "url", r.url },
+        };
+        return Ok(result);
     }
 
     private async Task<Dictionary<string, bool>?> CreateTables(IStorage storage, DataType dataType, SecurityType secType = SecurityType.Unknown)
     {
-        List<string> resultTableNames = new();
+        List<string> resultTableNames = [];
         switch (dataType)
         {
             case DataType.FinancialStat:

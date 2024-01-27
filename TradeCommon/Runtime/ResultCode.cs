@@ -61,7 +61,7 @@ public enum ResultCode
 
     AlreadyLoggedIn,
     NotLoggedInYet,
-    ActiveAlgoBatchesExist,
+    ActiveAlgoSessionsExist,
 
     GetMiscFailed,
     GetUserFailed,

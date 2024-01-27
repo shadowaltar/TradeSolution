@@ -77,11 +77,15 @@ public class Connectivity : IExternalConnectivityManagement
     /// Ping the external server.
     /// </summary>
     /// <returns></returns>
-    public bool Ping()
+    public bool Ping(out string url)
     {
         if (!Firewall.CanCall)
-            return true;
+        {
+            url = "";
+            return false;
+        }
 
+        url = _pingUrl;
         try
         {
             _stopwatch.Restart();

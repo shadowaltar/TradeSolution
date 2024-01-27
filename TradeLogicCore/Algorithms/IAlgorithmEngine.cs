@@ -13,7 +13,7 @@ public interface IAlgorithmEngine
 {
     event Action ReachedDesignatedEndTime;
 
-    long AlgoBatchId { get; }
+    long SessionId { get; }
 
     AlgorithmParameters? AlgoParameters { get; }
 
@@ -54,7 +54,7 @@ public interface IAlgorithmEngine
 
     Task Stop();
 
-    AlgoBatch AlgoBatch { get; }
+    AlgoSession AlgoSession { get; }
 
     Algorithm? Algorithm { get; }
 

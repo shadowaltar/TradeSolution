@@ -84,6 +84,9 @@ public class Program
             _exchange = ExchangeType.Binance;
         }
 
+        await ResetAlgoTables(environment);
+        return;
+
         await RunMacMimicWebService(environment);
         //await NewOrderDemo();
         //await RunRumiBackTestDemo();
@@ -91,35 +94,57 @@ public class Program
         //await Run();
     }
 
-    private static async Task ResetTables(EnvironmentType environment)
+    private static async Task ResetOrderTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
         storage.SetEnvironment(environment);
 
-        _log.Info("Changing Environment: " + environment);
-        //if (environment == EnvironmentType.Prod)
-        //{
-        //    Environment.Exit(1);
-        //}
-
         await storage.CreateTable<Order>("stock_orders");
-        await storage.CreateTable<OrderState>("stock_order_states");
-        await storage.CreateTable<Trade>("stock_trades");
-        await storage.CreateTable<Position>("stock_positions");
         await storage.CreateTable<Order>("error_stock_orders");
-        await storage.CreateTable<Trade>("error_stock_trades");
-        await storage.CreateTable<Position>("error_stock_positions");
+        await storage.CreateTable<OrderState>("stock_order_states");
         await storage.CreateTable<Order>("fx_orders");
-        await storage.CreateTable<OrderState>("fx_order_states");
-        await storage.CreateTable<Trade>("fx_trades");
-        await storage.CreateTable<Position>("fx_positions");
         await storage.CreateTable<Order>("error_fx_orders");
+        await storage.CreateTable<OrderState>("fx_order_states");
+    }
+    
+    private static async Task ResetTradeTables(EnvironmentType environment)
+    {
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
+        await storage.CreateTable<Trade>("stock_trades");
+        await storage.CreateTable<Trade>("error_stock_trades");
+        await storage.CreateTable<Trade>("fx_trades");
         await storage.CreateTable<Trade>("error_fx_trades");
+    }
+    
+    private static async Task ResetPositionTables(EnvironmentType environment)
+    {
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
+        await storage.CreateTable<Position>("stock_positions");
+        await storage.CreateTable<Position>("error_stock_positions");
+        await storage.CreateTable<Position>("fx_positions");
         await storage.CreateTable<Position>("error_fx_positions");
         await storage.CreateTable<Asset>();
         await storage.CreateTable<AssetState>();
+    }
+
+    private static async Task ResetAlgoTables(EnvironmentType environment)
+    {
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
         await storage.CreateTable<AlgoEntry>();
-        await storage.CreateTable<AlgoBatch>();
+        await storage.CreateTable<AlgoSession>();
+    }
+    
+    private static async Task ResetSecurityDefinitionAndPriceTables(EnvironmentType environment)
+    {
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
         await storage.CreateSecurityTable(SecurityType.Fx);
         await storage.CreateSecurityTable(SecurityType.Equity);
         var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
@@ -129,43 +154,42 @@ public class Program
         await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Equity);
         await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Equity);
         await storage.CreateFinancialStatsTable();
+    }
 
-        var createUserAccount = false;
-        if (createUserAccount)
+    private static async Task ResetAccountAndUserTables(EnvironmentType environment)
+    {
+        var storage = new Storage(Dependencies.ComponentContext);
+        storage.SetEnvironment(environment);
+
+        await storage.CreateAccountTable();
+        await storage.CreateUserTable();
+        var now = DateTime.UtcNow;
+        var user = new User
         {
-            await storage.CreateAccountTable();
-            await storage.CreateUserTable();
-            var now = DateTime.UtcNow;
-            var user = new User
-            {
-                Name = _userName.ToLowerInvariant(),
-                Email = _email,
-                CreateTime = now,
-                UpdateTime = now,
-            };
-            var userPassword = _password;
-            Credential.EncryptUserPassword(user, environment, ref userPassword);
-            await storage.InsertOne(user);
-            user = await storage.ReadUser(user.Name, user.Email, environment);
-
-            var account = new Account
-            {
-                OwnerId = user.Id,
-                Name = _accountName.ToLowerInvariant(),
-                Type = _accountType,
-                SubType = "",
-                BrokerId = ExternalNames.GetBrokerId(_broker),
-                CreateTime = now,
-                UpdateTime = now,
-                ExternalAccount = _accountId,
-                FeeStructure = "",
-            };
-            await storage.InsertOne(account);
-            account = await storage.ReadAccount(account.Name);
-            user.Accounts.Add(account);
-        }
-
-        Environment.Exit(0);
+            Name = _userName.ToLowerInvariant(),
+            Email = _email,
+            CreateTime = now,
+            UpdateTime = now,
+        };
+        var userPassword = _password;
+        Credential.EncryptUserPassword(user, environment, ref userPassword);
+        await storage.InsertOne(user);
+        user = await storage.ReadUser(user.Name, user.Email, environment);
+        var account = new Account
+        {
+            OwnerId = user.Id,
+            Name = _accountName.ToLowerInvariant(),
+            Type = _accountType,
+            SubType = "",
+            BrokerId = ExternalNames.GetBrokerId(_broker),
+            CreateTime = now,
+            UpdateTime = now,
+            ExternalAccount = _accountId,
+            FeeStructure = "",
+        };
+        await storage.InsertOne(account);
+        account = await storage.ReadAccount(account.Name);
+        user.Accounts.Add(account);
     }
 
     private static async Task RunMacMimicWebService(EnvironmentType environment)
@@ -186,7 +210,7 @@ public class Program
         var email = _email;
 
         var symbol = "BTCFDUSD";
-        var quoteCode = "FDUSDT";
+        var quoteCode = "FDUSD";
         var whitelistCodes = new List<string> { "BTC", "FDUSD" };
         var secType = SecurityType.Fx;
         var interval = IntervalType.OneMinute;
@@ -195,9 +219,6 @@ public class Program
         var stopLoss = 0.0002m;
         var takeProfit = 0.0005m;
         var initialAvailableQuantity = 100;
-
-
-        //await ResetTables(environment);
 
 
         var broker = ExternalNames.Convert(_exchange);
@@ -268,14 +289,14 @@ public class Program
         _log.Info("Execute algorithm with ap #1: " + ap);
         _log.Info("Execute algorithm with ap #2: " + algorithm);
 
-        var algoBatch = await core.Run(ep, ap, algorithm);
+        var session = await core.Run(ep, ap, algorithm);
 
         while (true)
         {
             Thread.Sleep(5000);
         }
 
-        await core.StopAlgorithm(algoBatch.Id);
+        await core.StopAlgorithm(session.Id);
     }
 
     private static async Task<ResultCode> Login(IServices services, string userName, string password, string email, string accountName, string accountType, EnvironmentType environment)

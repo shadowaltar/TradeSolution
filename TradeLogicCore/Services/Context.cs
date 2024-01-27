@@ -103,11 +103,12 @@ public class Context : ApplicationContext
         return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
     }
 
-    public AlgoBatch CreateAlgoBatch(long id)
+    public AlgoSession CreateAlgoSession(long id)
     {
-        if (_algorithm == null || _algorithmEngine == null) throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-batch entry.");
+        if (_algorithm == null || _algorithmEngine == null)
+            throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");
 
-        var algoBatch = new AlgoBatch
+        return new AlgoSession
         {
             Id = id,
             AlgoId = _algorithm.Id,
@@ -122,7 +123,6 @@ public class Context : ApplicationContext
             EngineParametersInString = _algorithmEngine.EngineParameters.ToString(),
             StartTime = DateTime.UtcNow,
         };
-        return algoBatch;
     }
 
     public bool SetPreferredQuoteCurrencies(List<string>? currencies)

@@ -57,9 +57,9 @@ public partial class Storage
         {
             count = await Insert<AlgoEntry>(task);
         }
-        else if (task.Type == typeof(AlgoBatch))
+        else if (task.Type == typeof(AlgoSession))
         {
-            count = await Insert<AlgoBatch>(task);
+            count = await Insert<AlgoSession>(task);
         }
         else
         {

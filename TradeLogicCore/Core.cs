@@ -2,6 +2,7 @@
 using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
+using TradeCommon.Database;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Runtime;
@@ -16,7 +17,6 @@ public class Core
 
     private readonly Dictionary<long, IAlgorithmEngine> _engines = new();
     private readonly IServices _services;
-    private readonly IdGenerator _assetIdGenerator;
     private Reconcilation? _reconciliation;
 
     public IReadOnlyDictionary<long, IAlgorithmEngine> Engines => _engines;
@@ -25,11 +25,12 @@ public class Core
     public EnvironmentType Environment => Context.Environment;
     public Context Context { get; }
 
+    public bool HasRunningAlgorithm => _engines.Count > 0;
+
     public Core(Context context, IServices services)
     {
         Context = context;
         _services = services;
-        _assetIdGenerator = IdGenerators.Get<Asset>();
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ public class Core
     /// <param name="algorithm"></param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public async Task<AlgoBatch> Run(EngineParameters engineParameters, AlgorithmParameters algoParameters, Algorithm algorithm)
+    public async Task<AlgoSession> Run(EngineParameters engineParameters, AlgorithmParameters algoParameters, Algorithm algorithm)
     {
         _log.Info($"Starting algorithm: {algorithm.GetType().Name}, Id [{algorithm.Id}], VerId [{algorithm.VersionId}]");
         var user = _services.Admin.CurrentUser;
@@ -62,7 +63,7 @@ public class Core
         var startTime = algoParameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
-        var isExternalAvailable = await _services.Admin.Ping();
+        var (isExternalAvailable, _) = await _services.Admin.Ping();
         if (!isExternalAvailable) throw Exceptions.Unreachable(Context.Broker);
         // some externals need this for calculation like minimal notional amount
         var refPrices = await _services.MarketData.GetPrices(algoParameters.SecurityPool);
@@ -74,16 +75,17 @@ public class Core
         await _reconciliation.RunAll(user, reconcileStart, algoParameters.SecurityPool);
 
         var engine = new AlgorithmEngine(Context, algorithm, engineParameters);
-        _engines[engine.AlgoBatchId] = engine;
-        var algoBatch = engine.AlgoBatch;
+        _engines[engine.SessionId] = engine;
+        var algoSession = engine.AlgoSession;
         _ = Task.Factory.StartNew(async () =>
         {
+            Context.Services.Persistence.Insert(algoSession, isSynchronous: true);
             await engine.Run(algoParameters); // this is a blocking call
 
         }, TaskCreationOptions.LongRunning);
 
         // the engine execution is a blocking call
-        return algoBatch;
+        return algoSession;
     }
 
     /// <summary>
@@ -107,6 +109,7 @@ public class Core
         {
             _log.Info("Stopping Algorithm Engine " + algoSessionId);
             await engine.Stop();
+            Context.Services.Persistence.Insert(engine.AlgoSession, isSynchronous: true);
             _log.Info("Stopped Algorithm Engine " + algoSessionId);
             _engines.Remove(algoSessionId);
             return ResultCode.StopEngineOk;
@@ -118,9 +121,9 @@ public class Core
         }
     }
 
-    public List<AlgoBatch> GetActiveAlgoBatches()
+    public List<AlgoSession> GetActiveAlgoSessions()
     {
-        return _engines.Values.Select(e => e.AlgoBatch).ToList();
+        return _engines.Values.Select(e => e.AlgoSession).ToList();
     }
 
     public async Task<(int expectedCount, int successfulCount)> StopAllAlgorithms()
