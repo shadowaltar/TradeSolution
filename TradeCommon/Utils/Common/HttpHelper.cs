@@ -45,7 +45,7 @@ public static class HttpHelper
         log ??= _log;
         try
         {
-            var json = await client.GetStringAsync(url).ConfigureAwait(false);
+            var json = await client.GetStringAsync(url);//.ConfigureAwait(false);
             if (json != null)
             {
                 log.Info($"Read json object from {url}, length: {json.Length}");

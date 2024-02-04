@@ -27,6 +27,8 @@ public class Context : ApplicationContext
 
     public IServices Services => _services ??= _container?.Resolve<IServices>() ?? throw Exceptions.ContextNotInitialized();
 
+    public AlgoSession AlgoSession => Core.Ses
+
     public Core Core => _core ??= _container?.Resolve<Core>() ?? throw Exceptions.ContextNotInitialized();
 
     /// <summary>
@@ -103,7 +105,7 @@ public class Context : ApplicationContext
         return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
     }
 
-    public AlgoSession CreateAlgoSession(long id)
+    public AlgoSession InitializeAlgoSession(long id)
     {
         if (_algorithm == null || _algorithmEngine == null)
             throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");

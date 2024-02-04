@@ -129,7 +129,7 @@ public interface IPortfolioService
     /// Traverse through current position and non-basic assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    Task<bool> CloseAllOpenPositions(string orderComment);
+    Task<bool> CloseAllAssets(string orderComment);
 
     Task<bool> CleanUpNonCashAssets(string orderComment);
 

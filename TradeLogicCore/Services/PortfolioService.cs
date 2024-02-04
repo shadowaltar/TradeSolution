@@ -223,20 +223,30 @@ public class PortfolioService : IPortfolioService
             };
     }
 
-    public async Task<bool> CloseAllOpenPositions(string orderComment)
+    public async Task<bool> CloseAllAssets(string orderComment)
     {
         // if it is non-fx, create orders to expunge the long/short positions
-        var positions = Portfolio.GetPositions();
-        if (positions.IsNullOrEmpty()) return false;
+        var assets = Portfolio.GetAssets();
+        if (assets.IsNullOrEmpty()) return false;
 
-        _log.Info($"Closing {positions.Count} opened positions.");
+        if (_context.PreferredQuoteCurrencies.Count == 0)
+            throw new InvalidOperationException("Algorithm must be initialized before closing any assets.");
+
+        _log.Info($"Closing {assets.Count} assets.");
         var count = 0;
-        foreach (var position in positions)
+        foreach (var asset in assets)
         {
-            if (position.IsClosed) continue;
+            if (asset.Quantity == 0)
+                continue;
+            if (asset.Security.MinQuantity == 0)
+            {
+                // not supposed to be zero usually
+            }
+            if (asset.Quantity <= asset.Security.MinQuantity)
+                continue;
 
-            count++;
-            var order = CreateCloseOrder(position.Quantity, position.Security, orderComment);
+            var security = _securityService.GetFxSecurity(asset.Security.Code, _context.PreferredQuoteCurrencies.First().Code);
+            var order = CreateCloseOrder(asset.Quantity, , orderComment);
             var state = await _orderService.SendOrder(order);
             // need to wait for a while
             if (Threads.WaitUntil(() => _closedPositions.ThreadSafeContains(position.Id)))

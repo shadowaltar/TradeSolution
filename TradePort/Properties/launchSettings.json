@@ -19,17 +19,6 @@
       "dotnetRunMessages": true,
       "applicationUrl": ""
     },
-    "UAT": {
-      "commandName": "Project",
-      "commandLineArgs": "UAT true",
-      "launchBrowser": true,
-      "launchUrl": "swagger",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "dotnetRunMessages": true,
-      "applicationUrl": ""
-    },
     "PROD DEBUG": {
       "commandName": "Project",
       "commandLineArgs": "PROD true",
@@ -44,6 +33,17 @@
     "PROD NGINX": {
       "commandName": "Project",
       "commandLineArgs": "PROD",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": ""
+    },
+    "UAT DEBUG": {
+      "commandName": "Project",
+      "commandLineArgs": "UAT true",
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
