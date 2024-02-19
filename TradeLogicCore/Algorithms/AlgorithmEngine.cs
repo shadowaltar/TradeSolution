@@ -128,7 +128,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         EngineParameters = engineParameters;
 
         _context.SetPreferredQuoteCurrencies(EngineParameters.PreferredQuoteCurrencies);
-        _context.SetGlobalCurrencyFilter(EngineParameters.GlobalCurrencyFilter);
+        _context.SetSecurityCodeWhiteList(EngineParameters.GlobalCurrencyFilter);
         _context.InitializeAlgorithmContext(this, algorithm);
 
         AlgoSession = _context.InitializeAlgoSession(uniqueId);
@@ -208,7 +208,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         // close open positions, when do not assume no open position
         if (!EngineParameters.AssumeNoOpenPositionOnStart && EngineParameters.CloseOpenPositionsOnStart)
         {
-            if (await _services.Portfolio.CloseAllAssets(Comments.CloseAllBeforeStart))
+            if (await _services.Portfolio.CloseAllPositions(Comments.CloseAllBeforeStart))
             {
                 hasPositionChangedDuringInit = true;
             }

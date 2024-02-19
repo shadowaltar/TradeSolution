@@ -1,5 +1,4 @@
 ﻿using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 
@@ -159,11 +158,6 @@ public interface IOrderService
                             string comment = "manual",
                             TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
 
-    //Task<bool> SendLongLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    //Task<bool> SendLongMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    //Task<bool> SendShortLimitOrder(string securityCode, decimal price, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-    //Task<bool> SendShortMarketOrder(string securityCode, decimal quantity, string comment = "", TimeInForceType timeInForce = TimeInForceType.GoodTillCancel);
-
     /// <summary>
     /// Reset all caches in this service.
     /// </summary>
@@ -177,13 +171,12 @@ public interface IOrderService
     void Update(ICollection<Order> orders, Security? security = null);
     void Update(ICollection<OrderState> orderStates, Security? security = null);
 
-    /// <summary>
-    /// Clear cached orders which their positions are closed.
-    /// Or specify a closed position and clear its related orders.
-    /// </summary>
-    /// <param name="position"></param>
-    void ClearCachedClosedPositionOrders(Position? position = null);
-    bool IsOperational(long orderId);
+    ///// <summary>
+    ///// Clear cached orders which their positions are closed.
+    ///// Or specify a closed position and clear its related orders.
+    ///// </summary>
+    ///// <param name="position"></param>
+    //void ClearCachedClosedPositionOrders(Position? position = null);
 
     ///// <summary>
     ///// Persist an order to data storage.

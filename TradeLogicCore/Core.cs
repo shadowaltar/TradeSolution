@@ -9,6 +9,7 @@ using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
+using TradeLogicCore.Utils;
 
 namespace TradeLogicCore;
 public class Core
@@ -62,6 +63,13 @@ public class Core
 
         var startTime = algoParameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
+
+
+        // read cash assets config file
+        var json = Path.Combine(AppContext.BaseDirectory, "CashAssets.json");
+        var codes = Json.Deserialize<CashAssetsConfig>(json)?.Codes;
+        if (codes.IsNullOrEmpty()) throw new InvalidOperationException("Failed to define cash asset codes.");
+        Context.SetCashCurrencies(codes);
 
         var (isExternalAvailable, _) = await _services.Admin.Ping();
         if (!isExternalAvailable) throw Exceptions.Unreachable(Context.Broker);

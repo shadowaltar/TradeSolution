@@ -4,11 +4,12 @@ using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
+using TradeCommon.Essentials.Instruments;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
 
 namespace TradeLogicCore.Services;
-public class Context : ApplicationContext
+public class Context(IComponentContext container, IStorage storage) : ApplicationContext(container, storage)
 {
     private User? _user;
     private Account? _account;
@@ -17,17 +18,11 @@ public class Context : ApplicationContext
     private Algorithm? _algorithm;
     private IAlgorithmEngine? _algorithmEngine;
 
-    public Context(IComponentContext container, IStorage storage) : base(container, storage)
-    {
-    }
-
     public bool IsBackTesting => _algorithmEngine?.AlgoParameters == null
                 ? throw Exceptions.InvalidAlgorithmEngineState()
                 : _algorithmEngine.AlgoParameters.IsBackTesting;
 
     public IServices Services => _services ??= _container?.Resolve<IServices>() ?? throw Exceptions.ContextNotInitialized();
-
-    public AlgoSession AlgoSession => Core.Ses
 
     public Core Core => _core ??= _container?.Resolve<Core>() ?? throw Exceptions.ContextNotInitialized();
 
@@ -127,51 +122,78 @@ public class Context : ApplicationContext
         };
     }
 
-    public bool SetPreferredQuoteCurrencies(List<string>? currencies)
+    /// <summary>
+    /// Set the global security code whitelist.
+    /// </summary>
+    /// <param name="codes"></param>
+    /// <returns></returns>
+    public bool SetSecurityCodeWhiteList(List<string>? codes)
     {
-        _preferredQuoteCurrencies.Clear();
-        if (currencies.IsNullOrEmpty())
-        {
-            _log.Warn("No preferred quote currencies are set!");
-            return false;
-        }
-        foreach (var currency in currencies)
-        {
-            var security = Services.Security.GetSecurity(currency);
-            if (security != null)
-            {
-                _preferredQuoteCurrencies.Add(security);
-            }
-            else
-            {
-                _log.Warn($"Invalid preferred quote currency: {currency}; it will be ignored.");
-            }
-        }
-        _log.Info($"Set preferred assets: " + string.Join(", ", _preferredQuoteCurrencies.Select(s => s.Code + "/" + s.Id)));
-        return true;
+        return SetSecurityCodeList(ref _currencyWhitelist, codes, "global code filter");
     }
 
-    public bool SetGlobalCurrencyFilter(List<string>? currencies)
+    /// <summary>
+    /// Set the list of asset codes which are cash;
+    /// holding them will not be consider holding an active position.
+    /// </summary>
+    /// <param name="codes"></param>
+    /// <returns></returns>
+    public bool SetCashCurrencies(List<string> codes)
     {
-        _currencyWhitelist.Clear();
-        if (currencies.IsNullOrEmpty())
+        if (_services == null)
+            throw Exceptions.ContextNotInitialized();
+        if (SetSecurityCodeList(ref _cashCurrencies, codes, "cash code"))
         {
-            _log.Info("No global currency filter is set.");
+            foreach (var code in codes)
+            {
+                var security = _services.Security.GetSecurity(code);
+                if (security == null)
+                {
+                    _log.Error($"Security code {code} is not found! Cannot set it as cash currency. This code will be ignored.");
+                }
+                else
+                {
+                    security.IsCash = true;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Set the preferred quote currency security code, in case when
+    /// trading a currency pair only the base currency code is specified.
+    /// </summary>
+    /// <param name="codes"></param>
+    /// <returns></returns>
+    public bool SetPreferredQuoteCurrencies(List<string>? codes)
+    {
+        return SetSecurityCodeList(ref _preferredQuoteCurrencies, codes, "preferred quote currencies");
+    }
+
+    private bool SetSecurityCodeList(ref List<Security> collection, List<string>? securityCodes, string description)
+    {
+        collection.Clear();
+
+        if (securityCodes.IsNullOrEmpty())
+        {
+            _log.Warn($"No {description} are set!");
             return false;
         }
-        foreach (var currency in currencies)
+        foreach (var code in securityCodes)
         {
-            var security = Services.Security.GetSecurity(currency);
+            var security = Services.Security.GetSecurity(code);
             if (security != null)
             {
-                _currencyWhitelist.Add(security);
+                collection.Add(security);
             }
             else
             {
-                _log.Warn($"Invalid global currency filter: {currency}; it will be ignored.");
+                _log.Warn($"Invalid {description}: {code}; it will be ignored.");
             }
         }
-        _log.Info($"Set global currency filter: " + string.Join(", ", _currencyWhitelist.Select(s => s.Code + "/" + s.Id)));
+        _log.Info($"Set {description}: " + string.Join(", ", collection.Select(s => s.Code + "/" + s.Id)));
         return true;
     }
 }

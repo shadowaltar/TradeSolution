@@ -7,14 +7,15 @@ using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
 
 namespace TradeCommon.Runtime;
-public class ApplicationContext
+public class ApplicationContext(IComponentContext container, IStorage storage)
 {
     protected static readonly ILog _log = Logger.New();
 
-    protected readonly List<Security> _preferredQuoteCurrencies = new();
-    protected readonly List<Security> _currencyWhitelist = new();
+    protected List<Security> _preferredQuoteCurrencies = [];
+    protected List<Security> _currencyWhitelist = [];
+    protected List<Security> _cashCurrencies = [];
 
-    protected IComponentContext? _container;
+    protected IComponentContext? _container = container;
 
     protected EnvironmentType _environment;
     protected ExchangeType _exchange;
@@ -26,7 +27,7 @@ public class ApplicationContext
 
     public bool IsInitialized { get; protected set; }
 
-    public IStorage Storage { get; }
+    public IStorage Storage { get; } = storage;
 
     /// <summary>
     /// The preferred quote currencies used by the engine for features like auto-closing.
@@ -39,12 +40,6 @@ public class ApplicationContext
     public IReadOnlyList<Security> CurrencyWhitelist => _currencyWhitelist;
 
     public bool HasCurrencyWhitelist => _currencyWhitelist.Count != 0;
-
-    public ApplicationContext(IComponentContext container, IStorage storage)
-    {
-        _container = container;
-        Storage = storage;
-    }
 
     /// <summary>
     /// Get current environment.

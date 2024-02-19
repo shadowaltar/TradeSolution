@@ -44,6 +44,9 @@ public class Security
     [DatabaseIgnore, JsonIgnore]
     public bool IsAsset => Id == QuoteSecurity?.Id;
 
+    [DatabaseIgnore, JsonIgnore]
+    public bool IsCash { get; set; }
+
     /// <summary>
     /// Ensure and return the currency/quote asset.
     /// If null, throws exception.

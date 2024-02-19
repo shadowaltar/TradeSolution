@@ -1,6 +1,5 @@
 ﻿using Common;
 using log4net;
-using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Portfolios;
 
@@ -8,155 +7,112 @@ namespace TradeCommon.Essentials.Portfolios;
 /// Portfolio is an aggregation of positions including asset-position (uninvested/free cash).
 /// Notice that positions here are all open positions; closed ones are removed immediately.
 /// </summary>
-public record Portfolio
+public record Portfolio(int AccountId)
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly Dictionary<long, Position> _positions = new();
-    private readonly Dictionary<long, Asset> _assets = new();
-    private readonly Dictionary<int, Position> _positionsBySecurityId = new();
-    private readonly Dictionary<int, Asset> _assetsBySecurityId = new();
+    private readonly Dictionary<int, Asset> _cashPositionsBySecurityId = [];
+    private readonly Dictionary<int, Asset> _assetsBySecurityId = [];
 
     private readonly object _lock = new();
 
-    public int AccountId { get; } = 0;
+    /// <summary>
+    /// Gets all asset positions, including those quantity == 0.
+    /// </summary>
+    public bool HasAssetPosition => _assetsBySecurityId.Count > 0;
 
-    public bool HasPosition => _positions.Count > 0;
-    public bool HasAsset => _assets.Count > 0;
-
-    public Portfolio(int accountId,
-                     List<Position> positions,
-                     List<Asset> assets)
+    public Portfolio(int accountId, List<Asset> assets) : this(accountId)
     {
-        AccountId = accountId;
         foreach (var asset in assets)
         {
-            if (!asset.Security.IsAsset)
+            if (asset.Quantity > 0)
             {
-                _log.Error("Invalid asset position which associates to a normal security; security code is:" + asset.Security.Code);
-                continue;
+                if (asset.Security.IsCash)
+                    _cashPositionsBySecurityId[asset.SecurityId] = asset;
+                else
+                    _assetsBySecurityId[asset.SecurityId] = asset;
             }
-            _assets.Add(asset.Id, asset);
-            _assetsBySecurityId.Add(asset.SecurityId, asset);
-        }
-        foreach (var position in positions)
-        {
-            if (position.Security.IsAsset)
-                throw Exceptions.InvalidSecurity(position.Security.Code, "Expecting a security for normal position.");
-            _positions.Add(position.Id, position);
-            _positionsBySecurityId.Add(position.SecurityId, position);
         }
     }
 
-    public Position? GetPosition(long id)
+    public List<Asset> GetAll()
     {
         lock (_lock)
-            return _positions.GetOrDefault(id);
+            return _assetsBySecurityId.Values.Union(_cashPositionsBySecurityId.Values).ToList();
     }
 
-    public Position? GetPositionBySecurityId(int securityId)
+    public List<Asset> GetAssetPositions()
     {
-        lock (_lock)
-            return _positionsBySecurityId.GetOrDefault(securityId);
+        return _assetsBySecurityId.ThreadSafeValues(_lock);
     }
 
-    public List<Position> GetPositions()
+    public List<Asset> GetCashes()
     {
-        lock (_lock)
-            return _positions.Values.ToList();
+        return _cashPositionsBySecurityId.ThreadSafeValues(_lock);
     }
 
-    public List<Asset> GetAssets()
+    public Asset? GetAssetPositionBySecurityId(int securityId)
     {
-        lock (_lock)
-            return _assets.Values.ToList();
+        return _assetsBySecurityId.ThreadSafeGet(securityId, _lock);
     }
 
-    public Asset? GetAsset(long id)
+    public Asset? GetCashAssetBySecurityId(int securityId)
     {
-        lock (_lock)
-            return _assets.GetOrDefault(id);
+        return _cashPositionsBySecurityId.ThreadSafeGet(securityId, _lock);
     }
 
-    public Asset? GetAssetBySecurityId(int securityId)
-    {
-        lock (_lock)
-            return _assetsBySecurityId.GetOrDefault(securityId);
-    }
-
-    public void AddOrUpdate(Position position)
-    {
-        lock (_lock)
-        {
-            _positions[position.Id] = position;
-            _positionsBySecurityId[position.SecurityId] = position;
-        }
-    }
 
     public void AddOrUpdate(Asset asset)
     {
         lock (_lock)
         {
-            _assets[asset.Id] = asset;
-            _assetsBySecurityId[asset.SecurityId] = asset;
+            if (asset.Security.IsCash)
+                _cashPositionsBySecurityId[asset.SecurityId] = asset;
+            else
+                _assetsBySecurityId[asset.SecurityId] = asset;
         }
     }
 
-    public bool RemovePosition(long id)
+    public void Close(int securityId)
     {
-        lock (_lock)
-        {
-            var p = _positions.GetOrDefault(id);
-            if (p == null)
-                return false;
-            _positionsBySecurityId.Remove(p.SecurityId);
-            _positions.Remove(id);
-            return true;
-        }
+        _assetsBySecurityId.ThreadSafeRemove(securityId, _lock);
     }
 
     public void Clear()
     {
         ClearPositions();
-        ClearAssets();
+        ClearCashes();
     }
 
     public void ClearPositions()
     {
-        lock (_lock)
-        {
-            _positions.Clear();
-            _positionsBySecurityId.Clear();
-        }
+        _assetsBySecurityId.ThreadSafeClear(_lock);
     }
 
-    public void ClearAssets()
+    public void ClearCashes()
     {
-        lock (_lock)
-        {
-            _assets.Clear();
-            _assetsBySecurityId.Clear();
-        }
+        _cashPositionsBySecurityId.ThreadSafeClear(_lock);
     }
 
     public virtual bool Equals(Portfolio? portfolio)
     {
         if (portfolio == null) return false;
         if (AccountId != portfolio.AccountId) return false;
-        if (_assets.Count != portfolio._assets.Count) return false;
+        if (_assetsBySecurityId.Count != portfolio._assetsBySecurityId.Count) return false;
+        if (_cashPositionsBySecurityId.Count != portfolio._cashPositionsBySecurityId.Count) return false;
 
-        foreach (var asset in _assets.Values)
+        foreach (var asset in _assetsBySecurityId.Values)
         {
-            if (!portfolio._assets.TryGetValue(asset.Id, out var exists))
+            if (!portfolio._assetsBySecurityId.TryGetValue(asset.SecurityId, out var exists))
                 return false;
             if (!exists.Equals(asset))
                 return false;
         }
-        foreach (var position in _positions.Values)
+        foreach (var cash in _cashPositionsBySecurityId.Values)
         {
-            if (!portfolio._assets.TryGetValue(position.Id, out var exists))
+            if (!portfolio._cashPositionsBySecurityId.TryGetValue(cash.SecurityId, out var exists))
                 return false;
-            if (!exists.Equals(position))
+            if (!exists.Equals(cash))
                 return false;
         }
         return true;
@@ -169,6 +125,6 @@ public record Portfolio
 
     public override string ToString()
     {
-        return $"Portfolio: acctId {AccountId}, pos {_positions.Count}, asset {_assets.Count}";
+        return $"Portfolio: acctId {AccountId}, posi {_assetsBySecurityId.Count}, cash {_cashPositionsBySecurityId.Count}";
     }
 }

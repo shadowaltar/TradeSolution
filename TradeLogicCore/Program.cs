@@ -123,10 +123,6 @@ public class Program
         var storage = new Storage(Dependencies.ComponentContext);
         storage.SetEnvironment(environment);
 
-        await storage.CreateTable<Position>("stock_positions");
-        await storage.CreateTable<Position>("error_stock_positions");
-        await storage.CreateTable<Position>("fx_positions");
-        await storage.CreateTable<Position>("error_fx_positions");
         await storage.CreateTable<Asset>();
         await storage.CreateTable<AssetState>();
     }

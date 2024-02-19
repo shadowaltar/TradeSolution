@@ -5,18 +5,17 @@ using TradeCommon.Essentials.Trading;
 namespace TradeLogicCore.Services;
 public interface IPortfolioService
 {
-    event Action<Position, Trade>? PositionProcessed;
-    event Action<Position>? PositionCreated;
-    event Action<Position>? PositionUpdated;
-    event Action<Position>? PositionClosed;
+    event Action<Asset, Trade>? AssetProcessed;
+    event Action<Asset>? AssetPositionCreated;
+    event Action<Asset>? AssetPositionUpdated;
+    event Action<List<Asset>>? AssetPositionsUpdated;
+    event Action<Asset>? AssetClosed;
 
     Portfolio InitialPortfolio { get; }
 
     Portfolio Portfolio { get; }
 
-    bool HasPosition { get; }
-
-    bool HasAsset { get; }
+    bool HasAssetPosition { get; }
 
     /// <summary>
     /// Initialize portfolio service.
@@ -27,7 +26,7 @@ public interface IPortfolioService
     Task<bool> Initialize();
 
     Task Reset();
-    
+
     /// <summary>
     /// Create or update (and cache) one or more positions by a series of trades.
     /// </summary>
@@ -46,61 +45,29 @@ public interface IPortfolioService
     /// Gets all open positions (a shallow copy of list of positions).
     /// </summary>
     /// <returns></returns>
-    List<Position> GetPositions();
+    List<Asset> GetPositions();
 
     /// <summary>
-    /// Get position given its Id.
+    /// Gets all cash positions.
     /// </summary>
-    /// <param name="id"></param>
     /// <returns></returns>
-    Position? GetPosition(long id);
+    List<Asset> GetCashes();
 
     /// <summary>
-    /// Get position given its security Id.
+    /// Get asset position given its security id.
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    Position? GetPositionBySecurityId(int securityId);
-
-    Side GetOpenPositionSide(int securityId);
-
-    /// <summary>
-    /// Get all asset positions.
-    /// </summary>
-    /// <returns></returns>
-    List<Asset> GetAssets();
-
-    /// <summary>
-    /// Get asset position given its Id.
-    /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    Asset? GetAsset(long id);
+    Asset? GetAssetPositionBySecurityId(int securityId);
 
     /// <summary>
     /// Get asset position given its security Id.
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    Asset? GetAssetBySecurityId(int securityId);
+    Asset? GetCashAssetBySecurityId(int securityId);
 
-    /// <summary>
-    /// Spend the free quantity in the related asset position given a security.
-    /// </summary>
-    /// <param name="security"></param>
-    /// <param name="quantity"></param>
-    /// <returns></returns>
-    void SpendAsset(Security security, decimal quantity);
-
-    ///// <summary>
-    ///// Realize the pnl from the trade just closed, related to a specific security;
-    ///// then set the quantity and notional value of its related asset position.
-    ///// Returns the new total realized pnl of this security.
-    ///// </summary>
-    ///// <param name="security"></param>
-    ///// <param name="realizedPnl"></param>
-    ///// <returns></returns>
-    //decimal Realize(Security security, decimal realizedPnl);
+    Side GetOpenPositionSide(int securityId);
 
     bool Validate(Order order);
 
@@ -126,31 +93,12 @@ public interface IPortfolioService
     Task<Asset?> Withdraw(int assetId, decimal quantity);
 
     /// <summary>
-    /// Traverse through current position and non-basic assets,
+    /// Traverse through active positions / non-cash assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    Task<bool> CloseAllAssets(string orderComment);
+    Task<bool> CloseAllPositions(string orderComment);
 
-    Task<bool> CleanUpNonCashAssets(string orderComment);
-
-    /// <summary>
-    /// Create a position by a trade, or apply the trade into the given position.
-    /// If the trade is operational, it will not be processed
-    /// </summary>
-    /// <param name="trade"></param>
-    /// <param name="position"></param>
-    /// <returns></returns>
-    Position? CreateOrApply(Trade trade, Position? position = null);
-
-    /// <summary>
-    /// Get positions from storage.
-    /// Optionally can specify the account which the positions belong to, and
-    /// the lower bound (inclusive) of position update time.
-    /// </summary>
-    /// <param name="start"></param>
-    /// <param name="isOpenOrClose"></param>
-    /// <returns></returns>
-    Task<List<Position>> GetStoragePositions(DateTime? start = null, OpenClose isOpenOrClose = OpenClose.All);
+    //Task<bool> CleanUpNonCashAssets(string orderComment);
 
     Task<List<Asset>> GetExternalAssets();
 
@@ -159,8 +107,6 @@ public interface IPortfolioService
     Task<List<AssetState>> GetAssetStates(Security security, DateTime start);
 
     void Update(List<Asset> assets, bool isInitializing = false);
-
-    void Update(List<Position> positions, bool isInitializing = false);
 
     /// <summary>
     /// Reload service cache.

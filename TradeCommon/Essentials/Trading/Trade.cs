@@ -101,11 +101,6 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
     public int AccountId { get; set; } = 0;
 
     /// <summary>
-    /// If true, the trade does not participate in position building.
-    /// </summary>
-    public bool IsOperational { get; set; } = false;
-
-    /// <summary>
     /// Calculate weighted average price, quantity and notional amount to 
     /// </summary>
     /// <param name="entry"></param>
