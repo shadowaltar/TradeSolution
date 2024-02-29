@@ -20,7 +20,6 @@ public interface IStorage : IDatabase
     Task CreateAssetTable();
     Task CreateFinancialStatsTable();
     Task<List<string>> CreateOrderTable(SecurityType securityType);
-    Task<List<string>> CreatePositionTable(SecurityType securityType);
     Task<string> CreatePriceTable(IntervalType interval, SecurityType securityType);
     Task CreateOrderBookTable(string securityCode, ExchangeType exchange, int level);
     Task CreateSecurityTable(SecurityType type);
@@ -70,8 +69,8 @@ public interface IStorage : IDatabase
     Task<List<Trade>> ReadTradesByOrderId(Security security, long orderId);
     Task<Trade?> ReadTradeByExternalId(long externalTradeId);
     Task<List<Trade>> ReadTradesByPositionId(Security security, long positionId, OperatorType positionIdComparisonOperator = OperatorType.Equals);
-    Task<Position?> ReadPosition(Security security, long positionId);
-    Task<List<Position>> ReadPositions(DateTime start, OpenClose isOpenOrClose);
+    //Task<Position?> ReadPosition(Security security, long positionId);
+    //Task<List<Position>> ReadPositions(DateTime start, OpenClose isOpenOrClose);
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
     Task UpsertFxDefinitions(List<Security> entries);
 

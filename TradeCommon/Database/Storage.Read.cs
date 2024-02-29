@@ -216,28 +216,28 @@ WHERE
         return null;
     }
 
-    public async Task<Position?> ReadPosition(Security security, long positionId)
-    {
-        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
-        var sqlPart = SqlReader<Position>.GetSelectClause();
-        var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND SecurityId = $SecurityId AND PositionId = $PositionId";
-        return await SqlReader.ReadOne<Position>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$SecurityId", security.Id), ("$PositionId", positionId));
-    }
+    //public async Task<Position?> ReadPosition(Security security, long positionId)
+    //{
+    //    var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
+    //    var sqlPart = SqlReader<Position>.GetSelectClause();
+    //    var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND SecurityId = $SecurityId AND PositionId = $PositionId";
+    //    return await SqlReader.ReadOne<Position>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$SecurityId", security.Id), ("$PositionId", positionId));
+    //}
 
-    public async Task<List<Position>> ReadPositions(DateTime start, OpenClose isOpenOrClose)
-    {
-        var results = new List<Position>();
-        foreach (var secType in Consts.SupportedSecurityTypes)
-        {
-            var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>(secType);
-            var openClosePart = isOpenOrClose == OpenClose.All ? "" : isOpenOrClose == OpenClose.OpenOnly ? "AND EndTradeId = 0 " : "AND EndTradeId <> 0";
-            var sqlPart = SqlReader<Position>.GetSelectClause();
-            var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND UpdateTime >= $StartTime {openClosePart}ORDER BY Id";
-            var positions = await SqlReader.ReadMany<Position>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$StartTime", start));
-            results.AddRange(positions);
-        }
-        return results;
-    }
+    //public async Task<List<Position>> ReadPositions(DateTime start, OpenClose isOpenOrClose)
+    //{
+    //    var results = new List<Position>();
+    //    foreach (var secType in Consts.SupportedSecurityTypes)
+    //    {
+    //        var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Position>(secType);
+    //        var openClosePart = isOpenOrClose == OpenClose.All ? "" : isOpenOrClose == OpenClose.OpenOnly ? "AND EndTradeId = 0 " : "AND EndTradeId <> 0";
+    //        var sqlPart = SqlReader<Position>.GetSelectClause();
+    //        var sql = @$"{sqlPart} FROM {tableName} WHERE accountId = $accountId AND UpdateTime >= $StartTime {openClosePart}ORDER BY Id";
+    //        var positions = await SqlReader.ReadMany<Position>(tableName, dbName, _environmentString, sql, ("$accountId", AccountId), ("$StartTime", start));
+    //        results.AddRange(positions);
+    //    }
+    //    return results;
+    //}
 
     public async Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type)
     {

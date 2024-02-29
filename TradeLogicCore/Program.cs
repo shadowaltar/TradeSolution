@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common;
 using log4net;
 using log4net.Config;
@@ -251,7 +252,7 @@ public class Program
         }
 
         // in case the environment is new, read asset data from external, store and cache
-        if (!services.Portfolio.HasAsset)
+        if (!services.Portfolio.HasAssetPosition)
         {
             await new Reconcilation(context).ReconcileAssets();
             services.Portfolio.Update(await services.Portfolio.GetStorageAssets(), true);
@@ -259,9 +260,8 @@ public class Program
 
         var security = await securityService.GetSecurity(symbol, context.Exchange, secType);
         var securityPool = new List<Security> { security! };
-        var ep = new EngineParameters(new List<string> { quoteCode },
+        var ep = new EngineParameters([quoteCode],
                                       GlobalCurrencyFilter: whitelistCodes,
-                                      AssumeNoOpenPositionOnStart: false,
                                       CancelOpenOrdersOnStart: true,
                                       CloseOpenPositionsOnStop: true,
                                       CloseOpenPositionsOnStart: true,
@@ -532,8 +532,12 @@ public class Program
             {
                 foreach (var sl in stopLosses)
                 {
-                    var asset = security.EnsureCurrencyAsset();
-                    var assetPosition = services.Portfolio.GetAsset(asset.Id);
+                    var assetPosition = services.Portfolio.GetRelatedCashPosition(security);
+                    if (assetPosition == null)
+                    {
+                        _log.Info($"No asset position: {security.Code} {security.Name}");
+                        continue;
+                    }
                     var initQuantity = assetPosition.Quantity.ToDouble();
                     var securityPool = new List<Security> { security };
 
@@ -541,9 +545,8 @@ public class Program
                     var screening = new SingleSecurityLogic(context, security);
                     algorithm.Screening = screening;
 
-                    var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                                new List<string> { "BTC", "USDT" },
-                                                                AssumeNoOpenPositionOnStart: true,
+                    var engineParameters = new EngineParameters(["USDT"],
+                                                                ["BTC", "USDT"],
                                                                 CancelOpenOrdersOnStart: true,
                                                                 CloseOpenPositionsOnStop: true,
                                                                 CloseOpenPositionsOnStart: true,
@@ -564,7 +567,7 @@ public class Program
                         _log.Info($"No trades at all: {security.Code} {security.Name}");
                         continue;
                     }
-                    assetPosition = services.Portfolio.GetAsset(asset.Id);
+                    assetPosition = services.Portfolio.GetRelatedCashPosition(security);
                     var endQuantity = assetPosition.Quantity.ToDouble();
                     var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                     if (annualizedReturn == 0)
@@ -636,7 +639,7 @@ public class Program
 
     private static async Task RunMACBackTestDemo(EnvironmentType environment)
     {
-        List<string> headers = new List<string> {
+        List<string> headers = [
             "StartAlgorithm",
             "End",
             "Interval",
@@ -651,7 +654,7 @@ public class Program
             "PNL>0 Cnt",
             "PNL>0/Total Cnt",
             "FilePath"
-        };
+        ];
         var services = Dependencies.ComponentContext.Resolve<IServices>();
         var securityService = services.Security;
 
@@ -705,8 +708,7 @@ public class Program
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     foreach (var stopLoss in stopLosses)
                     {
-                        var asset = security.EnsureCurrencyAsset();
-                        var assetPosition = services.Portfolio.GetAsset(asset.Id);
+                        var assetPosition = services.Portfolio.GetRelatedCashPosition(security);
                         var initQuantity = assetPosition.Quantity.ToDouble();
                         var securityPool = new List<Security> { security };
                         var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
@@ -719,9 +721,8 @@ public class Program
                         var algorithm = new MovingAverageCrossing(context, algoStartParams, fast, slow, stopLoss);
                         var screening = new SingleSecurityLogic(context, security);
                         algorithm.Screening = screening;
-                        var engineParameters = new EngineParameters(new List<string> { "USDT" },
-                                                                    new List<string> { "BTC", "USDT" },
-                                                                    AssumeNoOpenPositionOnStart: true,
+                        var engineParameters = new EngineParameters(["USDT"],
+                                                                    ["BTC", "USDT"],
                                                                     CancelOpenOrdersOnStart: true,
                                                                     CloseOpenPositionsOnStop: true,
                                                                     CloseOpenPositionsOnStart: true,
@@ -739,7 +740,7 @@ public class Program
                             continue;
                         }
 
-                        assetPosition = services.Portfolio.GetAsset(asset.Id);
+                        assetPosition = services.Portfolio.GetRelatedCashPosition(security);
                         var endQuantity = assetPosition.Quantity.ToDouble();
                         var annualizedReturn = Maths.GetAnnualizedReturn(initQuantity, endQuantity, start, end);
                         if (annualizedReturn == 0)

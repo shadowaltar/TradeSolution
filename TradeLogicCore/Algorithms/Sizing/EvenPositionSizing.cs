@@ -1,4 +1,5 @@
-﻿using TradeCommon.Essentials.Algorithms;
+﻿using Autofac.Core;
+using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeLogicCore.Services;
 
@@ -15,9 +16,8 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
 
     public decimal GetAvailableNewPositionQuantity(Security security, int maxConcurrentPositionCount)
     {
-        var positions = _portfolioService.GetPositions();
-        var asset = security.EnsureCurrencyAsset();
-        var assetPosition = _portfolioService.GetAsset(asset.Id);
+        var positions = _portfolioService.GetAssets();
+        var assetPosition = _portfolioService.GetRelatedCashPosition(security);
         if (assetPosition == null)
             return 0; // the account holds no such currency / asset for trading
         var freeBalance = assetPosition.Quantity;

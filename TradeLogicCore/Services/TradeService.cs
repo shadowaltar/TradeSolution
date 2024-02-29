@@ -22,11 +22,11 @@ public class TradeService : ITradeService
     private readonly IPortfolioService _portfolioService;
     private readonly Persistence _persistence;
     private readonly IdGenerator _tradeIdGen;
-    private readonly Dictionary<long, Trade> _trades = new();
-    private readonly Dictionary<long, Trade> _tradesByExternalId = new();
-    private readonly Dictionary<long, List<Trade>> _tradesByOrderId = new();
-    private readonly Dictionary<string, Security> _assetsByCode = new();
-    private readonly Dictionary<int, Security> _assetsById = new();
+    private readonly Dictionary<long, Trade> _trades = [];
+    private readonly Dictionary<long, Trade> _tradesByExternalId = [];
+    private readonly Dictionary<long, List<Trade>> _tradesByOrderId = [];
+    private readonly Dictionary<string, Security> _assetsByCode = [];
+    private readonly Dictionary<int, Security> _assetsById = [];
 
     public event TradeReceivedCallback? TradeProcessed;
 
@@ -107,9 +107,6 @@ public class TradeService : ITradeService
             return;
         }
 
-        // operational trades should not affect positions
-        var isOperational = _orderService.IsOperational(order.Id);
-
         // resolve fee asset id here
         if (!trade.FeeAssetCode.IsBlank() && trade.FeeAssetId <= 0)
         {
@@ -122,7 +119,6 @@ public class TradeService : ITradeService
 
         _securityService.Fix(trade);
 
-        trade.IsOperational = isOperational;
         trade.SecurityId = order.SecurityId;
         trade.Security = order.Security;
         trade.OrderId = order.Id;
@@ -149,7 +145,7 @@ public class TradeService : ITradeService
     public async Task<List<Trade>> GetExternalTrades(Security security, DateTime? start = null, DateTime? end = null)
     {
         var state = await _execution.GetTrades(security, start: start, end: end);
-        var trades = state.GetAll<Trade>() ?? new();
+        var trades = state.GetAll<Trade>() ?? [];
         Update(trades, security);
         return trades;
     }
@@ -175,7 +171,7 @@ public class TradeService : ITradeService
     public List<Trade> GetTradesByOrderId(long orderId)
     {
         lock (_tradesByOrderId)
-            return _tradesByOrderId.ThreadSafeGet(orderId)?.ToList() ?? new();
+            return _tradesByOrderId.ThreadSafeGet(orderId)?.ToList() ?? [];
     }
 
     public List<Trade> GetTrades(long orderId)
@@ -192,7 +188,7 @@ public class TradeService : ITradeService
         if (requestExternal)
         {
             var order = _orderService.GetOrder(orderId);
-            if (order == null) return new(); // TODO if an order is not cached in order service, this returns null
+            if (order == null) return []; // TODO if an order is not cached in order service, this returns null
 
             var state = await _execution.GetTrades(security, order.ExternalOrderId);
             trades = state.GetAll<Trade>();
@@ -201,7 +197,7 @@ public class TradeService : ITradeService
         {
             trades = await _storage.ReadTradesByOrderId(security, orderId);
         }
-        trades ??= new List<Trade>();
+        trades ??= [];
         foreach (var trade in trades)
         {
             trade.SecurityCode = security.Code;
@@ -287,48 +283,48 @@ public class TradeService : ITradeService
         }
     }
 
-    public void ClearCachedClosedPositionTrades(Position? position = null)
-    {
-        if (_trades.IsNullOrEmpty()) return;
+    //public void ClearCachedClosedPositionTrades(Position? position = null)
+    //{
+    //    if (_trades.IsNullOrEmpty()) return;
 
-        if (position != null && position.IsClosed)
-        {
-            lock (_trades)
-            {
-                var security = position.Security;
-                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTradesByPositionId(security, position.Id, OperatorType.Equals));
-                var tradeIds = trades.Select(t => t.Id);
-                Clear(tradeIds);
-            }
-        }
-        else if (position == null)
-        {
-            var allTrades = _trades.ThreadSafeValues();
-            var start = allTrades.Min(t => t.Time);
-            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly));
-            var groupedTrades = allTrades.GroupBy(t => t.Security);
-            foreach (var group in groupedTrades)
-            {
-                var tradeIds = group.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.Id);
-                Clear(tradeIds);
-            }
-        }
+    //    if (position != null && position.IsClosed)
+    //    {
+    //        lock (_trades)
+    //        {
+    //            var security = position.Security;
+    //            var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTradesByPositionId(security, position.Id, OperatorType.Equals));
+    //            var tradeIds = trades.Select(t => t.Id);
+    //            Clear(tradeIds);
+    //        }
+    //    }
+    //    else if (position == null)
+    //    {
+    //        var allTrades = _trades.ThreadSafeValues();
+    //        var start = allTrades.Min(t => t.Time);
+    //        var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly));
+    //        var groupedTrades = allTrades.GroupBy(t => t.Security);
+    //        foreach (var group in groupedTrades)
+    //        {
+    //            var tradeIds = group.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.Id);
+    //            Clear(tradeIds);
+    //        }
+    //    }
 
-        void Clear(IEnumerable<long> tradeIds)
-        {
-            lock (_trades)
-            {
-                foreach (var id in tradeIds)
-                {
-                    var trade = _trades.GetOrDefault(id);
-                    _trades.ThreadSafeRemove(id);
-                    if (trade != null)
-                    {
-                        _tradesByExternalId.ThreadSafeRemove(trade.ExternalTradeId);
-                        _tradesByOrderId.ThreadSafeRemove(trade.OrderId);
-                    }
-                }
-            }
-        }
-    }
+    //    void Clear(IEnumerable<long> tradeIds)
+    //    {
+    //        lock (_trades)
+    //        {
+    //            foreach (var id in tradeIds)
+    //            {
+    //                var trade = _trades.GetOrDefault(id);
+    //                _trades.ThreadSafeRemove(id);
+    //                if (trade != null)
+    //                {
+    //                    _tradesByExternalId.ThreadSafeRemove(trade.ExternalTradeId);
+    //                    _tradesByOrderId.ThreadSafeRemove(trade.OrderId);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 }

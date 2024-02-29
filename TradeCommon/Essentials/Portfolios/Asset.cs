@@ -46,6 +46,12 @@ public record Asset : SecurityRelatedEntry, IComparable<Asset>, IIdEntry
     [DatabaseIgnore]
     public bool IsEmpty => (Security == null || Security.MinQuantity == 0) ? Quantity == 0 : Math.Abs(Quantity) <= Security.MinQuantity;
 
+    /// <summary>
+    /// Alias of <see cref="IsEmpty"/>
+    /// </summary>
+    [DatabaseIgnore]
+    public bool IsClosed => IsEmpty;
+
     public override string ToString()
     {
         return $"[{Id}] Security[{SecurityId},{SecurityCode}], {Quantity}, {UpdateTime:yyyyMMdd-HHmmss}";

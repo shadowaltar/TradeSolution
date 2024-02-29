@@ -10,10 +10,12 @@ public enum DataType
 
     Order,
     Trade,
-    Position,
+    Asset,
+    
+    OrderState,
+    AssetState,
 
     Account,
-    Asset,
     User,
     AccountLedgerRecord,
 

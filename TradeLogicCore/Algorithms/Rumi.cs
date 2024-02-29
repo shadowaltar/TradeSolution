@@ -138,18 +138,18 @@ public class Rumi : Algorithm
 
     public override bool CanCloseLong(AlgoEntry current)
     {
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         return position != null
-               && position.Side == Side.Buy
+               && current.OpenSide == Side.Buy
                && current.LongCloseType == CloseType.None
                && current.LongSignal == SignalType.Close;
     }
 
     public override bool CanCloseShort(AlgoEntry current)
     {
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         return position != null
-               && position.Side == Side.Sell
+               && current.OpenSide == Side.Sell
                && current.ShortCloseType == CloseType.None
                && current.ShortSignal == SignalType.Close;
     }
@@ -160,27 +160,22 @@ public class Rumi : Algorithm
         return !openOrders.IsNullOrEmpty();
     }
 
-    public override void AfterPositionClosed(AlgoEntry entry)
+    public override void AfterStoppedLoss(AlgoEntry entry)
     {
         throw new NotImplementedException();
     }
 
-    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide)
+    public override void AfterTookProfit(AlgoEntry entry)
     {
         throw new NotImplementedException();
     }
 
-    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide)
+    public override bool ShallStopLoss(AlgoEntry current, Tick tick, out decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override bool ShallStopLoss(int securityId, Tick tick, out decimal triggerPrice)
-    {
-        throw new NotImplementedException();
-    }
-
-    public override bool ShallTakeProfit(int securityId, Tick tick, out decimal triggerPrice)
+    public override bool ShallTakeProfit(AlgoEntry current, Tick tick, out decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
@@ -190,24 +185,18 @@ public class Rumi : Algorithm
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice)
+    public override Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice)
+    public override Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override void AfterPositionCreated(AlgoEntry current)
+    public override void AfterPositionChanged(AlgoEntry current)
     {
-        throw new NotImplementedException();
-    }
-
-    public override void AfterPositionUpdated(AlgoEntry current)
-    {
-        throw new NotImplementedException();
     }
 
     public override string PrintAlgorithmParameters()

@@ -76,10 +76,4 @@ public interface ITradeService
     /// <param name="trades"></param>
     /// <param name="security"></param>
     void Update(ICollection<Trade> trades, Security? security = null);
-
-    /// <summary>
-    /// Clear cached trades which their positions are closed.
-    /// Or specify a closed position and clear its related trades.
-    /// </summary>
-    void ClearCachedClosedPositionTrades(Position? position = null);
 }

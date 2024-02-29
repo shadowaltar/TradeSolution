@@ -52,9 +52,9 @@ public class Security
     /// If null, throws exception.
     /// </summary>
     /// <returns></returns>
-    public Security EnsureCurrencyAsset()
+    public Security SafeGetQuoteSecurity()
     {
-        return QuoteSecurity ?? FxInfo?.QuoteAsset ?? throw Exceptions.MissingQuoteAsset(Code);
+        return QuoteSecurity ?? FxInfo?.QuoteSecurity ?? throw Exceptions.MissingQuoteAsset(Code);
     }
 
     /// <summary>

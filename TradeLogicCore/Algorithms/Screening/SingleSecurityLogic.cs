@@ -13,7 +13,7 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
     {
         _context = context;
         _security = security;
-        _securities = security != null ? new Dictionary<int, Security> { { security.Id, security } } : new Dictionary<int, Security>();
+        _securities = security != null ? new Dictionary<int, Security> { { security.Id, security } } : [];
     }
 
     public void SetAndPick(IDictionary<int, Security> securityPool)

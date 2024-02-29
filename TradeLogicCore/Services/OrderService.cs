@@ -20,13 +20,13 @@ public class OrderService : IOrderService
     private readonly IStorage _storage;
     private readonly ISecurityService _securityService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<long, Order> _allOrders = new(); // all orders
-    private readonly Dictionary<long, Order> _allOrdersByExternalId = new(); // same as _allOrders
-    private readonly Dictionary<long, Order> _openOrders = new(); // all live, partial filled orders
-    private readonly Dictionary<long, Order> _cancelledOrders = new(); // all cancelled, expired orders
-    private readonly Dictionary<long, Order> _errorOrders = new(); // all error, rejected orders
-    private readonly Dictionary<long, Order> _operationalOrders = new(); // orders which should not be considered affecting any positions
-    private readonly Dictionary<long, List<OrderState>> _orderStates = new(); // full states for all orders
+    private readonly Dictionary<long, Order> _allOrders = []; // all orders
+    private readonly Dictionary<long, Order> _allOrdersByExternalId = []; // same as _allOrders
+    private readonly Dictionary<long, Order> _openOrders = []; // all live, partial filled orders
+    private readonly Dictionary<long, Order> _cancelledOrders = []; // all cancelled, expired orders
+    private readonly Dictionary<long, Order> _errorOrders = []; // all error, rejected orders
+    private readonly Dictionary<long, Order> _operationalOrders = []; // orders which should not be considered affecting any positions
+    private readonly Dictionary<long, List<OrderState>> _orderStates = []; // full states for all orders
     private readonly IdGenerator _orderIdGen;
     private readonly object _lock = new();
 
@@ -434,53 +434,53 @@ public class OrderService : IOrderService
         }
     }
 
-    public void ClearCachedClosedPositionOrders(Position? position = null)
-    {
-        if (_allOrders.IsNullOrEmpty()) return;
+    //public void ClearCachedClosedPositionOrders(Position? position = null)
+    //{
+    //    if (_allOrders.IsNullOrEmpty()) return;
 
-        if (position != null && position.IsClosed)
-        {
-            lock (_allOrders)
-            {
-                var orders = _allOrders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
-                if (orders.IsNullOrEmpty()) return;
+    //    if (position != null && position.IsClosed)
+    //    {
+    //        lock (_allOrders)
+    //        {
+    //            var orders = _allOrders.Values.Where(o => o.SecurityId == position.SecurityId).ToList();
+    //            if (orders.IsNullOrEmpty()) return;
 
-                var security = orders[0].Security;
-                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, orders[0].CreateTime, DateTime.MaxValue));
-                var closedOrderIds = trades.Where(t => position.Id == t.PositionId).Select(t => t.OrderId);
-                Clear(closedOrderIds);
-            }
-        }
-        else if (position == null)
-        {
-            var start = _allOrders.Values.Min(o => o.UpdateTime);
-            var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
-            var groupedOrders = _allOrders.Values.GroupBy(o => o.Security);
-            foreach (var group in groupedOrders)
-            {
-                var security = group.Key;
-                var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, start, DateTime.MaxValue));
-                var closedOrderIds = trades.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.OrderId);
-                Clear(closedOrderIds);
-            }
-        }
+    //            var security = orders[0].Security;
+    //            var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, orders[0].CreateTime, DateTime.MaxValue));
+    //            var closedOrderIds = trades.Where(t => position.Id == t.PositionId).Select(t => t.OrderId);
+    //            Clear(closedOrderIds);
+    //        }
+    //    }
+    //    else if (position == null)
+    //    {
+    //        var start = _allOrders.Values.Min(o => o.UpdateTime);
+    //        var positions = AsyncHelper.RunSync(() => _context.Services.Portfolio.GetStoragePositions(start, OpenClose.ClosedOnly)).ToList();
+    //        var groupedOrders = _allOrders.Values.GroupBy(o => o.Security);
+    //        foreach (var group in groupedOrders)
+    //        {
+    //            var security = group.Key;
+    //            var trades = AsyncHelper.RunSync(() => _context.Storage.ReadTrades(security, start, DateTime.MaxValue));
+    //            var closedOrderIds = trades.Where(t => positions.Any(p => p.Id == t.PositionId)).Select(t => t.OrderId);
+    //            Clear(closedOrderIds);
+    //        }
+    //    }
 
-        void Clear(IEnumerable<long> closedOrderIds)
-        {
-            lock (_allOrders)
-            {
-                foreach (var id in closedOrderIds)
-                {
-                    var order = _allOrders.GetOrDefault(id);
-                    _allOrders.ThreadSafeRemove(id);
-                    if (order != null)
-                        _allOrdersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
-                    _cancelledOrders.ThreadSafeRemove(id);
-                    _errorOrders.ThreadSafeRemove(id);
-                }
-            }
-        }
-    }
+    //    void Clear(IEnumerable<long> closedOrderIds)
+    //    {
+    //        lock (_allOrders)
+    //        {
+    //            foreach (var id in closedOrderIds)
+    //            {
+    //                var order = _allOrders.GetOrDefault(id);
+    //                _allOrders.ThreadSafeRemove(id);
+    //                if (order != null)
+    //                    _allOrdersByExternalId.ThreadSafeRemove(order.ExternalOrderId);
+    //                _cancelledOrders.ThreadSafeRemove(id);
+    //                _errorOrders.ThreadSafeRemove(id);
+    //            }
+    //        }
+    //    }
+    //}
 
     /// <summary>
     /// Receive an order message from external.

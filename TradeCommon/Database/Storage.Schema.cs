@@ -331,22 +331,6 @@ CREATE INDEX UX_{tableName}_Time
         return tableNames;
     }
 
-    public async Task<List<string>> CreatePositionTable(SecurityType securityType)
-    {
-        var tableNames = new List<string>
-        {
-            DatabaseNames.GetPositionTableName(securityType),
-            DatabaseNames.GetPositionTableName(securityType, true)
-        };
-
-        foreach (var tableName in tableNames)
-        {
-            await CreateTable<Position>(tableName);
-        }
-
-        return tableNames;
-    }
-
     public long GetMax(string fieldName, string tableName, string databaseName)
     {
         using var connection = Connect(databaseName);

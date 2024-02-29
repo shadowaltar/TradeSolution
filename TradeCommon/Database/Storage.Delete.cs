@@ -18,10 +18,6 @@ public partial class Storage
         {
             count = await Delete<Trade>(task);
         }
-        else if (task.Type == typeof(Position))
-        {
-            count = await Insert<Position>(task);
-        }
         else if (task.Type == typeof(Order))
         {
             count = await Insert<Order>(task);
@@ -107,11 +103,6 @@ public partial class Storage
         {
             from = DatabaseNames.GetTradeTableName(trade.Security.SecurityType);
             to = DatabaseNames.GetTradeTableName(trade.Security.SecurityType, true);
-        }
-        else if (entry is Position position)
-        {
-            from = DatabaseNames.GetPositionTableName(position.Security.SecurityType);
-            to = DatabaseNames.GetPositionTableName(position.Security.SecurityType, true);
         }
         if (from.IsBlank() || to.IsBlank())
             return 0;

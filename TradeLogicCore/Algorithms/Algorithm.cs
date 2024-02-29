@@ -1,5 +1,4 @@
 ﻿using Common;
-using System.Text;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
@@ -15,7 +14,7 @@ namespace TradeLogicCore.Algorithms;
 
 public abstract class Algorithm
 {
-    protected WorkingItemMonitor<Position> _closingPositionMonitor;
+    protected WorkingItemMonitor<Asset> _closingPositionMonitor;
 
     public virtual int Id { get; }
     public virtual int VersionId { get; }
@@ -41,25 +40,23 @@ public abstract class Algorithm
     public virtual void AfterAlgoExecution() { }
     public virtual void BeforeProcessingSecurity(Security security) { }
     public virtual void AfterProcessingSecurity(Security security) { }
-    public abstract void AfterPositionCreated(AlgoEntry current);
-    public abstract void AfterPositionUpdated(AlgoEntry current);
-    public abstract void AfterPositionClosed(AlgoEntry entry);
-    public abstract void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide);
-    public abstract void AfterTookProfit(AlgoEntry entry, Side takeProfitSide);
+    public abstract void AfterPositionChanged(AlgoEntry current);
+    public abstract void AfterStoppedLoss(AlgoEntry entry);
+    public abstract void AfterTookProfit(AlgoEntry entry);
 
-    public virtual List<Order> PickOpenOrdersToCleanUp(AlgoEntry current) { return new(); }
+    public virtual List<Order> PickOpenOrdersToCleanUp(AlgoEntry current) { return []; }
     public abstract void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice);
     public abstract bool CanOpenLong(AlgoEntry current);
     public abstract bool CanOpenShort(AlgoEntry current);
     public abstract bool CanCloseLong(AlgoEntry current);
     public abstract bool CanCloseShort(AlgoEntry current);
-    public abstract bool ShallStopLoss(int securityId, Tick tick, out decimal triggerPrice);
-    public abstract bool ShallTakeProfit(int securityId, Tick tick, out decimal triggerPrice);
+    public abstract bool ShallStopLoss(AlgoEntry current, Tick tick, out decimal triggerPrice);
+    public abstract bool ShallTakeProfit(AlgoEntry current, Tick tick, out decimal triggerPrice);
     public abstract bool CanCancel(AlgoEntry current);
 
     protected Algorithm()
     {
-        _closingPositionMonitor = new WorkingItemMonitor<Position>();
+        _closingPositionMonitor = new WorkingItemMonitor<Asset>();
     }
 
     public virtual decimal GetStopLossPrice(decimal price, Side parentOrderSide, Security security)
@@ -93,9 +90,9 @@ public abstract class Algorithm
 
     public abstract Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType);
 
-    public abstract Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice);
+    public abstract Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice);
 
-    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice);
+    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice);
 
     public abstract string PrintAlgorithmParameters();
 }

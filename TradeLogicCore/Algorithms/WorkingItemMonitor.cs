@@ -4,7 +4,7 @@ using TradeCommon.Runtime;
 namespace TradeLogicCore.Algorithms;
 public class WorkingItemMonitor<T> where T : SecurityRelatedEntry, IIdEntry
 {
-    public Dictionary<int, T> ItemsBySecurityId { get; } = new();
+    public Dictionary<int, T> ItemsBySecurityId { get; } = [];
 
     /// <summary>
     /// If an item is being monitored, returns true,

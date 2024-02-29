@@ -39,23 +39,23 @@ public static class DatabaseNames
 
     public const string StockOrderTable = "stock_orders";
     public const string StockTradeTable = "stock_trades";
-    public const string StockPositionTable = "stock_positions";
+    //public const string StockPositionTable = "stock_positions";
     public const string StockOrderStateTable = "stock_order_states";
     public const string StockAssetStateTable = "stock_asset_states";
     public const string FxOrderTable = "fx_orders";
     public const string FxTradeTable = "fx_trades";
-    public const string FxPositionTable = "fx_positions";
+    //public const string FxPositionTable = "fx_positions";
     public const string FxOrderStateTable = "fx_order_states";
     public const string FxAssetStateTable = "fx_asset_states";
     public const string ErrorStockOrderTable = "error_stock_orders";
     public const string ErrorStockTradeTable = "error_stock_trades";
-    public const string ErrorStockPositionTable = "error_stock_positions";
+    //public const string ErrorStockPositionTable = "error_stock_positions";
     public const string ErrorFxOrderTable = "error_fx_orders";
     public const string ErrorFxTradeTable = "error_fx_trades";
-    public const string ErrorFxPositionTable = "error_fx_positions";
+    //public const string ErrorFxPositionTable = "error_fx_positions";
 
-    public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
-    public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
+    //public const string StockTradeToOrderToPositionIdTable = "stock_trade_order_position_ids";
+    //public const string FxTradeToOrderToPositionIdTable = "fx_trade_order_position_ids";
 
     public const string TradePositionReconciliation = "reconciled_trade_position";
 
@@ -69,7 +69,6 @@ public static class DatabaseNames
         if (t == typeof(Trade)) return ExecutionData;
         if (t == typeof(Order)) return ExecutionData;
         if (t == typeof(OrderState)) return ExecutionData;
-        if (t == typeof(Position)) return ExecutionData;
         if (t == typeof(Asset)) return ExecutionData;
         if (t == typeof(Asset)) return ExecutionData;
 
@@ -150,28 +149,28 @@ public static class DatabaseNames
     {
         return type switch
         {
-            SecurityType.Equity => StockPositionTable,
-            SecurityType.Fx => FxPositionTable,
+            SecurityType.Equity => StockAssetStateTable,
+            SecurityType.Fx => FxAssetStateTable,
             _ => null
         };
     }
 
-    public static string? GetPositionTableName(SecurityType type, bool isErrorTable = false)
-    {
-        return !isErrorTable
-            ? type switch
-            {
-                SecurityType.Equity => StockPositionTable,
-                SecurityType.Fx => FxPositionTable,
-                _ => null
-            }
-            : type switch
-            {
-                SecurityType.Equity => ErrorStockPositionTable,
-                SecurityType.Fx => ErrorFxPositionTable,
-                _ => null
-            };
-    }
+    //public static string? GetPositionTableName(SecurityType type, bool isErrorTable = false)
+    //{
+    //    return !isErrorTable
+    //        ? type switch
+    //        {
+    //            SecurityType.Equity => StockPositionTable,
+    //            SecurityType.Fx => FxPositionTable,
+    //            _ => null
+    //        }
+    //        : type switch
+    //        {
+    //            SecurityType.Equity => ErrorStockPositionTable,
+    //            SecurityType.Fx => ErrorFxPositionTable,
+    //            _ => null
+    //        };
+    //}
 
     public static string? GetPositionTableName(string securityType, bool isErrorTable = false)
     {
@@ -208,16 +207,6 @@ public static class DatabaseNames
         return $"order_book_{level}_{exchange.ToString().ToLower()}_{securityCode.ToLower()}";
     }
 
-    public static string GetTradeOrderPositionIdTable(SecurityType type)
-    {
-        return type switch
-        {
-            SecurityType.Equity => StockTradeToOrderToPositionIdTable,
-            SecurityType.Fx => FxTradeToOrderToPositionIdTable,
-            _ => throw new NotImplementedException()
-        };
-    }
-
     public static (string tableName, string databaseName) GetTableAndDatabaseName<T>(SecurityType securityType) where T : class
     {
         var type = typeof(T);
@@ -229,10 +218,6 @@ public static class DatabaseNames
         else if (type == typeof(Trade))
         {
             specificTable = GetTradeTableName(securityType);
-        }
-        else if (type == typeof(Position))
-        {
-            specificTable = GetPositionTableName(securityType);
         }
         else if (type == typeof(OrderState))
         {
@@ -261,10 +246,6 @@ public static class DatabaseNames
             else if (entry is OrderState)
             {
                 specificTable = GetOrderStateTableName(secType);
-            }
-            else if (entry is Position)
-            {
-                specificTable = GetPositionTableName(secType);
             }
         }
         (string tableName, string databaseName) = GetTableAndDatabaseName<T>();

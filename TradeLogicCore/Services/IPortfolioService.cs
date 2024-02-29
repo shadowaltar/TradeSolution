@@ -6,10 +6,10 @@ namespace TradeLogicCore.Services;
 public interface IPortfolioService
 {
     event Action<Asset, Trade>? AssetProcessed;
-    event Action<Asset>? AssetPositionCreated;
-    event Action<Asset>? AssetPositionUpdated;
-    event Action<List<Asset>>? AssetPositionsUpdated;
-    event Action<Asset>? AssetClosed;
+    //event Action<Asset>? AssetPositionCreated;
+    //event Action<Asset>? AssetPositionUpdated;
+    //event Action<List<Asset>>? AssetPositionsUpdated;
+    //event Action<Asset>? AssetClosed;
 
     Portfolio InitialPortfolio { get; }
 
@@ -45,7 +45,7 @@ public interface IPortfolioService
     /// Gets all open positions (a shallow copy of list of positions).
     /// </summary>
     /// <returns></returns>
-    List<Asset> GetPositions();
+    List<Asset> GetAssets();
 
     /// <summary>
     /// Gets all cash positions.
@@ -54,43 +54,58 @@ public interface IPortfolioService
     List<Asset> GetCashes();
 
     /// <summary>
+    /// Gets all cash + non-cash positions.
+    /// </summary>
+    /// <returns></returns>
+    List<Asset> GetAllAssets();
+
+    /// <summary>
     /// Get asset position given its security id.
     /// </summary>
     /// <param name="securityId"></param>
+    /// <param name="isInit"></param>
     /// <returns></returns>
-    Asset? GetAssetPositionBySecurityId(int securityId);
+    Asset? GetAssetBySecurityId(int securityId, bool isInit = false);
 
     /// <summary>
     /// Get asset position given its security Id.
     /// </summary>
     /// <param name="securityId"></param>
+    /// <param name="isInit"></param>
     /// <returns></returns>
-    Asset? GetCashAssetBySecurityId(int securityId);
+    Asset? GetCashAssetBySecurityId(int securityId, bool isInit = false);
+    
+    /// <summary>
+    /// Get the related cash position from a security's <see cref="Security.QuoteSecurity"/>.
+    /// </summary>
+    /// <param name="security"></param>
+    /// <returns></returns>
+    Asset? GetRelatedCashPosition(Security security);
 
     Side GetOpenPositionSide(int securityId);
 
     bool Validate(Order order);
 
-    /// <summary>
-    /// Deposit assets to current account's specific asset indicated by <paramref name="assetId"/>.
-    /// If asset is not found, throws exception.
-    /// </summary>
-    /// <param name="assetId"></param>
-    /// <param name="quantity"></param>
-    /// <returns></returns>
-    Task<Asset?> Deposit(int assetId, decimal quantity);
+    ///// <summary>
+    ///// Deposit assets to current account's specific asset indicated by <paramref name="assetId"/>.
+    ///// If asset is not found, throws exception.
+    ///// </summary>
+    ///// <param name="assetId"></param>
+    ///// <param name="quantity"></param>
+    ///// <returns></returns>
+    //Task<Asset?> Deposit(int assetId, decimal quantity);
 
-    /// <summary>
-    /// Deposit assets to specific account's specific asset indicated by <paramref name="accountId"/> and <paramref name="assetId"/>.
-    /// If targeting current account and asset is not found, throws exception; otherwise returns null.
-    /// </summary>
-    /// <param name="accountId"></param>
-    /// <param name="assetId"></param>
-    /// <param name="quantity"></param>
-    /// <returns></returns>
-    Task<Asset?> Deposit(int accountId, int assetId, decimal quantity);
+    ///// <summary>
+    ///// Deposit assets to specific account's specific asset indicated by <paramref name="accountId"/> and <paramref name="assetId"/>.
+    ///// If targeting current account and asset is not found, throws exception; otherwise returns null.
+    ///// </summary>
+    ///// <param name="accountId"></param>
+    ///// <param name="assetId"></param>
+    ///// <param name="quantity"></param>
+    ///// <returns></returns>
+    //Task<Asset?> Deposit(int accountId, int assetId, decimal quantity);
 
-    Task<Asset?> Withdraw(int assetId, decimal quantity);
+    //Task<Asset?> Withdraw(int assetId, decimal quantity);
 
     /// <summary>
     /// Traverse through active positions / non-cash assets,
@@ -121,8 +136,6 @@ public interface IPortfolioService
     /// <param name="affectAssets"></param>
     /// <param name="affectInitialPortfolio"></param>
     Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio);
-
-    void ClearCachedClosedPositions(bool isInitializing = false);
 
     decimal GetAssetPositionResidual(int assetSecurityId);
 }

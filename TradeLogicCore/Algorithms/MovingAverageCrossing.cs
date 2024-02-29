@@ -28,8 +28,8 @@ public class MovingAverageCrossing : Algorithm
     private readonly TimeSpan _openOrderTimeout;
     private readonly Context _context;
 
-    private readonly Dictionary<int, decimal> _stopLossPrices = new();
-    private readonly Dictionary<int, decimal> _takeProfitPrices = new();
+    private readonly Dictionary<int, decimal> _stopLossPrices = [];
+    private readonly Dictionary<int, decimal> _takeProfitPrices = [];
 
     public override AlgorithmParameters AlgorithmParameters { get; }
 
@@ -192,9 +192,10 @@ public class MovingAverageCrossing : Algorithm
         return state;
     }
 
-    public override bool ShallStopLoss(int securityId, Tick tick, out decimal triggerPrice)
+    public override bool ShallStopLoss(AlgoEntry current, Tick tick, out decimal triggerPrice)
     {
         triggerPrice = 0;
+        var securityId = current.SecurityId;
         if (_closingPositionMonitor.IsMonitoring(securityId))
         {
             if (_log.IsDebugEnabled)
@@ -205,28 +206,29 @@ public class MovingAverageCrossing : Algorithm
         var sl = _stopLossPrices.ThreadSafeGet(securityId);
         if (sl == 0) return false; // no position or no sl is setup
 
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(securityId);
-        if (position == null || position.IsClosed) return false;
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(securityId);
+        if (position == null || position.IsEmpty) return false;
 
-        var originalSide = position.Side;
+        var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && sl >= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO SL][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && sl <= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             triggerPrice = tick.Ask;
             return true;
         }
         return false;
     }
 
-    public override bool ShallTakeProfit(int securityId, Tick tick, out decimal triggerPrice)
+    public override bool ShallTakeProfit(AlgoEntry current, Tick tick, out decimal triggerPrice)
     {
         triggerPrice = 0;
+        var securityId = current.SecurityId;
         if (_closingPositionMonitor.IsMonitoring(securityId))
         {
             if (_log.IsDebugEnabled)
@@ -237,19 +239,19 @@ public class MovingAverageCrossing : Algorithm
         var tp = _takeProfitPrices.ThreadSafeGet(securityId);
         if (tp == 0) return false; // no position or no tp is setup
 
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(securityId);
-        if (position == null || position.IsClosed) return false;
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(securityId);
+        if (position == null || position.IsEmpty) return false;
 
-        var originalSide = position.Side;
+        var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && tp <= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && tp >= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO TP][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -258,9 +260,9 @@ public class MovingAverageCrossing : Algorithm
 
     public override bool CanCloseLong(AlgoEntry current)
     {
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         return position != null
-            && position.Side == Side.Buy
+            && current.OpenSide == Side.Buy
             && current.LongCloseType == CloseType.None
             && current.LongSignal == SignalType.Close;
     }
@@ -269,9 +271,9 @@ public class MovingAverageCrossing : Algorithm
     {
         if (!IsShortSellAllowed)
             return false;
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         return position != null
-            && position.Side == Side.Sell
+            && current.OpenSide == Side.Sell
             && current.ShortCloseType == CloseType.None
             && current.ShortSignal == SignalType.Close;
     }
@@ -282,19 +284,19 @@ public class MovingAverageCrossing : Algorithm
         return !openOrders.IsNullOrEmpty();
     }
 
-    public override async Task<ExternalQueryState> CloseByTickStopLoss(Position position, decimal triggerPrice)
+    public override async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice)
     {
-        return await CloseByTick(position, OrderActionType.TickSignalStopLoss, triggerPrice);
+        return await CloseByTick(current, position, OrderActionType.TickSignalStopLoss, triggerPrice);
     }
 
-    public override async Task<ExternalQueryState> CloseByTickTakeProfit(Position position, decimal triggerPrice)
+    public override async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice)
     {
-        return await CloseByTick(position, OrderActionType.TickSignalTakeProfit, triggerPrice);
+        return await CloseByTick(current, position, OrderActionType.TickSignalTakeProfit, triggerPrice);
     }
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
-        var position = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         if (position == null)
         {
             _log.Warn($"Other logic has closed the position for security {security.Code} already OR it did not exist; algo-crossing close logic is skipped.");
@@ -308,27 +310,28 @@ public class MovingAverageCrossing : Algorithm
         return await Exiting.Close(current, security, triggerPrice, exitSide, exitTime, actionType);
     }
 
-    public override void AfterPositionCreated(AlgoEntry current)
+    public override void AfterPositionChanged(AlgoEntry current)
     {
+        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        if (asset != null && asset.IsEmpty)
+        {
+            ResetInheritedVariables(current);
+
+            _closingPositionMonitor.MarkAsDone(current.SecurityId);
+        }
+        else if (asset == null)
+        {
+            // impossible
+            _log.Error("Asset is missing when it is changed!");
+        }
     }
 
-    public override void AfterPositionUpdated(AlgoEntry current)
-    {
-    }
-
-    public override void AfterPositionClosed(AlgoEntry entry)
+    public override void AfterStoppedLoss(AlgoEntry entry)
     {
         ResetInheritedVariables(entry);
-
-        _closingPositionMonitor.MarkAsDone(entry.SecurityId);
     }
 
-    public override void AfterStoppedLoss(AlgoEntry entry, Side stopLossSide)
-    {
-        ResetInheritedVariables(entry);
-    }
-
-    public override void AfterTookProfit(AlgoEntry entry, Side takeProfitSide)
+    public override void AfterTookProfit(AlgoEntry entry)
     {
         ResetInheritedVariables(entry);
     }
@@ -346,21 +349,21 @@ public class MovingAverageCrossing : Algorithm
 
         // prevent trading if has open positions
         var hasOpenPosition = false;
-        var openPosition = _context.Services.Portfolio.GetPositionBySecurityId(current.SecurityId);
-        if (openPosition != null && !openPosition.IsClosed && openPosition.EndTradeId == 0)
+        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        if (asset != null && !asset.IsEmpty)
             hasOpenPosition = true;
 
         return !hasOpenPosition;
     }
 
-    private async Task<ExternalQueryState> CloseByTick(Position position, OrderActionType actionType, decimal triggerPrice)
+    private async Task<ExternalQueryState> CloseByTick(AlgoEntry current, Asset position, OrderActionType actionType, decimal triggerPrice)
     {
         if (_closingPositionMonitor.MonitorAndPreventOtherActivity(position))
         {
             _log.Warn($"Other logic is closing the position for security {position.SecurityCode} already; tick-triggered close logic is skipped.");
             return ExternalQueryStates.CloseConflict(position.SecurityCode);
         }
-        return await Exiting.Close(null, position.Security, triggerPrice, position.CloseSide, DateTime.UtcNow, actionType);
+        return await Exiting.Close(null, position.Security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)

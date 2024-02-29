@@ -1,4 +1,5 @@
-﻿using Common.Attributes;
+﻿using Common;
+using Common.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
@@ -51,6 +52,10 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
 
     public CloseType ShortCloseType { get; set; }
 
+    public Side OpenSide => LongQuantity > 0 ? Side.Buy : ShortQuantity > 0 ? Side.Sell : Side.None;
+
+    public Side CloseSide => OpenSide.Invert();
+
     ///// <summary>
     ///// The open or close position order Id. If no order it equals to zero.
     ///// </summary>
@@ -67,6 +72,7 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     //public decimal? StopLossPrice { get; set; }
     //public decimal? TakeProfitPrice { get; set; }
     public DateTime? EnterTime { get; set; }
+    public DateTime? ExitTime { get; set; }
     public TimeSpan? Elapsed { get; set; }
 
     /// <summary>
@@ -101,6 +107,9 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public decimal ShortPrice { get; set; }
     [DatabaseIgnore]
     public decimal ShortNotional { get; set; }
+
+    public int OrderCount { get; set; }
+    public int TradeCount { get; set; }
 
     [NotNull, AsJson]
     public IAlgorithmVariables Variables { get; set; }

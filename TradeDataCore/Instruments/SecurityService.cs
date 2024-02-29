@@ -348,11 +348,11 @@ public class SecurityService : ISecurityService
                 {
                     if (!security.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.BaseCurrency, out var baseAsset))
                     {
-                        security.FxInfo.BaseAsset = baseAsset;
+                        security.FxInfo.BaseSecurity = baseAsset;
                     }
                     if (!security.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.QuoteCurrency, out var quoteAsset))
                     {
-                        security.FxInfo.QuoteAsset = quoteAsset;
+                        security.FxInfo.QuoteSecurity = quoteAsset;
                         security.QuoteSecurity = quoteAsset;
                         security.Currency = security.FxInfo.QuoteCurrency;
                     }
@@ -360,8 +360,8 @@ public class SecurityService : ISecurityService
                     {
                         // asset's quote asset is itself
                         // no base asset
-                        security.FxInfo.BaseAsset = null;
-                        security.FxInfo.QuoteAsset = security;
+                        security.FxInfo.BaseSecurity = null;
+                        security.FxInfo.QuoteSecurity = security;
                         // avoid circular reference which breaks serialization
                         //var simplified = new Security { Id = security.Id, Code = security.Code, SecurityType = SecurityType.Fx };
                         //security.QuoteSecurity = simplified;

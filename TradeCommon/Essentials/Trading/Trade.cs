@@ -101,6 +101,16 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
     public int AccountId { get; set; } = 0;
 
     /// <summary>
+    /// The algo session id which generates this order.
+    /// </summary>
+    public int AlgoSessionId { get; set; }
+
+    /// <summary>
+    /// The algo entry id which triggers this order.
+    /// </summary>
+    public int AlgoEntryId { get; set; }
+
+    /// <summary>
     /// Calculate weighted average price, quantity and notional amount to 
     /// </summary>
     /// <param name="entry"></param>

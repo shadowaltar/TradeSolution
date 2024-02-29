@@ -62,21 +62,21 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
 
         // now close the position using algorithm only
-        var position = _portfolioService.GetPositionBySecurityId(security.Id);
-        if (position == null || position.IsClosed)
+        var asset = _portfolioService.GetAssetBySecurityId(security.Id);
+        if (asset == null || asset.IsEmpty)
         {
             var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
             _log.Warn(message);
             return ExternalQueryStates.InvalidPosition(message);
         }
-        var quantity = Math.Abs(position.Quantity);
-        var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseAsset?.Id ?? 0);
+        var quantity = Math.Abs(asset.Quantity);
+        var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseSecurity?.Id ?? 0);
         var residualSign = Math.Sign(residualQuantity);
         if (residualSign == -(int)exitSide)
         {
             // if residual is the opposite side of exit-side, it is time to close the residual
             quantity += Math.Abs(residualQuantity);
-            _log.Info($"Discovered residual quantity for asset {security.FxInfo?.BaseAsset?.Code}, value is {residualQuantity}; we will {exitSide} them in this close order.");
+            _log.Info($"Discovered residual quantity for asset {security.FxInfo?.BaseSecurity?.Code}, value is {residualQuantity}; we will {exitSide} them in this close order.");
         }
         var order = new Order
         {

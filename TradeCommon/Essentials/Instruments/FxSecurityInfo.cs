@@ -19,10 +19,10 @@ public class FxSecurityInfo
     public decimal? MaxLotSize { get; set; }
 
     [DatabaseIgnore, JsonIgnore]
-    public Security? BaseAsset { get; set; }
+    public Security? BaseSecurity { get; set; }
 
     [DatabaseIgnore, JsonIgnore]
-    public Security? QuoteAsset { get; set; }
+    public Security? QuoteSecurity { get; set; }
 
     public override bool Equals(object? obj)
     {

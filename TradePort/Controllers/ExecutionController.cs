@@ -249,32 +249,24 @@ public class ExecutionController : Controller
     /// Get positions. Optionally can get the initial state of positions before algo engine is started.
     /// </summary>
     /// <param name="services"></param>
-    /// <param name="startStr"></param>
-    /// <param name="symbol"></param>
     /// <param name="dataSourceType"></param>
     /// <param name="isInitialPortfolio"></param>
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryPositions)]
-    public async Task<ActionResult> GetPositions([FromServices] IServices services,
-                                                 [FromQuery(Name = "start")] string startStr = "20231101",
-                                                 [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
-                                                 [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
-                                                 [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
+    public async Task<ActionResult> GetAllPositions([FromServices] IServices services,
+                                                    [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
+                                                    [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
-        if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
-
-        var security = services.Security.GetSecurity(symbol);
-        if (security == null || security.QuoteSecurity == null) return BadRequest("Invalid or missing security.");
 
         if (!isInitialPortfolio)
             switch (dataSourceType)
             {
                 case DataSourceType.MemoryCached:
-                    var cached = services.Portfolio.GetPositions();
-                    return Ok(cached.Select(o => o.UpdateTime >= start));
+                    var cached = services.Portfolio.Portfolio.GetAssetPositions();
+                    return Ok(cached);
                 case DataSourceType.InternalStorage:
-                    return Ok(await services.Portfolio.GetStoragePositions(start));
+                    return Ok(await services.Portfolio.GetStorageAssets());
                 case DataSourceType.External:
                     return BadRequest("External system (broker/exchange) does not support position info; maybe you are looking for Asset query API?");
                 default:
@@ -284,8 +276,8 @@ public class ExecutionController : Controller
             switch (dataSourceType)
             {
                 case DataSourceType.MemoryCached:
-                    var cached = services.Portfolio.InitialPortfolio.GetPositions();
-                    return Ok(cached.Select(o => o.UpdateTime >= start));
+                    var cached = services.Portfolio.InitialPortfolio.GetAssetPositions();
+                    return Ok(cached);
                 case DataSourceType.InternalStorage:
                     return BadRequest("Initial portfolio positions only exists in memory, as portfolio changes are always synchronized to internal storage.");
                 case DataSourceType.External:
@@ -323,14 +315,14 @@ public class ExecutionController : Controller
         object results = !isInitialPortfolio
             ? dataSourceType switch
             {
-                DataSourceType.MemoryCached => services.Portfolio.GetAssets(),
+                DataSourceType.MemoryCached => services.Portfolio.Portfolio.GetAll(),
                 DataSourceType.InternalStorage => await services.Portfolio.GetStorageAssets(),
                 DataSourceType.External => await services.Portfolio.GetExternalAssets(),
                 _ => BadRequest("Impossible"),
             }
             : dataSourceType switch
             {
-                DataSourceType.MemoryCached => services.Portfolio.InitialPortfolio.GetAssets(),
+                DataSourceType.MemoryCached => services.Portfolio.InitialPortfolio.GetAll(),
                 DataSourceType.InternalStorage => BadRequest("Initial portfolio assets only exists in memory, as portfolio changes are always synchronized to internal storage."),
                 DataSourceType.External => BadRequest("Initial portfolio assets only exists in memory, external asset position is always the most updated."),
                 _ => BadRequest("Impossible"),
@@ -418,10 +410,10 @@ public class ExecutionController : Controller
 
         var whitelistCodes = algoParams.AssetCodeWhitelist.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         whitelistCodes.AddRange(preferredCashCodes);
-        if (security.FxInfo?.BaseAsset != null)
-            whitelistCodes.Add(security.FxInfo.BaseAsset.Code);
-        if (security.FxInfo?.QuoteAsset != null)
-            whitelistCodes.Add(security.FxInfo.QuoteAsset.Code);
+        if (security.FxInfo?.BaseSecurity != null)
+            whitelistCodes.Add(security.FxInfo.BaseSecurity.Code);
+        if (security.FxInfo?.QuoteSecurity != null)
+            whitelistCodes.Add(security.FxInfo.QuoteSecurity.Code);
         whitelistCodes = whitelistCodes.Distinct().OrderBy(c => c).ToList();
 
         var ep = new EngineParameters(preferredCashCodes,

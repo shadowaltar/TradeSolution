@@ -365,14 +365,15 @@ public partial class AdminController : Controller
             results.AddRange(await CreateTables(storage, DataType.User));
             results.AddRange(await CreateTables(storage, DataType.Account));
             results.AddRange(await CreateTables(storage, DataType.Asset));
+            results.AddRange(await CreateTables(storage, DataType.AssetState));
             results.AddRange(await CreateTables(storage, DataType.FinancialStat));
             results.AddRange(await CreateTables(storage, DataType.AlgoEntry));
             results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Fx));
             results.AddRange(await CreateTables(storage, DataType.Order, SecurityType.Equity));
             results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Fx));
             results.AddRange(await CreateTables(storage, DataType.Trade, SecurityType.Equity));
-            results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Fx));
-            results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
+            //results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Fx));
+            //results.AddRange(await CreateTables(storage, DataType.Position, SecurityType.Equity));
         }
         return results.IsNullOrEmpty()
             ? BadRequest($"Invalid parameters: either {tableType} or {secTypeStr} is wrong.")
@@ -446,9 +447,9 @@ public partial class AdminController : Controller
                 case DataType.Trade:
                     resultTableNames.AddRange(await storage.CreateTradeTable(secType));
                     break;
-                case DataType.Position:
-                    resultTableNames.AddRange(await storage.CreatePositionTable(secType));
-                    break;
+                //case DataType.Position:
+                //    resultTableNames.AddRange(await storage.CreatePositionTable(secType));
+                //    break;
                     //case DataType.TradeOrderPositionRelationship:
                     //    results = new ListAlgoBatches<string> { await storage.CreateTradeOrderPositionIdTable(secType) };
                     //    break;

@@ -53,7 +53,7 @@ public class ExternalStopOrderEnterPositionAlgoLogic : SimpleEnterPositionAlgoLo
                 slOrder.ParentOrderId = parentOrderId;
                 slOrder.TriggerPrice = enterPrice;
                 var subState = await _orderService.SendOrder(slOrder);
-                parentState.SubStates ??= new();
+                parentState.SubStates ??= [];
                 parentState.SubStates.Add(subState);
                 if (subState.ResultCode == ResultCode.SendOrderFailed)
                 {
@@ -86,7 +86,7 @@ public class ExternalStopOrderEnterPositionAlgoLogic : SimpleEnterPositionAlgoLo
                 tpOrder.ParentOrderId = parentOrderId;
                 tpOrder.TriggerPrice = enterPrice;
                 var subState = await _orderService.SendOrder(tpOrder);
-                parentState.SubStates ??= new();
+                parentState.SubStates ??= [];
                 parentState.SubStates.Add(subState);
                 if (subState.ResultCode == ResultCode.SendOrderFailed)
                 {

@@ -8,7 +8,7 @@ public class Stochastics : PriceSeriesIndicator<decimal[]>
     public int DPeriod { get; }
     public int JPeriod { get; }
 
-    private readonly List<StochasticsComponent> _components = new();
+    private readonly List<StochasticsComponent> _components = [];
 
     public Stochastics(PriceElementType elementToUse = PriceElementType.Close, bool calculateFromBeginning = false, params int[] periods)
         : base(periods.Max(), elementToUse, calculateFromBeginning)

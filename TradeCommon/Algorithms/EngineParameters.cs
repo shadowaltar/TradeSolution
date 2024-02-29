@@ -10,14 +10,12 @@ namespace TradeCommon.Algorithms;
 /// engine will try to use the followed security codes in this list.</param>
 /// <param name="GlobalCurrencyFilter">A list of asset security code which will be visible in the engine,
 /// for all interested non-cash or cash/fiat currencies.</param>
-/// <param name="AssumeNoOpenPositionOnStart">Assume there is no open position during engine startup.</param>
 /// <param name="CancelOpenOrdersOnStart">Whether cancel all open orders on engine starts.</param>
 /// <param name="CloseOpenPositionsOnStop">Whether close all open positions before engine stops.</param>
 /// <param name="CloseOpenPositionsOnStart">Whether close all open positions on engine starts.</param>
 /// <param name="CleanUpNonCashOnStart">Whether clean up (sell) all non-cash assets on engine starts.</param>
 public record EngineParameters(List<string> PreferredQuoteCurrencies,
                                List<string>? GlobalCurrencyFilter = null,
-                               bool AssumeNoOpenPositionOnStart = true,
                                bool CancelOpenOrdersOnStart = true,
                                bool CloseOpenPositionsOnStop = true,
                                bool CloseOpenPositionsOnStart = true,
@@ -28,8 +26,7 @@ public record EngineParameters(List<string> PreferredQuoteCurrencies,
     {
         var sb = new StringBuilder();
         sb.Append("\"PreferredQuoteCurrencies\":\"").AppendJoin(",", PreferredQuoteCurrencies).AppendLine("\",");
-        sb.Append("\"GlobalCurrencyFilter\":\"").AppendJoin(",", GlobalCurrencyFilter ?? new List<string>()).AppendLine("\",");
-        sb.Append("\"AssumeNoOpenPositionOnStart\":").Append(AssumeNoOpenPositionOnStart).AppendLine(",");
+        sb.Append("\"GlobalCurrencyFilter\":\"").AppendJoin(",", GlobalCurrencyFilter ?? []).AppendLine("\",");
         sb.Append("\"CancelOpenOrdersOnStart\":").Append(CancelOpenOrdersOnStart).AppendLine(",");
         sb.Append("\"CloseOpenPositionsOnStop\":").Append(CloseOpenPositionsOnStop).AppendLine(",");
         sb.Append("\"CloseOpenPositionsOnStart\":").Append(CloseOpenPositionsOnStart).AppendLine(",");

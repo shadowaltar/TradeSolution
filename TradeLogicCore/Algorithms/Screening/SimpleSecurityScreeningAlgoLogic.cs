@@ -5,8 +5,8 @@ namespace TradeLogicCore.Algorithms.Screening;
 
 public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
-    private static readonly Dictionary<int, Security> _originalPool = new();
-    private static readonly Dictionary<int, Security> _pickedPool = new();
+    private static readonly Dictionary<int, Security> _originalPool = [];
+    private static readonly Dictionary<int, Security> _pickedPool = [];
 
     public bool CheckIsPicked(int securityId)
     {

@@ -16,7 +16,7 @@ public class Core
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly Dictionary<long, IAlgorithmEngine> _engines = new();
+    private readonly Dictionary<long, IAlgorithmEngine> _engines = [];
     private readonly IServices _services;
     private Reconcilation? _reconciliation;
 

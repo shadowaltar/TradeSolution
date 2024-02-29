@@ -2,8 +2,8 @@
 
 public static class Comments
 {
-    public const string CloseAllBeforeStart = "Close position before algo engine starts.";
-    public const string CloseAllBeforeStop = "Close position before algo engine stops.";
+    public const string CloseAllBeforeStart = "Close non-cash positions before algo engine starts.";
+    public const string CloseAllBeforeStop = "Close non-cash positions before algo engine stops.";
     public const string AlgoEnterLimit = "Algo enter (limit).";
     public const string AlgoEnterMarket = "Algo enter (market)";
     public const string AlgoExit = "Algo exit.";

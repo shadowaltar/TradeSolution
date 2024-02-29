@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac.Core;
+using Common;
 using log4net;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -9,6 +10,7 @@ using TradeCommon.Providers;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
 using TradeDataCore.Instruments;
+using TradeLogicCore.Utils;
 
 namespace TradeLogicCore.Services;
 public class PortfolioService : IPortfolioService
@@ -25,10 +27,10 @@ public class PortfolioService : IPortfolioService
     private readonly Dictionary<int, decimal> _residualByAssetSecurityId = [];
 
     public event Action<Asset, Trade>? AssetProcessed;
-    public event Action<Asset>? AssetPositionCreated;
-    public event Action<Asset>? AssetPositionUpdated;
-    public event Action<List<Asset>>? AssetPositionsUpdated;
-    public event Action<Asset>? AssetClosed;
+    //public event Action<Asset>? AssetPositionCreated;
+    //public event Action<Asset>? AssetPositionUpdated;
+    //public event Action<List<Asset>>? AssetPositionsUpdated;
+    //public event Action<Asset>? AssetClosed;
 
     public Portfolio InitialPortfolio { get; private set; }
 
@@ -89,7 +91,7 @@ public class PortfolioService : IPortfolioService
         if (state.ResultCode == ResultCode.GetAccountFailed)
         {
             _log.Error("Failed to get assets.");
-            return new();
+            return [];
         }
         var assets = state.Get<List<Asset>>();
         if (assets == null)
@@ -163,7 +165,7 @@ public class PortfolioService : IPortfolioService
         // must be two different instances
         Portfolio = new Portfolio(_context.AccountId, assets);
 
-        InitialPortfolio = new Portfolio(_context.AccountId, assets.Clone());
+        InitialPortfolio = new Portfolio(_context.AccountId, MiscExtensions.Clone(assets));
         return true;
     }
 
@@ -349,41 +351,41 @@ public class PortfolioService : IPortfolioService
     //    return position;
     //}
 
-    public void Update(List<Position> positions, bool isInitializing = false)
-    {
-        if (isInitializing)
-        {
-            InitialPortfolio.ClearPositions();
-            Portfolio.ClearPositions();
-        }
+    //public void Update(List<Position> positions, bool isInitializing = false)
+    //{
+    //    if (isInitializing)
+    //    {
+    //        InitialPortfolio.ClearPositions();
+    //        Portfolio.ClearPositions();
+    //    }
 
-        foreach (var position in positions)
-        {
-            _securityService.Fix(position);
-            if (position.IsClosed)
-            {
-                _closedPositions[position.Id] = position;
-                Portfolio.RemovePosition(position.Id);
-                if (isInitializing)
-                    InitialPortfolio.RemovePosition(position.Id);
-            }
-            else
-            {
-                Portfolio.AddOrUpdate(position);
-            }
-            if (isInitializing)
-            {
-                InitialPortfolio.AddOrUpdate(position with { });
-            }
-        }
-    }
+    //    foreach (var position in positions)
+    //    {
+    //        _securityService.Fix(position);
+    //        if (position.IsClosed)
+    //        {
+    //            _closedPositions[position.Id] = position;
+    //            Portfolio.RemovePosition(position.Id);
+    //            if (isInitializing)
+    //                InitialPortfolio.RemovePosition(position.Id);
+    //        }
+    //        else
+    //        {
+    //            Portfolio.AddOrUpdate(position);
+    //        }
+    //        if (isInitializing)
+    //        {
+    //            InitialPortfolio.AddOrUpdate(position with { });
+    //        }
+    //    }
+    //}
 
     public void Update(List<Asset> assets, bool isInitializing = false)
     {
         if (isInitializing)
         {
-            InitialPortfolio.ClearAssets();
-            Portfolio.ClearAssets();
+            InitialPortfolio.Clear();
+            Portfolio.Clear();
         }
         foreach (var asset in assets)
         {
@@ -401,10 +403,8 @@ public class PortfolioService : IPortfolioService
     {
         await _execution.Unsubscribe();
 
-        InitialPortfolio.ClearAssets();
-        InitialPortfolio.ClearPositions();
-        Portfolio.ClearAssets();
-        Portfolio.ClearPositions();
+        InitialPortfolio.Clear();
+        Portfolio.Clear();
 
         _residualByAssetSecurityId.Clear();
     }
@@ -415,20 +415,20 @@ public class PortfolioService : IPortfolioService
         return true;
     }
 
-    public async Task<Asset> Deposit(int assetId, decimal quantity)
-    {
-        // TODO external logic!
-        var asset = GetAsset(assetId);
-        if (asset != null)
-        {
-            asset.Quantity += quantity;
-            // TODO external logic
-            var assets = await _storage.ReadAssets();
-            asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
-            return asset;
-        }
-        throw Exceptions.MissingAsset(assetId);
-    }
+    //public async Task<Asset> Deposit(int assetId, decimal quantity)
+    //{
+    //    // TODO external logic!
+    //    var asset = GetAsset(assetId);
+    //    if (asset != null)
+    //    {
+    //        asset.Quantity += quantity;
+    //        // TODO external logic
+    //        var assets = await _storage.ReadAssets();
+    //        asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
+    //        return asset;
+    //    }
+    //    throw Exceptions.MissingAsset(assetId);
+    //}
 
     public async Task<Asset?> Deposit(int accountId, int assetId, decimal quantity)
     {
@@ -463,26 +463,26 @@ public class PortfolioService : IPortfolioService
         }
     }
 
-    public async Task<Asset?> Withdraw(int assetId, decimal quantity)
-    {
-        // TODO external logic!
-        var asset = GetAsset(assetId);
-        if (asset != null)
-        {
-            if (asset.Quantity < quantity)
-            {
-                _log.Error($"Attempt to withdraw quantity more than the free amount. Requested: {quantity}, free amount: {asset.Quantity}.");
-                return null;
-            }
-            asset.Quantity -= quantity;
-            _log.Info($"Withdrew {quantity} quantity from current account. Remaining free amount: {asset.Quantity}.");
-            var assets = await _storage.ReadAssets();
-            asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
-            asset.Quantity -= quantity;
-            return asset;
-        }
-        throw Exceptions.MissingAsset(assetId);
-    }
+    //public async Task<Asset?> Withdraw(int assetId, decimal quantity)
+    //{
+    //    // TODO external logic!
+    //    var asset = GetAsset(assetId);
+    //    if (asset != null)
+    //    {
+    //        if (asset.Quantity < quantity)
+    //        {
+    //            _log.Error($"Attempt to withdraw quantity more than the free amount. Requested: {quantity}, free amount: {asset.Quantity}.");
+    //            return null;
+    //        }
+    //        asset.Quantity -= quantity;
+    //        _log.Info($"Withdrew {quantity} quantity from current account. Remaining free amount: {asset.Quantity}.");
+    //        var assets = await _storage.ReadAssets();
+    //        asset = assets.FirstOrDefault(b => b.SecurityId == assetId) ?? throw Exceptions.MissingBalance(Portfolio.AccountId, assetId);
+    //        asset.Quantity -= quantity;
+    //        return asset;
+    //    }
+    //    throw Exceptions.MissingAsset(assetId);
+    //}
 
     public async Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio)
     {
@@ -495,23 +495,23 @@ public class PortfolioService : IPortfolioService
             }
             if (!clearOnly)
             {
-                var positions = await _storage.ReadPositions(DateTime.MinValue, OpenClose.OpenOnly);
-                foreach (var position in positions)
+                var assets = await _storage.ReadAssets();
+                foreach (var asset in assets)
                 {
-                    Portfolio.AddOrUpdate(position);
+                    Portfolio.AddOrUpdate(asset);
                     if (affectInitialPortfolio)
                     {
-                        InitialPortfolio.AddOrUpdate(position);
+                        InitialPortfolio.AddOrUpdate(asset);
                     }
                 }
             }
         }
         if (affectAssets)
         {
-            Portfolio.ClearAssets();
+            Portfolio.Clear();
             if (affectInitialPortfolio)
             {
-                InitialPortfolio.ClearAssets();
+                InitialPortfolio.Clear();
             }
             if (!clearOnly)
             {
@@ -541,59 +541,30 @@ public class PortfolioService : IPortfolioService
 
     public void Process(Trade trade)
     {
-        if (trade.IsOperational) return;
-
         var asset = GetPositionBySecurityId(trade.SecurityId);
-        var isNew = asset == null;
-        asset = CreateOrApply(trade, asset);
         if (asset == null) throw Exceptions.Impossible();
 
-        _securityService.Fix(asset);
-
-        // update storage for position and position-record
-        if (asset.IsClosed)
-        {
-            _closedPositions[asset.Id] = asset;
-            Portfolio.RemovePosition(asset.Id);
-
-            if (asset.Quantity != 0)
-            {
-                // has residual, which will be traded in future orders
-                var residual = asset.Quantity;
-                var assetSecId = asset.Security.FxInfo?.BaseAsset?.Id ?? 0;
-                if (assetSecId != 0)
-                {
-                    _residualByAssetSecurityId.ThreadSafeSet(asset.SecurityId, residual);
-                }
-                else
-                {
-                    _log.Warn("Cannot find base asset security Id! Position's security is: " + asset.SecurityCode);
-                }
-            }
-        }
-        else
-        {
-            Portfolio.AddOrUpdate(asset);
-        }
+        _securityService.Fix(asset);        
+        Portfolio.AddOrUpdate(asset);
         _persistence.Insert(asset);
 
         // invoke post-events
-        if (isNew)
-            AssetPositionCreated?.Invoke(asset);
-        else
-            AssetPositionUpdated?.Invoke(asset);
+        //if (asset.)
+        //    AssetPositionCreated?.Invoke(asset);
+        //else
+        //    AssetPositionUpdated?.Invoke(asset);
 
-        if (asset.IsClosed)
-        {
-            AssetClosed?.Invoke(asset);
-        }
+        //if (asset.IsEmpty)
+        //{
+        //    AssetClosed?.Invoke(asset);
+        //}
         AssetProcessed?.Invoke(asset, trade);
     }
 
     public Side GetOpenPositionSide(int securityId)
     {
-        var position = GetPositionBySecurityId(securityId);
-        return position == null ? Side.None : position.Side;
+        var asset = GetPositionBySecurityId(securityId);
+        return asset == null || asset.IsEmpty ? Side.None : asset.Quantity > 0 ? Side.Buy : Side.Sell;
     }
 
     public decimal GetAssetPositionResidual(int assetSecurityId)
@@ -649,7 +620,7 @@ public class PortfolioService : IPortfolioService
         _persistence.Insert(states, isUpsert: false);
     }
 
-    public List<Asset> GetPositions()
+    public List<Asset> GetAssets()
     {
         throw new NotImplementedException();
     }
@@ -659,13 +630,23 @@ public class PortfolioService : IPortfolioService
         throw new NotImplementedException();
     }
 
-    public Asset? GetAssetPositionBySecurityId(int securityId)
+    public Asset? GetAssetBySecurityId(int securityId, bool isInit = false)
     {
-        throw new NotImplementedException();
+        if (isInit)
+            return InitialPortfolio.GetAssetPositionBySecurityId(securityId);
+        return Portfolio.GetAssetPositionBySecurityId(securityId);
     }
 
-    public Asset? GetCashAssetBySecurityId(int securityId)
+    public Asset? GetRelatedCashPosition(Security security)
     {
-        throw new NotImplementedException();
+        var currencyAsset = security.SafeGetQuoteSecurity();
+        return GetCashAssetBySecurityId(currencyAsset.Id);
+    }
+
+    public Asset? GetCashAssetBySecurityId(int securityId, bool isInit = false)
+    {
+        if (isInit)
+            return Portfolio.GetAssetPositionBySecurityId(securityId);
+        return Portfolio.GetCashAssetBySecurityId(securityId);
     }
 }

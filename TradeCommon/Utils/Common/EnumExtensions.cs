@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Reflection;
+using TradeCommon.Essentials.Trading;
 
 namespace Common;
 public static class EnumExtensions
@@ -75,5 +76,15 @@ public static class EnumExtensions
     public static bool IsUnknown<T>(this T value) where T : struct, Enum
     {
         return value.As<int>() == 0;
+    }
+
+    public static Side Invert(this Side side)
+    {
+        return side switch
+        {
+            Side.Buy => Side.Sell,
+            Side.Sell => Side.Buy,
+            _ => Side.None,
+        };
     }
 }

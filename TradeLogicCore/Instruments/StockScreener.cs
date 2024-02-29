@@ -117,7 +117,7 @@ public abstract class ScreeningCriteria
     /// <summary>
     /// Security codes to be excluded from screening results.
     /// </summary>
-    public List<string> ExcludedCodes { get; } = new();
+    public List<string> ExcludedCodes { get; } = [];
 
     /// <summary>
     /// End time for the indicator calculation.
