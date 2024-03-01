@@ -9,6 +9,7 @@ public interface IServices
     Persistence Persistence { get; }
     DataPublisher Publisher { get; }
     IAdminService Admin { get; }
+    IAlgorithmService Algo { get; }
     IPortfolioService Portfolio { get; }
     IOrderService Order { get; }
     ITradeService Trade { get; }

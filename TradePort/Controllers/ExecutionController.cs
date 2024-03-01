@@ -418,7 +418,6 @@ public class ExecutionController : Controller
 
         var ep = new EngineParameters(preferredCashCodes,
                                       whitelistCodes,
-                                      algoParams.AssumeNoOpenPositionOnStart,
                                       algoParams.CancelOpenOrdersOnStart,
                                       algoParams.CloseOpenPositionsOnStop,
                                       algoParams.CloseOpenPositionsOnStart,
@@ -689,14 +688,6 @@ public class ExecutionController : Controller
         [FromForm(Name = "cancel-open-orders-on-start")]
         [DefaultValue(true)]
         public bool CancelOpenOrdersOnStart { get; set; } = true;
-
-        /// <summary>
-        /// Assumes no open positions when algo starts.
-        /// This affects <see cref="CloseOpenPositionsOnStart"/>.
-        /// </summary>
-        [FromForm(Name = "assume-no-open-position")]
-        [DefaultValue(true)]
-        public bool AssumeNoOpenPositionOnStart { get; set; } = true;
 
         /// <summary>
         /// Closes any open positions.

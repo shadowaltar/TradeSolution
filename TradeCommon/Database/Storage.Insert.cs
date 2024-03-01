@@ -21,10 +21,6 @@ public partial class Storage
         {
             count = await Insert<Trade>(task);
         }
-        else if (task.Type == typeof(Position))
-        {
-            count = await Insert<Position>(task);
-        }
         else if (task.Type == typeof(Order))
         {
             count = await Insert<Order>(task);

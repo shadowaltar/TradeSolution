@@ -37,7 +37,7 @@ public class DataTypeConverter
             "ORDERBOOK" or "DEPTHBOOK" or "ORDERBOOKS" or "DEPTHBOOKS" => DataType.OrderBook,
             "ORDER" or "ORDERS" => DataType.Order,
             "TRADE" or "TRADES" => DataType.Trade,
-            "POSITION" or "POSITIONS" => DataType.Position,
+            //"POSITION" or "POSITIONS" => DataType.Position,
             //"TRADEORDERPOSITIONRELATIONSHIP" or "TOP" => DataType.TradeOrderPositionRelationship,
             "FINANCIALSTAT" or "STAT" => DataType.FinancialStat,
             "ACCOUNT" or "ACCOUNTS" => DataType.Account,

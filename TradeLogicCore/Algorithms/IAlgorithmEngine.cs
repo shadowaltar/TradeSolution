@@ -69,8 +69,7 @@ public interface IAlgorithmEngine
     List<AlgoEntry> GetExecutionEntries(int securityId);
 
     /// <summary>
-    /// Runs the procedure to update the engine internal status.
-    /// Usually triggered by new price or new market events.
+    /// Main logic when an OHLC price is received.
     /// </summary>
     Task Update(int securityId, OhlcPrice ohlcPrice);
 }

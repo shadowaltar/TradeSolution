@@ -172,11 +172,11 @@ public static class DatabaseNames
     //        };
     //}
 
-    public static string? GetPositionTableName(string securityType, bool isErrorTable = false)
-    {
-        var type = SecurityTypeConverter.Parse(securityType);
-        return GetPositionTableName(type, isErrorTable);
-    }
+    //public static string? GetPositionTableName(string securityType, bool isErrorTable = false)
+    //{
+    //    var type = SecurityTypeConverter.Parse(securityType);
+    //    return GetPositionTableName(type, isErrorTable);
+    //}
 
     public static string GetPriceTableName(IntervalType intervalType, SecurityType securityType)
     {

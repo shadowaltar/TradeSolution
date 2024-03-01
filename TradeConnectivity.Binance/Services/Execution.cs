@@ -210,7 +210,6 @@ public class Execution : IExternalExecutionManagement
                         FeeAssetId = 0, // cannot be determined until executing in service layer logic
                         Time = order.ExternalUpdateTime,
                         PositionId = 0, // to be filled in later
-                        IsOperational = isOperational,
                     };
                     trades.Add(trade);
                 }

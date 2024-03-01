@@ -47,6 +47,7 @@ public class PortfolioServiceTests
             trades.Add(trade);
         }
 
+        service.
         var position = Position.Create(trades[0], 0);
         for (int i = 1; i < trades.Count; i++)
         {

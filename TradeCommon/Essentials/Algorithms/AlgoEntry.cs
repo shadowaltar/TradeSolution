@@ -67,10 +67,19 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// Return vs previous OHLC price using two close prices.
     /// </summary>
     public decimal Return { get; set; }
+
+    /// <summary>
+    /// Return from (<see cref="ExitPrice"/>-<see cref="EnterPrice"/>)*<see cref="Quantity"/>.
+    /// </summary>
+    [DatabaseIgnore]
+    public decimal ExecutionReturn => (ExitPrice ?? 0 - EnterPrice ?? 0) * Quantity;
+
     public decimal? EnterPrice { get; set; }
     public decimal? ExitPrice { get; set; }
+
     //public decimal? StopLossPrice { get; set; }
     //public decimal? TakeProfitPrice { get; set; }
+
     public DateTime? EnterTime { get; set; }
     public DateTime? ExitTime { get; set; }
     public TimeSpan? Elapsed { get; set; }

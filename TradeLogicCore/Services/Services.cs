@@ -3,50 +3,39 @@ using TradeDataCore.Instruments;
 using TradeDataCore.MarketData;
 
 namespace TradeLogicCore.Services;
-public class Services : IServices
+public class Services(Context context,
+                      Persistence persistence,
+                      IAdminService admin,
+                      IAlgorithmService algo,
+                      IPortfolioService portfolio,
+                      IOrderService order,
+                      ITradeService trade,
+                      ISecurityService security,
+                      IHistoricalMarketDataService historicalMarketDataService,
+                      IMarketDataService marketDataService,
+                      DataPublisher publisher) : IServices
 {
-    public Services(Context context,
-                    Persistence persistence,
-                    IAdminService admin,
-                    IPortfolioService portfolio,
-                    IOrderService order,
-                    ITradeService trade,
-                    ISecurityService security,
-                    IHistoricalMarketDataService historicalMarketDataService,
-                    IMarketDataService marketDataService,
-                    DataPublisher publisher)
-    {
-        Context = context;
-        Persistence = persistence;
-        Admin = admin;
-        Portfolio = portfolio;
-        Order = order;
-        Trade = trade;
-        Security = security;
-        HistoricalMarketData = historicalMarketDataService;
-        MarketData = marketDataService;
-        Publisher = publisher;
-    }
+    public Context Context { get; } = context;
 
-    public Context Context { get; }
+    public Persistence Persistence { get; } = persistence;
 
-    public Persistence Persistence { get; }
+    public IAdminService Admin { get; } = admin;
+    
+    public IAlgorithmService Algo { get; } = algo;
+    
+    public IPortfolioService Portfolio { get; private set; } = portfolio;
 
-    public IAdminService Admin { get; }
+    public IOrderService Order { get; private set; } = order;
 
-    public IPortfolioService Portfolio { get; private set; }
+    public ITradeService Trade { get; private set; } = trade;
 
-    public IOrderService Order { get; private set; }
+    public ISecurityService Security { get; private set; } = security;
 
-    public ITradeService Trade { get; private set; }
+    public IHistoricalMarketDataService HistoricalMarketData { get; private set; } = historicalMarketDataService;
 
-    public ISecurityService Security { get; private set; }
+    public IMarketDataService MarketData { get; private set; } = marketDataService;
 
-    public IHistoricalMarketDataService HistoricalMarketData { get; private set; }
-
-    public IMarketDataService MarketData { get; private set; }
-
-    public DataPublisher Publisher { get; }
+    public DataPublisher Publisher { get; } = publisher;
 
     public async Task Reset()
     {
