@@ -85,6 +85,9 @@ public class Execution : IExternalExecutionManagement
         if (!Firewall.CanCall)
             return ExternalQueryStates.FirewallBlocked();
 
+        var algoEntryId = order.AlgoEntryId;
+        var algoSessionId = order.AlgoSessionId;
+
         var url = $"{_connectivity.RootUrl}/api/v3/order";
         var isOk = false;
         var swTotal = Stopwatch.StartNew();
@@ -124,11 +127,15 @@ public class Execution : IExternalExecutionManagement
         // example JSON: var content = @"{ ""symbol"": ""BTCUSDT"", ""externalOrderId"": 28, ""orderListId"": -1, ""clientOrderId"": ""6gCrw2kRUAF9CvJDGP16IP"", ""transactTime"": 1507725176595, ""price"": ""0.00000000"", ""origQty"": ""10.00000000"", ""executedQty"": ""10.00000000"", ""cummulativeQuoteQty"": ""10.00000000"", ""status"": ""FILLED"", ""timeInForce"": ""GTC"", ""type"": ""MARKET"", ""side"": ""SELL"", ""workingTime"": 1507725176595, ""selfTradePreventionMode"": ""NONE"", ""fills"": [ { ""price"": ""4000.00000000"", ""qty"": ""1.00000000"", ""commission"": ""4.00000000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 56 }, { ""price"": ""3999.00000000"", ""qty"": ""5.00000000"", ""commission"": ""19.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 57 }, { ""price"": ""3998.00000000"", ""qty"": ""2.00000000"", ""commission"": ""7.99600000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 58 }, { ""price"": ""3997.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99700000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 59 }, { ""price"": ""3995.00000000"", ""qty"": ""1.00000000"", ""commission"": ""3.99500000"", ""commissionAsset"": ""USDT"", ""externalTradeId"": 60 } ] }"
         var trades = new List<Trade>();
 
+        // copy over the order object used for sending
+        // to this received one
         var receivedOrder = new Order
         {
             Id = order.Id,
             Action = order.Action,
             AccountId = _context.AccountId,
+            AlgoEntryId = algoEntryId,
+            AlgoSessionId = algoSessionId,
             CreateTime = order.CreateTime,
 
             Type = order.Type,
@@ -197,6 +204,8 @@ public class Execution : IExternalExecutionManagement
                     {
                         Id = _tradeIdGenerator.NewTimeBasedId,
                         AccountId = _context.AccountId,
+                        AlgoEntryId = order.AlgoEntryId,
+                        AlgoSessionId = order.AlgoSessionId,
                         ExternalTradeId = item.GetLong("tradeId"),
                         OrderId = order.Id,
                         ExternalOrderId = order.ExternalOrderId,

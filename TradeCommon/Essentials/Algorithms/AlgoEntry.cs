@@ -12,19 +12,19 @@ namespace TradeCommon.Essentials.Algorithms;
 /// Class which records prop algo execution.
 /// </summary>
 [Storage("algorithm_entries", "algorithm")]
-[Unique(nameof(SessionId), nameof(SequenceId), nameof(Time))]
+[Unique(nameof(SessionId), nameof(PositionId), nameof(Time))]
 [Index(nameof(SessionId))]
 public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
 {
     /// <summary>
-    /// Index / serial number / sequence id of an algo entry in a batch.
+    /// Sequence id which starts from zero in every algo batch session.
     /// </summary>
     public int SequenceId { get; set; }
 
     public long SessionId { get; set; }
 
     /// <summary>
-    /// The id which indicates a position's existence over multiple algo-entries
+    /// Position Id; default is 0, meaning that this entry is not related to a position.
     /// </summary>
     [NotNull]
     public long PositionId { get; set; } = 0;
@@ -61,48 +61,69 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     ///// </summary>
     //public long OrderId { get; set; }
 
+    /// <summary>
+    /// Target quantity being traded.
+    /// This is not the actual traded quantity in any given timestamp.
+    /// </summary>
     public decimal Quantity { get; set; }
 
     /// <summary>
-    /// Return vs previous OHLC price using two close prices.
+    /// An return value between current vs last entry.
+    /// It is a theoretical return if enter then exit at the end of the two OHLC's close prices.
     /// </summary>
-    public decimal Return { get; set; }
+    public decimal EntryReturn { get; set; }
 
     /// <summary>
-    /// Return from (<see cref="ExitPrice"/>-<see cref="EnterPrice"/>)*<see cref="Quantity"/>.
+    /// Return from (<see cref="TheoreticExitPrice"/>-<see cref="TheoreticEnterPrice"/>)*<see cref="Quantity"/>.
     /// </summary>
     [DatabaseIgnore]
-    public decimal ExecutionReturn => (ExitPrice ?? 0 - EnterPrice ?? 0) * Quantity;
+    public decimal TheoreticPnl => (TheoreticExitPrice ?? 0 - TheoreticEnterPrice ?? 0) * Quantity;
 
-    public decimal? EnterPrice { get; set; }
-    public decimal? ExitPrice { get; set; }
+    /// <summary>
+    /// The algo target enter price.
+    /// Actual price should look at <see cref="Order.Price"/>
+    /// which is an weighted average value of the related <see cref="Trade.Price"/>.
+    /// </summary>
+    public decimal? TheoreticEnterPrice { get; set; }
+
+    /// <summary>
+    /// The algo target exit price.
+    /// Actual price should look at <see cref="Order.Price"/>
+    /// which is an weighted average value of the related <see cref="Trade.Price"/>.
+    /// </summary>
+    public decimal? TheoreticExitPrice { get; set; }
 
     //public decimal? StopLossPrice { get; set; }
     //public decimal? TakeProfitPrice { get; set; }
 
-    public DateTime? EnterTime { get; set; }
-    public DateTime? ExitTime { get; set; }
-    public TimeSpan? Elapsed { get; set; }
+    public DateTime? TheoreticEnterTime { get; set; }
+    public DateTime? TheoreticExitTime { get; set; }
+    public TimeSpan? TheoreticElapsed => TheoreticEnterTime != null ? TheoreticExitTime == null ? TheoreticExitTime - TheoreticEnterTime : DateTime.UtcNow - TheoreticEnterTime : null;
 
     /// <summary>
-    /// Notional value of this entry. Current Price * Quantity being hold.
+    /// A target notional value of this entry. Short notional - long notional.
     /// </summary>
     public decimal Notional { get; set; }
 
     /// <summary>
     /// Realized return of this entry which is just closed. 1 - Exit Price / Enter Price.
     /// </summary>
-    public decimal RealizedReturn { get; set; }
+    public decimal RealizedReturn => (TheoreticEnterPrice == null || TheoreticEnterPrice == 0 || TheoreticExitPrice == null || TheoreticExitPrice == 0) ? 0 : (1 - TheoreticExitPrice / TheoreticEnterPrice).Value;
+
+    ///// <summary>
+    ///// Realized PNL of this entry which is just closed. (Exit Price - Enter Price) * Quantity held.
+    ///// </summary>
+    //public decimal RealizedPnl => (TheoreticEnterPrice == null || TheoreticEnterPrice == 0 || TheoreticExitPrice == null || TheoreticExitPrice == 0) ? 0 : ((TheoreticExitPrice - TheoreticEnterPrice) * Quantity).Value;
 
     /// <summary>
-    /// Realized PNL of this entry which is just closed. (Exit Price - Enter Price) * Quantity held.
+    /// (Only applicable for FX / Crypto) fee incurred related to base currency.
     /// </summary>
-    public decimal RealizedPnl { get; set; }
+    public decimal BaseFee { get; set; }
 
     /// <summary>
-    /// Fee incurred when enter and/or exit a position.
+    /// Fee incurred related to security's quote currency.
     /// </summary>
-    public decimal Fee { get; set; }
+    public decimal QuoteFee { get; set; }
 
     [DatabaseIgnore]
     public decimal LongPrice { get; set; }

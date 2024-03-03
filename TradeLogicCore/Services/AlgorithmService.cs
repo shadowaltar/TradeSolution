@@ -1,9 +1,15 @@
 ﻿using Autofac.Core;
 using Common;
+using Microsoft.Identity.Client;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using TradeCommon.Algorithms;
+using TradeCommon.Essentials;
+using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
+using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms;
 
@@ -38,7 +44,16 @@ public class AlgorithmService : IAlgorithmService
     /// </summary>
     private readonly Dictionary<int, List<AlgoEntry>> _executionEntriesBySecurityIds = [];
 
-    public AlgoSession? Session { get; set; }
+    private readonly Context _context;
+
+    public AlgorithmService(Context context)
+    {
+        _context = context;
+    }
+
+    public AlgoSession? Session { get; private set; }
+
+    AlgoSession IAlgorithmService.Session { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     public List<AlgoEntry> GetAllEntries(int securityId)
     {
@@ -47,12 +62,12 @@ public class AlgorithmService : IAlgorithmService
 
     public List<int> GetAllSecurityIds()
     {
-        return _allEntriesBySecurityIds.Keys.ToList();
+        return [.. _allEntriesBySecurityIds.Keys];
     }
 
-    public AlgoEntry GetCurrentEntry(int securityId)
+    public AlgoEntry? GetCurrentEntry(int securityId)
     {
-        throw new NotImplementedException();
+        return _currentEntriesBySecurityId.ThreadSafeGet(securityId);
     }
 
     public List<AlgoEntry> GetExecutionEntries(int securityId)
@@ -62,17 +77,25 @@ public class AlgorithmService : IAlgorithmService
 
     public AlgoEntry? GetLastEntry(int securityId)
     {
-        throw new NotImplementedException();
+        return _lastEntriesBySecurityId.ThreadSafeGet(securityId);
     }
 
-    public OhlcPrice? GetLastEntry(int securityId, string interval)
+    public OhlcPrice? GetLastOhlcPrice(int securityId, IntervalType interval)
     {
-        throw new NotImplementedException();
+        // TODO: currently only support one kind of interval type
+        return _lastOhlcPricesBySecurityId.ThreadSafeGet(securityId);
     }
 
     public AlgoEntry? GetLastEntryAt(int securityId, int offset)
     {
-        throw new NotImplementedException();
+        if (offset > 0) return null;
+        var entries = _allEntriesBySecurityIds.ThreadSafeGet(securityId);
+        if (entries.IsNullOrEmpty()) return null;
+        if (entries.Count <= -offset) return null;
+        lock (entries)
+        {
+            return entries[^offset];
+        }
     }
 
     public AlgoEntry CreateCurrentEntry(Algorithm algorithm, Security security, OhlcPrice ohlcPrice, out AlgoEntry? last)
@@ -106,13 +129,87 @@ public class AlgorithmService : IAlgorithmService
         return current;
     }
 
-    public void Next()
+    public void MoveNext(AlgoEntry current, OhlcPrice ohlcPrice)
     {
-        throw new NotImplementedException();
+        _lastEntriesBySecurityId.ThreadSafeSet(current.SecurityId, current);
+        _lastOhlcPricesBySecurityId.ThreadSafeSet(current.SecurityId, ohlcPrice);
     }
 
-    List<long> IAlgorithmService.GetAllSecurityIds()
+    public void RecordExecution(AlgoEntry current)
     {
-        throw new NotImplementedException();
+        _executionEntriesBySecurityIds.GetOrCreate(current.SecurityId).Add(current);
+    }
+
+    public void CopyOver(AlgoEntry current, AlgoEntry last, decimal price)
+    {
+        current.PositionId = last.PositionId;
+        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        if (asset != null && !asset.IsEmpty)
+        {
+            current.Quantity = asset.Quantity;
+            current.TheoreticEnterTime = asset.CreateTime;
+            // inherit
+            current.TheoreticEnterPrice = last.TheoreticEnterPrice;
+            current.TheoreticEnterTime = last.TheoreticEnterTime;
+            current.TheoreticExitPrice = last.TheoreticExitPrice;
+            current.TheoreticExitTime = last.TheoreticExitTime;
+            current.LongSignal = last.LongSignal;
+            current.ShortSignal = last.ShortSignal;
+            current.LongPrice = last.LongPrice;
+            current.ShortPrice = last.ShortPrice;
+            current.LongQuantity = last.LongQuantity;
+            current.ShortQuantity = last.ShortQuantity;
+            current.BaseFee = last.BaseFee;
+            current.QuoteFee = last.QuoteFee;
+        }
+        else
+        {
+            current.LongSignal = SignalType.None;
+            current.ShortSignal = SignalType.None;
+            current.Quantity = 0;
+            current.TheoreticEnterPrice = null;
+            current.TheoreticEnterTime = null;
+            current.TheoreticExitPrice = null;
+            current.BaseFee = 0;
+            current.QuoteFee = 0;
+        }
+
+        // if signal is hold, keep on holding
+        if (last.LongSignal == SignalType.Open)
+        {
+            current.LongSignal = SignalType.None;
+        }
+        if (last.ShortSignal == SignalType.Open)
+        {
+            current.ShortSignal = SignalType.None;
+        }
+
+        current.LongCloseType = CloseType.None;
+        current.ShortCloseType = CloseType.None;
+    }
+
+    public void InitializeSession(EngineParameters engineParameters)
+    {
+        var _algorithm = _context.GetAlgorithm();
+        if (_algorithm == null)
+            throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");
+
+        var uniqueId = IdGenerators.Get<AlgoSession>().NewTimeBasedId;
+
+        Session = new AlgoSession
+        {
+            Id = uniqueId,
+            AlgoId = _algorithm.Id,
+            AlgoName = _algorithm.GetType().Name,
+            AlgoVersionId = _algorithm.VersionId,
+            UserId = _context.UserId,
+            AccountId = _context.AccountId,
+            Environment = _context.Environment,
+            AlgorithmParameters = _algorithm.AlgorithmParameters,
+            AlgorithmParametersInString = _algorithm.AlgorithmParameters.ToString() + _algorithm.PrintAlgorithmParameters(),
+            EngineParameters = engineParameters,
+            EngineParametersInString = engineParameters.ToString(),
+            StartTime = DateTime.UtcNow,
+        };
     }
 }

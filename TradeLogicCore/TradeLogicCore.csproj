@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="7.1.0" />
+    <PackageReference Include="Autofac" Version="8.0.0" />
     <!--<PackageReference Include="futu-api" Version="7.1.3308" />-->
   </ItemGroup>
 

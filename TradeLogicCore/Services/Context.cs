@@ -56,6 +56,8 @@ public class Context(IComponentContext container, IStorage storage) : Applicatio
         }
     }
 
+    public AlgoSession? AlgoSession { get; internal set; }
+
     public void InitializeAlgorithmContext(IAlgorithmEngine algorithmEngine, Algorithm algorithm)
     {
         _algorithmEngine = algorithmEngine;
@@ -100,27 +102,6 @@ public class Context(IComponentContext container, IStorage storage) : Applicatio
         return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
     }
 
-    public AlgoSession InitializeAlgoSession(long id)
-    {
-        if (_algorithm == null || _algorithmEngine == null)
-            throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");
-
-        return new AlgoSession
-        {
-            Id = id,
-            AlgoId = _algorithm.Id,
-            AlgoName = _algorithm.GetType().Name,
-            AlgoVersionId = _algorithm.VersionId,
-            UserId = UserId,
-            AccountId = AccountId,
-            Environment = Environment,
-            AlgorithmParameters = _algorithm.AlgorithmParameters,
-            AlgorithmParametersInString = _algorithm.AlgorithmParameters.ToString() + _algorithm.PrintAlgorithmParameters(),
-            EngineParameters = _algorithmEngine.EngineParameters,
-            EngineParametersInString = _algorithmEngine.EngineParameters.ToString(),
-            StartTime = DateTime.UtcNow,
-        };
-    }
 
     /// <summary>
     /// Set the global security code whitelist.

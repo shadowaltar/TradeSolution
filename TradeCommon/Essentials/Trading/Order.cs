@@ -132,7 +132,7 @@ public record Order : SecurityRelatedEntry, IComparable<Order>, IIdEntry
     /// <summary>
     /// The algo session id which generates this order.
     /// </summary>
-    public int AlgoSessionId { get; set; }
+    public long AlgoSessionId { get; set; }
     
     /// <summary>
     /// The algo entry id which triggers this order.

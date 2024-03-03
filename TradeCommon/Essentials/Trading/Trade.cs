@@ -101,12 +101,12 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
     public int AccountId { get; set; } = 0;
 
     /// <summary>
-    /// The algo session id which generates this order.
+    /// The algo session id which generates this trade.
     /// </summary>
-    public int AlgoSessionId { get; set; }
+    public long AlgoSessionId { get; set; }
 
     /// <summary>
-    /// The algo entry id which triggers this order.
+    /// The algo entry id which triggers this trade.
     /// </summary>
     public int AlgoEntryId { get; set; }
 

@@ -578,14 +578,14 @@ public class Program
                     var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
                     var filePath = Path.Combine(@"C:\Temp", subFolder, $"{security.Code}-{intervalStr}.csv");
                     var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
-                    var positiveCount = entries.Where(e => e.RealizedPnl > 0).Count();
+                    var positiveCount = entries.Where(e => e.TheoreticPnl > 0).Count();
                     var result = new List<object>
                     {
                         security.Code,
                         security.Name,
                         intervalStr,
                         endQuantity,
-                        Maths.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
+                        Maths.GetStandardDeviation(entries.Select(e => e.EntryReturn.ToDouble()).ToList()),
                         annualizedReturn.ToString("P4"),
                         tradeCount,
                         entries.Count(e => e.LongCloseType == CloseType.StopLoss),
@@ -753,7 +753,7 @@ public class Program
                         Csv.Write(columns, entries, detailFilePath);
 
                         var tradeCount = entries.Count(e => e.LongCloseType != CloseType.None);
-                        var positiveCount = entries.Where(e => e.RealizedPnl > 0).Count();
+                        var positiveCount = entries.Where(e => e.TheoreticPnl > 0).Count();
                         var summary = new List<object>
                         {
                             start,
@@ -763,7 +763,7 @@ public class Program
                             security.Code,
                             security.Name,
                             endQuantity,
-                            Maths.GetStandardDeviation(entries.Select(e => e.Return.ToDouble()).ToList()),
+                            Maths.GetStandardDeviation(entries.Select(e => e.EntryReturn.ToDouble()).ToList()),
                             annualizedReturn.ToString("P4"),
                             tradeCount,
                             entries.Count(e => e.LongCloseType == CloseType.StopLoss),

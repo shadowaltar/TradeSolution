@@ -133,11 +133,13 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             throw Exceptions.InvalidOrder($"Insufficient quote asset to be traded. Existing: {assetPosition.Quantity}; desired: {quantity}");
         if (type is OrderType.Market or OrderType.Stop or OrderType.TakeProfit)
             price = 0;
-
+        var algoEntry = _context.Services.Algo.GetCurrentEntry(security.Id);
         var order = new Order
         {
             Id = _orderIdGen.NewTimeBasedId,
             AccountId = _context.AccountId,
+            AlgoEntryId = algoEntry?.SequenceId ?? 0,
+            AlgoSessionId = algoEntry?.SessionId ?? 0,
             ExternalOrderId = _orderIdGen.NewNegativeTimeBasedId, // we may have multiple SENDING orders coexist
             Side = side,
             CreateTime = time,
@@ -180,22 +182,15 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         // apply fee when a new position is opened
         FeeLogic?.ApplyFee(current);
 
-        _log.Info($"action=open|time0={current.EnterTime:yyMMdd-HHmm}|p0={current.EnterPrice}|q={current.Quantity}");
+        _log.Info($"action=open|time0={current.TheoreticEnterTime:yyMMdd-HHmm}|p0={current.TheoreticEnterPrice}|q={current.Quantity}");
     }
 
     public void SyncOpenOrderToEntry(AlgoEntry current, decimal size, decimal enterPrice, DateTime enterTime)
     {
         // this method should take care of multiple fills
         current.Quantity = size;
-        current.EnterPrice = enterPrice;
-        current.EnterTime = enterTime;
-        current.ExitPrice = 0;
-        if (current.Elapsed == null)
-            current.Elapsed = TimeSpan.Zero;
-        else if (current.EnterTime != null)
-            current.Elapsed = enterTime - current.EnterTime; // happens at 2nd or later fills
-        current.RealizedPnl = 0;
-        current.RealizedReturn = 0;
-        current.Notional = size * enterPrice;
+        current.TheoreticEnterPrice = enterPrice;
+        current.TheoreticEnterTime = enterTime;
+        current.TheoreticExitPrice = 0;
     }
 }

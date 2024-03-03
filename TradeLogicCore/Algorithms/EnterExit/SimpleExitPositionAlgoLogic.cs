@@ -106,7 +106,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
     {
         if (!_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
 
-        Assertion.ShallNever(current.EnterPrice is null or 0);
+        Assertion.ShallNever(current.TheoreticEnterPrice is null or 0);
 
         if (exitPrice == 0 || !exitPrice.IsValid() || exitTime == DateTime.MinValue)
         {
@@ -114,22 +114,18 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             return;
         }
 
-        var enterPrice = current.EnterPrice!.Value;
+        var enterPrice = current.TheoreticEnterPrice!.Value;
         var r = (exitPrice - enterPrice) / enterPrice;
 
         current.LongCloseType = CloseType.Normal;
         current.ShortCloseType = CloseType.Normal;
 
-        current.ExitPrice = exitPrice;
-        current.Elapsed = exitTime - current.EnterTime!.Value;
-        current.RealizedPnl = (exitPrice - enterPrice) * current.Quantity;
-        current.RealizedReturn = r;
-        current.Notional = current.Quantity * exitPrice;
-
+        current.TheoreticExitPrice = exitPrice;
+        
         // apply fee when a new position is closed
         FeeLogic?.ApplyFee(current);
 
-        _log.Info($"action=close|p1={current.ExitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
+        _log.Info($"action=close|p1={current.TheoreticExitPrice:F2}|p0={current.TheoreticEnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.TheoreticPnl:F2}");
     }
 
     public void BackTestStopLoss(AlgoEntry current, AlgoEntry last, DateTime exitTime)
@@ -146,7 +142,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         if (!slRatio.IsValid() && slRatio <= 0)
             return;
 
-        var enterPrice = current.EnterPrice!.Value;
+        var enterPrice = current.TheoreticEnterPrice!.Value;
         var exitPrice = current.Security.GetStopLossPrice(enterPrice, slRatio);
         var r = (exitPrice - enterPrice) / enterPrice;
 
@@ -158,13 +154,9 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         {
             current.ShortCloseType = CloseType.StopLoss;
         }
-        current.ExitPrice = exitPrice;
-        current.Elapsed = exitTime - current.EnterTime!.Value;
-        current.RealizedPnl = (exitPrice - enterPrice) * current.Quantity;
-        current.RealizedReturn = r;
-        current.Notional = current.Quantity * exitPrice;
-
-        _log.Info($"action=stopLoss|p1={exitPrice:F2}|p0={current.EnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.RealizedPnl:F2}");
+        current.TheoreticExitPrice = exitPrice;
+        
+        _log.Info($"action=stopLoss|p1={exitPrice:F2}|p0={current.TheoreticEnterPrice:F2}|q={current.Quantity:F2}|r={r:P2}|rpnl={current.TheoreticPnl:F2}");
         Assertion.ShallNever(r < LongStopLossRatio * -1);
     }
 
