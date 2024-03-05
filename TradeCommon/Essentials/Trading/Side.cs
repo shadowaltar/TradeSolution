@@ -21,6 +21,11 @@ public enum Side
     Sell = -1,
 }
 
+public static class Sides
+{
+    public static Side[] BuySell { get; } = [Side.Buy, Side.Sell];
+}
+
 public class SideConverter
 {
     public static Side Parse(string? sideStr)

@@ -3,7 +3,6 @@ using log4net;
 using System.Text;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
-using TradeCommon.Constants;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
@@ -12,7 +11,6 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeLogicCore.Algorithms.EnterExit;
-using TradeLogicCore.Algorithms.FeeCalculation;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Services;
@@ -48,8 +46,6 @@ public class MovingAverageCrossing : Algorithm
 
     public bool IsShortSellAllowed { get; private set; }
 
-    private readonly OpenPositionPercentageFeeLogic _upfrontFeeLogic;
-
     public MovingAverageCrossing(Context context,
                                  AlgorithmParameters parameters,
                                  int fast,
@@ -75,7 +71,6 @@ public class MovingAverageCrossing : Algorithm
         ShortTakeProfitRatio = shortTakeProfitRatio <= 0 ? decimal.MinValue : shortTakeProfitRatio;
         AlgorithmParameters = parameters;
 
-        _upfrontFeeLogic = new OpenPositionPercentageFeeLogic();
         Sizing = sizing ?? new SimplePositionSizingLogic();
         Screening = screening ?? new SimpleSecurityScreeningAlgoLogic();
         Entering = parameters.StopOrderTriggerBy == StopOrderStyleType.RealOrder
@@ -91,15 +86,15 @@ public class MovingAverageCrossing : Algorithm
 
     public void BeforeProcessingSecurity(IAlgorithmEngine context, Security security)
     {
-        if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
-        {
-            _upfrontFeeLogic.PercentageOfQuantity = 0.001m;
-            Entering.FeeLogic = _upfrontFeeLogic;
-        }
-        else
-        {
-            Entering.FeeLogic = null;
-        }
+        //if (security.Code == "ETHUSDT" && security.Exchange == ExchangeType.Binance.ToString().ToUpperInvariant())
+        //{
+        //    _upfrontFeeLogic.PercentageOfQuantity = 0.001m;
+        //    Entering.FeeLogic = _upfrontFeeLogic;
+        //}
+        //else
+        //{
+        //    Entering.FeeLogic = null;
+        //}
     }
 
     public override IAlgorithmVariables CalculateVariables(decimal price, AlgoEntry? last)
@@ -135,7 +130,7 @@ public class MovingAverageCrossing : Algorithm
         return openOrders;
     }
 
-    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
+    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         ProcessSignal(current, last);
 
@@ -153,28 +148,69 @@ public class MovingAverageCrossing : Algorithm
         current.ShortSignal = shouldShort ? SignalType.Open : shouldLong ? SignalType.Close : SignalType.Hold;
     }
 
-    public override bool CanOpenLong(AlgoEntry current)
+    public override bool CanOpen(AlgoEntry current, Side side)
     {
         // prevent trading if trading is ongoing
         if (!CanOpen(current))
             return false;
 
-        // check long signal
-        return current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
+        if (side == Side.Sell && !IsShortSellAllowed)
+            return false;
+
+        return side switch
+        {
+            Side.Buy => current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open,
+            Side.Sell => current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open,
+            _ => throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side),
+        };
     }
 
-    public override bool CanOpenShort(AlgoEntry current)
+    public override bool CanClose(AlgoEntry current, Side side)
     {
-        if (!IsShortSellAllowed)
-            return false;
-
-        // prevent trading if trading is ongoing
-        if (!CanOpen(current))
-            return false;
-
-        // check short signal
-        return current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
+        CloseType closeType;
+        SignalType signalType;
+        switch (side)
+        {
+            case Side.Buy:
+                closeType = current.LongCloseType;
+                signalType = current.LongSignal;
+                break;
+            case Side.Sell:
+                closeType = current.ShortCloseType;
+                signalType = current.ShortSignal;
+                break;
+            default:
+                throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side);
+        }
+        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        return position != null
+            && current.OpenSide == side
+            && closeType == CloseType.None
+            && signalType == SignalType.Close;
     }
+
+    //public override bool CanOpenLong(AlgoEntry current)
+    //{
+    //    // prevent trading if trading is ongoing
+    //    if (!CanOpen(current))
+    //        return false;
+
+    //    // check long signal
+    //    return current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
+    //}
+
+    //public override bool CanOpenShort(AlgoEntry current)
+    //{
+    //    if (!IsShortSellAllowed)
+    //        return false;
+
+    //    // prevent trading if trading is ongoing
+    //    if (!CanOpen(current))
+    //        return false;
+
+    //    // check short signal
+    //    return current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
+    //}
 
     public override async Task<ExternalQueryState> Open(AlgoEntry current, AlgoEntry last, decimal price, Side enterSide, DateTime time)
     {
@@ -257,26 +293,25 @@ public class MovingAverageCrossing : Algorithm
         }
         return false;
     }
+    //public override bool CanCloseLong(AlgoEntry current)
+    //{
+    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+    //    return position != null
+    //        && current.OpenSide == Side.Buy
+    //        && current.LongCloseType == CloseType.None
+    //        && current.LongSignal == SignalType.Close;
+    //}
 
-    public override bool CanCloseLong(AlgoEntry current)
-    {
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        return position != null
-            && current.OpenSide == Side.Buy
-            && current.LongCloseType == CloseType.None
-            && current.LongSignal == SignalType.Close;
-    }
-
-    public override bool CanCloseShort(AlgoEntry current)
-    {
-        if (!IsShortSellAllowed)
-            return false;
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        return position != null
-            && current.OpenSide == Side.Sell
-            && current.ShortCloseType == CloseType.None
-            && current.ShortSignal == SignalType.Close;
-    }
+    //public override bool CanCloseShort(AlgoEntry current)
+    //{
+    //    if (!IsShortSellAllowed)
+    //        return false;
+    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+    //    return position != null
+    //        && current.OpenSide == Side.Sell
+    //        && current.ShortCloseType == CloseType.None
+    //        && current.ShortSignal == SignalType.Close;
+    //}
 
     public override bool CanCancel(AlgoEntry current)
     {

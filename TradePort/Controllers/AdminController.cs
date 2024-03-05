@@ -29,6 +29,7 @@ public partial class AdminController : Controller
 
     /// <summary>
     /// Login with a user and account to an environment and exchange.
+    /// Admin password is required by PROD only.
     /// </summary>
     /// <param name="context"></param>
     /// <param name="container"></param>
@@ -42,7 +43,9 @@ public partial class AdminController : Controller
                                           [FromServices] IAdminService adminService,
                                           [FromForm] LoginRequestModel model)
     {
-        if (ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out var br)) return br;
+        if (context.Environment == EnvironmentType.Prod
+            && ControllerValidator.IsAdminPasswordBad(model.AdminPassword, context.Environment, out var br))
+            return br;
 
         if (adminService.IsLoggedIn)
         {

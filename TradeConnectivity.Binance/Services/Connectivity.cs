@@ -132,6 +132,10 @@ public class Connectivity : IExternalConnectivityManagement
                 // silently ignore
             }
         });
-        return milliseconds.Where(ms => ms < 10000).Average();
+        var mss = milliseconds.Where(ms => ms < 10000).ToList();
+        if (mss.Count == 0) {
+            return 10000;
+        }
+        return mss.Average();
     }
 }

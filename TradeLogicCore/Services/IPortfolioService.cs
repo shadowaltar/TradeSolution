@@ -74,7 +74,7 @@ public interface IPortfolioService
     /// <param name="isInit"></param>
     /// <returns></returns>
     Asset? GetCashAssetBySecurityId(int securityId, bool isInit = false);
-    
+
     /// <summary>
     /// Get the related cash position from a security's <see cref="Security.QuoteSecurity"/>.
     /// </summary>
@@ -125,17 +125,13 @@ public interface IPortfolioService
 
     /// <summary>
     /// Reload service cache.
-    /// For positions, only open positions may be cached.
-    /// For assets, all asset positions will be cached.
+    /// Both asset position and cash position will be cached.
     /// Can either clear the cache only, or clear + reload from storage.
-    /// Can only affect position, asset, or both (or none, though useless).
     /// Can also affect initial portfolio object.
     /// </summary>
     /// <param name="clearOnly"></param>
-    /// <param name="affectPositions"></param>
-    /// <param name="affectAssets"></param>
     /// <param name="affectInitialPortfolio"></param>
-    Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio);
+    Task Reload(bool clearOnly, bool affectInitialPortfolio);
 
     decimal GetAssetPositionResidual(int assetSecurityId);
 }

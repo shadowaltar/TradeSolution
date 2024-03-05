@@ -1,3 +1,6 @@
 ﻿namespace TradeLogicCore.Utils;
 
-public record CashAssetsConfig(List<string> Codes);
+public record CashAssetsConfig
+{
+    public List<string> Codes { get; set; } = [];
+}

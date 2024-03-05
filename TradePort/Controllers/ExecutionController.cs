@@ -1,6 +1,8 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using TradeCommon.Algorithms;
@@ -11,6 +13,7 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeCommon.Utils;
 using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
@@ -49,7 +52,7 @@ public class ExecutionController : Controller
                                               [FromServices] IPortfolioService portfolioService,
                                               [FromServices] Context context,
                                               [FromQuery(Name = "sec-type")] string? secTypeStr = "fx",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "side")] Side side = Side.None,
                                               [FromQuery(Name = "order-type")] OrderType orderType = OrderType.Limit,
                                               [FromQuery(Name = "price")] decimal price = 0,
@@ -172,10 +175,23 @@ public class ExecutionController : Controller
         return !r ? BadRequest("Failed to cancel.") : Ok("Cancelled all open orders.");
     }
 
+    [HttpPost(RestApiConstants.CloseAllPositions)]
+    public async Task<ActionResult> CloseAllPositions([FromServices] Context context,
+                                                      [FromServices] IServices services,
+                                                      [FromForm(Name = "admin-password")] string adminPassword)
+    {
+        if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
+
+
+        var r = await services.Portfolio.CloseAllPositions(Comments.CloseAll);
+
+        return !r ? BadRequest("Failed to close.") : Ok("Closed all open orders.");
+    }
+
     [HttpPost(RestApiConstants.QueryOrders)]
     public async Task<ActionResult> GetOrders([FromServices] IServices services,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "is-alive-only")] bool isAliveOnly = false,
                                               [FromQuery(Name = "is-fills-only")] bool isFillsOnly = false,
                                               [FromQuery(Name = "is-error-only")] bool isErrorsOnly = false,
@@ -208,7 +224,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryOrderStates)]
     public async Task<ActionResult> GetOrderStates([FromServices] IServices services,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
-                                                   [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD")
+                                                   [FromQuery(Name = "symbol")] string symbol = "BTCUSDT")
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
@@ -222,7 +238,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryTrades)]
     public async Task<ActionResult> GetTrades([FromServices] IServices services,
                                               [FromQuery(Name = "start")] string startStr = "20231101",
-                                              [FromQuery(Name = "symbol")] string symbol = "BTCFDUSD",
+                                              [FromQuery(Name = "symbol")] string symbol = "BTCUSDT",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached)
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
@@ -297,7 +313,7 @@ public class ExecutionController : Controller
     /// <returns></returns>
     [HttpPost(RestApiConstants.QueryAssets)]
     public async Task<ActionResult> GetAssets([FromServices] IServices services,
-                                              [FromQuery(Name = "symbols")] string symbolStr = "BTC,FDUSD",
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT",
                                               [FromQuery(Name = "where")] DataSourceType dataSourceType = DataSourceType.MemoryCached,
                                               [FromQuery(Name = "get-initial-state")] bool isInitialPortfolio = false)
     {
@@ -342,7 +358,7 @@ public class ExecutionController : Controller
     [HttpPost(RestApiConstants.QueryAssetStates)]
     public async Task<ActionResult> GetAssetStates([FromServices] IServices services,
                                                    [FromQuery(Name = "start")] string startStr = "20231101",
-                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,FDUSD")
+                                                   [FromQuery(Name = "symbols")] string symbolStr = "BTC,USDT")
     {
         if (ControllerValidator.IsBadOrParse(startStr, out DateTime start, out var br)) return br;
         if (!services.Admin.IsLoggedIn) return BadRequest("Must login user and account");
@@ -405,7 +421,7 @@ public class ExecutionController : Controller
         var preferredCashCodes = algoParams.PreferredQuoteCurrencies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (preferredCashCodes.Count == 0)
         {
-            preferredCashCodes.AddRange("FDUSD");
+            preferredCashCodes.AddRange("USDT");
         }
 
         var whitelistCodes = algoParams.AssetCodeWhitelist.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -418,11 +434,10 @@ public class ExecutionController : Controller
 
         var ep = new EngineParameters(preferredCashCodes,
                                       whitelistCodes,
-                                      algoParams.CancelOpenOrdersOnStart,
-                                      algoParams.CloseOpenPositionsOnStop,
-                                      algoParams.CloseOpenPositionsOnStart,
-                                      algoParams.CleanUpNonCashOnStart,
-                                      algoParams.RecordOrderBookOnExecution);
+                                      CancelOpenOrdersOnStart: algoParams.CancelOpenOrdersOnStart,
+                                      CloseOpenPositionsOnStop: algoParams.CloseOpenPositionsOnStop,
+                                      CloseOpenPositionsOnStart: algoParams.CloseOpenPositionsOnStart,
+                                      RecordOrderBookOnExecution: algoParams.RecordOrderBookOnExecution);
         var ap = new AlgorithmParameters(IsBackTesting: false,
                                          Interval: interval,
                                          SecurityPool: [security],
@@ -440,7 +455,8 @@ public class ExecutionController : Controller
         switch (algoParams.PositionSizingMethod)
         {
             case PositionSizingMethod.PreserveFixed:
-                sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
+                if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
+                    return BadRequest();
                 break;
             case PositionSizingMethod.Fixed:
                 sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
@@ -562,7 +578,7 @@ public class ExecutionController : Controller
                                               [FromServices] IAdminService adminService,
                                               [FromServices] ISecurityService securityService,
                                               [FromServices] IPortfolioService portfolioService,
-                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCFDUSD",
+                                              [FromQuery(Name = "symbols")] string symbolStr = "BTCUSDT",
                                               [FromQuery(Name = "sec-type")] SecurityType securityType = SecurityType.Fx)
     {
         if (!Consts.SupportedSecurityTypes.Contains(securityType)) return BadRequest("Invalid security type selected.");
@@ -582,10 +598,11 @@ public class ExecutionController : Controller
         DateTime reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
         await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);
 
-        await portfolioService.Reload(false, true, true, true);
+        await portfolioService.Reload(false, true);
 
         return Ok("Done");
     }
+
     public class UserCredentialModel
     {
         [FromForm(Name = "userName")]
@@ -618,8 +635,8 @@ public class ExecutionController : Controller
     public class AlgorithmStartModel
     {
         [FromForm(Name = "symbol")]
-        [Required, DefaultValue("BTCFDUSD")]
-        public string Symbol { get; set; } = "BTCFDUSD";
+        [Required, DefaultValue("BTCUSDT")]
+        public string Symbol { get; set; } = "BTCUSDT";
 
         [FromForm(Name = "interval")]
         [Required, DefaultValue("1m")]
@@ -671,16 +688,16 @@ public class ExecutionController : Controller
         /// Only these asset codes will be tradable.
         /// </summary>
         [FromForm(Name = "asset-code-whitelist")]
-        [Required, DefaultValue("BTC,USDT,BNB,FDUSD")]
-        public string AssetCodeWhitelist { get; set; } = "BTC,USDT,BNB,FDUSD";
+        [Required, DefaultValue("BTC,USDT,BNB,USDT")]
+        public string AssetCodeWhitelist { get; set; } = "BTC,USDT,BNB,USDT";
 
         /// <summary>
         /// In any situation if an FX quote currency is missing but an order needs to be created,
         /// use these quote currencies. First currency has higher precedence.
         /// </summary>
         [FromForm(Name = "preferred-quote-currencies")]
-        [Required, DefaultValue("FDUSD")]
-        public string PreferredQuoteCurrencies { get; set; } = "FDUSD";
+        [Required, DefaultValue("USDT")]
+        public string PreferredQuoteCurrencies { get; set; } = "USDT";
 
         /// <summary>
         /// Cancel all open orders on algo start.
@@ -704,14 +721,6 @@ public class ExecutionController : Controller
         [FromForm(Name = "close-open-position-on-stop")]
         [DefaultValue(true)]
         public bool CloseOpenPositionsOnStop { get; set; } = true;
-
-        /// <summary>
-        /// Assuming all other currencies are base currencies.
-        /// Sell everything to exchange for <see cref="PreferredQuoteCurrencies"/>.
-        /// </summary>
-        [FromForm(Name = "clean-up-non-cash-on-start")]
-        [DefaultValue(false)]
-        public bool CleanUpNonCashOnStart { get; set; } = false;
 
         /// <summary>
         /// Let the engine record the order book data during order execution.

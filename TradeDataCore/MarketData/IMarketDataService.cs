@@ -31,6 +31,7 @@ public interface IMarketDataService
     Task Reset();
 
     Task<Dictionary<string, decimal>?> GetPrices(List<Security> securities);
+    Task<decimal> GetPrice(Security security);
     Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null);
     Task<ExternalConnectionState> UnsubscribeOhlc(Security security, IntervalType interval);
     Task<ExternalConnectionState> UnsubscribeAllOhlcs();

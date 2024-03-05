@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Autofac.Core;
 using Common;
 using log4net;
 using log4net.Config;
@@ -51,8 +50,8 @@ public class Program
     private static BrokerType _broker = BrokerType.Binance;
     private static ExchangeType _exchange = ExchangeType.Binance;
 
-    private static readonly DateTime _testStart = new DateTime(2022, 1, 1);
-    private static readonly DateTime _testEnd = new DateTime(2023, 7, 1);
+    private static readonly DateTime _testStart = new(2022, 1, 1);
+    private static readonly DateTime _testEnd = new(2023, 7, 1);
 
     public static async Task Main(string[] args)
     {
@@ -60,7 +59,7 @@ public class Program
         XmlConfigurator.Configure();
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-        var environment = EnvironmentType.Prod;
+        var environment = EnvironmentType.Uat;
 
         if (environment is EnvironmentType.Uat or EnvironmentType.Test or EnvironmentType.Simulation)
         {
@@ -85,7 +84,7 @@ public class Program
             _exchange = ExchangeType.Binance;
         }
 
-        await ResetAlgoTables(environment);
+        await ResetTables(environment);
         return;
 
         await RunMacMimicWebService(environment);
@@ -93,6 +92,14 @@ public class Program
         //await RunRumiBackTestDemo();
         //await RunMACBackTestDemo();
         //await Run();
+    }
+
+    private static async Task ResetTables(EnvironmentType environment)
+    {
+        await ResetOrderTables(environment);
+        await ResetTradeTables(environment);
+        await ResetAssetTables(environment);
+        await ResetAlgoTables(environment);
     }
 
     private static async Task ResetOrderTables(EnvironmentType environment)
@@ -107,7 +114,7 @@ public class Program
         await storage.CreateTable<Order>("error_fx_orders");
         await storage.CreateTable<OrderState>("fx_order_states");
     }
-    
+
     private static async Task ResetTradeTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
@@ -118,8 +125,8 @@ public class Program
         await storage.CreateTable<Trade>("fx_trades");
         await storage.CreateTable<Trade>("error_fx_trades");
     }
-    
-    private static async Task ResetPositionTables(EnvironmentType environment)
+
+    private static async Task ResetAssetTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
         storage.SetEnvironment(environment);
@@ -136,7 +143,7 @@ public class Program
         await storage.CreateTable<AlgoEntry>();
         await storage.CreateTable<AlgoSession>();
     }
-    
+
     private static async Task ResetSecurityDefinitionAndPriceTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
@@ -265,7 +272,6 @@ public class Program
                                       CancelOpenOrdersOnStart: true,
                                       CloseOpenPositionsOnStop: true,
                                       CloseOpenPositionsOnStart: true,
-                                      CleanUpNonCashOnStart: false,
                                       RecordOrderBookOnExecution: true);
         var ap = new AlgorithmParameters(false,
                                          interval,
@@ -278,7 +284,9 @@ public class Program
         var algorithm = new MovingAverageCrossing(context, ap, fastMa, slowMa, stopLoss, takeProfit);
         var screening = new SingleSecurityLogic(context, security);
         var sizing = new SimplePositionSizingLogic(PositionSizingMethod.PreserveFixed);
-        sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity);
+        if (!sizing.CalculatePreserveFixed(securityService, portfolioService, quoteCode, initialAvailableQuantity))
+            return;
+
         algorithm.Screening = screening;
         algorithm.Sizing = sizing;
 
@@ -550,7 +558,7 @@ public class Program
                                                                 CancelOpenOrdersOnStart: true,
                                                                 CloseOpenPositionsOnStop: true,
                                                                 CloseOpenPositionsOnStart: true,
-                                                                CleanUpNonCashOnStart: false);
+                                                                RecordOrderBookOnExecution: false);
 
                     var timeRange = new AlgoEffectiveTimeRange { DesignatedStart = start, DesignatedStop = end };
                     var algoParameters = new AlgorithmParameters(true, interval, securityPool, securityPool.Select(s => s.Code).ToList(), timeRange,
@@ -726,7 +734,7 @@ public class Program
                                                                     CancelOpenOrdersOnStart: true,
                                                                     CloseOpenPositionsOnStop: true,
                                                                     CloseOpenPositionsOnStart: true,
-                                                                    CleanUpNonCashOnStart: false);
+                                                                    RecordOrderBookOnExecution: false);
                         var engine = new AlgorithmEngine(context, algorithm, engineParameters);
                         await engine.Run(algoStartParams);
 

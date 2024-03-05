@@ -10,13 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="8.0.0" />
-    <PackageReference Include="ScottPlot.WPF" Version="5.0.21" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TradeCommon\TradeCommon.csproj" />
     <ProjectReference Include="..\TradeLogicCore\TradeLogicCore.csproj" />
+	<PackageReference Include="Autofac" Version="8.0.0" />
+	<PackageReference Include="ScottPlot.WPF" Version="5.0.21" />
 	<PackageReference Include="Syncfusion.Licensing" Version="23.2.7" />
 	<PackageReference Include="Syncfusion.SfNavigationDrawer.WPF" Version="23.2.7" />
 	<PackageReference Include="Syncfusion.SfSkinManager.WPF" Version="23.2.7" />

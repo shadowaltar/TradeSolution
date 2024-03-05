@@ -45,11 +45,9 @@ public abstract class Algorithm
     public abstract void AfterTookProfit(AlgoEntry entry);
 
     public virtual List<Order> PickOpenOrdersToCleanUp(AlgoEntry current) { return []; }
-    public abstract void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice);
-    public abstract bool CanOpenLong(AlgoEntry current);
-    public abstract bool CanOpenShort(AlgoEntry current);
-    public abstract bool CanCloseLong(AlgoEntry current);
-    public abstract bool CanCloseShort(AlgoEntry current);
+    public abstract void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice? lastPrice);
+    public abstract bool CanOpen(AlgoEntry current, Side side);
+    public abstract bool CanClose(AlgoEntry current, Side side);
     public abstract bool ShallStopLoss(AlgoEntry current, Tick tick, out decimal triggerPrice);
     public abstract bool ShallTakeProfit(AlgoEntry current, Tick tick, out decimal triggerPrice);
     public abstract bool CanCancel(AlgoEntry current);

@@ -95,6 +95,14 @@ public class Quotation : IExternalQuotationManagement
         return ExternalConnectionStates.UnsubscribedAll();
     }
 
+    public async Task<ExternalQueryState> GetPrice(string symbol)
+    {
+        if (!Firewall.CanCall)
+            return ExternalQueryStates.FirewallBlocked();
+
+        return await GetPrices(symbol);
+    }
+
     public async Task<ExternalQueryState> GetPrices(params string[] symbols)
     {
         if (!Firewall.CanCall)

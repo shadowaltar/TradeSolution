@@ -66,8 +66,7 @@ public class Core
 
 
         // read cash assets config file
-        var json = Path.Combine(AppContext.BaseDirectory, "CashAssets.json");
-        var codes = Json.Deserialize<CashAssetsConfig>(json)?.Codes;
+        var codes = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "CashAssets.txt"))?.ToList();
         if (codes.IsNullOrEmpty()) throw new InvalidOperationException("Failed to define cash asset codes.");
         Context.SetCashCurrencies(codes);
 
@@ -97,7 +96,7 @@ public class Core
     }
 
     /// <summary>
-    /// Given min notional and ref price, find securities' min quantity.
+    /// Given min notional and ref price, set securities' min quantity.
     /// </summary>
     /// <param name="refPrices"></param>
     private void SetMinQuantities(Dictionary<string, decimal>? refPrices)

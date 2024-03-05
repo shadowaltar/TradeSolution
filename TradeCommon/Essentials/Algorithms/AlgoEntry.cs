@@ -33,6 +33,11 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     public DateTime Time { get; set; }
 
     /// <summary>
+    /// Whether the algo entry is related to ohlc price movement only, or related to opening/closing orders and/or holding positions.
+    /// </summary>
+    public bool IsExecuting { get; set; } = false;
+
+    /// <summary>
     /// Current price. Usually the close of OHLC price object.
     /// </summary>
     [NotNull]

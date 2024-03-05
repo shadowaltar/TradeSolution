@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:i="clr-namespace:TradeCommon.Essentials;assembly=TradeCommon"
              xmlns:viewmodels="clr-namespace:TradeDesk.ViewModels"
+             xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
              d:DataContext="{d:DesignInstance Type=viewmodels:OverviewViewModel}"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
@@ -63,9 +64,9 @@
                 <RowDefinition Height="2*" />
                 <RowDefinition />
             </Grid.RowDefinitions>
-            <WpfPlot x:Name="mainPlot" Grid.Column="0" Grid.Row="0" />
-            <WpfPlot x:Name="rightPlot" Grid.Column="1" Grid.Row="0" />
-            <WpfPlot x:Name="lowerPlot" Grid.Column="0" Grid.Row="1" />
+            <ScottPlot:WpfPlot x:Name="mainPlot" Grid.Column="0" Grid.Row="0" />
+            <ScottPlot:WpfPlot x:Name="rightPlot" Grid.Column="1" Grid.Row="0" />
+            <ScottPlot:WpfPlot x:Name="lowerPlot" Grid.Column="0" Grid.Row="1" />
         </Grid>
     </Grid>
 </UserControl>

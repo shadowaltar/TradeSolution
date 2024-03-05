@@ -134,7 +134,7 @@ public class Program
                 }
             });
         });
-
+        builder.Logging.ClearProviders();
         builder.Host.UseServiceProviderFactory(new AutofacServiceProviderFactory())
             .ConfigureContainer<ContainerBuilder>(builder =>
             {

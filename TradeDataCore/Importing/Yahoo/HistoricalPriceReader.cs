@@ -187,7 +187,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
                                 continue;
                             }
 
-                            corporateActions ??= new List<IStockCorporateAction>();
+                            corporateActions ??= [];
                             corporateActions.Add(new StockSplitEvent(payableDate, exDate, (int)numerator, (int)denominator));
                         }
                     }
@@ -205,7 +205,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
                                 continue;
                             }
 
-                            corporateActions ??= new List<IStockCorporateAction>();
+                            corporateActions ??= [];
                             corporateActions.Add(new StockDividendEvent(exDate, paymentDate, amount));
                         }
                     }

@@ -1,13 +1,10 @@
 ﻿using ScottPlot;
-using ScottPlot.Plottable;
 using System;
+using System.Collections.Generic;
 using System.Threading;
-using System.Windows;
 using System.Windows.Controls;
-using TradeCommon.Essentials;
 using TradeCommon.Essentials.Quotes;
 using TradeDesk.Utils;
-using TradeDesk.ViewModels;
 
 namespace TradeDesk.Views;
 /// <summary>
@@ -15,9 +12,8 @@ namespace TradeDesk.Views;
 /// </summary>
 public partial class OverviewView : UserControl
 {
-    public OHLC[] OhlcData { get; }
+    public List<OHLC> OhlcData { get; } = [];
 
-    private FinancePlot _candlePlot;
     private Timer _timer;
     private int _candleCount = 100;
 
@@ -32,7 +28,7 @@ public partial class OverviewView : UserControl
     {
         InitializeComponent();
 
-        OhlcData = new OHLC[CandleCount];
+        OhlcData = new List<OHLC>(CandleCount);
     }
 
     public void StartLive(TimeSpan interval)
@@ -56,21 +52,20 @@ public partial class OverviewView : UserControl
     public void UpdateOhlc(OhlcPrice price, TimeSpan timeSpan)
     {
         // init logic
-        if (OhlcData[^1] == null)
+        if (OhlcData.Count < CandleCount)
         {
             var lastTime = price.T;
-            for (int i = OhlcData.Length - 1; i >= 0; i--)
+            for (int i = OhlcData.Count - 1; i >= 0; i--)
             {
                 lastTime -= timeSpan;
                 OhlcData[i] = new OHLC(0, 0, 0, 0, lastTime, timeSpan);
             }
 
-            _candlePlot ??= mainPlot.Plot.AddCandlesticks(OhlcData);
+            mainPlot.Plot.Add.OHLC(OhlcData);
         }
 
         var candle = Convert(price, timeSpan);
 
-        Array.Copy(OhlcData, 1, OhlcData, 0, OhlcData.Length - 1);
         OhlcData[^1] = candle;
     }
 

@@ -2,6 +2,7 @@
 
 public static class Comments
 {
+    public const string CloseAll = "Close non-cash positions.";
     public const string CloseAllBeforeStart = "Close non-cash positions before algo engine starts.";
     public const string CloseAllBeforeStop = "Close non-cash positions before algo engine stops.";
     public const string AlgoEnterLimit = "Algo enter (limit).";

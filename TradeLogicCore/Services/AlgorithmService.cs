@@ -1,11 +1,6 @@
-﻿using Autofac.Core;
-using Common;
-using Microsoft.Identity.Client;
-using System.Diagnostics;
-using System.Security.Cryptography;
+﻿using Common;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials;
-using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
@@ -119,11 +114,7 @@ public class AlgorithmService : IAlgorithmService
         // if just started, return null last entry but set other caches' last entry = current entry
         if (last == null)
         {
-            _lastOhlcPricesBySecurityId.ThreadSafeSet(security.Id, ohlcPrice);
-            _lastEntriesBySecurityId.ThreadSafeSet(security.Id, current);
-            // current entry dict will be updated later
-            var allEntries = _allEntriesBySecurityIds.ThreadSafeGetOrCreate(security.Id);
-            allEntries.ThreadSafeAdd(current);
+            MoveNext(current, ohlcPrice);
         }
 
         return current;
@@ -131,14 +122,21 @@ public class AlgorithmService : IAlgorithmService
 
     public void MoveNext(AlgoEntry current, OhlcPrice ohlcPrice)
     {
+        if (current.IsExecuting)
+        {
+            _executionEntriesBySecurityIds.ThreadSafeGetOrCreate(current.SecurityId).ThreadSafeAdd(current);
+        }
+
+        GetAllEntries(current.SecurityId).ThreadSafeAdd(current);
+
         _lastEntriesBySecurityId.ThreadSafeSet(current.SecurityId, current);
         _lastOhlcPricesBySecurityId.ThreadSafeSet(current.SecurityId, ohlcPrice);
     }
 
-    public void RecordExecution(AlgoEntry current)
-    {
-        _executionEntriesBySecurityIds.GetOrCreate(current.SecurityId).Add(current);
-    }
+    //public void RecordExecution(AlgoEntry current)
+    //{
+    //    _executionEntriesBySecurityIds.GetOrCreate(current.SecurityId).Add(current);
+    //}
 
     public void CopyOver(AlgoEntry current, AlgoEntry last, decimal price)
     {
@@ -190,10 +188,7 @@ public class AlgorithmService : IAlgorithmService
 
     public void InitializeSession(EngineParameters engineParameters)
     {
-        var _algorithm = _context.GetAlgorithm();
-        if (_algorithm == null)
-            throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");
-
+        var _algorithm = _context.GetAlgorithm() ?? throw new InvalidOperationException("Must specify algorithm and algo-engine before saving an algo-session entry.");
         var uniqueId = IdGenerators.Get<AlgoSession>().NewTimeBasedId;
 
         Session = new AlgoSession
@@ -211,5 +206,7 @@ public class AlgorithmService : IAlgorithmService
             EngineParametersInString = engineParameters.ToString(),
             StartTime = DateTime.UtcNow,
         };
+
+        _context.AlgoSession = Session;
     }
 }

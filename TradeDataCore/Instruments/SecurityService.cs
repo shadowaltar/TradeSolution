@@ -11,9 +11,9 @@ using TradeDataCore.Essentials;
 namespace TradeDataCore.Instruments;
 public class SecurityService : ISecurityService
 {
-    private readonly Dictionary<int, Security> _securities = new();
-    private readonly Dictionary<string, Security> _securitiesByCode = new();
-    private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = new();
+    private readonly Dictionary<int, Security> _securities = [];
+    private readonly Dictionary<string, Security> _securitiesByCode = [];
+    private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = [];
     private readonly IStorage _storage;
     private readonly ApplicationContext _context;
 
@@ -150,7 +150,7 @@ public class SecurityService : ISecurityService
             await Initialize();
         if (requestExternal)
         {
-            var securities = await _storage.ReadSecurities(new List<int> { securityId });
+            var securities = await _storage.ReadSecurities([securityId]);
             if (!securities.IsNullOrEmpty())
             {
                 RefreshCache(securities[0]);
@@ -278,7 +278,7 @@ public class SecurityService : ISecurityService
     public async Task<List<ExtendedOrderBook>> GetOrderBookHistory(Security security, int level, DateTime date)
     {
         var name = DatabaseNames.GetOrderBookTableName(security.Code, security.ExchangeType, level);
-        return await _storage.IsTableExists(name, DatabaseNames.MarketData) ? await _storage.ReadOrderBooks(security, level, date) : new();
+        return await _storage.IsTableExists(name, DatabaseNames.MarketData) ? await _storage.ReadOrderBooks(security, level, date) : [];
     }
 
     public async Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval)
@@ -299,9 +299,17 @@ public class SecurityService : ISecurityService
         return results;
     }
 
+    public decimal SetSecurityMinQuantity(string code, decimal price)
+    {
+        var security = GetSecurity(code);
+        if (security == null || price == 0) return 0;
+        security.MinQuantity = security.MinNotional / price;
+        return security.MinQuantity;
+    }
+
     private async Task<List<Security>> ReadStorageAndRefreshCache()
     {
-        List<Security> securities = new();
+        List<Security> securities = [];
         foreach (var secType in Consts.SupportedSecurityTypes)
         {
             securities.AddRange(await _storage.ReadSecurities(secType, _context.Exchange));

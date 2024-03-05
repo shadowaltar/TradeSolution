@@ -113,7 +113,12 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalQueryState> GetPrices(params string[] symbols)
     {
-        return ExternalQueryStates.Simulation<List<OhlcPrice>>(new List<OhlcPrice>());
+        return ExternalQueryStates.Simulation<List<OhlcPrice>>([]);
+    }
+
+    public async Task<ExternalQueryState> GetPrice(string symbol)
+    {
+        return ExternalQueryStates.Simulation<List<OhlcPrice>>([]);
     }
 
     public ExternalConnectionState SubscribeTick(Security security)

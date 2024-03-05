@@ -66,6 +66,11 @@ public record Portfolio(int AccountId)
     {
         lock (_lock)
         {
+            if (asset.Security == null)
+            {
+                _log.Error("Invalid asset with no security.");
+                return;
+            }
             if (asset.Security.IsCash)
                 _cashPositionsBySecurityId[asset.SecurityId] = asset;
             else

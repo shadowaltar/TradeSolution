@@ -15,6 +15,7 @@ public static class RestApiConstants
     public const string SendOrder = "orders/send";
     public const string CancelOrder = "orders/cancel";
     public const string CancelAllOrders = "orders/cancel-all";
+    public const string CloseAllPositions = "orders/close-all";
 
     public const string QueryRunningAlgoSessions = "algorithms/list";
     public const string QueryAlgoSessions = "algo-sessions/list";

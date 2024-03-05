@@ -49,7 +49,7 @@ public class DefinitionReader
         if (securities == null)
         {
             _log.Warn($"No securities are downloaded or parsed for HKEX from {url}");
-            return new List<Security>();
+            return [];
         }
         securities = securities.Where(s => !s.Code.IsBlank()).ToList();
 

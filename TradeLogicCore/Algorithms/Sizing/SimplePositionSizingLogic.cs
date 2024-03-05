@@ -151,13 +151,32 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
         }
     }
 
-    public void CalculatePreserveFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal initialAvailableQuantity)
+    public bool CalculatePreserveFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal initialAvailableQuantity)
     {
-        var fiat = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
-        var fiatAsset = portfolioService.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
-        var lockedAmount = fiatAsset.Quantity - initialAvailableQuantity;
-        if (lockedAmount < 0) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {initialAvailableQuantity}");
+        var quoteSecurity = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
+
+        if (portfolioService.Portfolio.GetAll().Count == 0)
+        {
+            // not initialized or nothing in account; retry
+            _log.Error("Cannot calculate CalculatePreserveFixed: either service not initialized, or there is nothing in user account.");
+            return false;
+        }
+
+        var cashAsset = portfolioService.GetAssetBySecurityId(quoteSecurity.Id);
+        if (cashAsset == null)
+        {
+            _log.Error($"Cannot calculate CalculatePreserveFixed: {quoteCurrencyCode} asset does not exist.");
+            return false;
+        }
+        var lockedAmount = cashAsset.Quantity - initialAvailableQuantity;
+        if (lockedAmount < 0)
+        {
+            _log.Error($"Cannot calculate CalculatePreserveFixed: {quoteCurrencyCode} asset quantity < {initialAvailableQuantity}");
+            return false;
+        }
         LockedAmount = lockedAmount;
+
+        return true;
     }
 
     public void CalculateFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal fixedQuantity)

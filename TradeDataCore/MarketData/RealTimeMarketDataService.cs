@@ -22,9 +22,9 @@ public class RealTimeMarketDataService : IMarketDataService
     public event OrderBookReceivedCallback? NextOrderBook;
     public event Action<int>? HistoricalPriceEnd;
 
-    private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = new();
-    private readonly HashSet<int> _tickSubscriptions = new();
-    private readonly HashSet<int> _orderBookSubscriptions = new();
+    private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = [];
+    private readonly HashSet<int> _tickSubscriptions = [];
+    private readonly HashSet<int> _orderBookSubscriptions = [];
 
     public RealTimeMarketDataService(IExternalQuotationManagement external,
                                      IHistoricalMarketDataService historicalMarketDataService,
@@ -67,6 +67,12 @@ public class RealTimeMarketDataService : IMarketDataService
     {
         var state = await External.GetPrices(securities.Select(s => s.Code).ToArray());
         return state.ResultCode == ResultCode.GetPriceOk ? state.Get<Dictionary<string, decimal>>() : null;
+    }
+
+    public async Task<decimal> GetPrice(Security security)
+    {
+        var state = await External.GetPrice(security.Code);
+        return state.ResultCode == ResultCode.GetPriceOk ? state.Get<Dictionary<string, decimal>>()?.GetOrDefault(security.Code) ?? 0 : 0;
     }
 
     public async Task<ExternalConnectionState> SubscribeOhlc(Security security, IntervalType interval, DateTime? start = null, DateTime? end = null)

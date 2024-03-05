@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel;
-using TradeCommon.Constants;
-using TradeCommon.Runtime;
 using RequiredAttribute = System.ComponentModel.DataAnnotations.RequiredAttribute;
 
 namespace TradePort.Controllers.Models;
@@ -9,11 +7,10 @@ namespace TradePort.Controllers.Models;
 public class LoginRequestModel
 {
     /// <summary>
-    /// Admin password.
+    /// Admin password. Required by PROD only.
     /// </summary>
     [FromForm(Name = "admin-password")]
-    [Required]
-    public string AdminPassword { get; set; }
+    public string? AdminPassword { get; set; }
 
     /// <summary>
     /// User name.

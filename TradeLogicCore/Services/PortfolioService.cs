@@ -212,7 +212,6 @@ public class PortfolioService : IPortfolioService
         if (_context.PreferredQuoteCurrencies.Count == 0)
             throw new InvalidOperationException("Algorithm must be initialized before closing any assets.");
 
-        _log.Info($"Closing {assets.Count} assets.");
         var count = 0;
         foreach (var asset in assets)
         {
@@ -223,17 +222,27 @@ public class PortfolioService : IPortfolioService
 
             if (_context.HasCurrencyWhitelist && !_context.CurrencyWhitelist.Contains(asset.Security))
             {
-                _log.Warn($"Whitelist is set and this asset code {asset.SecurityCode} is not in it and will be ignored.");
+                _log.Debug($"Whitelist is set and this asset code {asset.SecurityCode} is not in it and will be ignored.");
                 continue;
             }
 
-            if (asset.Security.MinQuantity == 0)
-            {
-                // not supposed to be zero usually
-                _log.Info($"Minimum quantity for security {asset.Security.Code} is zero.");
-            }
-            if (asset.Quantity <= asset.Security.MinQuantity)
-                continue;
+            //if (asset.Security.MinQuantity == 0)
+            //{
+            //    // some externals need this for calculation like minimal notional amount
+            //    var refPrice = await _context.Services.MarketData.GetPrice(asset.Security);
+            //    if (refPrice == 0)
+            //    {
+            //        _log.Error($"Failed to get market price for {asset.SecurityCode}.");
+            //    }
+            //    else
+            //    {
+            //        _context.Services.Security.SetSecurityMinQuantity(asset.SecurityCode, refPrice);
+            //    }
+            //    // not supposed to be zero usually
+            //    _log.Info($"Minimum quantity for security {asset.Security.Code} is zero.");
+            //}
+            //if (asset.Quantity <= asset.Security.MinQuantity)
+            //    continue;
 
             foreach (var quoteCurrency in _context.PreferredQuoteCurrencies)
             {
@@ -243,10 +252,33 @@ public class PortfolioService : IPortfolioService
                     _log.Warn($"Cannot close asset {asset.SecurityCode} by quote currency {quoteCurrency.Code}; will try next preferred quote currency.");
                     continue;
                 }
+
+                if (security.MinQuantity == 0)
+                {
+                    // some externals need this for calculation like minimal notional amount
+                    var refPrice = await _context.Services.MarketData.GetPrice(security);
+                    if (refPrice == 0)
+                    {
+                        _log.Error($"Failed to get market price for {security.Code}; minimum quantity for security {security.Code} is zero; will try next preferred quote currency.");
+                        continue;
+                    }
+                    else
+                    {
+                        var min = _context.Services.Security.SetSecurityMinQuantity(security.Code, refPrice);
+                        _log.Info($"Retrieved min quantity for security {security.Code}: {min}");
+                    }
+                }
+                if (asset.Quantity <= security.MinQuantity)
+                    continue;
+
+                _log.Info($"Selling off all {asset.SecurityCode} asset position.");
                 var order = CreateCloseOrder(asset.Quantity, security, orderComment);
                 var state = await _orderService.SendOrder(order);
                 // need to wait for a while
-                if (Threads.WaitUntil(() => Portfolio.GetAssetPositionBySecurityId(asset.SecurityId) == null))
+                if (Threads.WaitUntil(() =>
+                {
+                    return asset.IsClosed;
+                }))
                 {
                     _log.Info("Closed asset position: " + asset.SecurityCode);
                     break;
@@ -484,45 +516,24 @@ public class PortfolioService : IPortfolioService
     //    throw Exceptions.MissingAsset(assetId);
     //}
 
-    public async Task Reload(bool clearOnly, bool affectPositions, bool affectAssets, bool affectInitialPortfolio)
+    public async Task Reload(bool clearOnly, bool affectInitialPortfolio)
     {
-        if (affectPositions)
+        Portfolio.Clear();
+
+        if (affectInitialPortfolio)
         {
-            Portfolio.ClearPositions();
-            if (affectInitialPortfolio)
-            {
-                InitialPortfolio.ClearPositions();
-            }
-            if (!clearOnly)
-            {
-                var assets = await _storage.ReadAssets();
-                foreach (var asset in assets)
-                {
-                    Portfolio.AddOrUpdate(asset);
-                    if (affectInitialPortfolio)
-                    {
-                        InitialPortfolio.AddOrUpdate(asset);
-                    }
-                }
-            }
+            InitialPortfolio.Clear();
         }
-        if (affectAssets)
+        if (!clearOnly)
         {
-            Portfolio.Clear();
-            if (affectInitialPortfolio)
+            var assets = await _storage.ReadAssets();
+            foreach (var asset in assets)
             {
-                InitialPortfolio.Clear();
-            }
-            if (!clearOnly)
-            {
-                var assets = await _storage.ReadAssets();
-                foreach (var asset in assets)
+                _securityService.Fix(asset);
+                Portfolio.AddOrUpdate(asset);
+                if (affectInitialPortfolio)
                 {
-                    Portfolio.AddOrUpdate(asset);
-                    if (affectInitialPortfolio)
-                    {
-                        InitialPortfolio.AddOrUpdate(asset);
-                    }
+                    InitialPortfolio.AddOrUpdate(asset);
                 }
             }
         }
@@ -544,7 +555,7 @@ public class PortfolioService : IPortfolioService
         var asset = GetPositionBySecurityId(trade.SecurityId);
         if (asset == null) throw Exceptions.Impossible();
 
-        _securityService.Fix(asset);        
+        _securityService.Fix(asset);
         Portfolio.AddOrUpdate(asset);
         _persistence.Insert(asset);
 
@@ -622,12 +633,12 @@ public class PortfolioService : IPortfolioService
 
     public List<Asset> GetAssets()
     {
-        throw new NotImplementedException();
+        return Portfolio.GetAssetPositions();
     }
 
     public List<Asset> GetCashes()
     {
-        throw new NotImplementedException();
+        return Portfolio.GetCashes();
     }
 
     public Asset? GetAssetBySecurityId(int securityId, bool isInit = false)

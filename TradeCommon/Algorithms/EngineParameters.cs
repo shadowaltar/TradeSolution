@@ -19,7 +19,6 @@ public record EngineParameters(List<string> PreferredQuoteCurrencies,
                                bool CancelOpenOrdersOnStart = true,
                                bool CloseOpenPositionsOnStop = true,
                                bool CloseOpenPositionsOnStart = true,
-                               bool CleanUpNonCashOnStart = true,
                                bool RecordOrderBookOnExecution = true)
 {
     public override string ToString()
@@ -30,7 +29,6 @@ public record EngineParameters(List<string> PreferredQuoteCurrencies,
         sb.Append("\"CancelOpenOrdersOnStart\":").Append(CancelOpenOrdersOnStart).AppendLine(",");
         sb.Append("\"CloseOpenPositionsOnStop\":").Append(CloseOpenPositionsOnStop).AppendLine(",");
         sb.Append("\"CloseOpenPositionsOnStart\":").Append(CloseOpenPositionsOnStart).AppendLine(",");
-        sb.Append("\"CleanUpNonCashOnStart\":").Append(CleanUpNonCashOnStart).AppendLine(",");
         sb.Append("\"RecordOrderBookOnExecution\":").Append(RecordOrderBookOnExecution).AppendLine(",");
 
         return sb.ToString();

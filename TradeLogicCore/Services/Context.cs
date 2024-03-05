@@ -72,11 +72,8 @@ public class Context(IComponentContext container, IStorage storage) : Applicatio
         AccountId = 0;
         _preferredQuoteCurrencies.Clear();
         _currencyWhitelist.Clear();
-        _environment = EnvironmentType.Unknown;
-        _exchange = ExchangeType.Unknown;
-        _exchangeId = 0;
-        _broker = BrokerType.Unknown;
-        _brokerId = 0;
+        // do not reset environment, exchange, broker
+        // as they are initialized during app startup
 
         ExternalQueryStates.Exchange = Exchange;
         ExternalQueryStates.Environment = Environment;

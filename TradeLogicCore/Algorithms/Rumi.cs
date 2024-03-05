@@ -116,7 +116,7 @@ public class Rumi : Algorithm
         Assertion.ShallNever(signal1 == -1 && signal2 == -1);
     }
 
-    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice lastPrice)
+    public override void Analyze(AlgoEntry current, AlgoEntry last, OhlcPrice currentPrice, OhlcPrice? lastPrice)
     {
         var lastRumi = ((RumiVariables)last.Variables).Rumi;
         var rumi = ((RumiVariables)current.Variables).Rumi;
@@ -124,35 +124,70 @@ public class Rumi : Algorithm
         current.LongSignal = isSignal ? SignalType.Open : SignalType.None;
     }
 
-    public override bool CanOpenLong(AlgoEntry current)
+    public override bool CanOpen(AlgoEntry current, Side side)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
-        return openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
+        return side switch
+        {
+            Side.Buy => openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open,
+            Side.Sell => openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open,
+            _ => throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side),
+        };
     }
 
-    public override bool CanOpenShort(AlgoEntry current)
-    {
-        var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
-        return openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
-    }
+    //public override bool CanOpenLong(AlgoEntry current)
+    //{
+    //    var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+    //    return openOrders.IsNullOrEmpty() && current.LongCloseType == CloseType.None && current.LongSignal == SignalType.Open;
+    //}
 
-    public override bool CanCloseLong(AlgoEntry current)
+    //public override bool CanOpenShort(AlgoEntry current)
+    //{
+    //    var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
+    //    return openOrders.IsNullOrEmpty() && current.ShortCloseType == CloseType.None && current.ShortSignal == SignalType.Open;
+    //}
+
+    public override bool CanClose(AlgoEntry current, Side side)
     {
+        CloseType closeType;
+        SignalType signalType;
+        switch (side)
+        {
+            case Side.Buy:
+                closeType = current.LongCloseType;
+                signalType = current.LongSignal;
+                break;
+            case Side.Sell:
+                closeType = current.ShortCloseType;
+                signalType = current.ShortSignal;
+                break;
+            default:
+                throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side);
+        }
         var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
         return position != null
-               && current.OpenSide == Side.Buy
-               && current.LongCloseType == CloseType.None
-               && current.LongSignal == SignalType.Close;
+            && current.OpenSide == side
+            && closeType == CloseType.None
+            && signalType == SignalType.Close;
     }
 
-    public override bool CanCloseShort(AlgoEntry current)
-    {
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        return position != null
-               && current.OpenSide == Side.Sell
-               && current.ShortCloseType == CloseType.None
-               && current.ShortSignal == SignalType.Close;
-    }
+    //public override bool CanCloseLong(AlgoEntry current)
+    //{
+    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+    //    return position != null
+    //           && current.OpenSide == Side.Buy
+    //           && current.LongCloseType == CloseType.None
+    //           && current.LongSignal == SignalType.Close;
+    //}
+
+    //public override bool CanCloseShort(AlgoEntry current)
+    //{
+    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+    //    return position != null
+    //           && current.OpenSide == Side.Sell
+    //           && current.ShortCloseType == CloseType.None
+    //           && current.ShortSignal == SignalType.Close;
+    //}
 
     public override bool CanCancel(AlgoEntry current)
     {

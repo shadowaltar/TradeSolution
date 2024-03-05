@@ -13,7 +13,7 @@ namespace TradeDataCore.MarketData;
 public class DataPublisher
 {
     private readonly IMarketDataService _marketDataService;
-    private readonly Dictionary<(int, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = new();
+    private readonly Dictionary<(int, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = [];
     public DataPublisher(IMarketDataService marketDataService)
     {
         _marketDataService = marketDataService;

@@ -23,6 +23,8 @@ public interface IExternalQuotationManagement
     Task<ExternalConnectionState> Initialize();
 
     Task<ExternalQueryState> GetPrices(params string[] symbols);
+    
+    Task<ExternalQueryState> GetPrice(string symbol);
 
     ExternalConnectionState SubscribeTick(Security security);
 

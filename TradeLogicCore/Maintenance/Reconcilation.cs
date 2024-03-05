@@ -101,9 +101,10 @@ public class Reconcilation
             {
                 _orderService.Update(toCreate);
                 _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are created from external to internal.");
-                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", toCreate.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
+                
                 foreach (var order in toCreate)
                 {
+                    _log.Info($"OID:{order.Id}, EOID:{order.ExternalOrderId}");
                     order.Comment = "Upserted by reconcilation.";
                     var table = DatabaseNames.GetOrderTableName(order.Security.Type);
 
@@ -168,9 +169,9 @@ public class Reconcilation
                     orders = toUpdate.Values.OrderBy(o => o.Id).ToList();
                     _orderService.Update(orders);
                     _log.Info($"{orders.Count} recent orders for [{security.Id},{security.Code}] are updated from external to internal.");
-                    _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                     foreach (var order in orders)
                     {
+                        _log.Info($"OID:{order.Id}, EOID:{order.ExternalOrderId}");
                         order.Comment = "Updated by reconcilation.";
 
                         if (internalOrders.TryGetValue(order.ExternalOrderId, out var conflict) && conflict.Id != order.Id)
@@ -186,9 +187,9 @@ public class Reconcilation
             {
                 var orders = toDelete.Select(i => internalOrders[i]).ToList();
                 _log.Info($"{toDelete.Count} recent orders for [{security.Id},{security.Code}] are moved to error table.");
-                _log.Info($"Orders [ExternalOrderId][InternalOrderId]:\n\t" + string.Join("\n\t", orders.Select(t => $"[{t.ExternalOrderId}][{t.Id}]")));
                 foreach (var i in toDelete)
                 {
+                    _log.Info($"OID:{i}");
                     var order = internalResults.FirstOrDefault(o => o.ExternalOrderId == i);
                     if (order != null)
                     {
@@ -269,7 +270,7 @@ public class Reconcilation
                 }
                 _tradeService.Update(toCreate, security);
                 _log.Info($"{toCreate.Count} recent trades for [{security.Id},{security.Code}] are created from external to internal.");
-                _log.Info(string.Join("\n\t", toCreate.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+                _log.Info(string.Join("\n", toCreate.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
 
                 await _storage.InsertMany(toCreate, false);
             }
@@ -278,7 +279,7 @@ public class Reconcilation
                 var trades = toUpdate.Values;
                 _tradeService.Update(trades, security);
                 _log.Info($"{toUpdate.Count} recent trades for [{security.Id},{security.Code}] are updated from external to internal.");
-                _log.Info(string.Join("\n\t", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+                _log.Info(string.Join("\n", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
                 foreach (var trade in trades)
                 {
                     var table = DatabaseNames.GetTradeTableName(trade.Security.Type);
@@ -289,7 +290,7 @@ public class Reconcilation
             {
                 var trades = toDelete.Select(i => internalTrades[i]).ToList();
                 _log.Info($"{toDelete.Count} recent trades for [{security.Id},{security.Code}] are moved to error table.");
-                _log.Info(string.Join("\n\t", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
+                _log.Info(string.Join("\n", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
                 foreach (var trade in trades)
                 {
                     if (trade != null)
@@ -339,11 +340,19 @@ public class Reconcilation
         foreach (var a in externalResults)
         {
             _securityService.Fix(a);
+            if (a.Security == null)
+            {
+
+            }
             a.AccountId = _context.AccountId;
         }
         foreach (var a in internalResults)
         {
             _securityService.Fix(a);
+            if (a.Security == null)
+            {
+
+            }
             a.AccountId = _context.AccountId;
         }
 

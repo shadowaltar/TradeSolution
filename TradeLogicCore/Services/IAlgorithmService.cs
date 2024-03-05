@@ -31,7 +31,8 @@ public interface IAlgorithmService
     void MoveNext(AlgoEntry current, OhlcPrice ohlcPrice);
 
     AlgoEntry CreateCurrentEntry(Algorithm algorithm, Security security, OhlcPrice ohlcPrice, out AlgoEntry? last);
-    void RecordExecution(AlgoEntry current);
+    
     void CopyOver(AlgoEntry current, AlgoEntry last, decimal price);
+
     void InitializeSession(EngineParameters engineParameters);
 }

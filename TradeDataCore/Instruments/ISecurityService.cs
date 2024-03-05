@@ -28,4 +28,6 @@ public interface ISecurityService : ISecurityDefinitionProvider
     Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime end, int lookBackPeriod);
     Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end);
     Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval);
+    
+    decimal SetSecurityMinQuantity(string code, decimal price);
 }
