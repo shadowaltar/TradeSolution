@@ -1,8 +1,5 @@
 ﻿using Common;
-using Microsoft.Diagnostics.Runtime.Utilities;
-using System;
 using System.Collections.Concurrent;
-using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using TradeCommon.Essentials;
@@ -10,14 +7,10 @@ using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Quotes;
 
 namespace TradeDataCore.MarketData;
-public class DataPublisher
+public class DataPublisher(IMarketDataService marketDataService)
 {
-    private readonly IMarketDataService _marketDataService;
+    private readonly IMarketDataService _marketDataService = marketDataService;
     private readonly Dictionary<(int, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = [];
-    public DataPublisher(IMarketDataService marketDataService)
-    {
-        _marketDataService = marketDataService;
-    }
 
     public void Initialize()
     {
@@ -52,7 +45,7 @@ public class DataPublisher
     public async Task PublishOhlc(WebSocket webSocket, Security security, IntervalType interval)
     {
         var queue = _ohlcQueues.ThreadSafeGetOrCreate((security.Id, interval));
-        
+
         var receiveBuffer = new ArraySegment<byte>(new Byte[8192]);
 
         using var ms = new MemoryStream();
@@ -76,7 +69,7 @@ public class DataPublisher
             }
             while (!receiveResult.EndOfMessage);
 
-            switch(receiveResult.MessageType)
+            switch (receiveResult.MessageType)
             {
                 case WebSocketMessageType.Text:
                     var text = Encoding.UTF8.GetString(ms.ToArray());

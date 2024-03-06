@@ -64,12 +64,6 @@ public class Core
         var startTime = algoParameters.TimeRange.ActualStartTime;
         if (!startTime.IsValid()) throw new InvalidOperationException("The start time is incorrect.");
 
-
-        // read cash assets config file
-        var codes = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "CashAssets.txt"))?.ToList();
-        if (codes.IsNullOrEmpty()) throw new InvalidOperationException("Failed to define cash asset codes.");
-        Context.SetCashCurrencies(codes);
-
         var (isExternalAvailable, _) = await _services.Admin.Ping();
         if (!isExternalAvailable) throw Exceptions.Unreachable(Context.Broker);
         // some externals need this for calculation like minimal notional amount

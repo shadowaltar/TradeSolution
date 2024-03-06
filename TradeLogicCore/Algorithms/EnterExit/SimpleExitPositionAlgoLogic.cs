@@ -56,13 +56,14 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
 
     public async Task<ExternalQueryState> Close(AlgoEntry? current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
+        if (current == null) throw Exceptions.InvalidAlgorithmEngineState();
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         // cancel any partial filled, SL or TP orders
         await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
 
         // now close the position using algorithm only
-        var asset = _portfolioService.GetAssetBySecurityId(security.Id);
+        var asset = _context.Services.Algo.GetAsset(current);
         if (asset == null || asset.IsEmpty)
         {
             var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
@@ -104,6 +105,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
 
     public void BackTestClose(AlgoEntry current, decimal exitPrice, DateTime exitTime)
     {
+        if (current == null) throw Exceptions.InvalidAlgorithmEngineState();
         if (!_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(true);
 
         Assertion.ShallNever(current.TheoreticEnterPrice is null or 0);

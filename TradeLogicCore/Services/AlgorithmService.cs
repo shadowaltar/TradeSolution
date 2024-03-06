@@ -1,8 +1,10 @@
 ﻿using Common;
+using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -12,6 +14,8 @@ namespace TradeLogicCore.Services;
 
 public class AlgorithmService : IAlgorithmService
 {
+    private static readonly ILog _log = Logger.New();
+
     /// <summary>
     /// Caches algo-entries related to last time frame.
     /// Key is securityId.
@@ -141,11 +145,11 @@ public class AlgorithmService : IAlgorithmService
     public void CopyOver(AlgoEntry current, AlgoEntry last, decimal price)
     {
         current.PositionId = last.PositionId;
-        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             current.Quantity = asset.Quantity;
-            current.TheoreticEnterTime = asset.CreateTime;
+            current.TheoreticEnterTime = last.TheoreticEnterTime;
             // inherit
             current.TheoreticEnterPrice = last.TheoreticEnterPrice;
             current.TheoreticEnterTime = last.TheoreticEnterTime;
@@ -164,6 +168,10 @@ public class AlgorithmService : IAlgorithmService
         {
             current.LongSignal = SignalType.None;
             current.ShortSignal = SignalType.None;
+            current.TheoreticEnterPrice = null;
+            current.TheoreticEnterTime = null;
+            current.TheoreticExitPrice = null;
+            current.TheoreticExitTime = null;
             current.Quantity = 0;
             current.TheoreticEnterPrice = null;
             current.TheoreticEnterTime = null;
@@ -208,5 +216,25 @@ public class AlgorithmService : IAlgorithmService
         };
 
         _context.AlgoSession = Session;
+    }
+
+    public Asset? GetCash(AlgoEntry current)
+    {
+        if (current.Security.QuoteSecurity == null)
+        {
+            _log.Error("Failed to get correct quote security from security: " + current.Security.Code);
+            return null;
+        }
+        return _context.Services.Portfolio.GetCashAssetBySecurityId(current.Security.QuoteSecurity.Id);
+    }
+
+    public Asset? GetAsset(AlgoEntry current)
+    {
+        if (current.Security.FxInfo?.BaseCurrency != null)
+        {
+            var baseSecurity = current.Security.FxInfo.BaseSecurity;
+            return _context.Services.Portfolio.GetAssetBySecurityId(baseSecurity!.Id);
+        }
+        return _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
     }
 }

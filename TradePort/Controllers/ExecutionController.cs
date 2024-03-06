@@ -456,7 +456,15 @@ public class ExecutionController : Controller
         {
             case PositionSizingMethod.PreserveFixed:
                 if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
-                    return BadRequest();
+                {
+                    // try to reconcilate first
+                    var recon  = new Reconcilation(core.Context);
+                    await recon.ReconcileAssets();
+                    if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
+                    {
+                        return BadRequest();
+                    }
+                }
                 break;
             case PositionSizingMethod.Fixed:
                 sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);

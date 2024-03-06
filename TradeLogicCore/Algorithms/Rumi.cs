@@ -164,8 +164,8 @@ public class Rumi : Algorithm
             default:
                 throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side);
         }
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        return position != null
+        var asset = _context.Services.Algo.GetAsset(current);
+        return asset != null
             && current.OpenSide == side
             && closeType == CloseType.None
             && signalType == SignalType.Close;

@@ -207,8 +207,6 @@ public class TradeService : ITradeService
 
     public void Reset()
     {
-        _execution.TradeReceived -= OnTradeReceived;
-
         _trades.ThreadSafeClear();
         _tradesByExternalId.ThreadSafeClear();
         _tradesByOrderId.ThreadSafeClear();

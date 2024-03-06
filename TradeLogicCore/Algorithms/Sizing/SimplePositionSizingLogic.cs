@@ -162,7 +162,7 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
             return false;
         }
 
-        var cashAsset = portfolioService.GetAssetBySecurityId(quoteSecurity.Id);
+        var cashAsset = portfolioService.GetCashAssetBySecurityId(quoteSecurity.Id);
         if (cashAsset == null)
         {
             _log.Error($"Cannot calculate CalculatePreserveFixed: {quoteCurrencyCode} asset does not exist.");
@@ -181,9 +181,9 @@ public class SimplePositionSizingLogic : IPositionSizingAlgoLogic
 
     public void CalculateFixed(ISecurityService securityService, IPortfolioService portfolioService, string quoteCurrencyCode, decimal fixedQuantity)
     {
-        var fiat = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
-        var fiatAsset = portfolioService.GetAssetBySecurityId(fiat.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
-        if (fiatAsset.Quantity < fixedQuantity) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {fixedQuantity}");
+        var quoteSecurity = securityService.GetSecurity(quoteCurrencyCode) ?? throw Exceptions.Impossible(quoteCurrencyCode + " definition does not exist.");
+        var quoteAsset = portfolioService.GetCashAssetBySecurityId(quoteSecurity.Id) ?? throw Exceptions.Impossible(quoteCurrencyCode + " asset does not exist.");
+        if (quoteAsset.Quantity < fixedQuantity) throw Exceptions.Impossible($"{quoteCurrencyCode} asset quantity < {fixedQuantity}");
         FixedAmount = fixedQuantity;
     }
 }

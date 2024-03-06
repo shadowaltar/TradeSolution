@@ -182,8 +182,8 @@ public class MovingAverageCrossing : Algorithm
             default:
                 throw Exceptions.InvalidOrder("The order side to be tested is invalid: " + side);
         }
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        return position != null
+        var asset = _context.Services.Algo.GetAsset(current);
+        return asset != null
             && current.OpenSide == side
             && closeType == CloseType.None
             && signalType == SignalType.Close;
@@ -242,19 +242,19 @@ public class MovingAverageCrossing : Algorithm
         var sl = _stopLossPrices.ThreadSafeGet(securityId);
         if (sl == 0) return false; // no position or no sl is setup
 
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(securityId);
-        if (position == null || position.IsEmpty) return false;
+        var asset = _context.Services.Algo.GetAsset(current);
+        if (asset == null || asset.IsEmpty) return false;
 
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && sl >= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, SLPRX:{asset.Security.FormatPrice(sl)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && sl <= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, SLPRX:{position.Security.FormatPrice(sl)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, SLPRX:{asset.Security.FormatPrice(sl)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -275,19 +275,19 @@ public class MovingAverageCrossing : Algorithm
         var tp = _takeProfitPrices.ThreadSafeGet(securityId);
         if (tp == 0) return false; // no position or no tp is setup
 
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(securityId);
-        if (position == null || position.IsEmpty) return false;
+        var asset = _context.Services.Algo.GetAsset(current);
+        if (asset == null || asset.IsEmpty) return false;
 
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && tp <= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, TPPRX:{asset.Security.FormatPrice(tp)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && tp >= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{position.SecurityCode}]\n\t\tPID:{position.Id}, MID:{tick.Mid}, TPPRX:{position.Security.FormatPrice(tp)}, QTY:{position.Security.FormatQuantity(position.Quantity)}");
+            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, TPPRX:{asset.Security.FormatPrice(tp)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -319,25 +319,25 @@ public class MovingAverageCrossing : Algorithm
         return !openOrders.IsNullOrEmpty();
     }
 
-    public override async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice)
+    public override async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset asset, decimal triggerPrice)
     {
-        return await CloseByTick(current, position, OrderActionType.TickSignalStopLoss, triggerPrice);
+        return await CloseByTick(current, asset, OrderActionType.TickSignalStopLoss, triggerPrice);
     }
 
-    public override async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice)
+    public override async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset asset, decimal triggerPrice)
     {
-        return await CloseByTick(current, position, OrderActionType.TickSignalTakeProfit, triggerPrice);
+        return await CloseByTick(current, asset, OrderActionType.TickSignalTakeProfit, triggerPrice);
     }
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
-        var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-        if (position == null)
+        var asset = _context.Services.Algo.GetAsset(current);
+        if (asset == null)
         {
             _log.Warn($"Other logic has closed the position for security {security.Code} already OR it did not exist; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
         }
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(position))
+        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(asset))
         {
             _log.Warn($"Other logic is closing the position for security {security.Code} already; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
@@ -347,7 +347,7 @@ public class MovingAverageCrossing : Algorithm
 
     public override void AfterPositionChanged(AlgoEntry current)
     {
-        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && asset.IsEmpty)
         {
             ResetInheritedVariables(current);
@@ -384,7 +384,7 @@ public class MovingAverageCrossing : Algorithm
 
         // prevent trading if has open positions
         var hasOpenPosition = false;
-        var asset = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
+        var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
             hasOpenPosition = true;
 

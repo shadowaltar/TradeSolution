@@ -277,6 +277,8 @@ public class PortfolioService : IPortfolioService
                 // need to wait for a while
                 if (Threads.WaitUntil(() =>
                 {
+                    var asset = GetAssetBySecurityId(security.Id);
+                    if (asset == null) return false;
                     return asset.IsClosed;
                 }))
                 {

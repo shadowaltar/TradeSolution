@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using log4net;
+using System;
 using System.Net;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -89,7 +90,7 @@ public class ApplicationContext(IComponentContext container, IStorage storage)
         protected set => _brokerId = value;
     }
 
-    public void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
+    public virtual void Initialize(EnvironmentType environment, ExchangeType exchange, BrokerType broker)
     {
         if (environment is EnvironmentType.Unknown) throw Exceptions.EnumUnknown(nameof(environment));
         if (exchange is ExchangeType.Unknown) throw Exceptions.EnumUnknown(nameof(exchange));

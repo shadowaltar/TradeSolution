@@ -85,8 +85,6 @@ public class Context(IComponentContext container, IStorage storage) : Applicatio
         ExternalConnectionStates.EnvironmentId = ExchangeId;
         ExternalConnectionStates.Broker = Broker;
         ExternalConnectionStates.BrokerId = BrokerId;
-
-        IsInitialized = false;
     }
 
     public Algorithm GetAlgorithm()
@@ -94,10 +92,10 @@ public class Context(IComponentContext container, IStorage storage) : Applicatio
         return _algorithm is Algorithm result ? result : throw Exceptions.MissingAlgorithm();
     }
 
-    public IAlgorithmEngine GetEngine()
-    {
-        return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
-    }
+    //public IAlgorithmEngine GetEngine()
+    //{
+    //    return _algorithmEngine is IAlgorithmEngine result ? result : throw Exceptions.MissingAlgorithmEngine();
+    //}
 
 
     /// <summary>

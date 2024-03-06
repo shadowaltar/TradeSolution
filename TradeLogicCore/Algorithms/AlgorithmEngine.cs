@@ -1,6 +1,7 @@
 ﻿using Common;
 using log4net;
 using OfficeOpenXml.Style;
+using System.Diagnostics;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -284,8 +285,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (asset.IsClosed)
         {
             var quoteSecurityId = asset.Security.QuoteSecurity?.Id ?? throw Exceptions.Impossible("A position must has a quote currency.");
-            var initCashPosition = _services.Portfolio.InitialPortfolio.GetAssetPositionBySecurityId(quoteSecurityId);
-            var currentCashPosition = _services.Portfolio.Portfolio.GetAssetPositionBySecurityId(quoteSecurityId);
+            var initCashPosition = _services.Portfolio.InitialPortfolio.GetCashAssetBySecurityId(quoteSecurityId);
+            var currentCashPosition = _services.Portfolio.Portfolio.GetCashAssetBySecurityId(quoteSecurityId);
 
             _log.Info($"\n\tPOS: [{asset.UpdateTime:HHmmss}][{asset.SecurityCode}][Closed]\n\t\tID:{asset.Id}, TID:{trade.Id}, PNL:{current.Notional:F4}, R:{current.EntryReturn:P4}, Notional:{initCashPosition?.Quantity}=>{currentCashPosition?.Quantity}");
 
@@ -499,9 +500,9 @@ public class AlgorithmEngine : IAlgorithmEngine
     private static void LogEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
     {
         if (actionType == null)
-            _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"ALGO ENTRY: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
         else
-            _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}][{actionType}][{side}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"ALGO [{actionType}/{side}]: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
     }
 
     private async Task ClosePositionIfNeeded()
@@ -675,6 +676,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.CanOpen(current, side))
             return false;
 
+        var enterPrice = price.C;
+
         StartOrderBookRecording(current.SecurityId);
 
         // cancel any partial filled, SL or TP orders
@@ -684,16 +687,49 @@ public class AlgorithmEngine : IAlgorithmEngine
         current.IsExecuting = true;
         if (IsBackTesting)
         {
-            var sl = Algorithm.GetStopLossPrice(price.C, side, security);
-            var tp = Algorithm.GetTakeProfitPrice(price.C, side, security);
-            EnterLogic.BackTestOpen(current, last, price.C, side, time, sl, tp);
+            var sl = Algorithm.GetStopLossPrice(enterPrice, side, security);
+            var tp = Algorithm.GetTakeProfitPrice(enterPrice, side, security);
+            EnterLogic.BackTestOpen(current, last, enterPrice, side, time, sl, tp);
         }
         else
         {
-            await Algorithm.Open(current, last, price.C, side, time);
+            var state = await Algorithm.Open(current, last, enterPrice, side, time);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                current.TheoreticEnterTime = time;
+                current.TheoreticEnterPrice = enterPrice;
+            }
         }
 
         current.PositionId = _algoEntryIdGen.NewInt;
+        return true;
+    }
+
+    private async Task<bool> TryClose(Side side, AlgoEntry current, OhlcPrice price, IntervalType intervalType)
+    {
+        if (current == null) return false; // not yet started
+        if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
+
+        if (!Algorithm.CanClose(current, side))
+            return false;
+
+        current.IsExecuting = true;
+        var endTime = GetOhlcEndTime(price, intervalType);
+        var exitPrice = price.C;
+        if (IsBackTesting)
+        {
+            ExitLogic.BackTestClose(current, exitPrice, endTime);
+        }
+        else
+        {
+            var state = await Algorithm.Close(current, current.Security, exitPrice, side.Invert(), endTime, OrderActionType.AlgoClose);
+            if (state.ResultCode == ResultCode.SendOrderOk)
+            {
+                current.TheoreticExitTime = endTime;
+                current.TheoreticExitPrice = exitPrice;
+            }
+        }
+
         return true;
     }
 
@@ -762,24 +798,6 @@ public class AlgorithmEngine : IAlgorithmEngine
     //    current.PositionId = _algoEntryIdGen.NewInt;
     //    return true;
     //}
-
-    private async Task<bool> TryClose(Side side, AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
-    {
-        if (current == null) return false; // not yet started
-        if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-
-        if (!Algorithm.CanClose(current, side))
-            return false;
-
-        current.IsExecuting = true;
-        var endTime = GetOhlcEndTime(ohlcPrice, intervalType);
-        if (IsBackTesting)
-            ExitLogic.BackTestClose(current, ohlcPrice.C, endTime);
-        else
-            await Algorithm.Close(current, current.Security, ohlcPrice.C, side.Invert(), endTime, OrderActionType.AlgoClose);
-
-        return true;
-    }
     //private async Task<bool> TryCloseLong(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
     //{
     //    if (current == null) return false; // not yet started
@@ -823,7 +841,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.ShallStopLoss(current, tick, out var triggerPrice))
             return false;
 
-        var asset = _services.Portfolio.GetAssetBySecurityId(securityId);
+        var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{asset.SecurityCode}][{current?.PositionId}][StopLoss]\n\t\tR:{current.EntryReturn:P4}");
@@ -850,12 +868,12 @@ public class AlgorithmEngine : IAlgorithmEngine
         if (!Algorithm.ShallTakeProfit(current, tick, out var triggerPrice))
             return false;
 
-        var position = _services.Portfolio.GetAssetBySecurityId(securityId);
-        if (position != null && !position.IsEmpty)
+        var asset = _context.Services.Algo.GetAsset(current);
+        if (asset != null && !asset.IsEmpty)
         {
-            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{position.SecurityCode}][{current?.PositionId}][TakeProfit]\n\t\tR:{current.EntryReturn:P4}");
+            _log.Info($"\n\tEVT: [{DateTime.UtcNow:HHmmss}][{asset.SecurityCode}][{current?.PositionId}][TakeProfit]\n\t\tR:{current.EntryReturn:P4}");
             _persistence.Insert(current);
-            var state = await Algorithm.CloseByTickTakeProfit(current, position, triggerPrice);
+            var state = await Algorithm.CloseByTickTakeProfit(current, asset, triggerPrice);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterTookProfit(current);

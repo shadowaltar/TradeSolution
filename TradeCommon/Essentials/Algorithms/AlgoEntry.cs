@@ -113,7 +113,7 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// <summary>
     /// Realized return of this entry which is just closed. 1 - Exit Price / Enter Price.
     /// </summary>
-    public decimal RealizedReturn => (TheoreticEnterPrice == null || TheoreticEnterPrice == 0 || TheoreticExitPrice == null || TheoreticExitPrice == 0) ? 0 : (1 - TheoreticExitPrice / TheoreticEnterPrice).Value;
+    public decimal TheoreticRealizedReturn => (TheoreticEnterPrice == null || TheoreticEnterPrice == 0 || TheoreticExitPrice == null || TheoreticExitPrice == 0) ? 0 : (1 - TheoreticExitPrice / TheoreticEnterPrice).Value;
 
     ///// <summary>
     ///// Realized PNL of this entry which is just closed. (Exit Price - Enter Price) * Quantity held.

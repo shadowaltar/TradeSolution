@@ -16,6 +16,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
     private static readonly ILog _log = Logger.New();
 
     private IPortfolioService _portfolioService => _context.Services.Portfolio;
+    private IAlgorithmService _algorithmService => _context.Services.Algo;
     private IOrderService _orderService => _context.Services.Order;
 
     private readonly IdGenerator _orderIdGen;
@@ -50,24 +51,26 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
                                                decimal stopLossPrice,
                                                decimal takeProfitPrice)
     {
-        if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
+        if (_context.IsBackTesting)
+            throw Exceptions.InvalidBackTestMode(false);
 
         try
         {
             IsOpening = true;
 
-            if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
-
-            var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id)
-                ?? throw Exceptions.MissingAssetPosition(current.Security.QuoteSecurity.Code);
+            if (_context.IsBackTesting)
+                throw Exceptions.InvalidBackTestMode(false);
+            if (current.Security.QuoteSecurity == null)
+                throw Exceptions.InvalidSecurity(current.Security.Code, "Missing related quote security.");
+            var asset = _algorithmService.GetCash(current);
+            if (asset == null)
+                return ExternalQueryStates.InvalidOrder($"Current asset's security has no quote security.", "", "No quote security defined.");
 
             var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
             if (size <= 0)
-            {
                 return ExternalQueryStates.InvalidOrder($"Current asset quantity = {asset.Quantity}", "", "Quantity must be positive");
-            }
-            var order = CreateOrder(OrderType.Market, side, enterTime, 0, size, current.Security,
-                OrderActionType.AlgoOpen, comment: Comments.AlgoEnterMarket);
+
+            var order = CreateOrder(OrderType.Market, side, enterTime, 0, size, current.Security, OrderActionType.AlgoOpen, comment: Comments.AlgoEnterMarket);
             order.TriggerPrice = enterPrice;
             var state = await _orderService.SendOrder(order);
             if (state.ResultCode == ResultCode.SendOrderOk)
@@ -127,7 +130,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         if (!security.QuoteSecurity.IsValid()) throw Exceptions.Invalid<Security>("Security's quote security is: " + security.QuoteSecurity);
         if (stopPrice != null && (!stopPrice.IsValid() || stopPrice <= 0)) throw Exceptions.Invalid<decimal>(stopPrice);
 
-        var assetPosition = _context.Services.Portfolio.GetAssetBySecurityId(security.QuoteSecurity.Id);
+        var assetPosition = _context.Services.Portfolio.GetCashAssetBySecurityId(security.QuoteSecurity.Id);
         if (assetPosition == null || !assetPosition.Security.IsValid()) throw Exceptions.Invalid<Security>("asset position security is: " + assetPosition?.Security);
         if (assetPosition.Quantity < quantity)
             throw Exceptions.InvalidOrder($"Insufficient quote asset to be traded. Existing: {assetPosition.Quantity}; desired: {quantity}");
@@ -174,7 +177,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
         if (!_context.IsBackTesting) return;
 
         // TODO current sizing happens here
-        var asset = _portfolioService.GetAssetBySecurityId(current.Security.QuoteSecurity.Id);
+        var asset = _portfolioService.GetCashAssetBySecurityId(current.Security.QuoteSecurity.Id);
         var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
 
         SyncOpenOrderToEntry(current, size, enterPrice, enterTime);

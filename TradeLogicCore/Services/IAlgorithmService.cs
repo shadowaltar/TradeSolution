@@ -2,6 +2,7 @@
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeLogicCore.Algorithms;
 
@@ -35,4 +36,22 @@ public interface IAlgorithmService
     void CopyOver(AlgoEntry current, AlgoEntry last, decimal price);
 
     void InitializeSession(EngineParameters engineParameters);
+
+    /// <summary>
+    /// Get the cash position from current algo entry.
+    /// For FX, it is for the quote currency asset.
+    /// For stock, it is usually USD.
+    /// </summary>
+    /// <param name="current"></param>
+    /// <returns></returns>
+    Asset? GetCash(AlgoEntry current);
+
+    /// <summary>
+    /// Get the asset position from algo entry.
+    /// For FX, it is for the base currency asset.
+    /// For stock, it is the security itself.
+    /// </summary>
+    /// <param name="current"></param>
+    /// <returns></returns>
+    Asset? GetAsset(AlgoEntry current);
 }

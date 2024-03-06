@@ -382,10 +382,6 @@ public class OrderService : IOrderService
 
     public void Reset()
     {
-        _execution.OrderPlaced -= OnSentOrderAccepted;
-        _execution.OrderCancelled -= OnOrderCancelled;
-        _execution.OrderReceived -= OnOrderReceived;
-
         _errorOrders.ThreadSafeClear();
         _cancelledOrders.ThreadSafeClear();
         _openOrders.ThreadSafeClear();

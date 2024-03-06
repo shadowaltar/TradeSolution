@@ -1,4 +1,5 @@
 ﻿using Common;
+using log4net;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -9,21 +10,17 @@ using TradeCommon.Runtime;
 using TradeDataCore.Essentials;
 
 namespace TradeDataCore.Instruments;
-public class SecurityService : ISecurityService
+public class SecurityService(IStorage storage, ApplicationContext context) : ISecurityService
 {
+    private static readonly ILog _log = Logger.New();
+
     private readonly Dictionary<int, Security> _securities = [];
     private readonly Dictionary<string, Security> _securitiesByCode = [];
     private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = [];
-    private readonly IStorage _storage;
-    private readonly ApplicationContext _context;
+    private readonly IStorage _storage = storage;
+    private readonly ApplicationContext _context = context;
 
     public bool IsInitialized { get; private set; }
-
-    public SecurityService(IStorage storage, ApplicationContext context)
-    {
-        _storage = storage;
-        _context = context;
-    }
 
     public void Reset()
     {
@@ -41,6 +38,23 @@ public class SecurityService : ISecurityService
         if (IsInitialized) return;
         await ReadStorageAndRefreshCache();
         IsInitialized = true;
+
+        // read cash assets config file
+        var codes = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "CashAssets.txt"))?.ToList();
+        if (codes.IsNullOrEmpty()) throw new InvalidOperationException("Failed to define cash asset codes.");
+
+        foreach (var code in codes)
+        {
+            var security = GetSecurity(code);
+            if (security == null)
+            {
+                _log.Error($"Security code {code} is not found! Cannot set it as cash currency. This code will be ignored.");
+            }
+            else
+            {
+                security.IsCash = true;
+            }
+        }
     }
 
     public async Task<List<Security>> GetAllSecurities(bool readStorage = false)
@@ -354,14 +368,14 @@ public class SecurityService : ISecurityService
                 }
                 if (security.FxInfo != null)
                 {
-                    if (!security.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.BaseCurrency, out var baseAsset))
+                    if (!security.FxInfo.BaseCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.BaseCurrency, out var baseSecurity))
                     {
-                        security.FxInfo.BaseSecurity = baseAsset;
+                        security.FxInfo.BaseSecurity = baseSecurity;
                     }
-                    if (!security.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.QuoteCurrency, out var quoteAsset))
+                    if (!security.FxInfo.QuoteCurrency.IsBlank() && fxSecurities.TryGetValue(security.FxInfo.QuoteCurrency, out var quoteSecurity))
                     {
-                        security.FxInfo.QuoteSecurity = quoteAsset;
-                        security.QuoteSecurity = quoteAsset;
+                        security.FxInfo.QuoteSecurity = quoteSecurity;
+                        security.QuoteSecurity = quoteSecurity;
                         security.Currency = security.FxInfo.QuoteCurrency;
                     }
                     if (security.FxInfo.IsAsset)
