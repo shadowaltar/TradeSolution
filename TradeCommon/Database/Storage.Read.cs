@@ -53,8 +53,8 @@ public partial class Storage
 
     public async Task<User?> ReadUser(string userName, string email, EnvironmentType environment)
     {
-        var un = userName.ToUpperInvariant().Trim();
-        var em = email.ToLowerInvariant().Trim();
+        var un = userName.ToLowerTrimmed();
+        var em = email.ToLowerTrimmed();
         if (un.IsBlank() && em.IsBlank())
         {
             return null;
@@ -76,12 +76,12 @@ WHERE
 
         var env = _environmentString.IsBlank() ? Environments.ToString(environment) : _environmentString;
         return await SqlReader.ReadOne<User>(tableName, DatabaseNames.StaticData, env, sql,
-            ("$Name", un), ("$Email", em), ("$Environment", env));
+            ("$Name", un), ("$Email", em));
     }
 
     public async Task<Account?> ReadAccount(string accountName)
     {
-        accountName = accountName.ToUpperInvariant();
+        accountName = accountName.ToLowerTrimmed();
         var sqlPart = SqlReader<Account>.GetSelectClause();
         var (tableName, dbName) = DatabaseNames.GetTableAndDatabaseName<Account>();
         var sql = @$"{sqlPart} FROM {tableName} WHERE Name = $Name";

@@ -8,13 +8,13 @@ namespace TradeCommon.Essentials.Accounts;
 [Unique(nameof(Name)), Unique(nameof(Email))]
 public record User
 {
-    [AutoIncrementOnInsert]
+    [AutoIncrementOnInsert, NotNull, Positive]
     public int Id { get; set; } = 0;
 
     /// <summary>
     /// Name of the user; it must be stored in UPPER-CASE internally.
     /// </summary>
-    [NotNull, Length(MinLength = 3, MaxLength = 100)]
+    [NotNull, Length(MinLength = 3, MaxLength = 100), AlwaysLowerCase]
     public string Name { get; set; } = "";
 
     /// <summary>

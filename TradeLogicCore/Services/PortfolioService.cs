@@ -541,39 +541,6 @@ public class PortfolioService : IPortfolioService
         }
     }
 
-    public void Process(List<Trade> trades, bool isSameSecurity)
-    {
-        if (trades.IsNullOrEmpty())
-            return;
-
-        foreach (var trade in trades)
-        {
-            Process(trade);
-        }
-    }
-
-    public void Process(Trade trade)
-    {
-        var asset = GetPositionBySecurityId(trade.SecurityId);
-        if (asset == null) throw Exceptions.Impossible();
-
-        _securityService.Fix(asset);
-        Portfolio.AddOrUpdate(asset);
-        _persistence.Insert(asset);
-
-        // invoke post-events
-        //if (asset.)
-        //    AssetPositionCreated?.Invoke(asset);
-        //else
-        //    AssetPositionUpdated?.Invoke(asset);
-
-        //if (asset.IsEmpty)
-        //{
-        //    AssetClosed?.Invoke(asset);
-        //}
-        AssetProcessed?.Invoke(asset, trade);
-    }
-
     public Side GetOpenPositionSide(int securityId)
     {
         var asset = GetPositionBySecurityId(securityId);
@@ -606,6 +573,7 @@ public class PortfolioService : IPortfolioService
 
     private void OnAssetsChanged(List<Asset> assets)
     {
+        _log.Info("ON ASSET CHANGED");
         var account = _context.Account ?? throw Exceptions.MustLogin();
         var states = new List<AssetState>();
         foreach (var asset in assets)
@@ -631,6 +599,7 @@ public class PortfolioService : IPortfolioService
         }
         _persistence.Insert(assets, isUpsert: true);
         _persistence.Insert(states, isUpsert: false);
+        _log.Info("ON ASSET CHANGE SAVED");
     }
 
     public List<Asset> GetAssets()

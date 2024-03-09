@@ -23,8 +23,8 @@ public class Credential
 
         var envStr = Environments.ToString(environment).ToUpperInvariant();
         var encryptedPassword =
-            CryptographyUtils.Encrypt(user.Name + password, PasswordSalt)
-            + CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt)
+            CryptographyUtils.Encrypt(user.Name.ToLowerTrimmed() + password, PasswordSalt)
+            + CryptographyUtils.Encrypt(user.Email.ToLowerTrimmed() + password, PasswordSalt)
             + CryptographyUtils.Encrypt(envStr + password, PasswordSalt);
         return encryptedPassword == user.EncryptedPassword;
     }
@@ -43,8 +43,8 @@ public class Credential
         if (password.IsBlank()) throw new ArgumentNullException(nameof(password));
 
         var envStr = Environments.ToString(environment).ToUpperInvariant();
-        var encrypted1 = CryptographyUtils.Encrypt(user.Name + password, PasswordSalt);
-        var encrypted2 = CryptographyUtils.Encrypt(user.Email.ToLowerInvariant() + password, PasswordSalt);
+        var encrypted1 = CryptographyUtils.Encrypt(user.Name.ToLowerTrimmed() + password, PasswordSalt);
+        var encrypted2 = CryptographyUtils.Encrypt(user.Email.ToLowerTrimmed() + password, PasswordSalt);
         var encrypted3 = CryptographyUtils.Encrypt(envStr + password, PasswordSalt);
         user.EncryptedPassword = encrypted1 + encrypted2 + encrypted3;
 

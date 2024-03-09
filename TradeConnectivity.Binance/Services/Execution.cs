@@ -158,21 +158,22 @@ public class Execution : IExternalExecutionManagement
         }
         var state = ExternalQueryStates.SendOrder(receivedOrder, content, connId, isOk).RecordTimes(rtt, swTotal);
 
+        OrderPlaced?.Invoke(receivedOrder.IsGood, state);
         // raise events, and prevent other places to invoke events
-        _broker.Enqueue(new EventInvokerTask(() =>
-        {
-            OrderPlaced?.Invoke(receivedOrder.IsGood, state);
-            if (!trades.IsNullOrEmpty())
-            {
-                foreach (var trade in trades)
-                {
-                    if (!_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
-                    {
-                        TradeReceived?.Invoke(trade);
-                    }
-                }
-            }
-        }));
+        //_broker.Enqueue(new EventInvokerTask(() =>
+        //{
+        //    OrderPlaced?.Invoke(receivedOrder.IsGood, state);
+        //    if (!trades.IsNullOrEmpty())
+        //    {
+        //        foreach (var trade in trades)
+        //        {
+        //            if (!_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
+        //            {
+        //                TradeReceived?.Invoke(trade);
+        //            }
+        //        }
+        //    }
+        //}));
         return state;
 
         void Parse(JsonObject json, Order order, List<Trade> trades)
@@ -1082,12 +1083,17 @@ public class Execution : IExternalExecutionManagement
                         };
                     }
 
-                    _broker.Enqueue(new EventInvokerTask(() =>
-                    {
-                        OrderReceived?.Invoke(order);
-                        if (trade != null && !_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
-                            TradeReceived?.Invoke(trade);
-                    }));
+                    //_broker.Enqueue(new EventInvokerTask(() =>
+                    //{
+                    //    OrderReceived?.Invoke(order);
+                    //    if (trade != null && !_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
+                    //        TradeReceived?.Invoke(trade);
+                    //}));
+
+
+                    OrderReceived?.Invoke(order);
+                    if (trade != null && !_processedExternalTradeIds.ThreadSafeContainsElseAdd(trade.ExternalTradeId))
+                        TradeReceived?.Invoke(trade);
 
                     break;
                 default:

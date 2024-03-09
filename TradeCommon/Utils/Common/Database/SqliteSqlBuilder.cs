@@ -193,7 +193,7 @@ public class SqliteSqlBuilder : IDatabaseSqlBuilder
             }
             foreach (var attr in propAttributes)
             {
-                if (attr is DatabaseIgnoreAttribute)
+                if (attr is DatabaseIgnoreAttribute && attr is not AutoIncrementOnInsertAttribute)
                 {
                     ignoredColumns.Add(name);
                     break;

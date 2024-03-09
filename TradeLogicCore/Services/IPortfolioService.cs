@@ -28,20 +28,6 @@ public interface IPortfolioService
     Task Reset();
 
     /// <summary>
-    /// Create or update (and cache) one or more positions by a series of trades.
-    /// </summary>
-    /// <param name="trades"></param>
-    /// <param name="isSameSecurity"></param>
-    /// <returns></returns>
-    void Process(List<Trade> trades, bool isSameSecurity);
-
-    /// <summary>
-    /// Create or update (and cache) one position by one trade.
-    /// </summary>
-    /// <param name="trade"></param>
-    void Process(Trade trade);
-
-    /// <summary>
     /// Gets all open positions (a shallow copy of list of positions).
     /// </summary>
     /// <returns></returns>

@@ -75,12 +75,12 @@ public class TradeService : ITradeService
 
     private void OnTradeReceived(Trade trade)
     {
+        _log.Info("ON TRADE RECEIVED");
         InternalOnNextTrade(trade);
 
         _persistence.Insert(trade);
+        _log.Info("ON TRADE CHANGE SAVED");
         TradeProcessed?.Invoke(trade);
-
-        _portfolioService.Process(trade);
     }
 
     private void InternalOnNextTrade(Trade trade)
@@ -118,7 +118,11 @@ public class TradeService : ITradeService
         }
 
         _securityService.Fix(trade);
-
+        if (trade.AlgoEntryId == 0)
+        {
+            var current = _context.Services.Algo.GetCurrentEntry(trade.Security.FxInfo?.BaseSecurity?.Id ?? 0);
+            trade.AlgoEntryId = order.AlgoEntryId;
+        }
         trade.SecurityId = order.SecurityId;
         trade.Security = order.Security;
         trade.OrderId = order.Id;

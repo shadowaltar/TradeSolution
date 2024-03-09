@@ -217,4 +217,14 @@ public static class StringExtensions
     {
         return value.IsBlank() ? value : value.Length == 1 ? char.ToUpper(value[0]).ToString() : char.ToUpper(value[0]) + value[1..];
     }
+
+    public static string ToLowerTrimmed(this string value)
+    {
+        return value.ToLowerInvariant().Trim();
+    }
+
+    public static string ToUpperTrimmed(this string value)
+    {
+        return value.ToUpperInvariant().Trim();
+    }
 }

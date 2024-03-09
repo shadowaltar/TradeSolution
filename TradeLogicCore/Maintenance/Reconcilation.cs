@@ -101,7 +101,7 @@ public class Reconcilation
             {
                 _orderService.Update(toCreate);
                 _log.Info($"{toCreate.Count} recent orders for [{security.Id},{security.Code}] are created from external to internal.");
-                
+
                 foreach (var order in toCreate)
                 {
                     _log.Info($"OID:{order.Id}, EOID:{order.ExternalOrderId}");
@@ -530,51 +530,51 @@ public class Reconcilation
     //    return null;
     //}
 
-//    private async Task<List<Position>?> FixZeroPositionIds(Security security)
-//    {
-//        var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
-//        var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
-//        if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
+    //    private async Task<List<Position>?> FixZeroPositionIds(Security security)
+    //    {
+    //        var (tradeTable, tradeDb) = DatabaseNames.GetTableAndDatabaseName<Trade>(security.SecurityType);
+    //        var (posTable, posDb) = DatabaseNames.GetTableAndDatabaseName<Position>(security.SecurityType);
+    //        if (tradeTable.IsBlank() || posTable.IsBlank()) throw Exceptions.NotImplemented($"Security type {security.SecurityType} is not supported.");
 
-//        // #1 fix missing pid trades
-//        var whereClause = $"SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId} AND IsOperational = 0";
-//        var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
-//        if (trades.Count > 0)
-//        {
-//            // it is possible that a trade with no position exists among other good ones
-//            // so, find the previous good trade with position, get its position id,
-//            // then find out the earliest trade with this position id,
-//            // then from this trade we reconstruct all positions.
-//            var sql = $@"
-//SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
-//	SELECT PositionId FROM (
-//		SELECT Max(Id), PositionId FROM fx_trades WHERE Id < (
-//			SELECT MIN(Id) FROM fx_trades WHERE SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId}
-//		)
-//	)
-//)";
-//            var (isGood, minId) = await _storage.TryReadScalar<long>(sql, tradeDb);
-//            if (!isGood)
-//            {
-//                // it means the very first trade in trades table has zero pid
-//                minId = trades.Min(t => t.Id);
-//            }
+    //        // #1 fix missing pid trades
+    //        var whereClause = $"SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId} AND IsOperational = 0";
+    //        var trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
+    //        if (trades.Count > 0)
+    //        {
+    //            // it is possible that a trade with no position exists among other good ones
+    //            // so, find the previous good trade with position, get its position id,
+    //            // then find out the earliest trade with this position id,
+    //            // then from this trade we reconstruct all positions.
+    //            var sql = $@"
+    //SELECT MIN(Id) FROM fx_trades WHERE PositionId = (
+    //	SELECT PositionId FROM (
+    //		SELECT Max(Id), PositionId FROM fx_trades WHERE Id < (
+    //			SELECT MIN(Id) FROM fx_trades WHERE SecurityId = {security.Id} AND PositionId = 0 AND AccountId = {_context.AccountId}
+    //		)
+    //	)
+    //)";
+    //            var (isGood, minId) = await _storage.TryReadScalar<long>(sql, tradeDb);
+    //            if (!isGood)
+    //            {
+    //                // it means the very first trade in trades table has zero pid
+    //                minId = trades.Min(t => t.Id);
+    //            }
 
-//            whereClause = $"SecurityId = {security.Id} AND Id >= {minId} AND AccountId = {_context.AccountId} AND IsOperational = 0";
-//            trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
-//            if (trades.IsNullOrEmpty()) // highly impossible
-//                return null; // no historical trades at all
+    //            whereClause = $"SecurityId = {security.Id} AND Id >= {minId} AND AccountId = {_context.AccountId} AND IsOperational = 0";
+    //            trades = await _storage.Read<Trade>(tradeTable, tradeDb, whereClause);
+    //            if (trades.IsNullOrEmpty()) // highly impossible
+    //                return null; // no historical trades at all
 
-//            // out of order trade id handling
-//            // not only reconstruct the trade ids but also may need to update existing positions
-//            _securityService.Fix(trades);
-//            var ps = await ProcessAndSavePosition(security, trades)!;
-//            _persistence.WaitAll();
-//            _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
-//            return ps;
-//        }
-//        return null;
-//    }
+    //            // out of order trade id handling
+    //            // not only reconstruct the trade ids but also may need to update existing positions
+    //            _securityService.Fix(trades);
+    //            var ps = await ProcessAndSavePosition(security, trades)!;
+    //            _persistence.WaitAll();
+    //            _log.Info($"Position Reconciliation for {security.Code}, reconstruct {ps.Count} positions.");
+    //            return ps;
+    //        }
+    //        return null;
+    //    }
 
     //private async Task FixInvalidPositions(Security security, int lookbackDays)
     //{
@@ -735,6 +735,7 @@ public class Reconcilation
         await RecalculateOrderPrice(start, securityPool);
 
         //await ReconcilePositions(securityPool);
+        _log.Info("Finished reconciliation.");
     }
 
     private async Task RecalculateOrderPrice(DateTime start, List<Security> securities)

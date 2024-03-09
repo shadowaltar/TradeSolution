@@ -84,6 +84,7 @@ public class Program
             _exchange = ExchangeType.Binance;
         }
 
+        await ResetAccountAndUserTables(environment);
         await ResetTables(environment);
         return;
 
@@ -165,12 +166,12 @@ public class Program
         var storage = new Storage(Dependencies.ComponentContext);
         storage.SetEnvironment(environment);
 
-        await storage.CreateAccountTable();
-        await storage.CreateUserTable();
+        await storage.CreateTable<Account>();
+        await storage.CreateTable<User>();
         var now = DateTime.UtcNow;
         var user = new User
         {
-            Name = _userName.ToLowerInvariant(),
+            Name = _userName.ToLowerTrimmed(),
             Email = _email,
             CreateTime = now,
             UpdateTime = now,
@@ -178,11 +179,12 @@ public class Program
         var userPassword = _password;
         Credential.EncryptUserPassword(user, environment, ref userPassword);
         await storage.InsertOne(user);
-        user = await storage.ReadUser(user.Name, user.Email, environment);
+        var resultUser = await storage.ReadUser(user.Name, user.Email, environment);
+        user = resultUser;
         var account = new Account
         {
             OwnerId = user.Id,
-            Name = _accountName.ToLowerInvariant(),
+            Name = _accountName.ToLowerTrimmed(),
             Type = _accountType,
             SubType = "",
             BrokerId = ExternalNames.GetBrokerId(_broker),

@@ -53,17 +53,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS IX_{tableName}_email_environment
 
     public async Task<(string table, string database)> CreateTable<T>(string? tableNameOverride = null) where T : class
     {
-        var type = typeof(T);
-        if (type == typeof(User))
-        {
-            await CreateUserTable();
-            return (DatabaseNames.UserTable, DatabaseNames.StaticData);
-        }
-        if (type == typeof(Account))
-        {
-            await CreateAccountTable();
-            return (DatabaseNames.AccountTable, DatabaseNames.StaticData);
-        }
+        //var type = typeof(T);
+        //if (type == typeof(User))
+        //{
+        //    await CreateUserTable();
+        //    return (DatabaseNames.UserTable, DatabaseNames.StaticData);
+        //}
+        //if (type == typeof(Account))
+        //{
+        //    await CreateAccountTable();
+        //    return (DatabaseNames.AccountTable, DatabaseNames.StaticData);
+        //}
 
         string dropSql = SqlHelper.CreateDropTableAndIndexSql<T>(tableNameOverride);
         string createSql = SqlHelper.CreateCreateTableAndIndexSql<T>(tableNameOverride);

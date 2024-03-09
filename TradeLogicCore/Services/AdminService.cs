@@ -73,8 +73,8 @@ public class AdminService : IAdminService
         }
         IsLoggedIn = false;
 
-        userName = userName.ToUpperInvariant();
-        accountName = accountName?.ToUpperInvariant();
+        userName = userName.ToLowerTrimmed();
+        accountName = accountName?.ToLowerTrimmed();
 
         _log.Info($"Logging in user and account: {userName}, {accountName}, {environment}");
         if (userName.IsBlank()) return ResultCode.InvalidArgument;
@@ -156,10 +156,9 @@ public class AdminService : IAdminService
             return -1;
         }
 
-        userName = userName.Trim().ToUpperInvariant();
-
-        userPassword = userPassword.Trim().ToLowerInvariant();
-        email = email.Trim().ToLowerInvariant();
+        userName = userName.ToLowerTrimmed();
+        userPassword = userPassword.ToLowerTrimmed();
+        email = email.ToLowerTrimmed();
         var now = DateTime.UtcNow;
         var user = new User
         {

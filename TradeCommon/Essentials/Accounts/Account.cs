@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Attributes;
+using System.Diagnostics.CodeAnalysis;
 using TradeCommon.Database;
 using TradeCommon.Runtime;
 
@@ -16,7 +17,7 @@ public class Account : ITimeRelatedEntry
     /// <summary>
     /// Unique account id.
     /// </summary>
-    [AutoIncrementOnInsert]
+    [AutoIncrementOnInsert, NotNull, Positive]
     public int Id { get; set; } = 0;
 
     /// <summary>

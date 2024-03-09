@@ -46,8 +46,8 @@ public static class EnumExtensions
                 continue;
             var enumValueStr = enumValue.ToString()!;
             d2e[enumValueStr] = enumValue;
-            d2e[enumValueStr.ToUpperInvariant()] = enumValue;
-            d2e[enumValueStr.ToLowerInvariant()] = enumValue;
+            d2e[enumValueStr.ToUpperTrimmed()] = enumValue;
+            d2e[enumValueStr.ToLowerTrimmed()] = enumValue;
             if (Attribute.GetCustomAttribute(field, _descriptionType) is DescriptionAttribute attribute)
             {
                 var descriptions = attribute.Description.Split('|');

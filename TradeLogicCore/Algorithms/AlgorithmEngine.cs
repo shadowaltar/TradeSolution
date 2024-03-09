@@ -230,9 +230,6 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private void OnOrderProcessed(Order order)
     {
-        var current = _services.Algo.GetCurrentEntry(order.SecurityId);
-        if (current == null) throw new InvalidOperationException("Must initialize first.");
-
         var filledQtyStr = order.Status == OrderStatus.PartialFilled ? ", FILLQTY:" + order.FormattedFilledQuantity : "";
         var orderTypeStr = "";
         string orderPriceStr;
@@ -251,26 +248,45 @@ public class AlgorithmEngine : IAlgorithmEngine
             orderPriceStr = order.FormattedPrice.ToString();
         }
 
-        current.OrderCount++;
-        if (order.AlgoEntryId == 0)
+        var current = _services.Algo.GetCurrentEntry(order.SecurityId);
+        if (current != null)
         {
-            order.AlgoEntryId = current.SequenceId;
-            order.AlgoSessionId = current.SessionId;
+            current.OrderCount++;
+            if (order.AlgoEntryId == 0)
+            {
+                order.AlgoEntryId = current.SequenceId;
+                order.AlgoSessionId = current.SessionId;
+            }
         }
-        _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}]\n\t\tID:{order.Id}, {orderTypeStr}P:{orderPriceStr}, Q:{order.FormattedQuantity}{filledQtyStr}");
+        else
+        {
+            _log.Debug("Received an order not from algo execution but manual or auto position closing logic.");
+        }
+        _log.Info($"\n\tORD: [{order.UpdateTime:HHmmss}][{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}]\n\t\tID:{order.Id}, {orderTypeStr}P*Q:{orderPriceStr}*{order.FormattedQuantity}{filledQtyStr}");
     }
 
     private void OnTradeProcessed(Trade trade)
     {
         var current = _services.Algo.GetCurrentEntry(trade.SecurityId);
-        if (current == null) throw new InvalidOperationException("Must initialize first.");
-
-        current.TradeCount++;
-        if (trade.AlgoEntryId == 0)
+        if (current != null)
         {
-            trade.AlgoEntryId = current.SequenceId;
-            trade.AlgoSessionId = current.SessionId;
+            current.TradeCount++;
+            if (trade.AlgoEntryId == 0)
+            {
+                trade.AlgoEntryId = current.SequenceId;
+                trade.AlgoSessionId = current.SessionId;
+            }
         }
+        else
+        {
+            _log.Debug("Received a trade not from algo execution but manual or auto position closing logic.");
+        }
+        var order = _services.Order.GetOrderByExternalId(trade.ExternalOrderId);
+        if (order != null)
+        {
+
+        }
+
         _log.Info($"\n\tTRD: [{trade.Time:HHmmss}][{trade.SecurityCode}][{trade.Side}]\n\t\tID:{trade.Id}, P*Q:{trade.Price}*{trade.Quantity}");
     }
 
