@@ -716,7 +716,6 @@ public class AlgorithmEngine : IAlgorithmEngine
                 current.TheoreticEnterPrice = enterPrice;
             }
         }
-
         current.PositionId = _algoEntryIdGen.NewInt;
         return true;
     }

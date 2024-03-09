@@ -58,7 +58,7 @@ public class MovingAverageCrossing : Algorithm
                                  IPositionSizingAlgoLogic? sizing = null,
                                  ISecurityScreeningAlgoLogic? screening = null,
                                  IEnterPositionAlgoLogic? entering = null,
-                                 IExitPositionAlgoLogic? exiting = null)
+                                 IExitPositionAlgoLogic? exiting = null) : base(context)
     {
         _context = context;
 
@@ -331,18 +331,7 @@ public class MovingAverageCrossing : Algorithm
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
-        var asset = _context.Services.Algo.GetAsset(current);
-        if (asset == null)
-        {
-            _log.Warn($"Other logic has closed the position for security {security.Code} already OR it did not exist; algo-crossing close logic is skipped.");
-            return ExternalQueryStates.CloseConflict(security.Code);
-        }
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(asset))
-        {
-            _log.Warn($"Other logic is closing the position for security {security.Code} already; algo-crossing close logic is skipped.");
-            return ExternalQueryStates.CloseConflict(security.Code);
-        }
-        return await Exiting.Close(current, security, triggerPrice, exitSide, exitTime, actionType);
+        return await base.Close(current, security, triggerPrice, exitSide, exitTime, actionType);
     }
 
     public override void AfterPositionChanged(AlgoEntry current)
@@ -398,7 +387,16 @@ public class MovingAverageCrossing : Algorithm
             _log.Warn($"Other logic is closing the position for security {position.SecurityCode} already; tick-triggered close logic is skipped.");
             return ExternalQueryStates.CloseConflict(position.SecurityCode);
         }
-        return await Exiting.Close(null, position.Security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
+        var state = await Exiting.Close(null, position.Security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
+
+        if (state.Content is Order order)
+        {
+            current.SequenceId = 0;
+            current.LongCloseType = CloseType.None;
+            current.ShortCloseType = CloseType.None;
+            current.TheoreticExitPrice = order.Price;
+        }
+        return state;
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)
