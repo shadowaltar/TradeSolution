@@ -2,9 +2,9 @@
 using TradeCommon.Runtime;
 
 namespace TradeLogicCore.Algorithms;
-public class WorkingItemMonitor<T> where T : SecurityRelatedEntry, IIdEntry
+public class WorkingItemMonitor<T> where T : IIdEntry
 {
-    public Dictionary<int, T> ItemsBySecurityId { get; } = [];
+    public Dictionary<long, T> ItemsBySecurityId { get; } = [];
 
     /// <summary>
     /// If an item is being monitored, returns true,
@@ -14,9 +14,7 @@ public class WorkingItemMonitor<T> where T : SecurityRelatedEntry, IIdEntry
     /// <returns></returns>
     public bool MonitorAndPreventOtherActivity(T item)
     {
-        return item.IsSecurityInvalid()
-            ? throw Exceptions.InvalidSecurityInPosition(item.Id)
-            : ItemsBySecurityId.ThreadSafeContainsOrSet(item.SecurityId, item);
+        return ItemsBySecurityId.ThreadSafeContainsOrSet(item.Id, item);
     }
 
     /// <summary>

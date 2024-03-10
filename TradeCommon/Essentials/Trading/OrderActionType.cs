@@ -63,6 +63,10 @@ public enum OrderActionType
     /// A normal order to close position in order to clean up anything opened on algo start.
     /// </summary>
     CloseOnStart,
+    /// <summary>
+    /// A normal order to close position in order to clean up anything opened on algo stop.
+    /// </summary>
+    CloseOnStop,
 
     /// <summary>
     /// 

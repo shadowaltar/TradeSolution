@@ -183,7 +183,7 @@ public class ExecutionController : Controller
         if (ControllerValidator.IsAdminPasswordBad(adminPassword, context.Environment, out var br)) return br;
 
 
-        var r = await services.Portfolio.CloseAllPositions(Comments.CloseAll);
+        var r = await services.Portfolio.CloseAllPositions(OrderActionType.ManualClose, Comments.CloseAll);
 
         return !r ? BadRequest("Failed to close.") : Ok("Closed all open orders.");
     }
@@ -458,7 +458,7 @@ public class ExecutionController : Controller
                 if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
                 {
                     // try to reconcilate first
-                    var recon  = new Reconcilation(core.Context);
+                    var recon = new Reconcilation(core.Context);
                     await recon.ReconcileAssets();
                     if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
                     {

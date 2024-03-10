@@ -3,7 +3,6 @@ using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -18,7 +17,7 @@ public abstract class Algorithm
 {
     private static readonly ILog _log = Logger.New();
 
-    protected WorkingItemMonitor<Asset> _closingPositionMonitor;
+    protected WorkingItemMonitor<Security> _closingPositionMonitor;
     private readonly Context _context;
 
     public virtual int Id { get; }
@@ -59,7 +58,7 @@ public abstract class Algorithm
 
     protected Algorithm(Context context)
     {
-        _closingPositionMonitor = new WorkingItemMonitor<Asset>();
+        _closingPositionMonitor = new WorkingItemMonitor<Security>();
         _context = context;
     }
 
@@ -89,7 +88,6 @@ public abstract class Algorithm
     {
         current.TheoreticEnterTime = time;
         current.TheoreticEnterPrice = price;
-        current.SequenceId = IdGenerators.Get<AlgoEntry>().NewInt;
 
         var sl = GetStopLossPrice(price, enterSide, current.Security);
         var tp = GetTakeProfitPrice(price, enterSide, current.Security);
@@ -112,7 +110,7 @@ public abstract class Algorithm
             _log.Warn($"Other logic has closed the position for security {security.Code} already OR it did not exist; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
         }
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(asset))
+        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(security))
         {
             _log.Warn($"Other logic is closing the position for security {security.Code} already; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
@@ -120,7 +118,6 @@ public abstract class Algorithm
 
         current.TheoreticExitPrice = triggerPrice;
         current.TheoreticExitTime = time;
-        current.SequenceId = 0;
 
         var state = await Exiting.Close(current, security, triggerPrice, exitSide, time, actionType);
         if (state.Content is Order order)
@@ -131,9 +128,9 @@ public abstract class Algorithm
         return state;
     }
 
-    public abstract Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice);
+    public abstract Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Security security, decimal triggerPrice);
 
-    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice);
+    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Security security, decimal triggerPrice);
 
     public abstract string PrintAlgorithmParameters();
 }

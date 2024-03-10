@@ -6,7 +6,7 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Runtime;
 
 namespace TradeCommon.Essentials.Instruments;
-public class Security
+public class Security : IIdEntry
 {
     [AutoIncrementOnInsert]
     public int Id { get; set; } = 0;
@@ -46,6 +46,7 @@ public class Security
 
     [DatabaseIgnore, JsonIgnore]
     public bool IsCash { get; set; }
+    long IIdEntry.Id { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     /// <summary>
     /// Ensure and return the currency/quote asset.
@@ -211,6 +212,35 @@ public class Security
         hash.Add(ExchangeType);
         hash.Add(IsAsset);
         return hash.ToHashCode();
+    }
+
+    public bool EqualsIgnoreId(IIdEntry other)
+    {
+        return other is Security security &&
+               Code == security.Code &&
+               Name == security.Name &&
+               Exchange == security.Exchange &&
+               Type == security.Type &&
+               SubType == security.SubType &&
+               LotSize == security.LotSize &&
+               TickSize == security.TickSize &&
+               MinNotional == security.MinNotional &&
+               Currency == security.Currency &&
+               (Conditions.AllNull(QuoteSecurity, security.QuoteSecurity)
+               || (Conditions.AllNotNull(QuoteSecurity, security.QuoteSecurity) && QuoteSecurity!.Id == security.QuoteSecurity!.Id)) &&
+               Cusip == security.Cusip &&
+               Isin == security.Isin &&
+               YahooTicker == security.YahooTicker &&
+               IsShortable == security.IsShortable &&
+               EqualityComparer<FxSecurityInfo?>.Default.Equals(FxInfo, security.FxInfo) &&
+               EqualityComparer<StockSecurityInfo?>.Default.Equals(StockInfo, security.StockInfo) &&
+               EqualityComparer<OptionSecurityInfo?>.Default.Equals(DerivativeInfo, security.DerivativeInfo) &&
+               PricePrecision == security.PricePrecision &&
+               QuantityPrecision == security.QuantityPrecision &&
+               SecurityType == security.SecurityType &&
+               SecuritySubType == security.SecuritySubType &&
+               ExchangeType == security.ExchangeType &&
+               IsAsset == security.IsAsset;
     }
 }
 

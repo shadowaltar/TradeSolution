@@ -1,5 +1,4 @@
-﻿using Autofac.Core;
-using Common;
+﻿using Common;
 using log4net;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
@@ -185,7 +184,7 @@ public class PortfolioService : IPortfolioService
                 Type = OrderType.Market,
                 TimeInForce = TimeInForceType.GoodTillCancel,
                 Status = OrderStatus.Sending,
-                
+
                 AccountId = _context.AccountId,
                 ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId,
                 FilledQuantity = 0,
@@ -277,9 +276,8 @@ public class PortfolioService : IPortfolioService
                 // need to wait for a while
                 if (Threads.WaitUntil(() =>
                 {
-                    var asset = GetAssetBySecurityId(security.Id);
-                    if (asset == null) return false;
-                    return asset.IsClosed;
+                    var a = GetAssetBySecurityId(asset.SecurityId);
+                    return a != null && a.IsClosed;
                 }))
                 {
                     _log.Info("Closed asset position: " + asset.SecurityCode);
@@ -575,30 +573,27 @@ public class PortfolioService : IPortfolioService
     {
         _log.Info("ON ASSET CHANGED: " + asset.SecurityCode);
         var account = _context.Account ?? throw Exceptions.MustLogin();
-        var states = new List<AssetState>();
-        foreach (var asset in assets)
+
+        _securityService.Fix(asset);
+
+        // basically just use the id from the existing item
+        var existingAsset = asset.Security.IsCash ? Portfolio.GetCashAssetBySecurityId(asset.SecurityId) : Portfolio.GetAssetPositionBySecurityId(asset.SecurityId);
+        if (existingAsset == null)
         {
-            _securityService.Fix(asset);
-
-            // basically just use the id from the existing item
-            var existingAsset = asset.Security.IsCash ? Portfolio.GetCashAssetBySecurityId(asset.SecurityId) : Portfolio.GetAssetPositionBySecurityId(asset.SecurityId);
-            if (existingAsset == null)
-            {
-                _log.Info($"Adding asset {asset.SecurityCode} with quantity {asset.Quantity}");
-            }
-            else
-            {
-                _log.Info($"Updating asset {asset.SecurityCode} with quantity {asset.Quantity}");
-            }
-            asset.AccountId = existingAsset?.AccountId ?? account.Id;
-            asset.UpdateTime = DateTime.UtcNow;
-            asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
-            states.Add(AssetState.From(asset));
-
-            Portfolio.AddOrUpdate(asset);
+            _log.Info($"Adding asset {asset.SecurityCode} with quantity {asset.Quantity}");
         }
-        _persistence.Insert(assets, isUpsert: true);
-        _persistence.Insert(states, isUpsert: false);
+        else
+        {
+            _log.Info($"Updating asset {asset.SecurityCode} with quantity {asset.Quantity}");
+        }
+        asset.AccountId = existingAsset?.AccountId ?? account.Id;
+        asset.UpdateTime = DateTime.UtcNow;
+        asset.Id = existingAsset != null ? existingAsset.Id : _assetIdGenerator.NewTimeBasedId;
+        var state = AssetState.From(asset);
+
+        Portfolio.AddOrUpdate(asset);
+        _persistence.Insert(asset, isUpsert: true);
+        _persistence.Insert(state, isUpsert: false);
         _log.Info("ON ASSET CHANGE SAVED");
     }
 

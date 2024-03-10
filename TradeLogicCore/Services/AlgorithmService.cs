@@ -144,13 +144,10 @@ public class AlgorithmService : IAlgorithmService
 
     public void CopyOver(AlgoEntry current, AlgoEntry last, decimal price)
     {
-        current.PositionId = last.PositionId;
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             current.Quantity = asset.Quantity;
-            current.TheoreticEnterTime = last.TheoreticEnterTime;
-            // inherit
             current.TheoreticEnterPrice = last.TheoreticEnterPrice;
             current.TheoreticEnterTime = last.TheoreticEnterTime;
             current.TheoreticExitPrice = last.TheoreticExitPrice;
@@ -163,6 +160,8 @@ public class AlgorithmService : IAlgorithmService
             current.ShortQuantity = last.ShortQuantity;
             current.BaseFee = last.BaseFee;
             current.QuoteFee = last.QuoteFee;
+
+            current.PositionId = last.PositionId;
         }
         else
         {
@@ -178,6 +177,8 @@ public class AlgorithmService : IAlgorithmService
             current.TheoreticExitPrice = null;
             current.BaseFee = 0;
             current.QuoteFee = 0;
+
+            current.PositionId = 0;
         }
 
         // if signal is hold, keep on holding
@@ -192,6 +193,8 @@ public class AlgorithmService : IAlgorithmService
 
         current.LongCloseType = CloseType.None;
         current.ShortCloseType = CloseType.None;
+
+        current.SequenceId = last.SequenceId + 1;
     }
 
     public void InitializeSession(EngineParameters engineParameters)

@@ -71,7 +71,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
             return ExternalQueryStates.InvalidPosition(message);
         }
         var quantity = Math.Abs(asset.Quantity);
-        var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(security.FxInfo?.BaseSecurity?.Id ?? 0);
+        var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(asset.SecurityId);
         var residualSign = Math.Sign(residualQuantity);
         if (residualSign == -(int)exitSide)
         {

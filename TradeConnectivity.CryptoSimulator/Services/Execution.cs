@@ -47,7 +47,7 @@ public class Execution : IExternalExecutionManagement
     public event TradesReceivedCallback? TradesReceived;
 
     public event TransferredCallback? Transferred;
-    public event AssetsChangedCallback? AssetsChanged;
+    public event AssetChangedCallback? AssetChanged;
 
     public Execution(IExternalConnectivityManagement connectivity,
                      HttpClient httpClient,

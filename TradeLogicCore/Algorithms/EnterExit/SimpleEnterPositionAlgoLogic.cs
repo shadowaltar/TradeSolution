@@ -69,7 +69,7 @@ public class SimpleEnterPositionAlgoLogic : IEnterPositionAlgoLogic
             var size = Sizing.GetSize(asset.Quantity, current, last, enterPrice, enterTime);
             if (size <= 0)
                 return ExternalQueryStates.InvalidOrder($"Current asset quantity = {asset.Quantity}", "", "Quantity must be positive");
-
+            _log.Info("OPEN ORDER SIZE: " + size);
             var order = CreateOrder(OrderType.Market, side, enterTime, 0, size, current.Security, OrderActionType.AlgoOpen, comment: Comments.AlgoEnterMarket);
             order.TriggerPrice = enterPrice;
             var state = await _orderService.SendOrder(order);

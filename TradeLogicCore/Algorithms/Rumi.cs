@@ -220,12 +220,12 @@ public class Rumi : Algorithm
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset position, decimal triggerPrice)
+    public override Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Security security, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset position, decimal triggerPrice)
+    public override Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Security security, decimal triggerPrice)
     {
         throw new NotImplementedException();
     }
