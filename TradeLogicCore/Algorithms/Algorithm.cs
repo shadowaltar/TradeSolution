@@ -87,19 +87,19 @@ public abstract class Algorithm
 
     public virtual async Task<ExternalQueryState> Open(AlgoEntry current, AlgoEntry last, decimal price, Side enterSide, DateTime time)
     {
+        current.TheoreticEnterTime = time;
+        current.TheoreticEnterPrice = price;
+        current.SequenceId = IdGenerators.Get<AlgoEntry>().NewInt;
+
         var sl = GetStopLossPrice(price, enterSide, current.Security);
         var tp = GetTakeProfitPrice(price, enterSide, current.Security);
         var state = await Entering.Open(current, last, price, enterSide, time, sl, tp);
         if (state.Content is Order order)
         {
-            if (order.Side == Side.Buy)
+            if (enterSide == Side.Buy)
                 current.LongQuantity = order.Quantity;
-            else if (order.Side == Side.Sell)
+            else if (enterSide == Side.Sell)
                 current.ShortQuantity = order.Quantity;
-
-            current.TheoreticEnterTime = time;
-            current.TheoreticEnterPrice = order.Price;
-            current.SequenceId = IdGenerators.Get<AlgoEntry>().NewInt;
         }
         return state;
     }
@@ -117,17 +117,16 @@ public abstract class Algorithm
             _log.Warn($"Other logic is closing the position for security {security.Code} already; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
         }
+
+        current.TheoreticExitPrice = triggerPrice;
+        current.TheoreticExitTime = time;
+        current.SequenceId = 0;
+
         var state = await Exiting.Close(current, security, triggerPrice, exitSide, time, actionType);
         if (state.Content is Order order)
         {
-            if (exitSide == Side.Sell)
-                current.LongCloseType = CloseType.None;
-            else if (exitSide == Side.Buy)
-                current.ShortCloseType = CloseType.None;
-            
-            current.TheoreticExitPrice = order.Price;
-            current.TheoreticExitTime = time;
-            current.SequenceId = 0;
+            current.LongCloseType = CloseType.None;
+            current.ShortCloseType = CloseType.None;
         }
         return state;
     }

@@ -60,9 +60,14 @@ public enum OrderActionType
     TickSignalTakeProfit,
 
     /// <summary>
-    /// A normal order to close position in order to clean up anything opened.
+    /// A normal order to close position in order to clean up anything opened on algo start.
     /// </summary>
-    CleanUpLive,
+    CloseOnStart,
+
+    /// <summary>
+    /// 
+    /// </summary>
+    CancelOnStart,
 
     /// <summary>
     /// An order to cancel any order which is still opened.

@@ -173,7 +173,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             var securities = AlgoParameters.SecurityPool;
             foreach (var security in securities)
             {
-                await _services.Order.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, true);
+                await _services.Order.CancelAllOpenOrders(security, OrderActionType.CancelOnStart, true);
             }
         }
 
@@ -182,7 +182,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         // close open positions
         if (EngineParameters.CloseOpenPositionsOnStart)
         {
-            if (await _services.Portfolio.CloseAllPositions(Comments.CloseAllBeforeStart))
+            if (await _services.Portfolio.CloseAllPositions(OrderActionType.CloseOnStart, Comments.CloseAllBeforeStart))
             {
                 await InitializeCaches(); // reload cache
             }
@@ -697,7 +697,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         StartOrderBookRecording(current.SecurityId);
 
         // cancel any partial filled, SL or TP orders
-        await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
+        await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CloseOnStart, false);
 
         var time = DateTime.UtcNow;
         current.IsExecuting = true;

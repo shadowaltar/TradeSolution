@@ -75,7 +75,7 @@ public class TradeService : ITradeService
 
     private void OnTradeReceived(Trade trade)
     {
-        _log.Info("ON TRADE RECEIVED");
+        _log.Info("ON TRADE RECEIVED: " + trade.Id);
         InternalOnNextTrade(trade);
 
         _persistence.Insert(trade);
@@ -120,7 +120,6 @@ public class TradeService : ITradeService
         _securityService.Fix(trade);
         if (trade.AlgoEntryId == 0)
         {
-            var current = _context.Services.Algo.GetCurrentEntry(trade.Security.FxInfo?.BaseSecurity?.Id ?? 0);
             trade.AlgoEntryId = order.AlgoEntryId;
         }
         trade.SecurityId = order.SecurityId;

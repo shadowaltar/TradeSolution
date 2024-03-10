@@ -1,5 +1,5 @@
 ﻿namespace Common;
-public class IdGenerator
+public class IdGenerator(string name)
 {
     private static readonly long _baseTicks = new DateTime(2000, 1, 1).Ticks;
 
@@ -10,12 +10,7 @@ public class IdGenerator
 
     private readonly object _lock = new();
 
-    public IdGenerator(string name)
-    {
-        Name = name;
-    }
-
-    public string Name { get; }
+    public string Name { get; } = name;
 
     public long NewLong => Interlocked.Increment(ref _longId);
 
@@ -59,7 +54,7 @@ public class IdGenerator
 
 public class IdGenerators
 {
-    private static readonly Dictionary<Type, IdGenerator> _idGenerators = new();
+    private static readonly Dictionary<Type, IdGenerator> _idGenerators = [];
     
     public static IdGenerator Get()
     {

@@ -97,7 +97,7 @@ public interface IPortfolioService
     /// Traverse through active positions / non-cash assets,
     /// create corresponding opposite side orders and send.
     /// </summary>
-    Task<bool> CloseAllPositions(string orderComment);
+    Task<bool> CloseAllPositions(OrderActionType action, string orderComment);
 
     //Task<bool> CleanUpNonCashAssets(string orderComment);
 

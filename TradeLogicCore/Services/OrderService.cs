@@ -484,7 +484,7 @@ public class OrderService : IOrderService
     /// <param name="order"></param>
     private async void OnOrderReceived(Order order)
     {
-        _log.Info("ON ORDER RECEIVED");
+        _log.Info("ON ORDER RECEIVED: " + order.Id);
 
         _securityService.Fix(order);
 

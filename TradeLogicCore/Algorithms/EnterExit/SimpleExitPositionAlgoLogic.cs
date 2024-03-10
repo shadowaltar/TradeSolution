@@ -60,7 +60,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         if (_context.IsBackTesting) throw Exceptions.InvalidBackTestMode(false);
 
         // cancel any partial filled, SL or TP orders
-        await _orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, false);
+        await _orderService.CancelAllOpenOrders(security, OrderActionType.CloseOnStart, false);
 
         // now close the position using algorithm only
         var asset = _context.Services.Algo.GetAsset(current);

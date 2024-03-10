@@ -56,6 +56,7 @@ public class Execution : IExternalExecutionManagement
     public event OrderReceivedCallback? OrderReceived;
     public event TradeReceivedCallback? TradeReceived;
 
+    public event AssetChangedCallback? AssetChanged;
     public event AssetsChangedCallback? AssetsChanged;
     public event TransferredCallback? Transferred;
 
@@ -962,8 +963,9 @@ public class Execution : IExternalExecutionManagement
                                 LockedQuantity = balanceObject.GetDecimal("l"),
                             };
                             assets.Add(asset);
+                            AssetChanged?.Invoke(asset);
                         }
-                        AssetsChanged?.Invoke(assets);
+                        //AssetsChanged?.Invoke(assets);
                     }
                     break;
                 case "balanceUpdate": // asset changes due to deposit or withdrawal or fund transfer

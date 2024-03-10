@@ -17,6 +17,7 @@ public static class Delegates
     public delegate void TradeReceivedCallback(Trade trade);
     public delegate void TradesReceivedCallback(List<Trade> trades, bool isSameSecurity);
 
+    public delegate void AssetChangedCallback(Asset asset);
     public delegate void AssetsChangedCallback(List<Asset> assets);
     public delegate void TransferredCallback(TransferAction transferAction);
 

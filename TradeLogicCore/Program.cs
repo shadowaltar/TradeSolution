@@ -449,7 +449,7 @@ public class Program
         if (security == null)
             return;
 
-        await orderService.CancelAllOpenOrders(security, OrderActionType.CleanUpLive, true);
+        await orderService.CancelAllOpenOrders(security, OrderActionType.CloseOnStart, true);
 
         var order = new Order
         {

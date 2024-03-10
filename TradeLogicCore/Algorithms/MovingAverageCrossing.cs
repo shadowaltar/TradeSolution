@@ -321,12 +321,28 @@ public class MovingAverageCrossing : Algorithm
 
     public override async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Asset asset, decimal triggerPrice)
     {
-        return await CloseByTick(current, asset, OrderActionType.TickSignalStopLoss, triggerPrice);
+        current.SequenceId = 0;
+        var state = await CloseByTick(current, asset, OrderActionType.TickSignalStopLoss, triggerPrice);
+
+        if (state.Content is Order order)
+        {
+            current.LongCloseType = CloseType.None;
+            current.ShortCloseType = CloseType.None;
+        }
+        return state;
     }
 
     public override async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Asset asset, decimal triggerPrice)
     {
-        return await CloseByTick(current, asset, OrderActionType.TickSignalTakeProfit, triggerPrice);
+        current.SequenceId = 0;
+        var state = await CloseByTick(current, asset, OrderActionType.TickSignalTakeProfit, triggerPrice);
+
+        if (state.Content is Order order)
+        {
+            current.LongCloseType = CloseType.None;
+            current.ShortCloseType = CloseType.None;
+        }
+        return state;
     }
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
@@ -387,7 +403,7 @@ public class MovingAverageCrossing : Algorithm
             _log.Warn($"Other logic is closing the position for security {position.SecurityCode} already; tick-triggered close logic is skipped.");
             return ExternalQueryStates.CloseConflict(position.SecurityCode);
         }
-        var state = await Exiting.Close(null, position.Security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
+        var state = await Exiting.Close(current, position.Security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
 
         if (state.Content is Order order)
         {

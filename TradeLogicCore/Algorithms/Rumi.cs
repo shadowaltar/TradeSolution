@@ -47,7 +47,7 @@ public class Rumi : Algorithm
 
     public override bool IsShortSellAllowed { get; }
 
-    public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio, bool isShortSellAllowed = false)
+    public Rumi(Context context, int fast, int slow, int rumi, decimal stopLossRatio, bool isShortSellAllowed = false) : base(context)
     {
         _context = context;
         Sizing = new SimplePositionSizingLogic();

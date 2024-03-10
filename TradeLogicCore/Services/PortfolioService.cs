@@ -50,8 +50,8 @@ public class PortfolioService : IPortfolioService
         _orderService = orderService;
         _securityService = securityService;
         _persistence = persistence;
-        _execution.AssetsChanged -= OnAssetsChanged;
-        _execution.AssetsChanged += OnAssetsChanged;
+        _execution.AssetChanged -= OnAssetChanged;
+        _execution.AssetChanged += OnAssetChanged;
 
         _orderIdGenerator = IdGenerators.Get<Order>();
         _assetIdGenerator = IdGenerators.Get<Asset>();
@@ -169,14 +169,14 @@ public class PortfolioService : IPortfolioService
         return true;
     }
 
-    private Order CreateCloseOrder(decimal quantity, Security security, string comment)
+    private Order CreateCloseOrder(decimal quantity, Security security, OrderActionType action, string comment)
     {
         return _context.Account == null
             ? throw Exceptions.MustLogin()
             : new Order
             {
                 Id = _orderIdGenerator.NewTimeBasedId,
-                Action = OrderActionType.CleanUpLive,
+                Action = action,
 
                 CreateTime = DateTime.UtcNow,
                 UpdateTime = DateTime.UtcNow,
@@ -185,7 +185,7 @@ public class PortfolioService : IPortfolioService
                 Type = OrderType.Market,
                 TimeInForce = TimeInForceType.GoodTillCancel,
                 Status = OrderStatus.Sending,
-
+                
                 AccountId = _context.AccountId,
                 ExternalOrderId = _orderIdGenerator.NewNegativeTimeBasedId,
                 FilledQuantity = 0,
@@ -203,7 +203,7 @@ public class PortfolioService : IPortfolioService
             };
     }
 
-    public async Task<bool> CloseAllPositions(string orderComment)
+    public async Task<bool> CloseAllPositions(OrderActionType action, string orderComment)
     {
         // if it is non-fx, create orders to expunge the long/short positions
         var assets = Portfolio.GetAssetPositions();
@@ -272,7 +272,7 @@ public class PortfolioService : IPortfolioService
                     continue;
 
                 _log.Info($"Selling off all {asset.SecurityCode} asset position.");
-                var order = CreateCloseOrder(asset.Quantity, security, orderComment);
+                var order = CreateCloseOrder(asset.Quantity, security, action, orderComment);
                 var state = await _orderService.SendOrder(order);
                 // need to wait for a while
                 if (Threads.WaitUntil(() =>
@@ -571,9 +571,9 @@ public class PortfolioService : IPortfolioService
     //    }
     //}
 
-    private void OnAssetsChanged(List<Asset> assets)
+    private void OnAssetChanged(Asset asset)
     {
-        _log.Info("ON ASSET CHANGED");
+        _log.Info("ON ASSET CHANGED: " + asset.SecurityCode);
         var account = _context.Account ?? throw Exceptions.MustLogin();
         var states = new List<AssetState>();
         foreach (var asset in assets)
