@@ -54,12 +54,12 @@ public class Program
         void OnNextOrderBook(ExtendedOrderBook orderBook)
         {
             var clone = orderBook with { };
-            clone.Bids = new();
+            clone.Bids = [];
             foreach (var bid in orderBook.Bids)
             {
                 clone.Bids.Add(bid with { });
             }
-            clone.Asks = new();
+            clone.Asks = [];
             foreach (var ask in orderBook.Asks)
             {
                 clone.Asks.Add(ask with { });

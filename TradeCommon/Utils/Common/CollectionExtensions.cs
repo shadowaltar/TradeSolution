@@ -567,7 +567,7 @@ public static class CollectionExtensions
 
             if (!results.TryAdd(k, v))
             {
-                failedItems ??= new List<TSource>();
+                failedItems ??= [];
                 failedItems.Add(item);
             }
         }

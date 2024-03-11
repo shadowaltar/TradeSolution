@@ -22,9 +22,9 @@ public class RealTimeMarketDataService : IMarketDataService
     public event OrderBookReceivedCallback? NextOrderBook;
     public event Action<int>? HistoricalPriceEnd;
 
-    private readonly Dictionary<(int securityId, IntervalType interval), int> _ohlcSubscriptionCounters = [];
-    private readonly HashSet<int> _tickSubscriptions = [];
-    private readonly HashSet<int> _orderBookSubscriptions = [];
+    private readonly Dictionary<(long securityId, IntervalType interval), int> _ohlcSubscriptionCounters = [];
+    private readonly HashSet<long> _tickSubscriptions = [];
+    private readonly HashSet<long> _orderBookSubscriptions = [];
 
     public RealTimeMarketDataService(IExternalQuotationManagement external,
                                      IHistoricalMarketDataService historicalMarketDataService,
@@ -43,7 +43,7 @@ public class RealTimeMarketDataService : IMarketDataService
         External.NextOrderBook += OnNextOrderBook;
     }
 
-    private void OnNextOhlc(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
+    private void OnNextOhlc(long securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
         NextOhlc?.Invoke(securityId, price, interval, isComplete);
     }
@@ -200,7 +200,7 @@ public class RealTimeMarketDataService : IMarketDataService
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlcs()
     {
-        List<(int securityId, IntervalType interval)> keys;
+        List<(long securityId, IntervalType interval)> keys;
         lock (_ohlcSubscriptionCounters)
         {
             keys = _ohlcSubscriptionCounters.Select(pair => pair.Key).ToList();
@@ -276,7 +276,7 @@ public class RealTimeMarketDataService : IMarketDataService
     /// <param name="interval"></param>
     /// <param name="change"></param>
     /// <returns></returns>
-    private int CountOhlcSubscription(int id, IntervalType interval, int change)
+    private int CountOhlcSubscription(long id, IntervalType interval, int change)
     {
         var newCount = 0;
         var key = (id, interval);
@@ -292,7 +292,7 @@ public class RealTimeMarketDataService : IMarketDataService
         return newCount;
     }
 
-    private void OnNextHistoricalPrice(int securityId, IntervalType interval, OhlcPrice price)
+    private void OnNextHistoricalPrice(long securityId, IntervalType interval, OhlcPrice price)
     {
         throw new NotImplementedException();
     }

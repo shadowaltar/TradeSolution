@@ -35,7 +35,7 @@ public class Execution : IExternalExecutionManagement
     private readonly IdGenerator _tradeIdGenerator;
     private readonly ConcurrentDictionary<string, ExtendedWebSocket> _webSockets = new();
 
-    private readonly HashSet<long> _processedExternalTradeIds = new();
+    private readonly HashSet<long> _processedExternalTradeIds = [];
 
     private readonly MessageBroker<EventInvokerTask> _broker = new();
 
@@ -835,7 +835,7 @@ public class Execution : IExternalExecutionManagement
         return orders;
     }
 
-    private static Order ParseOrder(JsonObject rootObj, int? securityId)
+    private static Order ParseOrder(JsonObject rootObj, long? securityId)
     {
         // 'workingTime' is similar to 'time', usually smaller than 'updateTime'
         var createTime = rootObj.GetUtcFromUnixMs("time");
@@ -872,7 +872,7 @@ public class Execution : IExternalExecutionManagement
         return order;
     }
 
-    private Trade? ParseTrade(JsonObject? rootObj, int? securityId)
+    private Trade? ParseTrade(JsonObject? rootObj, long? securityId)
     {
         if (rootObj == null) return null;
         try

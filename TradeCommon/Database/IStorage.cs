@@ -39,12 +39,12 @@ public interface IStorage : IDatabase
     Task<int> DeleteOne<T>(T entry, string? tableNameOverride = null) where T : class, new();
     Task<int> DeleteMany<T>(IList<T> entries, string? tableNameOverride = null) where T : class, new();
     Task<Account?> ReadAccount(string accountName);
-    Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
+    Task<Dictionary<long, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
     Task<List<Asset>> ReadAssets();
     Task<List<AssetState>> ReadAssetStates(Security security, DateTime start);
     Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType);
     Task<List<FinancialStat>> ReadFinancialStats();
-    Task<List<FinancialStat>> ReadFinancialStats(int secId);
+    Task<List<FinancialStat>> ReadFinancialStats(long securityId);
     Task<Order?> ReadOrderByExternalId(long externalOrderId);
     Task<List<Order>> ReadOrders(Security? security, List<long>? ids, DateTime? start, DateTime? end, params OrderStatus[] orderStatuses);
     Task<List<OrderState>> ReadOrderStates(Security security, DateTime start, DateTime end);
@@ -57,12 +57,12 @@ public interface IStorage : IDatabase
     /// <param name="end"></param>
     /// <returns></returns>
     Task<List<Order>> ReadOrderJoinedStates(Security security, DateTime start, DateTime end);
-    Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
-    Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
-    IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
+    Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
+    Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16);
+    IAsyncEnumerable<OhlcPrice> ReadPricesAsync(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
     Task<List<ExtendedOrderBook>> ReadOrderBooks(Security security, int level, DateTime date);
-    Task<List<Security>> ReadSecurities(List<int>? ids = null);
-    Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null);
+    Task<List<Security>> ReadSecurities(List<long>? ids = null);
+    Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<long>? ids = null);
     Task<Security?> ReadSecurity(ExchangeType exchange, string code, SecurityType type);
     Task<List<Trade>> ReadTrades(Security security, DateTime start, DateTime end, bool? isOperational = false);
     Task<List<Trade>> ReadTrades(Security security, List<long> ids);
@@ -74,8 +74,8 @@ public interface IStorage : IDatabase
     Task<User?> ReadUser(string userName, string email, EnvironmentType environment);
     Task UpsertFxDefinitions(List<Security> entries);
 
-    Task<int> InsertPrice(int securityId, IntervalType interval, SecurityType securityType, OhlcPrice price);
-    Task<(int securityId, int count)> InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
+    Task<int> InsertPrice(long securityId, IntervalType interval, SecurityType securityType, OhlcPrice price);
+    Task<(long securityId, int count)> InsertPrices(long securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices);
     
     Task<int> UpsertSecurityFinancialStats(List<FinancialStat> stats);
     Task UpsertStockDefinitions(List<Security> entries);

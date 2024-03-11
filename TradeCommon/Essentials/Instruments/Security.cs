@@ -9,7 +9,8 @@ namespace TradeCommon.Essentials.Instruments;
 public class Security : IIdEntry
 {
     [AutoIncrementOnInsert]
-    public int Id { get; set; } = 0;
+    public long Id { get; set; } = 0;
+
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string Exchange { get; set; } = "";
@@ -46,7 +47,6 @@ public class Security : IIdEntry
 
     [DatabaseIgnore, JsonIgnore]
     public bool IsCash { get; set; }
-    long IIdEntry.Id { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     /// <summary>
     /// Ensure and return the currency/quote asset.

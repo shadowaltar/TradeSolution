@@ -86,7 +86,7 @@ public record Trade : SecurityRelatedEntry, IComparable<Trade>, IIdEntry
     /// The asset Id of the fee.
     /// </summary>
     [NotNull]
-    public int FeeAssetId { get; set; } = 0;
+    public long FeeAssetId { get; set; } = 0;
 
     /// <summary>
     /// The asset/currency of the fee.

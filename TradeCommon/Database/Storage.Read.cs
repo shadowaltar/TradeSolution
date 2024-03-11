@@ -295,7 +295,7 @@ WHERE
         }
     }
 
-    public async Task<List<Security>> ReadSecurities(List<int>? ids = null)
+    public async Task<List<Security>> ReadSecurities(List<long>? securityIds = null)
     {
         var results = new List<Security>();
         foreach (var exchange in Enum.GetValues<ExchangeType>())
@@ -303,7 +303,7 @@ WHERE
             if (exchange.IsUnknown()) continue;
             foreach (var secType in Consts.SupportedSecurityTypes)
             {
-                var partialResults = await ReadSecurities(secType, exchange, ids);
+                var partialResults = await ReadSecurities(secType, exchange, securityIds);
                 if (partialResults == null)
                     continue;
                 results.AddRange(partialResults);
@@ -334,15 +334,15 @@ WHERE
             : $"{startingAnd}Status IN ('{string.Join("','", statuses).ToUpper()}'){endingAnd}";
     }
 
-    public async Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<int>? ids = null)
+    public async Task<List<Security>> ReadSecurities(SecurityType type, ExchangeType exchange, List<long>? securityIds = null)
     {
         var tableName = DatabaseNames.GetDefinitionTableName(type);
         if (tableName.IsBlank())
-            return new List<Security>();
+            return [];
         var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         var typeStr = type.ToString().ToUpperInvariant();
         var exchangeStr = exchange.ToString().ToUpperInvariant();
-        var idClause = GetInClause("Id", ids, false, true);
+        var idClause = GetInClause("Id", securityIds, false, true);
         var exchangeClause = exchange.IsUnknown()
             ? ""
             : "AND Exchange = $Exchange";
@@ -423,7 +423,7 @@ FROM {DatabaseNames.FinancialStatsTable}
         return await SqlReader.ReadMany<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, _environmentString, sql);
     }
 
-    public async Task<List<FinancialStat>> ReadFinancialStats(int secId)
+    public async Task<List<FinancialStat>> ReadFinancialStats(long securityId)
     {
         string sql =
 @$"
@@ -431,7 +431,7 @@ SELECT SecurityId,MarketCap
 FROM {DatabaseNames.FinancialStatsTable}
 WHERE SecurityId = $SecurityId
 ";
-        return await SqlReader.ReadMany<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, _environmentString, sql, ("$SecurityId", secId));
+        return await SqlReader.ReadMany<FinancialStat>(DatabaseNames.FinancialStatsTable, DatabaseNames.StaticData, _environmentString, sql, ("$SecurityId", securityId));
     }
 
     public async Task<List<MissingPriceSituation>> ReadDailyMissingPriceSituations(IntervalType interval, SecurityType securityType)
@@ -444,7 +444,7 @@ GROUP BY DATE(startTime), SecurityId)";
         MissingPriceSituation Transform(SqliteDataReader r) => new(r.GetInt32("SecurityId"), r.GetDateTime("Date"), r.GetInt32("Count"), interval);
     }
 
-    public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
+    public async Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -484,7 +484,7 @@ WHERE
         }
     }
 
-    public async IAsyncEnumerable<OhlcPrice> ReadPricesAsync(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
+    public async IAsyncEnumerable<OhlcPrice> ReadPricesAsync(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -529,7 +529,7 @@ WHERE
             _log.Debug($"Read {count} entries from {tableName} table in {DatabaseNames.MarketData}.");
     }
 
-    public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
+    public async Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime end, int entryCount, int priceDecimalPoints = 16)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -573,10 +573,10 @@ LIMIT $EntryCount
         return results;
     }
 
-    public async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
+    public async Task<Dictionary<long, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
     {
         if (securities.Count == 0)
-            return new();
+            return [];
 
         var now = DateTime.Today;
         var intervalStr = IntervalTypeConverter.ToIntervalString(interval);
@@ -606,11 +606,11 @@ WHERE
         }
         using var r = await command.ExecuteReaderAsync();
 
-        var results = new Dictionary<int, List<ExtendedOhlcPrice>>();
+        var results = new Dictionary<long, List<ExtendedOhlcPrice>>();
         while (await r.ReadAsync())
         {
             var close = r.GetDecimal("Close");
-            var secId = r.GetInt32("SecurityId");
+            var secId = r.GetInt64("SecurityId");
             if (!securityMap.TryGetValue(secId, out var sec))
                 continue;
             var list = results.GetOrCreate(secId);

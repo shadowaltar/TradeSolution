@@ -26,7 +26,7 @@ public interface ISecurityDefinitionProvider
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    Security GetSecurity(int securityId);
+    Security GetSecurity(long securityId);
 
     /// <summary>
     /// Fix any missing security info in given entry.

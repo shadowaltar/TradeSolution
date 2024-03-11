@@ -16,7 +16,7 @@ public class OrderViewModel : AbstractViewModel
     protected PeriodicTimer? _timer;
     private readonly Server _server;
 
-    public ObservableCollection<Order> Orders { get; } = new();
+    public ObservableCollection<Order> Orders { get; } = [];
     public Order? SelectedOrder { get; private set; }
     public ICommand SelectedCommand { get; }
     public ICommand CreateCommand { get; }

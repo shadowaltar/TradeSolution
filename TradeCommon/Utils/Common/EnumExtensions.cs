@@ -5,8 +5,8 @@ using TradeCommon.Essentials.Trading;
 namespace Common;
 public static class EnumExtensions
 {
-    private static readonly Dictionary<Type, Dictionary<string, object>> _descriptionToEnumValues = new();
-    private static readonly Dictionary<Type, Dictionary<object, string>> _enumValueToDescriptions = new();
+    private static readonly Dictionary<Type, Dictionary<string, object>> _descriptionToEnumValues = [];
+    private static readonly Dictionary<Type, Dictionary<object, string>> _enumValueToDescriptions = [];
     private static readonly Type _descriptionType = typeof(DescriptionAttribute);
 
     public static T ConvertDescriptionToEnum<T>(this string description, T defaultValue = default!) where T : Enum

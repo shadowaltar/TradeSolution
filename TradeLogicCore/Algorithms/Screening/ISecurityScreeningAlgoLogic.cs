@@ -3,13 +3,13 @@
 namespace TradeLogicCore.Algorithms.Screening;
 public interface ISecurityScreeningAlgoLogic
 {
-    void SetAndPick(IDictionary<int, Security> securityPool);
+    void SetAndPick(IDictionary<long, Security> securityPool);
 
-    IReadOnlyDictionary<int, Security> GetPickedOnes();
+    IReadOnlyDictionary<long, Security> GetPickedOnes();
 
-    IReadOnlyDictionary<int, Security> GetAll();
+    IReadOnlyDictionary<long, Security> GetAll();
 
-    bool CheckIsPicked(int securityId);
+    bool CheckIsPicked(long securityId);
 
     void Repick();
 
@@ -19,5 +19,5 @@ public interface ISecurityScreeningAlgoLogic
     /// it becomes true again when the picked ones are changed again later.
     /// </summary>
     /// <returns></returns>
-    bool TryCheckIfChanged(out IReadOnlyDictionary<int, Security> pickedOnes);
+    bool TryCheckIfChanged(out IReadOnlyDictionary<long, Security> pickedOnes);
 }

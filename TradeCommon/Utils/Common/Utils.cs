@@ -75,7 +75,7 @@ public static class Utils
 public class CompareReport
 {
     public Type Type { get; }
-    public List<(string propertyName, bool isEqual, object value1, object value2)> Values { get; } = new();
+    public List<(string propertyName, bool isEqual, object value1, object value2)> Values { get; } = [];
     public bool InvalidCount { get; internal set; }
     public CompareReport(Type type)
     {

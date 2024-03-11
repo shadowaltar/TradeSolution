@@ -23,7 +23,7 @@ public class WorkingItemMonitor<T> where T : IIdEntry
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    public bool IsMonitoring(int securityId)
+    public bool IsMonitoring(long securityId)
     {
         return ItemsBySecurityId.ThreadSafeContains(securityId);
     }
@@ -34,7 +34,7 @@ public class WorkingItemMonitor<T> where T : IIdEntry
     /// </summary>
     /// <param name="securityId"></param>
     /// <returns></returns>
-    public bool MarkAsDone(int securityId)
+    public bool MarkAsDone(long securityId)
     {
         return ItemsBySecurityId.ThreadSafeRemove(securityId);
     }

@@ -26,7 +26,7 @@ public class TradeService : ITradeService
     private readonly Dictionary<long, Trade> _tradesByExternalId = [];
     private readonly Dictionary<long, List<Trade>> _tradesByOrderId = [];
     private readonly Dictionary<string, Security> _assetsByCode = [];
-    private readonly Dictionary<int, Security> _assetsById = [];
+    private readonly Dictionary<long, Security> _assetsById = [];
 
     public event TradeReceivedCallback? TradeProcessed;
 
@@ -75,11 +75,10 @@ public class TradeService : ITradeService
 
     private void OnTradeReceived(Trade trade)
     {
-        _log.Info("ON TRADE RECEIVED: " + trade.Id);
+        _log.Info($"\n\t[{trade.Time:HH:mm:ss}] TRADE RECEIVED [{trade.SecurityCode}] ID[{trade.Id}]");
         InternalOnNextTrade(trade);
 
         _persistence.Insert(trade);
-        _log.Info("ON TRADE CHANGE SAVED");
         TradeProcessed?.Invoke(trade);
     }
 

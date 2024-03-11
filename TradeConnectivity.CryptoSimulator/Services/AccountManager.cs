@@ -12,7 +12,7 @@ namespace TradeConnectivity.CryptoSimulator.Services;
 public class AccountManager : IExternalAccountManagement
 {
     private static readonly ILog _log = Logger.New();
-    private static readonly List<string> _accountTypes = new() { "SIM" };
+    private static readonly List<string> _accountTypes = ["SIM"];
     private readonly IExternalConnectivityManagement _connectivity;
     private readonly HttpClient _httpClient;
     private readonly KeyManager _keyManager;

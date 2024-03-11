@@ -14,7 +14,7 @@ namespace Common.Database;
 public class SqlReader<T> : IDisposable where T : new()
 {
     private static readonly ILog _log = Logger.New();
-    private static readonly Dictionary<Type, string> _selectClauses = new();
+    private static readonly Dictionary<Type, string> _selectClauses = [];
     private Dictionary<string, PropertyInfo> _properties;
     private ValueSetter<T> _valueSetter;
 
@@ -193,7 +193,7 @@ public static class SqlReader
         catch (Exception e)
         {
             _log.Error("Failed to read one.", e);
-            return new();
+            return [];
         }
     }
 
@@ -239,7 +239,7 @@ public static class SqlReader
         catch (Exception e)
         {
             _log.Error("Failed to read one.", e);
-            return new();
+            return [];
         }
     }
 

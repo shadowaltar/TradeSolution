@@ -12,7 +12,7 @@ namespace TradeConnectivity.Binance.Services;
 public class AccountManager : IExternalAccountManagement
 {
     private static readonly ILog _log = Logger.New();
-    private static readonly List<string> _accountTypes = new() { "SPOT", "MARGIN", "FUTURES" };
+    private static readonly List<string> _accountTypes = ["SPOT", "MARGIN", "FUTURES"];
     private readonly IExternalConnectivityManagement _connectivity;
     private readonly ApplicationContext _context;
     private readonly HttpClient _httpClient;

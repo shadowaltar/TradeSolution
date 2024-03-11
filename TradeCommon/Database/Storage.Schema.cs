@@ -11,7 +11,7 @@ namespace TradeCommon.Database;
 
 public partial class Storage
 {
-    private readonly Dictionary<string, string> _insertSqls = new();
+    private readonly Dictionary<string, string> _insertSqls = [];
 
     public async Task<bool> IsTableExists(string tableName, string databaseName)
     {

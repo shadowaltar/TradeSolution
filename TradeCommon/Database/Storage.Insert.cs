@@ -334,7 +334,7 @@ DO UPDATE SET
         await connection.CloseAsync();
     }
 
-    public async Task<(int securityId, int count)> InsertPrices(int securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
+    public async Task<(long securityId, int count)> InsertPrices(long securityId, IntervalType interval, SecurityType securityType, List<OhlcPrice> prices)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";
@@ -400,7 +400,7 @@ DO UPDATE SET
         return (securityId, count);
     }
 
-    public async Task<int> InsertPrice(int securityId, IntervalType interval, SecurityType securityType, OhlcPrice price)
+    public async Task<int> InsertPrice(long securityId, IntervalType interval, SecurityType securityType, OhlcPrice price)
     {
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
         var dailyPriceSpecificColumn1 = securityType == SecurityType.Equity && interval == IntervalType.OneDay ? "AdjClose," : "";

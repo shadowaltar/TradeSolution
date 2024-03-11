@@ -3,7 +3,7 @@
 public record ExtendedTick : Tick
 {
     public DateTime Time { get; set; }
-    public int SecurityId { get; set; }
+    public long SecurityId { get; set; }
     public string SecurityCode { get; set; }
 
     public ExtendedTick()

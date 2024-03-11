@@ -20,28 +20,28 @@ public class AlgorithmService : IAlgorithmService
     /// Caches algo-entries related to last time frame.
     /// Key is securityId.
     /// </summary>
-    private readonly Dictionary<int, AlgoEntry?> _lastEntriesBySecurityId = [];
+    private readonly Dictionary<long, AlgoEntry?> _lastEntriesBySecurityId = [];
 
     /// <summary>
     /// Caches algo-entries related to last time frame.
     /// Key is securityId.
     /// </summary>
-    private readonly Dictionary<int, AlgoEntry?> _currentEntriesBySecurityId = [];
+    private readonly Dictionary<long, AlgoEntry?> _currentEntriesBySecurityId = [];
 
     /// <summary>
     /// Caches last OHLC price. Key is securityId.
     /// </summary>
-    private readonly Dictionary<int, OhlcPrice> _lastOhlcPricesBySecurityId = [];
+    private readonly Dictionary<long, OhlcPrice> _lastOhlcPricesBySecurityId = [];
 
     /// <summary>
     /// Caches full history of entries.
     /// </summary>
-    private readonly Dictionary<int, List<AlgoEntry>> _allEntriesBySecurityIds = [];
+    private readonly Dictionary<long, List<AlgoEntry>> _allEntriesBySecurityIds = [];
 
     /// <summary>
     /// Caches entries related to execution only.
     /// </summary>
-    private readonly Dictionary<int, List<AlgoEntry>> _executionEntriesBySecurityIds = [];
+    private readonly Dictionary<long, List<AlgoEntry>> _executionEntriesBySecurityIds = [];
 
     private readonly Context _context;
 
@@ -54,38 +54,38 @@ public class AlgorithmService : IAlgorithmService
 
     AlgoSession IAlgorithmService.Session { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-    public List<AlgoEntry> GetAllEntries(int securityId)
+    public List<AlgoEntry> GetAllEntries(long securityId)
     {
         return _allEntriesBySecurityIds.ThreadSafeGetOrCreate(securityId);
     }
 
-    public List<int> GetAllSecurityIds()
+    public List<long> GetAllSecurityIds()
     {
         return [.. _allEntriesBySecurityIds.Keys];
     }
 
-    public AlgoEntry? GetCurrentEntry(int securityId)
+    public AlgoEntry? GetCurrentEntry(long securityId)
     {
         return _currentEntriesBySecurityId.ThreadSafeGet(securityId);
     }
 
-    public List<AlgoEntry> GetExecutionEntries(int securityId)
+    public List<AlgoEntry> GetExecutionEntries(long securityId)
     {
         return _executionEntriesBySecurityIds.ThreadSafeGetOrCreate(securityId);
     }
 
-    public AlgoEntry? GetLastEntry(int securityId)
+    public AlgoEntry? GetLastEntry(long securityId)
     {
         return _lastEntriesBySecurityId.ThreadSafeGet(securityId);
     }
 
-    public OhlcPrice? GetLastOhlcPrice(int securityId, IntervalType interval)
+    public OhlcPrice? GetLastOhlcPrice(long securityId, IntervalType interval)
     {
         // TODO: currently only support one kind of interval type
         return _lastOhlcPricesBySecurityId.ThreadSafeGet(securityId);
     }
 
-    public AlgoEntry? GetLastEntryAt(int securityId, int offset)
+    public AlgoEntry? GetLastEntryAt(long securityId, int offset)
     {
         if (offset > 0) return null;
         var entries = _allEntriesBySecurityIds.ThreadSafeGet(securityId);

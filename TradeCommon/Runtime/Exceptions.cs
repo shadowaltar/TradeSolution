@@ -6,7 +6,7 @@ namespace TradeCommon.Runtime;
 
 public static class Exceptions
 {
-    public static InvalidOperationException InvalidSecurityId(int securityId)
+    public static InvalidOperationException InvalidSecurityId(long securityId)
     {
         return new InvalidOperationException($"The security id {securityId} has no security defined. Check your security definition.");
     }
@@ -21,7 +21,7 @@ public static class Exceptions
         return new InvalidOperationException($"The security with code {code ?? "n/a"} is invalid: " + message);
     }
 
-    public static InvalidOperationException MissingQuoteAsset(int securityId)
+    public static InvalidOperationException MissingQuoteAsset(long securityId)
     {
         return new InvalidOperationException($"The security with id {securityId} must have an associated currency/quote asset. Check your security definition.");
     }

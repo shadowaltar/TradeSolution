@@ -7,16 +7,16 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
 {
     private readonly Context _context;
     private Security? _security;
-    private readonly Dictionary<int, Security> _securities = new(1);
+    private readonly Dictionary<long, Security> _securities = new(1);
 
     public SingleSecurityLogic(Context context, Security? security)
     {
         _context = context;
         _security = security;
-        _securities = security != null ? new Dictionary<int, Security> { { security.Id, security } } : [];
+        _securities = security != null ? new Dictionary<long, Security> { { security.Id, security } } : [];
     }
 
-    public void SetAndPick(IDictionary<int, Security> securityPool)
+    public void SetAndPick(IDictionary<long, Security> securityPool)
     {
         if (securityPool == null || securityPool.Count == 0) throw new ArgumentNullException(nameof(securityPool));
 
@@ -27,22 +27,22 @@ public class SingleSecurityLogic : ISecurityScreeningAlgoLogic
         _securities[_security.Id] = _security;
     }
 
-    public bool CheckIsPicked(int securityId)
+    public bool CheckIsPicked(long securityId)
     {
         return _security != null && securityId == _security?.Id;
     }
 
-    public IReadOnlyDictionary<int, Security> GetPickedOnes()
+    public IReadOnlyDictionary<long, Security> GetPickedOnes()
     {
         return _securities;
     }
 
-    public IReadOnlyDictionary<int, Security> GetAll()
+    public IReadOnlyDictionary<long, Security> GetAll()
     {
         return _securities;
     }
 
-    public bool TryCheckIfChanged(out IReadOnlyDictionary<int, Security> pickedOnes)
+    public bool TryCheckIfChanged(out IReadOnlyDictionary<long, Security> pickedOnes)
     {
         pickedOnes = _securities;
         return false;

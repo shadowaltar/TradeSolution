@@ -6,5 +6,5 @@ namespace TradeDataCore.Importing;
 
 public interface IHistoricalPriceReader
 {
-    Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType);
+    Task<Dictionary<long, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType);
 }

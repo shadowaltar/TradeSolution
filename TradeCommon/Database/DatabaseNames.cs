@@ -59,9 +59,9 @@ public static class DatabaseNames
 
     public const string TradePositionReconciliation = "reconciled_trade_position";
 
-    private static readonly Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = new();
+    private static readonly Dictionary<Type, (string tableName, string databaseName)> _tableDatabaseNamesByType = [];
 
-    public static Dictionary<int, string> OrderBookTableNameCache { get; } = new();
+    public static Dictionary<long, string> OrderBookTableNameCache { get; } = [];
 
     public static string GetDatabaseName<T>()
     {

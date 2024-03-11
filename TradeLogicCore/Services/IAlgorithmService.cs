@@ -10,19 +10,19 @@ namespace TradeLogicCore.Services;
 
 public interface IAlgorithmService
 {
-    AlgoEntry? GetCurrentEntry(int securityId);
+    AlgoEntry? GetCurrentEntry(long securityId);
 
-    AlgoEntry? GetLastEntry(int securityId);
+    AlgoEntry? GetLastEntry(long securityId);
 
-    OhlcPrice? GetLastOhlcPrice(int securityId, IntervalType interval);
+    OhlcPrice? GetLastOhlcPrice(long securityId, IntervalType interval);
 
-    AlgoEntry? GetLastEntryAt(int securityId, int offset);
+    AlgoEntry? GetLastEntryAt(long securityId, int offset);
 
-    List<AlgoEntry> GetAllEntries(int securityId);
+    List<AlgoEntry> GetAllEntries(long securityId);
 
-    List<AlgoEntry> GetExecutionEntries(int securityId);
+    List<AlgoEntry> GetExecutionEntries(long securityId);
 
-    List<int> GetAllSecurityIds();
+    List<long> GetAllSecurityIds();
 
     AlgoSession Session { get; set; }
 

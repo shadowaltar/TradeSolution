@@ -61,15 +61,15 @@ public interface IAlgorithmEngine
     /// <summary>
     /// Gets all the algo entries created during engine execution.
     /// </summary>
-    List<AlgoEntry> GetAllEntries(int securityId);
+    List<AlgoEntry> GetAllEntries(long securityId);
 
     /// <summary>
     /// Gets the algo entries only related to trading activities during engine execution.
     /// </summary>
-    List<AlgoEntry> GetExecutionEntries(int securityId);
+    List<AlgoEntry> GetExecutionEntries(long securityId);
 
     /// <summary>
     /// Main logic when an OHLC price is received.
     /// </summary>
-    Task Update(int securityId, OhlcPrice ohlcPrice);
+    Task Update(long securityId, OhlcPrice ohlcPrice);
 }

@@ -46,4 +46,9 @@ public class PersistenceTask
         Action = DatabaseActionType.Unknown;
         CallerInfo = "";
     }
+
+    public override string ToString()
+    {
+        return $"PersistTask: {Action} {CallerInfo} {Type?.Name}";
+    }
 }

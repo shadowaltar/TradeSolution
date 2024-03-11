@@ -14,20 +14,20 @@ public interface ISecurityService : ISecurityDefinitionProvider
     
     Task Initialize();
     
-    Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
-    Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
-    Task<(int securityId, int count)> InsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices);
+    Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16);
+    Task<Dictionary<long, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range);
+    Task<(long securityId, int count)> InsertPrices(long securityId, IntervalType interval, SecurityType secType, List<OhlcPrice> prices);
     List<Security> GetAssets(ExchangeType exchange = ExchangeType.Unknown);
     Task<List<Security>> GetSecurities(SecurityType securityType, ExchangeType exchange = ExchangeType.Unknown, bool requestExternal = false);
-    Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false);
+    Task<List<Security>> GetSecurities(List<long> securityIds, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, string exchange, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, ExchangeType exchange, SecurityType securityType = SecurityType.Unknown, bool requestExternal = false);
     Task<Security?> GetSecurity(string code, SecurityType securityType);
-    Task<Security?> GetSecurity(int securityId, bool requestExternal = false);
+    Task<Security?> GetSecurity(long securityId, bool requestExternal = false);
     Task<List<ExtendedOrderBook>> GetOrderBookHistory(Security security, int level, DateTime date);
     Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType interval, DateTime end, int lookBackPeriod);
     Task<List<OhlcPrice>> GetOhlcPrices(Security security, IntervalType type, DateTime start, DateTime end);
-    Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval);
+    Task<Dictionary<long, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval);
     
     decimal SetSecurityMinQuantity(string code, decimal price);
 }

@@ -3,7 +3,7 @@
 namespace Common;
 public class Pool<T> : IDisposable where T : class, new()
 {
-    private readonly ConcurrentBag<T> _objects = new();
+    private readonly ConcurrentBag<T> _objects = [];
     private bool _isDisposed = false;
     private int _leasedCount = 0;
     private int _expectedCount = 0;

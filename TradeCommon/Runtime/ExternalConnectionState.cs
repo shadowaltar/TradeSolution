@@ -354,7 +354,7 @@ public static class ExternalQueryStates
             ResultCode = compositeResult,
             UniqueConnectionId = null,
             Description = $"Update order: cancel then send a new order for security code {cancelledOrder.SecurityCode}",
-            SubStates = new(),
+            SubStates = [],
         };
         state.SubStates.Add(cancelState);
         state.SubStates.Add(sendState);
@@ -532,7 +532,7 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedOhlcOk(int securityId, IntervalType interval)
+    public static ExternalConnectionState UnsubscribedOhlcOk(long securityId, IntervalType interval)
     {
         return new()
         {
@@ -611,7 +611,7 @@ public static class ExternalConnectionStates
         };
     }
 
-    public static ExternalConnectionState UnsubscribedMultipleFailed(int securityId, IntervalType interval, string quotationKind)
+    public static ExternalConnectionState UnsubscribedMultipleFailed(long securityId, IntervalType interval, string quotationKind)
     {
         return new()
         {

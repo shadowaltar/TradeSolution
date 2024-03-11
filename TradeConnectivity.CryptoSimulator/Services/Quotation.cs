@@ -19,8 +19,8 @@ public class Quotation : IExternalQuotationManagement
     private readonly IExternalConnectivityManagement _connectivity;
     private readonly HttpClient _httpClient;
     private readonly ConcurrentDictionary<string, ClientWebSocket> _webSockets = new();
-    private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _messageBrokers = new();
-    private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = new();
+    private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _messageBrokers = [];
+    private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = [];
     private readonly ConcurrentDictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
 
     public string Name => ExternalNames.Binance;

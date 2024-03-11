@@ -14,12 +14,12 @@ public class MessageBroker<T> : IDisposable
 
     public MessageBroker() { }
 
-    public MessageBroker(int id)
+    public MessageBroker(long id)
     {
         Id = id;
     }
 
-    public int Id { get; }
+    public long Id { get; }
 
     public void Enqueue(T item)
     {

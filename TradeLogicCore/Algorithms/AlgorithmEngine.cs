@@ -41,14 +41,14 @@ public class AlgorithmEngine : IAlgorithmEngine
 
     private readonly IntervalType _intervalType;
     private readonly List<ExtendedOrderBook> _orderBookSavingBuffer = [];
-    private IReadOnlyDictionary<int, Security>? _pickedSecurities;
+    private IReadOnlyDictionary<long, Security>? _pickedSecurities;
 
     private readonly bool _isRecordingOrderBook = false;
 
     /// <summary>
     /// Caches order books.
     /// </summary>
-    private readonly Dictionary<int, OrderBookCache> _orderBookCaches = [];
+    private readonly Dictionary<long, OrderBookCache> _orderBookCaches = [];
 
     private readonly IdGenerator _algoEntryIdGen = IdGenerators.Get<AlgoEntry>();
 
@@ -127,9 +127,9 @@ public class AlgorithmEngine : IAlgorithmEngine
         Screening = algorithm.Screening;
     }
 
-    public List<AlgoEntry> GetAllEntries(int securityId) => _services.Algo.GetAllEntries(securityId);
+    public List<AlgoEntry> GetAllEntries(long securityId) => _services.Algo.GetAllEntries(securityId);
 
-    public List<AlgoEntry> GetExecutionEntries(int securityId) => _services.Algo.GetExecutionEntries(securityId);
+    public List<AlgoEntry> GetExecutionEntries(long securityId) => _services.Algo.GetExecutionEntries(securityId);
 
     public void Halt(DateTime? resumeTime)
     {
@@ -261,7 +261,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         {
             _log.Debug("Received an order not from algo execution but manual or auto position closing logic.");
         }
-        _log.Info($"ORDER: [{order.UpdateTime:HH:mm:ss}][{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}] ID[{order.Id}][{order.ExternalOrderId}] {orderTypeStr} P*Q:{orderPriceStr}*{order.FormattedQuantity}{filledQtyStr}");
+        _log.Info($"\n\t[{order.UpdateTime:HH:mm:ss}] ORDER [{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}] ID[{order.Id}][{order.ExternalOrderId}] {orderTypeStr} P*Q:{orderPriceStr}*{order.FormattedQuantity}{filledQtyStr}");
     }
 
     private void OnTradeProcessed(Trade trade)
@@ -281,12 +281,12 @@ public class AlgorithmEngine : IAlgorithmEngine
             _log.Debug("Received a trade not from algo execution but manual or auto position closing logic.");
         }
         var order = _services.Order.GetOrderByExternalId(trade.ExternalOrderId);
-        if (order != null)
+        if (order == null)
         {
-
+            _log.Error("Received a state object without content! ETID: " + trade.ExternalOrderId);
         }
 
-        _log.Info($"TRADE: [{trade.Time:HH:mm:ss}][{trade.SecurityCode}][{trade.Side}] ID[{trade.Id}][{trade.ExternalTradeId}], OID:[{trade.OrderId}] P*Q:{trade.Price}*{trade.Quantity}");
+        _log.Info($"\n\t[{trade.Time:HH:mm:ss}] TRADE [{trade.SecurityCode}][{trade.Side}] ID[{trade.Id}][{trade.ExternalTradeId}] P*Q[{trade.Price}*{trade.Quantity}] OrderP*Q[{order.Price}*{order.FilledQuantity}]");
     }
 
     private void OnAssetProcessed(Asset asset, Trade trade)
@@ -303,13 +303,13 @@ public class AlgorithmEngine : IAlgorithmEngine
             var initCashPosition = _services.Portfolio.InitialPortfolio.GetCashAssetBySecurityId(quoteSecurityId);
             var currentCashPosition = _services.Portfolio.Portfolio.GetCashAssetBySecurityId(quoteSecurityId);
 
-            _log.Info($"\n\tPOS: [{asset.UpdateTime:HHmmss}][{asset.SecurityCode}][Closed]\n\t\tID:{asset.Id}, TID:{trade.Id}, PNL:{current.Notional:F4}, R:{current.EntryReturn:P4}, Notional:{initCashPosition?.Quantity}=>{currentCashPosition?.Quantity}");
+            _log.Info($"\n\t[{asset.UpdateTime:HHmmss}] ASSET SOLDOUT [{asset.SecurityCode}] PNL[{current.Notional:F4}] R[{current.EntryReturn:P4}]");
 
             StopOrderBookRecording(current.SecurityId);
         }
         else
         {
-            _log.Info($"\n\tPOS: [{asset.UpdateTime:HHmmss}][{asset.SecurityCode}][Updated]\n\t\tID:{asset.Id}, TID:{trade.Id}, COUNT:{current.TradeCount}, P*Q:{trade.Price}*{asset.Quantity}");
+            _log.Info($"\n\t[{asset.UpdateTime:HHmmss}] ASSET CHANGED [{asset.SecurityCode}] Q[{asset.Quantity}] TRD-CNT[{current.TradeCount}]");
         }
         Algorithm.AfterPositionChanged(current);
     }
@@ -368,7 +368,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         }
     }
 
-    private async void OnNextTickPrice(int securityId, string securityCode, Tick tick)
+    private async void OnNextTickPrice(long securityId, string securityCode, Tick tick)
     {
         if (_runningState != AlgoRunningState.Running)
             return;
@@ -380,8 +380,8 @@ public class AlgorithmEngine : IAlgorithmEngine
         TotalTickEventCount++;
         if (AlgoParameters!.StopOrderTriggerBy == StopOrderStyleType.TickSignal)
         {
-            await TryStopLoss(current, securityId, tick);
-            await TryTakeProfit(current, securityId, tick);
+            await TryStopLoss(current, tick);
+            await TryTakeProfit(current, tick);
         }
     }
 
@@ -410,7 +410,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     /// <param name="price"></param>
     /// <param name="interval"></param>
     /// <param name="isComplete"></param>
-    private async void OnNextOhlcPrice(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
+    private async void OnNextOhlcPrice(long securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
         if (Screening == null) throw Exceptions.Impossible("Screening logic must have been initialized.");
 
@@ -426,7 +426,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             _pickedSecurities = securities;
 
         var security = _pickedSecurities?.GetOrDefault(securityId) ?? throw Exceptions.MissingSecurity();
-        _log.Info($"\n\tPRX: [{price.T:HHmmss}][{security.Code}]\n\t\tH:{security.RoundTickSize(price.H)}, L:{security.RoundTickSize(price.L)}, C:{security.RoundTickSize(price.C)}, V:{price.V}");
+        _log.Info($"\n\t[{price.T:HH:mm:ss}] OHLC [{security.Code}] H/L/C[{security.RoundTickSize(price.H)}/{security.RoundTickSize(price.L)}/{security.RoundTickSize(price.C)}] V[{price.V}]");
 
         TotalPriceEventCount++;
         await Update(securityId, price);
@@ -437,7 +437,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     /// </summary>
     /// <param name="securityId"></param>
     /// <param name="ohlcPrice"></param>
-    public async Task Update(int securityId, OhlcPrice ohlcPrice)
+    public async Task Update(long securityId, OhlcPrice ohlcPrice)
     {
         if (Algorithm == null || AlgoParameters == null || Screening == null || AlgoSession == null) throw Exceptions.InvalidAlgorithmEngineState();
 
@@ -515,9 +515,9 @@ public class AlgorithmEngine : IAlgorithmEngine
     private static void LogEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
     {
         if (actionType == null)
-            _log.Info($"ALGO ENTRY: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\n\t[{current.Time:HH:mm:ss}] ALGO NOACTION [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
         else
-            _log.Info($"ALGO [{actionType}/{side}]: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\n\t[{current.Time:HH:mm:ss}] ALGO {actionType} {side} [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
     }
 
     private async Task ClosePositionIfNeeded()
@@ -848,7 +848,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     //    return true;
     //}
 
-    private async Task<bool> TryStopLoss(AlgoEntry current, int securityId, Tick tick)
+    private async Task<bool> TryStopLoss(AlgoEntry current, Tick tick)
     {
         if (current == null) return false; // not yet started
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
@@ -857,33 +857,33 @@ public class AlgorithmEngine : IAlgorithmEngine
 
         var assetSecurity = current.Security;
         // TODO base is always asset; quote is always cash
-        var security = AlgoParameters!.SecurityPool.FirstOrDefault(s => s.FxInfo?.BaseCurrency == assetSecurity.Code && s.QuoteSecurity!.IsCash);
-        if (security == null)
-        {
-            _log.Error($"Failed to stop loss due to missing security, base: {current.SecurityCode}, in pool: {string.Join(',', AlgoParameters!.SecurityPool.Select(s => s.Code))}");
-            return false;
-        }
+        //var security = AlgoParameters!.SecurityPool.FirstOrDefault(s => s.FxInfo?.BaseCurrency == assetSecurity.Code && s.QuoteSecurity!.IsCash);
+        //if (security == null)
+        //{
+        //    _log.Error($"Failed to stop loss due to missing security, base: {current.SecurityCode}, in pool: {string.Join(',', AlgoParameters!.SecurityPool.Select(s => s.Code))}");
+        //    return false;
+        //}
 
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
-            _log.Info($"EVENT SL: [{DateTime.UtcNow:HH:mm:ss}][{security.Code}][{current?.PositionId}] R:{current.EntryReturn:P4}");
+            _log.Info($"EVENT SL: [{DateTime.UtcNow:HH:mm:ss}][{assetSecurity.Code}][{current?.PositionId}] R:{current.EntryReturn:P4}");
             _persistence.Insert(current);
-            var state = await Algorithm.CloseByTickStopLoss(current, security, triggerPrice);
+            var state = await Algorithm.CloseByTickStopLoss(current, assetSecurity, triggerPrice);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterStoppedLoss(current!);
             }
             else
             {
-                _log.Error($"STOP LOSS ORDER FAILURE! SecId: {securityId}");
+                _log.Error($"STOP LOSS ORDER FAILURE! SecurityCode: {assetSecurity.Code}");
             }
             return true;
         }
         return false;
     }
 
-    private async Task<bool> TryTakeProfit(AlgoEntry current, int securityId, Tick tick)
+    private async Task<bool> TryTakeProfit(AlgoEntry current, Tick tick)
     {
         if (current == null) return false; // not yet started
         if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
@@ -892,27 +892,20 @@ public class AlgorithmEngine : IAlgorithmEngine
             return false;
 
         var assetSecurity = current.Security;
-        // TODO base is always asset; quote is always cash
-        var security = AlgoParameters!.SecurityPool.FirstOrDefault(s => s.FxInfo?.BaseCurrency == assetSecurity.Code && s.QuoteSecurity!.IsCash);
-        if (security == null)
-        {
-            _log.Error($"Failed to take profit due to missing security, base: {current.SecurityCode}, in pool: {string.Join(',', AlgoParameters!.SecurityPool.Select(s => s.Code))}");
-            return false;
-        }
 
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             _log.Info($"EVENT TP: [{DateTime.UtcNow:HHmmss}][{asset.SecurityCode}][{current?.PositionId}] R:{current.EntryReturn:P4}");
             _persistence.Insert(current);
-            var state = await Algorithm.CloseByTickTakeProfit(current, security, triggerPrice);
+            var state = await Algorithm.CloseByTickTakeProfit(current, assetSecurity, triggerPrice);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterTookProfit(current);
             }
             else
             {
-                _log.Error($"TAKE PROFIT ORDER FAILURE! SecId: {securityId}");
+                _log.Error($"TAKE PROFIT ORDER FAILURE! SecurityCode: {assetSecurity.Code}");
             }
             return true;
         }
@@ -998,7 +991,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     //    current.Notional = current.Quantity * currentPrice;
     //}
 
-    private void StartOrderBookRecording(int securityId)
+    private void StartOrderBookRecording(long securityId)
     {
         var cache = _orderBookCaches.ThreadSafeGet(securityId);
         if (cache == null)
@@ -1006,7 +999,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         cache.StartPersistence();
     }
 
-    private void StopOrderBookRecording(int securityId)
+    private void StopOrderBookRecording(long securityId)
     {
         // we want to record some order books after it is stopped
         var cache = _orderBookCaches.ThreadSafeGet(securityId);

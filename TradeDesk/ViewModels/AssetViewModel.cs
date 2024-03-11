@@ -18,7 +18,7 @@ public class AssetViewModel : AbstractViewModel
 
     public Asset SelectedAsset { get => selectedAsset; set => SetValue(ref selectedAsset, value); }
 
-    public ObservableCollection<Asset> Assets { get; } = new();
+    public ObservableCollection<Asset> Assets { get; } = [];
 
     public event Action<List<Asset>, DateTime> Refreshed;
 

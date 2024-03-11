@@ -20,9 +20,9 @@ public class HistoricalMarketData : IExternalHistoricalMarketDataManagement
         _connectivity = connectivity;
     }
 
-    public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
+    public async Task<Dictionary<long, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
-        var results = new Dictionary<int, List<OhlcPrice>>();
+        var results = new Dictionary<long, List<OhlcPrice>>();
         await Parallel.ForEachAsync(securities, async (security, ct) =>
         {
             var prices = await ReadPrices(security, start, end, intervalType);

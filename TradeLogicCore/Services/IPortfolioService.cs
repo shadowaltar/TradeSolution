@@ -51,7 +51,7 @@ public interface IPortfolioService
     /// <param name="securityId"></param>
     /// <param name="isInit"></param>
     /// <returns></returns>
-    Asset? GetAssetBySecurityId(int securityId, bool isInit = false);
+    Asset? GetAssetBySecurityId(long securityId, bool isInit = false);
 
     /// <summary>
     /// Get asset position given its security Id.
@@ -59,7 +59,7 @@ public interface IPortfolioService
     /// <param name="securityId"></param>
     /// <param name="isInit"></param>
     /// <returns></returns>
-    Asset? GetCashAssetBySecurityId(int securityId, bool isInit = false);
+    Asset? GetCashAssetBySecurityId(long securityId, bool isInit = false);
 
     /// <summary>
     /// Get the related cash position from a security's <see cref="Security.QuoteSecurity"/>.
@@ -68,7 +68,7 @@ public interface IPortfolioService
     /// <returns></returns>
     Asset? GetRelatedCashPosition(Security security);
 
-    Side GetOpenPositionSide(int securityId);
+    Side GetOpenPositionSide(long securityId);
 
     bool Validate(Order order);
 
@@ -119,5 +119,5 @@ public interface IPortfolioService
     /// <param name="affectInitialPortfolio"></param>
     Task Reload(bool clearOnly, bool affectInitialPortfolio);
 
-    decimal GetAssetPositionResidual(int assetSecurityId);
+    decimal GetAssetPositionResidual(long assetSecurityId);
 }

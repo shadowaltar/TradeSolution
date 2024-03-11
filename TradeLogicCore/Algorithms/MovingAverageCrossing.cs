@@ -1,5 +1,7 @@
 ﻿using Common;
 using log4net;
+using OfficeOpenXml.Style;
+using System.Diagnostics;
 using System.Text;
 using TradeCommon.Algorithms;
 using TradeCommon.Calculations;
@@ -26,8 +28,8 @@ public class MovingAverageCrossing : Algorithm
     private readonly TimeSpan _openOrderTimeout;
     private readonly Context _context;
 
-    private readonly Dictionary<int, decimal> _stopLossPrices = [];
-    private readonly Dictionary<int, decimal> _takeProfitPrices = [];
+    private readonly Dictionary<long, decimal> _stopLossPrices = [];
+    private readonly Dictionary<long, decimal> _takeProfitPrices = [];
 
     public override AlgorithmParameters AlgorithmParameters { get; }
 
@@ -223,7 +225,15 @@ public class MovingAverageCrossing : Algorithm
             var tp = GetTakeProfitPrice(price, enterSide, current.Security);
             _takeProfitPrices.ThreadSafeSet(current.SecurityId, tp);
 
-            _log.Info($"\n\tALGO:[SETUP][{time:HHmmss}][{current.SecurityCode}]\n\t\tSLPRX:{current.Security.FormatPrice(sl)}, TPPRX:{current.Security.FormatPrice(tp)}");
+            var order = state.Content?.As<Order>();
+            if (order == null)
+            {
+                _log.Error("Received a state object without content on open!");
+            }
+            else
+            {
+                _log.Info($"\n\t[{time:HH:mm:ss}] ALGO OPEN [{current.SecurityCode}][{enterSide}] THEOPRX*Q[{price}*{order.Quantity}] SL@[{current.Security.FormatPrice(sl)}] TP@[{current.Security.FormatPrice(tp)}]");
+            }
         }
         return state;
     }
@@ -248,13 +258,13 @@ public class MovingAverageCrossing : Algorithm
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && sl >= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, SLPRX:{asset.Security.FormatPrice(sl)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
+            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@BID[{tick.Bid}]");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && sl <= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO SL {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, SLPRX:{asset.Security.FormatPrice(sl)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
+            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@ASK[{tick.Ask}]");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -281,13 +291,13 @@ public class MovingAverageCrossing : Algorithm
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && tp <= tick.Bid)
         {
-            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, TPPRX:{asset.Security.FormatPrice(tp)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
+            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@BID[{tick.Bid}]");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && tp >= tick.Ask)
         {
-            _log.Info($"\n\tALGO:[ALGO TP {current.CloseSide}][{tick.As<ExtendedTick>().Time:HHmmss}][{asset.SecurityCode}]\n\t\tPID:{asset.Id}, MID:{tick.Mid}, TPPRX:{asset.Security.FormatPrice(tp)}, QTY:{asset.Security.FormatQuantity(asset.Quantity)}");
+            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@ASK[{tick.Ask}]");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -345,7 +355,17 @@ public class MovingAverageCrossing : Algorithm
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
     {
-        return await base.Close(current, security, triggerPrice, exitSide, exitTime, actionType);
+        var state = await base.Close(current, security, triggerPrice, exitSide, exitTime, actionType);
+        var order = state.Content?.As<Order>();
+        if (order == null)
+        {
+            _log.Error("Received a state object without content on open!");
+        }
+        else
+        {
+            _log.Info($"\n\t[{exitTime:HH:mm:ss}] ALGO CLOSE [{current.SecurityCode}][{exitSide}] THEOPRX*Q[{triggerPrice}*{order.Quantity}]");
+        }
+        return state;
     }
 
     public override void AfterPositionChanged(AlgoEntry current)

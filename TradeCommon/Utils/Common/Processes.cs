@@ -2,7 +2,7 @@
 
 public class Processes
 {
-    public static Dictionary<string, Mutex> Owned { get; } = new();
+    public static Dictionary<string, Mutex> Owned { get; } = [];
     public static bool IsExistsInSystem(string mutexName)
     {
         if (!Mutex.TryOpenExisting(mutexName, out var existing))

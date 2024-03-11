@@ -16,7 +16,7 @@ public class HistoricalMarketDataService : IHistoricalMarketDataService, IPriceP
 
     public bool HasSubscription => NextPrice != null;
 
-    public event Action<int, IntervalType, OhlcPrice>? NextPrice;
+    public event Action<long, IntervalType, OhlcPrice>? NextPrice;
 
 
     public async Task<List<OhlcPrice>> Get(Security security, IntervalType intervalType, DateTime start, DateTime end)
@@ -42,7 +42,7 @@ public class HistoricalMarketDataService : IHistoricalMarketDataService, IPriceP
         });
     }
 
-    public async Task<int> Subscribe(Security security, IntervalType interval, DateTime start, DateTime stop, Action<int, IntervalType, OhlcPrice>? callback)
+    public async Task<int> Subscribe(Security security, IntervalType interval, DateTime start, DateTime stop, Action<long, IntervalType, OhlcPrice>? callback)
     {
         var count = 0;
         var id = security.Id;

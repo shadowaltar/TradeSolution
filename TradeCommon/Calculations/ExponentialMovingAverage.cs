@@ -29,7 +29,7 @@ public class ExponentialMovingAverage : Calculator
     {
         if (_previous.IsNaN())
         {
-            _cachedValues ??= new();
+            _cachedValues ??= [];
             _cachedValues.Add(value);
             if (_cachedValues.Count == Period)
             {
@@ -58,7 +58,7 @@ public class ExponentialMovingAverage : Calculator
     {
         if (!_previousDecimal.IsValid())
         {
-            _cachedDecimalValues ??= new();
+            _cachedDecimalValues ??= [];
             _cachedDecimalValues.Add(value);
             if (_cachedDecimalValues.Count == Period)
             {

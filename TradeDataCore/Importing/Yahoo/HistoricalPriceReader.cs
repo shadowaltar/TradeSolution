@@ -23,9 +23,9 @@ public class HistoricalPriceReader : IHistoricalPriceReader
         _storage = storage;
     }
 
-    public async Task<Dictionary<int, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
+    public async Task<Dictionary<long, List<OhlcPrice>>?> ReadPrices(List<Security> securities, DateTime start, DateTime end, IntervalType intervalType)
     {
-        IDictionary<int, PricesAndCorporateActions> results = await ReadYahooPrices(securities, intervalType, start, end);
+        IDictionary<long, PricesAndCorporateActions> results = await ReadYahooPrices(securities, intervalType, start, end);
         return results.ToDictionary(r => r.Key, r => r.Value.Prices);
     }
 
@@ -35,7 +35,7 @@ public class HistoricalPriceReader : IHistoricalPriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+    public async Task<IDictionary<long, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
          DateTime startTime, DateTime endTime, params (FinancialStatType type, decimal value)[] filters)
     {
         return await ReadYahooPrices(securities, interval, startTime, endTime, TimeRangeType.Unknown, filters);
@@ -47,16 +47,16 @@ public class HistoricalPriceReader : IHistoricalPriceReader
     /// <param name="asOfTime"></param>
     /// <param name="tickers"></param>
     /// <returns></returns>
-    public async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+    public async Task<IDictionary<long, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
          TimeRangeType range, params (FinancialStatType type, decimal value)[] filters)
     {
         return await ReadYahooPrices(securities, interval, null, null, range, filters);
     }
 
-    private async Task<IDictionary<int, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
+    private async Task<IDictionary<long, PricesAndCorporateActions>> ReadYahooPrices(List<Security> securities, IntervalType interval,
         DateTime? start, DateTime? end, TimeRangeType range, params (FinancialStatType type, decimal value)[] filters)
     {
-        var results = new Dictionary<int, PricesAndCorporateActions>();
+        var results = new Dictionary<long, PricesAndCorporateActions>();
         if (range == TimeRangeType.Unknown && (start == null || end == null))
         {
             throw new InvalidOperationException("Range must be set, or provide both start and end time.");

@@ -14,9 +14,9 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly Dictionary<int, Security> _securities = [];
+    private readonly Dictionary<long, Security> _securities = [];
     private readonly Dictionary<string, Security> _securitiesByCode = [];
-    private readonly Dictionary<(string code, ExchangeType exchange), int> _mapping = [];
+    private readonly Dictionary<(string code, ExchangeType exchange), long> _mapping = [];
     private readonly IStorage _storage = storage;
     private readonly ApplicationContext _context = context;
 
@@ -110,7 +110,7 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
         }
     }
 
-    public async Task<List<Security>> GetSecurities(List<int> securityIds, bool requestExternal = false)
+    public async Task<List<Security>> GetSecurities(List<long> securityIds, bool requestExternal = false)
     {
         if (!IsInitialized)
             await Initialize();
@@ -158,7 +158,7 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
         }
     }
 
-    public async Task<Security?> GetSecurity(int securityId, bool requestExternal = false)
+    public async Task<Security?> GetSecurity(long securityId, bool requestExternal = false)
     {
         if (!IsInitialized)
             await Initialize();
@@ -200,7 +200,7 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
         return _securities.ThreadSafeFirst(s => s.Value.FxInfo?.BaseCurrency == baseCurrency && s.Value.FxInfo?.QuoteCurrency == quoteCurrency).Value;
     }
 
-    public Security GetSecurity(int securityId)
+    public Security GetSecurity(long securityId)
     {
         if (!IsInitialized)
             AsyncHelper.RunSync(Initialize);
@@ -255,17 +255,17 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
         }
     }
 
-    public async Task<(int securityId, int count)> InsertPrices(int id, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
+    public async Task<(long securityId, int count)> InsertPrices(long securityId, IntervalType interval, SecurityType secType, List<OhlcPrice> prices)
     {
-        return await _storage.InsertPrices(id, interval, secType, prices);
+        return await _storage.InsertPrices(securityId, interval, secType, prices);
     }
 
-    public async Task<List<OhlcPrice>> ReadPrices(int securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
+    public async Task<List<OhlcPrice>> ReadPrices(long securityId, IntervalType interval, SecurityType securityType, DateTime start, DateTime? end = null, int priceDecimalPoints = 16)
     {
         return await _storage.ReadPrices(securityId, interval, securityType, start, end, priceDecimalPoints);
     }
 
-    public async Task<Dictionary<int, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
+    public async Task<Dictionary<long, List<ExtendedOhlcPrice>>> ReadAllPrices(List<Security> securities, IntervalType interval, SecurityType securityType, TimeRangeType range)
     {
         return await _storage.ReadAllPrices(securities, interval, securityType, range);
     }
@@ -295,7 +295,7 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
         return await _storage.IsTableExists(name, DatabaseNames.MarketData) ? await _storage.ReadOrderBooks(security, level, date) : [];
     }
 
-    public async Task<Dictionary<int, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval)
+    public async Task<Dictionary<long, List<DateTime>>> GetSecurityIdToPriceTimes(Security security, IntervalType interval)
     {
         var securityType = SecurityTypeConverter.Parse(security.Type);
         var tableName = DatabaseNames.GetPriceTableName(interval, securityType);
@@ -303,10 +303,10 @@ public class SecurityService(IStorage storage, ApplicationContext context) : ISe
             DatabaseNames.MarketData,
             TypeCode.Int32, TypeCode.DateTime);
 
-        var results = new Dictionary<int, List<DateTime>>();
+        var results = new Dictionary<long, List<DateTime>>();
         foreach (DataRow row in dt.Rows)
         {
-            var id = (int)row["SecurityId"];
+            var id = (long)row["SecurityId"];
             var dateTimes = results.GetOrCreate(security.Id);
             dateTimes.Add((DateTime)row["StartTime"]);
         }

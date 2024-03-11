@@ -4,19 +4,19 @@ using System.ComponentModel.DataAnnotations;
 namespace Common;
 public static class Validator
 {
-    public static readonly List<Type> ValidationAttributes = new()
-    {
+    public static readonly List<Type> ValidationAttributes =
+    [
         typeof(PositiveAttribute),
         typeof(NotNegativeAttribute),
         typeof(NotUnknownAttribute),
         typeof(MinLengthAttribute)
-    };
+    ];
 
-    public static readonly List<Type> AutoCorrectAttributes = new()
-    {
+    public static readonly List<Type> AutoCorrectAttributes =
+    [
         typeof(AlwaysUpperCaseAttribute),
         typeof(AlwaysLowerCaseAttribute),
-    };
+    ];
 
     /// <summary>
     /// Validate an instance and if not ok, throws <see cref="ArgumentException"/>.

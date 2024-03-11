@@ -3,8 +3,8 @@
 namespace TradeCommon.Essentials.Quotes;
 public record OrderBook
 {
-    public List<OrderBookLevel> Bids { get; set; } = new();
-    public List<OrderBookLevel> Asks { get; set; } = new();
+    public List<OrderBookLevel> Bids { get; set; } = [];
+    public List<OrderBookLevel> Asks { get; set; } = [];
     public decimal BestBid => Bids.Count == 0 ? 0 : Bids[0].Price;
     public decimal BestBidSize => Bids.Count == 0 ? 0 : Bids[0].Size;
     public decimal BestAsk => Asks.Count == 0 ? 0 : Asks[0].Price;
@@ -20,12 +20,12 @@ public record OrderBook
     public virtual OrderBook DeepClone()
     {
         var clone = this with { };
-        clone.Bids = new();
+        clone.Bids = [];
         foreach (var bid in Bids)
         {
             clone.Bids.Add(bid with { });
         }
-        clone.Asks = new();
+        clone.Asks = [];
         foreach (var ask in Asks)
         {
             clone.Asks.Add(ask with { });
@@ -37,7 +37,7 @@ public record OrderBook
 public record ExtendedOrderBook : OrderBook
 {
     public DateTime Time { get; set; }
-    public int SecurityId { get; set; }
+    public long SecurityId { get; set; }
 
     public override string ToString()
     {
@@ -47,12 +47,12 @@ public record ExtendedOrderBook : OrderBook
     public override ExtendedOrderBook DeepClone()
     {
         var clone = this with { };
-        clone.Bids = new();
+        clone.Bids = [];
         foreach (var bid in Bids)
         {
             clone.Bids.Add(bid with { });
         }
-        clone.Asks = new();
+        clone.Asks = [];
         foreach (var ask in Asks)
         {
             clone.Asks.Add(ask with { });

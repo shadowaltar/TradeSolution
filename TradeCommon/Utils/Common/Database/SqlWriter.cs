@@ -34,15 +34,15 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
     public virtual string ConnectionString { get; protected set; }
     public virtual string DefaultTableName { get; protected set; }
 
-    public Dictionary<string, string> InsertSqls { get; } = new();
+    public Dictionary<string, string> InsertSqls { get; } = [];
 
-    public Dictionary<string, string> UpsertSqls { get; } = new();
+    public Dictionary<string, string> UpsertSqls { get; } = [];
 
-    public Dictionary<string, string> DeleteSqls { get; } = new();
+    public Dictionary<string, string> DeleteSqls { get; } = [];
 
-    public Dictionary<string, string> DropTableAndIndexSqls { get; } = new();
+    public Dictionary<string, string> DropTableAndIndexSqls { get; } = [];
 
-    public Dictionary<string, string> CreateTableAndIndexSqls { get; } = new();
+    public Dictionary<string, string> CreateTableAndIndexSqls { get; } = [];
 
     public SqlWriter(IDatabase db, string environmentString, char placeholderPrefix = Consts.SqlCommandPlaceholderPrefix)
     {

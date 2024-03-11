@@ -5,5 +5,5 @@ namespace TradeDataCore.MarketData;
 
 public interface IPriceProvider
 {
-    event Action<int, IntervalType, OhlcPrice>? NextPrice;
+    event Action<long, IntervalType, OhlcPrice>? NextPrice;
 }

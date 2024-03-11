@@ -25,9 +25,9 @@ public class LoginViewModel : AbstractViewModel
 
     public LoginView Window { get; internal set; }
 
-    public ObservableCollection<EnvironmentType> EnvironmentTypes { get; } = new();
+    public ObservableCollection<EnvironmentType> EnvironmentTypes { get; } = [];
 
-    public ObservableCollection<ExchangeType> ExchangeTypes { get; } = new();
+    public ObservableCollection<ExchangeType> ExchangeTypes { get; } = [];
 
     public string Account { get => _account; set => SetValue(ref _account, value); }
 

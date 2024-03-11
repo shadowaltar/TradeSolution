@@ -21,7 +21,7 @@ public static class Delegates
     public delegate void AssetsChangedCallback(List<Asset> assets);
     public delegate void TransferredCallback(TransferAction transferAction);
 
-    public delegate void OhlcPriceReceivedCallback(int securityId, OhlcPrice price, IntervalType interval, bool isComplete);
-    public delegate void TickPriceReceivedCallback(int securityId, string securityCode, Tick tick);
+    public delegate void OhlcPriceReceivedCallback(long securityId, OhlcPrice price, IntervalType interval, bool isComplete);
+    public delegate void TickPriceReceivedCallback(long securityId, string securityCode, Tick tick);
     public delegate void OrderBookReceivedCallback(ExtendedOrderBook orderBook);
 }

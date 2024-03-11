@@ -22,7 +22,7 @@ public class OrderBookCache
 
     public bool IsRecording { get; private set; } = false;
 
-    public OrderBookCache(IStorage storage, int securityId)
+    public OrderBookCache(IStorage storage, long securityId)
     {
         _storage = storage;
         var table = DatabaseNames.OrderBookTableNameCache.ThreadSafeGet(securityId);

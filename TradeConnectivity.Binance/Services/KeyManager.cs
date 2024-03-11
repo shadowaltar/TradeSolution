@@ -14,13 +14,13 @@ public class KeyManager
     private const string _secretFolder = @"C:\Temp\Data";
 
     // key1 is user name, key2 is account name
-    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _testHashers = new();
-    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _uatHashers = new();
-    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _prodHashers = new();
+    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _testHashers = [];
+    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _uatHashers = [];
+    private readonly Dictionary<int, Dictionary<int, HMACSHA256>> _prodHashers = [];
 
-    private readonly Dictionary<int, Dictionary<int, string[]>> _testApiKeys = new();
-    private readonly Dictionary<int, Dictionary<int, string[]>> _uatApiKeys = new();
-    private readonly Dictionary<int, Dictionary<int, string[]>> _prodApiKeys = new();
+    private readonly Dictionary<int, Dictionary<int, string[]>> _testApiKeys = [];
+    private readonly Dictionary<int, Dictionary<int, string[]>> _uatApiKeys = [];
+    private readonly Dictionary<int, Dictionary<int, string[]>> _prodApiKeys = [];
 
     private int _currentUserId;
     private int _currentAccountId;

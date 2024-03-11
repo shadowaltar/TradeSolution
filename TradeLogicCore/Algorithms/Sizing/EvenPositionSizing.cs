@@ -32,7 +32,7 @@ public class EvenPositionSizing : IPositionSizingAlgoLogic
         throw new NotImplementedException();
     }
 
-    private decimal LotRounding(int securityId, decimal proposedSize)
+    private decimal LotRounding(long securityId, decimal proposedSize)
     {
         throw new NotImplementedException();
     }

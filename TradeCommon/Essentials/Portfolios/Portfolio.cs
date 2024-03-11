@@ -11,8 +11,8 @@ public record Portfolio(int AccountId)
 {
     private static readonly ILog _log = Logger.New();
 
-    private readonly Dictionary<int, Asset> _cashPositionsBySecurityId = [];
-    private readonly Dictionary<int, Asset> _assetsBySecurityId = [];
+    private readonly Dictionary<long, Asset> _cashPositionsBySecurityId = [];
+    private readonly Dictionary<long, Asset> _assetsBySecurityId = [];
 
     private readonly object _lock = new();
 
@@ -51,12 +51,12 @@ public record Portfolio(int AccountId)
         return _cashPositionsBySecurityId.ThreadSafeValues(_lock);
     }
 
-    public Asset? GetAssetPositionBySecurityId(int securityId)
+    public Asset? GetAssetPositionBySecurityId(long securityId)
     {
         return _assetsBySecurityId.ThreadSafeGet(securityId, _lock);
     }
 
-    public Asset? GetCashAssetBySecurityId(int securityId)
+    public Asset? GetCashAssetBySecurityId(long securityId)
     {
         return _cashPositionsBySecurityId.ThreadSafeGet(securityId, _lock);
     }
@@ -78,7 +78,7 @@ public record Portfolio(int AccountId)
         }
     }
 
-    public void Close(int securityId)
+    public void Close(long securityId)
     {
         _assetsBySecurityId.ThreadSafeRemove(securityId, _lock);
     }

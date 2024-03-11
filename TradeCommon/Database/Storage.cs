@@ -297,7 +297,7 @@ public partial class Storage : IStorage
 
     protected class SqlWriters
     {
-        private readonly Dictionary<string, ISqlWriter> _writers = new();
+        private readonly Dictionary<string, ISqlWriter> _writers = [];
         private readonly IStorage _storage;
         private string? _environmentString;
 

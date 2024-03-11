@@ -12,7 +12,7 @@ public static class ExcelExtensions
     /// <summary>
     /// Color cache.
     /// </summary>
-    private static readonly Dictionary<string, Color> _stringToColors = new();
+    private static readonly Dictionary<string, Color> _stringToColors = [];
 
     public static void SetStyle(this ExcelRange range,
         string fontFamily = "Calibri",

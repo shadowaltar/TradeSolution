@@ -13,7 +13,7 @@ public record SecurityRelatedEntry
     public Security Security { get; set; }
 
     [NotNull, Positive, Column(Order = 1)]
-    public int SecurityId { get; set; } = 0;
+    public long SecurityId { get; set; } = 0;
 
     [DatabaseIgnore]
     public string SecurityCode { get; set; } = "";

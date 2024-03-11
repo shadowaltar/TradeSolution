@@ -208,7 +208,7 @@ public static class CsvSettings<T>
 {
     public class BooleanCsvConversion : ClassMap<T>
     {
-        public static List<Expression<Func<T, bool>>> BooleanConversionPropertySelectors { get; } = new();
+        public static List<Expression<Func<T, bool>>> BooleanConversionPropertySelectors { get; } = [];
 
         public BooleanCsvConversion(bool treatEmptyStringAsFalse = false)
         {

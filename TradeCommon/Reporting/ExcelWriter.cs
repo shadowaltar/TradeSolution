@@ -172,7 +172,7 @@ public class ExcelWriter
             var (innerV, innerT) = getter.GetTypeAndValue(entry, innerObjectFieldName);
             if (innerV != null)
             {
-                allInnerObjectValueAndFieldNames[innerObjectFieldName] = new();
+                allInnerObjectValueAndFieldNames[innerObjectFieldName] = [];
                 var innerColumns = innerColumnGroup.Select(ic => ic with { FieldName = RemoveFirstPart('.', ic.FieldName) }).ToList();
                 Dictionary<string, PropertyInfo> mapping = ReflectionUtils.GetPropertyToName(innerT);
 

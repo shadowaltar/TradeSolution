@@ -11,37 +11,37 @@ public static class ReflectionUtils
     /// <summary>
     /// Cached untyped getters. Key is the object type (which holds the property getters).
     /// </summary>
-    private static readonly Dictionary<Type, object> _typeToValueGetters = new();
+    private static readonly Dictionary<Type, object> _typeToValueGetters = [];
 
     /// <summary>
     /// Cached untyped setters. Key is the object type (which holds the property setters).
     /// </summary>
-    private static readonly Dictionary<Type, object> _typeToValueSetters = new();
+    private static readonly Dictionary<Type, object> _typeToValueSetters = [];
 
     /// <summary>
     /// Cache of types which the key is its type name (not fully qualified name).
     /// </summary>
-    private static readonly Dictionary<string, Type?> _typesByTypeName = new();
+    private static readonly Dictionary<string, Type?> _typesByTypeName = [];
 
     /// <summary>
     /// Cache of types which the key is its super type.
     /// </summary>
-    private static readonly Dictionary<Type, List<Type>> _typesBySuperType = new();
+    private static readonly Dictionary<Type, List<Type>> _typesBySuperType = [];
 
     /// <summary>
     /// Cache of property info for a given type. Property info are keyed by its name.
     /// </summary>
-    private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _typeToPropertyInfoMap = new();
+    private static readonly Dictionary<Type, Dictionary<string, PropertyInfo>> _typeToPropertyInfoMap = [];
 
     /// <summary>
     /// Cache of meta info for a given type. See <see cref="ReflectionMetaInfo{T}"/> for details.
     /// </summary>
-    private static readonly Dictionary<Type, object> _typeToMetaInfo = new();
+    private static readonly Dictionary<Type, object> _typeToMetaInfo = [];
 
     /// <summary>
     /// Cache of attribute meta info for a given type. See <see cref="AttributeMetaInfo"/> for details.
     /// </summary>
-    private static readonly Dictionary<Type, AttributeMetaInfo> _typeToAttributeInfo = new();
+    private static readonly Dictionary<Type, AttributeMetaInfo> _typeToAttributeInfo = [];
 
     public static bool IsRecord(this Type type)
     {
@@ -99,7 +99,7 @@ public static class ReflectionUtils
     public static List<(string name, Type type, Action<T, object> setter)> BuildUntypedSetters<T>()
     {
         var properties = typeof(T).GetProperties();
-        List<(string name, Type type, Action<T, object> setter)> tuples = new();
+        List<(string name, Type type, Action<T, object> setter)> tuples = [];
         foreach (var property in properties)
         {
             var setter = BuildUntypedSetter<T>(property);
@@ -131,7 +131,7 @@ public static class ReflectionUtils
     public static List<(string name, Type type, Func<T, object> getter)> BuildUntypedGetters<T>()
     {
         var properties = typeof(T).GetProperties();
-        List<(string name, Type type, Func<T, object> getter)> tuples = new();
+        List<(string name, Type type, Func<T, object> getter)> tuples = [];
         foreach (var property in properties)
         {
             var getter = BuildUntypedGetter<T>(property);
@@ -277,7 +277,7 @@ public static class ReflectionUtils
         typeChain.Reverse();
         typeChain.Add(type);
 
-        results = new Dictionary<string, PropertyInfo>();
+        results = [];
         foreach (var t in typeChain)
         {
             // only in current class (no super), exclude the static and non-public getter
@@ -420,10 +420,10 @@ public class ReflectionMetaInfo<T>
     /// <summary>
     /// Ordering of properties. [Initialized by <see cref="ReflectionUtils"/>]
     /// </summary>
-    public Dictionary<string, int> Ordering { get; } = new();
-    public Dictionary<string, Func<T, object>> Getters { get; } = new();
-    public Dictionary<string, Action<T, object?>> Setters { get; } = new();
-    public Dictionary<string, Type> PropertyTypes { get; } = new();
+    public Dictionary<string, int> Ordering { get; } = [];
+    public Dictionary<string, Func<T, object>> Getters { get; } = [];
+    public Dictionary<string, Action<T, object?>> Setters { get; } = [];
+    public Dictionary<string, Type> PropertyTypes { get; } = [];
 }
 
 public class ValueGetter<T> : PropertyReflectionHelper<T>

@@ -23,7 +23,7 @@ public class PortfolioService : IPortfolioService
     private readonly IOrderService _orderService;
     private readonly ISecurityDefinitionProvider _securityService;
     private readonly Persistence _persistence;
-    private readonly Dictionary<int, decimal> _residualByAssetSecurityId = [];
+    private readonly Dictionary<long, decimal> _residualByAssetSecurityId = [];
 
     public event Action<Asset, Trade>? AssetProcessed;
     //public event Action<Asset>? AssetPositionCreated;
@@ -56,12 +56,12 @@ public class PortfolioService : IPortfolioService
         _assetIdGenerator = IdGenerators.Get<Asset>();
     }
 
-    public Asset? GetPositionBySecurityId(int securityId)
+    public Asset? GetPositionBySecurityId(long securityId)
     {
         return Portfolio.GetAssetPositionBySecurityId(securityId);
     }
 
-    public Asset? GetCash(int securityId)
+    public Asset? GetCash(long securityId)
     {
         return Portfolio.GetCashAssetBySecurityId(securityId);
     }
@@ -71,7 +71,7 @@ public class PortfolioService : IPortfolioService
         return Portfolio.GetAll();
     }
 
-    public Asset? GetCashBySecurityId(int securityId)
+    public Asset? GetCashBySecurityId(long securityId)
     {
         return Portfolio.GetCashAssetBySecurityId(securityId);
     }
@@ -539,13 +539,13 @@ public class PortfolioService : IPortfolioService
         }
     }
 
-    public Side GetOpenPositionSide(int securityId)
+    public Side GetOpenPositionSide(long securityId)
     {
         var asset = GetPositionBySecurityId(securityId);
         return asset == null || asset.IsEmpty ? Side.None : asset.Quantity > 0 ? Side.Buy : Side.Sell;
     }
 
-    public decimal GetAssetPositionResidual(int assetSecurityId)
+    public decimal GetAssetPositionResidual(long assetSecurityId)
     {
         return _residualByAssetSecurityId.ThreadSafeGet(assetSecurityId);
     }
@@ -571,7 +571,6 @@ public class PortfolioService : IPortfolioService
 
     private void OnAssetChanged(Asset asset)
     {
-        _log.Info("ON ASSET CHANGED: " + asset.SecurityCode);
         var account = _context.Account ?? throw Exceptions.MustLogin();
 
         _securityService.Fix(asset);
@@ -580,11 +579,11 @@ public class PortfolioService : IPortfolioService
         var existingAsset = asset.Security.IsCash ? Portfolio.GetCashAssetBySecurityId(asset.SecurityId) : Portfolio.GetAssetPositionBySecurityId(asset.SecurityId);
         if (existingAsset == null)
         {
-            _log.Info($"Adding asset {asset.SecurityCode} with quantity {asset.Quantity}");
+            _log.Info($"\n[{asset.UpdateTime:HH:mm:ss}] ASSET ADDED [{asset.SecurityCode}] Q[{asset.Quantity}]");
         }
         else
         {
-            _log.Info($"Updating asset {asset.SecurityCode} with quantity {asset.Quantity}");
+            _log.Info($"\n[{asset.UpdateTime:HH:mm:ss}] ASSET CHANGED [{asset.SecurityCode}] Q[{asset.Quantity}]");
         }
         asset.AccountId = existingAsset?.AccountId ?? account.Id;
         asset.UpdateTime = DateTime.UtcNow;
@@ -594,7 +593,6 @@ public class PortfolioService : IPortfolioService
         Portfolio.AddOrUpdate(asset);
         _persistence.Insert(asset, isUpsert: true);
         _persistence.Insert(state, isUpsert: false);
-        _log.Info("ON ASSET CHANGE SAVED");
     }
 
     public List<Asset> GetAssets()
@@ -607,7 +605,7 @@ public class PortfolioService : IPortfolioService
         return Portfolio.GetCashes();
     }
 
-    public Asset? GetAssetBySecurityId(int securityId, bool isInit = false)
+    public Asset? GetAssetBySecurityId(long securityId, bool isInit = false)
     {
         if (isInit)
             return InitialPortfolio.GetAssetPositionBySecurityId(securityId);
@@ -620,7 +618,7 @@ public class PortfolioService : IPortfolioService
         return GetCashAssetBySecurityId(currencyAsset.Id);
     }
 
-    public Asset? GetCashAssetBySecurityId(int securityId, bool isInit = false)
+    public Asset? GetCashAssetBySecurityId(long securityId, bool isInit = false)
     {
         if (isInit)
             return Portfolio.GetAssetPositionBySecurityId(securityId);

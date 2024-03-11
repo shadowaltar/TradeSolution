@@ -484,7 +484,7 @@ public class OrderService : IOrderService
     /// <param name="order"></param>
     private async void OnOrderReceived(Order order)
     {
-        _log.Info("ON ORDER RECEIVED: " + order.Id);
+        _log.Info($"\n\t[{order.UpdateTime:HH:mm:ss}] ORDER RECEIVED [{order.SecurityCode}] ID[{order.Id}]");
 
         _securityService.Fix(order);
 
@@ -577,8 +577,6 @@ public class OrderService : IOrderService
         states.ThreadSafeAdd(state);
         _persistence.Insert(state, isUpsert: false);
 
-        _log.Info("ON ORDER CHANGE SAVED");
-
         OrderProcessed?.Invoke(order);
     }
 
@@ -591,7 +589,7 @@ public class OrderService : IOrderService
         var order = state.Get<Order>();
         if (order == null)
         {
-            _log.Warn("Received a state object without content!");
+            _log.Error("Received a state object without content!");
             return;
         }
         OnOrderReceived(order);
@@ -608,7 +606,7 @@ public class OrderService : IOrderService
         var order = state.Get<Order>();
         if (order == null)
         {
-            _log.Warn("Received a state object without content!");
+            _log.Error("Received a state object without content!");
             return;
         }
 

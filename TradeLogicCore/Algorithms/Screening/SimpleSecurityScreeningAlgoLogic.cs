@@ -5,10 +5,10 @@ namespace TradeLogicCore.Algorithms.Screening;
 
 public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
 {
-    private static readonly Dictionary<int, Security> _originalPool = [];
-    private static readonly Dictionary<int, Security> _pickedPool = [];
+    private static readonly Dictionary<long, Security> _originalPool = [];
+    private static readonly Dictionary<long, Security> _pickedPool = [];
 
-    public bool CheckIsPicked(int securityId)
+    public bool CheckIsPicked(long securityId)
     {
         lock (_pickedPool)
         {
@@ -16,7 +16,7 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
         }
     }
 
-    public void SetAndPick(IDictionary<int, Security> securityPool)
+    public void SetAndPick(IDictionary<long, Security> securityPool)
     {
         lock (_originalPool)
         {
@@ -33,7 +33,7 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
         }
     }
 
-    public IReadOnlyDictionary<int, Security> GetPickedOnes()
+    public IReadOnlyDictionary<long, Security> GetPickedOnes()
     {
         lock (_pickedPool)
             return _pickedPool;
@@ -43,13 +43,13 @@ public class SimpleSecurityScreeningAlgoLogic : ISecurityScreeningAlgoLogic
     {
     }
 
-    public IReadOnlyDictionary<int, Security> GetAll()
+    public IReadOnlyDictionary<long, Security> GetAll()
     {
         lock (_originalPool)
             return _originalPool;
     }
 
-    public bool TryCheckIfChanged(out IReadOnlyDictionary<int, Security> pickedOnes)
+    public bool TryCheckIfChanged(out IReadOnlyDictionary<long, Security> pickedOnes)
     {
         lock (_originalPool)
         {

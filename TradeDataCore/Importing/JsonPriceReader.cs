@@ -18,9 +18,9 @@ public class JsonPriceReader
         _securityService = securityService;
     }
 
-    public async Task<Dictionary<(string, string, string), (int, int)>> Import(string json)
+    public async Task<Dictionary<(string, string, string), (long, int)>> Import(string json)
     {
-        var results = new Dictionary<(string, string, string), (int, int)>();
+        var results = new Dictionary<(string, string, string), (long, int)>();
         var content = await File.ReadAllTextAsync(json);
         var p = Json.Deserialize<List<ExtendedOhlcPrice>>(content);
         var priceGroups = p.GroupBy(p => (p.Code, p.Ex, p.I));

@@ -5,7 +5,7 @@ namespace TradeCommon.Externals;
 public class FakeHttpClient : HttpClient
 {
     public string Content { get; set; }
-    public List<(string, string)> Headers { get; } = new();
+    public List<(string, string)> Headers { get; } = [];
 
     public async Task<(HttpResponseMessage response, long elapsedMs)> TimedSendAsync(HttpRequestMessage request)
     {

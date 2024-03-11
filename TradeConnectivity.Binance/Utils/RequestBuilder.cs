@@ -34,7 +34,7 @@ public class RequestBuilder
         var result = "";
         if (method == HttpMethod.Get)
         {
-            parameters ??= new();
+            parameters ??= [];
             result = StringUtils.ToUrlParamString(parameters);
             request.RequestUri = !result.IsBlank()
                 ? new Uri($"{url}?{result}")

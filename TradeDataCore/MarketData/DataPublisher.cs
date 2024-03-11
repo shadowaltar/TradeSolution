@@ -10,7 +10,7 @@ namespace TradeDataCore.MarketData;
 public class DataPublisher(IMarketDataService marketDataService)
 {
     private readonly IMarketDataService _marketDataService = marketDataService;
-    private readonly Dictionary<(int, IntervalType), BlockingCollection<OhlcPrice>> _ohlcQueues = [];
+    private readonly Dictionary<(long securityId, IntervalType interval), BlockingCollection<OhlcPrice>> _ohlcQueues = [];
 
     public void Initialize()
     {
@@ -29,7 +29,7 @@ public class DataPublisher(IMarketDataService marketDataService)
         _marketDataService.NextTick -= OnTickReceived;
     }
 
-    private void OnTickReceived(int securityId, string securityCode, Tick tick)
+    private void OnTickReceived(long securityId, string securityCode, Tick tick)
     {
     }
 
@@ -37,7 +37,7 @@ public class DataPublisher(IMarketDataService marketDataService)
     {
     }
 
-    private void OnOhlcPriceReceived(int securityId, OhlcPrice price, IntervalType interval, bool isComplete)
+    private void OnOhlcPriceReceived(long securityId, OhlcPrice price, IntervalType interval, bool isComplete)
     {
         var queue = _ohlcQueues.ThreadSafeGetOrCreate((securityId, interval));
     }

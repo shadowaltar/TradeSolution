@@ -32,7 +32,7 @@ public record User
     public DateTime UpdateTime { get; set; }
 
     [DatabaseIgnore]
-    public List<Account> Accounts { get; } = new();
+    public List<Account> Accounts { get; } = [];
 
     [DatabaseIgnore]
     public string LoginSessionId { get; set; }

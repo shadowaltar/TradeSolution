@@ -15,7 +15,7 @@ public class AssetStateViewModel : AbstractViewModel
     private readonly Server _server;
     private AssetState selectedAssetState;
     public AssetState SelectedAssetState { get => selectedAssetState; set => SetValue(ref selectedAssetState, value); }
-    public ObservableCollection<AssetState> AssetStates { get; } = new();
+    public ObservableCollection<AssetState> AssetStates { get; } = [];
 
     public event Action<List<AssetState>, DateTime> Refreshed;
 

@@ -26,16 +26,16 @@ public class Quotation : IExternalQuotationManagement
     private readonly HttpClient _httpClient;
     private readonly ConcurrentDictionary<string, ExtendedWebSocket> _webSockets = new();
 
-    private readonly Dictionary<(int, IntervalType), MessageBroker<OhlcPrice>> _ohlcPriceBrokers = new();
-    private readonly Dictionary<(int, IntervalType), OhlcPrice> _lastOhlcPrices = new();
-    private readonly Dictionary<int, HashSet<IntervalType>> _registeredIntervals = new();
+    private readonly Dictionary<(long securityId, IntervalType interval), MessageBroker<OhlcPrice>> _ohlcPriceBrokers = [];
+    private readonly Dictionary<(long securityId, IntervalType interval), OhlcPrice> _lastOhlcPrices = [];
+    private readonly Dictionary<long, HashSet<IntervalType>> _registeredIntervals = [];
 
-    private readonly Dictionary<int, MessageBroker<ExtendedTick>> _tickBrokers = new();
+    private readonly Dictionary<long, MessageBroker<ExtendedTick>> _tickBrokers = [];
     private readonly Pool<ExtendedTick> _tickPool = new();
-    private readonly Dictionary<int, ExtendedTick> _lastTicks = new();
+    private readonly Dictionary<long, ExtendedTick> _lastTicks = [];
 
-    private readonly Dictionary<int, MessageBroker<ExtendedOrderBook>> _orderBookBrokers = new();
-    private readonly Dictionary<int, ExtendedOrderBook> _lastOrderBooks = new();
+    private readonly Dictionary<long, MessageBroker<ExtendedOrderBook>> _orderBookBrokers = [];
+    private readonly Dictionary<long, ExtendedOrderBook> _lastOrderBooks = [];
 
     private Timer _latencyTimer;
     private double _roundTripTime;
@@ -297,7 +297,7 @@ public class Quotation : IExternalQuotationManagement
 
     public async Task<ExternalConnectionState> UnsubscribeAllOhlc()
     {
-        List<KeyValuePair<(int, IntervalType), MessageBroker<OhlcPrice>>> keyValuePairs;
+        List<KeyValuePair<(long, IntervalType), MessageBroker<OhlcPrice>>> keyValuePairs;
         lock (_ohlcPriceBrokers)
         {
             keyValuePairs = _ohlcPriceBrokers.ToList();
@@ -312,7 +312,7 @@ public class Quotation : IExternalQuotationManagement
             Description = "Subscribe multiple OHLC prices",
             ResultCode = ResultCode.SubscriptionOk,
         };
-        parentState.SubStates = new();
+        parentState.SubStates = [];
 
         foreach (var (key, broker) in keyValuePairs)
         {

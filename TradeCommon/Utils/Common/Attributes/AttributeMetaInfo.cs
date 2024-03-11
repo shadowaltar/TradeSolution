@@ -3,12 +3,12 @@
 namespace Common.Attributes;
 public class AttributeMetaInfo
 {
-    public Dictionary<string, List<ValidationAttribute>> Validations { get; } = new();
-    public Dictionary<string, AutoCorrectAttribute> AutoCorrections { get; } = new();
-    public HashSet<string> DatabaseIgnoredPropertyNames { get; } = new();
-    public HashSet<string> AsJsonPropertyNames { get; } = new();
-    public HashSet<string> PrimaryUniqueKey { get; } = new();
-    public List<HashSet<string>> AllUniqueKeys { get; } = new();
+    public Dictionary<string, List<ValidationAttribute>> Validations { get; } = [];
+    public Dictionary<string, AutoCorrectAttribute> AutoCorrections { get; } = [];
+    public HashSet<string> DatabaseIgnoredPropertyNames { get; } = [];
+    public HashSet<string> AsJsonPropertyNames { get; } = [];
+    public HashSet<string> PrimaryUniqueKey { get; } = [];
+    public List<HashSet<string>> AllUniqueKeys { get; } = [];
 
     public bool IsAsJson(string name)
     {
