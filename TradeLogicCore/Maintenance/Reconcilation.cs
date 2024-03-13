@@ -289,13 +289,13 @@ public class Reconcilation
             if (!toDelete.IsNullOrEmpty())
             {
                 var trades = toDelete.Select(i => internalTrades[i]).ToList();
-                _log.Info($"{toDelete.Count} recent trades for [{security.Id},{security.Code}] are moved to error table.");
+                _log.Info($"{toDelete.Count} recent trades for [{security.Id},{security.Code}] will be moved to error table.");
                 _log.Info(string.Join("\n", trades.Select(t => $"ID:{t.Id}, ETID:{t.ExternalTradeId}, OID:{t.OrderId}, EOID:{t.ExternalOrderId}")));
                 foreach (var trade in trades)
                 {
                     if (trade != null)
                     {
-                        // malformed trade
+                        // malformed trade, or test-env external system clean up our data
                         var tableName = DatabaseNames.GetOrderTableName(trade.Security.SecurityType, true);
                         var r = await _storage.MoveToError(trade);
                     }

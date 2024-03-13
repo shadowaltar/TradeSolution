@@ -184,7 +184,7 @@ public partial class Storage
         }
         catch (Exception e)
         {
-            _log.Error($"Failed to inserted order book entries into {tableName} table.", e);
+            _log.Error($"Failed to insert order book entries into {tableName} table.", e);
             transaction.Rollback();
         }
         finally

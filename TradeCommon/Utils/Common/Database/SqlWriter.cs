@@ -223,7 +223,7 @@ public class SqlWriter<T> : ISqlWriter, IDisposable where T : class, new()
             deleteCommand = connection.CreateCommand();
             var deleteSql = GetDeleteSql(fromTableName);
             deleteCommand.CommandText = deleteSql;
-            SetCommandParameters(deleteCommand, e, _uniqueKeyNames);
+            SetCommandParameters(deleteCommand, e);
             result = await deleteCommand.ExecuteNonQueryAsync();
             if (result != 1)
             {

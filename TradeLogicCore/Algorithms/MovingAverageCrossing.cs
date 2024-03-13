@@ -232,7 +232,7 @@ public class MovingAverageCrossing : Algorithm
             }
             else
             {
-                _log.Info($"\n\t[{time:HH:mm:ss}] ALGO OPEN [{current.SecurityCode}][{enterSide}] THEOPRX*Q[{price}*{order.Quantity}] SL@[{current.Security.FormatPrice(sl)}] TP@[{current.Security.FormatPrice(tp)}]");
+                _log.Info($"\t[{time:HH:mm:ss}] ALGO OPEN [{current.SecurityCode}][{enterSide}] THEOPRX*Q[{price}*{order.Quantity}] SL@[{current.Security.FormatPrice(sl)}] TP@[{current.Security.FormatPrice(tp)}]");
             }
         }
         return state;
@@ -258,13 +258,13 @@ public class MovingAverageCrossing : Algorithm
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && sl >= tick.Bid)
         {
-            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@BID[{tick.Bid}]");
+            _log.Info($"\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@BID[{tick.Bid}]");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && sl <= tick.Ask)
         {
-            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@ASK[{tick.Ask}]");
+            _log.Info($"\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO SL [{current.SecurityCode}][{current.CloseSide}] SL@[{asset.Security.FormatPrice(sl)}] TRIGGER@ASK[{tick.Ask}]");
             triggerPrice = tick.Ask;
             return true;
         }
@@ -291,66 +291,23 @@ public class MovingAverageCrossing : Algorithm
         var originalSide = current.OpenSide;
         if (originalSide == Side.Buy && tp <= tick.Bid)
         {
-            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@BID[{tick.Bid}]");
+            _log.Info($"\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@BID[{tick.Bid}]");
             triggerPrice = tick.Bid;
             return true;
         }
         if (originalSide == Side.Sell && tp >= tick.Ask)
         {
-            _log.Info($"\n\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@ASK[{tick.Ask}]");
+            _log.Info($"\t[{tick.As<ExtendedTick>().Time:HH:mm:ss}] ALGO TP [{current.SecurityCode}][{current.CloseSide}] TP@[{asset.Security.FormatPrice(tp)}] TRIGGER@ASK[{tick.Ask}]");
             triggerPrice = tick.Ask;
             return true;
         }
         return false;
     }
-    //public override bool CanCloseLong(AlgoEntry current)
-    //{
-    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-    //    return position != null
-    //        && current.OpenSide == Side.Buy
-    //        && current.LongCloseType == CloseType.None
-    //        && current.LongSignal == SignalType.Close;
-    //}
-
-    //public override bool CanCloseShort(AlgoEntry current)
-    //{
-    //    if (!IsShortSellAllowed)
-    //        return false;
-    //    var position = _context.Services.Portfolio.GetAssetBySecurityId(current.SecurityId);
-    //    return position != null
-    //        && current.OpenSide == Side.Sell
-    //        && current.ShortCloseType == CloseType.None
-    //        && current.ShortSignal == SignalType.Close;
-    //}
 
     public override bool CanCancel(AlgoEntry current)
     {
         var openOrders = _context.Services.Order.GetOpenOrders(current.Security);
         return !openOrders.IsNullOrEmpty();
-    }
-
-    public override async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Security security, decimal triggerPrice)
-    {
-        var state = await CloseByTick(current, security, OrderActionType.TickSignalStopLoss, triggerPrice);
-
-        if (state.Content is Order order)
-        {
-            current.LongCloseType = CloseType.None;
-            current.ShortCloseType = CloseType.None;
-        }
-        return state;
-    }
-
-    public override async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Security security, decimal triggerPrice)
-    {
-        var state = await CloseByTick(current, security, OrderActionType.TickSignalTakeProfit, triggerPrice);
-
-        if (state.Content is Order order)
-        {
-            current.LongCloseType = CloseType.None;
-            current.ShortCloseType = CloseType.None;
-        }
-        return state;
     }
 
     public override async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime exitTime, OrderActionType actionType)
@@ -363,19 +320,24 @@ public class MovingAverageCrossing : Algorithm
         }
         else
         {
-            _log.Info($"\n\t[{exitTime:HH:mm:ss}] ALGO CLOSE [{current.SecurityCode}][{exitSide}] THEOPRX*Q[{triggerPrice}*{order.Quantity}]");
+            _log.Info($"\t[{exitTime:HH:mm:ss}] ALGO CLOSE [{current.SecurityCode}][{exitSide}] THEOPRX*Q[{triggerPrice}*{order.Quantity}]");
+
+            _closingPositionMonitor.MarkAsDone(current.SecurityId);
         }
         return state;
     }
 
-    public override void AfterPositionChanged(AlgoEntry current)
+    public override void AfterAssetPositionChanged(AlgoEntry current)
     {
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && asset.IsEmpty)
         {
             ResetInheritedVariables(current);
 
-            _closingPositionMonitor.MarkAsDone(current.SecurityId);
+            if (_closingPositionMonitor.IsMonitoring(current.SecurityId))
+            {
+                _log.Error($"Security {current.SecurityCode} should have been marked as 'able-to-be-closed'.");
+            }
         }
         else if (asset == null)
         {
@@ -392,6 +354,21 @@ public class MovingAverageCrossing : Algorithm
     public override void AfterTookProfit(AlgoEntry entry)
     {
         ResetInheritedVariables(entry);
+    }
+
+    public override string ToString()
+    {
+        return $"Algo - Moving Average Crossing: Fast [{_fastMa.GetType().Name}:{FastParam}], Slow [{_slowMa.GetType().Name}:{SlowParam}]," +
+            $" LongSL% [{LongStopLossRatio.NAIfInvalid()}], LongTP% [{LongTakeProfitRatio.NAIfInvalid()}]," +
+            $" ShortSL% [{ShortStopLossRatio.NAIfInvalid()}], ShortTP% [{ShortTakeProfitRatio.NAIfInvalid()}]";
+    }
+
+    public override string PrintAlgorithmParameters()
+    {
+        var sb = new StringBuilder();
+        sb.Append("\"FastMA\":\"").Append(FastParam).AppendLine("\",");
+        sb.Append("\"SlowMA\":\"").Append(SlowParam).AppendLine("\",");
+        return sb.ToString();
     }
 
     private bool CanOpen(AlgoEntry current)
@@ -412,24 +389,6 @@ public class MovingAverageCrossing : Algorithm
             hasOpenPosition = true;
 
         return !hasOpenPosition;
-    }
-
-    private async Task<ExternalQueryState> CloseByTick(AlgoEntry current, Security security, OrderActionType actionType, decimal triggerPrice)
-    {
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(security))
-        {
-            _log.Warn($"Other logic is closing the position for security {security.Code} already; tick-triggered close logic is skipped.");
-            return ExternalQueryStates.CloseConflict(security.Code);
-        }
-        var state = await Exiting.Close(current, security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
-
-        if (state.Content is Order order)
-        {
-            current.LongCloseType = CloseType.None;
-            current.ShortCloseType = CloseType.None;
-            current.TheoreticExitPrice = order.Price;
-        }
-        return state;
     }
 
     private static void ProcessSignal(AlgoEntry current, AlgoEntry last)
@@ -498,21 +457,6 @@ public class MovingAverageCrossing : Algorithm
         // case > & =, < & = are treated as no-change
         crossing = 0;
         return false;
-    }
-
-    public override string ToString()
-    {
-        return $"Algo - Moving Average Crossing: Fast [{_fastMa.GetType().Name}:{FastParam}], Slow [{_slowMa.GetType().Name}:{SlowParam}]," +
-            $" LongSL% [{LongStopLossRatio.NAIfInvalid()}], LongTP% [{LongTakeProfitRatio.NAIfInvalid()}]," +
-            $" ShortSL% [{ShortStopLossRatio.NAIfInvalid()}], ShortTP% [{ShortTakeProfitRatio.NAIfInvalid()}]";
-    }
-
-    public override string PrintAlgorithmParameters()
-    {
-        var sb = new StringBuilder();
-        sb.Append("\"FastMA\":\"").Append(FastParam).AppendLine("\",");
-        sb.Append("\"SlowMA\":\"").Append(SlowParam).AppendLine("\",");
-        return sb.ToString();
     }
 }
 

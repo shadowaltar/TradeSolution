@@ -13,6 +13,9 @@ public interface IExternalExecutionManagement
     event OrderReceivedCallback? OrderReceived;
     event TradeReceivedCallback? TradeReceived;
 
+    /// <summary>
+    /// Returns the asset object from external system.
+    /// </summary>
     event AssetChangedCallback? AssetChanged;
     //event AssetsChangedCallback? AssetsChanged;
     event TransferredCallback? Transferred;

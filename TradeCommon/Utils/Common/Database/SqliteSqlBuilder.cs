@@ -342,15 +342,36 @@ ON {tableName}
         tableName = tableNameOverride ?? tableName;
         var attributeInfo = ReflectionUtils.GetAttributeInfo<T>();
         var uniqueKey = attributeInfo.PrimaryUniqueKey.ToArray();
+        var uniqueKeyTuples = typeof(T).GetDistinctAttributes<UniqueAttribute>();
         var sb = new StringBuilder("DELETE FROM ")
             .Append(tableName)
             .Append(" WHERE ");
-        for (int i = 0; i < uniqueKey.Length; i++)
+        //for (int i = 0; i < uniqueKey.Length; i++)
+        //{
+        //    string? name = uniqueKey[i];
+        //    sb.Append(name).Append(" = ").Append(placeholderPrefix).Append(name);
+        //    if (i != uniqueKey.Length - 1)
+        //        sb.Append(" AND ");
+        //}
+        for (int i = 0; i < uniqueKeyTuples.Count; i++)
         {
-            string? name = uniqueKey[i];
-            sb.Append(name).Append(" = ").Append(placeholderPrefix).Append(name);
-            if (i != uniqueKey.Length - 1)
-                sb.Append(" AND ");
+            UniqueAttribute? uniqueAttr = uniqueKeyTuples[i];
+            var names = uniqueAttr.FieldNames;
+            sb.Append('(');
+            for (int j = 0; j < names.Length; j++)
+            {
+                string? name = names[j];
+                sb.Append(name).Append(" = ").Append(placeholderPrefix).Append(name);
+                if (j != names.Length - 1)
+                {
+                    sb.Append(" AND ");
+                }
+            }
+            sb.Append(')');
+            if (i != uniqueKeyTuples.Count - 1)
+            {
+                sb.Append(" OR ");
+            }
         }
         return sb.ToString();
     }

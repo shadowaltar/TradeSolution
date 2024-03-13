@@ -17,7 +17,7 @@ public enum ActionType
     GetAccount,
     GetTrade,
     GetOrder,
-    GetPosition,
+    GetAssetPosition,
     GetPrice,
 
     GetMisc,

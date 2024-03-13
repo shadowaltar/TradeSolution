@@ -405,18 +405,23 @@ public class OrderService : IOrderService
 
             _securityService.Fix(order, security);
 
-            if (order.Status is OrderStatus.Live or OrderStatus.PartialFilled)
+            switch (order.Status)
             {
-                _openOrders.ThreadSafeSet(order.Id, order);
+                case OrderStatus.Live or OrderStatus.PartialFilled:
+                    _openOrders.ThreadSafeSet(order.Id, order);
+                    break;
+                case OrderStatus.Failed:
+                    _errorOrders.ThreadSafeSet(order.Id, order);
+                    break;
+                case OrderStatus.Cancelled or OrderStatus.PartialCancelled:
+                    _cancelledOrders.ThreadSafeSet(order.Id, order);
+                    _openOrders.ThreadSafeRemove(order.Id);
+                    break;
+                case OrderStatus.Filled:
+                    _openOrders.ThreadSafeRemove(order.Id);
+                    break;
             }
-            else if (order.Status == OrderStatus.Failed)
-            {
-                _errorOrders.ThreadSafeSet(order.Id, order);
-            }
-            else if (order.Status is OrderStatus.Cancelled or OrderStatus.PartialCancelled)
-            {
-                _cancelledOrders.ThreadSafeSet(order.Id, order);
-            }
+
             _allOrders.ThreadSafeSet(order.Id, order);
             _allOrdersByExternalId.ThreadSafeSet(order.ExternalOrderId, order);
         }
@@ -484,7 +489,7 @@ public class OrderService : IOrderService
     /// <param name="order"></param>
     private async void OnOrderReceived(Order order)
     {
-        _log.Info($"\n\t[{order.UpdateTime:HH:mm:ss}] ORDER RECEIVED [{order.SecurityCode}] ID[{order.Id}]");
+        _log.Info($"\t[{order.UpdateTime:HH:mm:ss}] ORDER RECEIVED [{order.SecurityCode}] ID[{order.Id}]");
 
         _securityService.Fix(order);
 

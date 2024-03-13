@@ -188,13 +188,13 @@ public static class ExternalQueryStates
         };
     }
 
-    public static ExternalQueryState InvalidPosition(string errorMessage)
+    public static ExternalQueryState InvalidAsset(string errorMessage)
     {
         return new()
         {
             Content = null,
             ResponsePayload = null,
-            Action = ActionType.GetPosition,
+            Action = ActionType.GetAssetPosition,
             ExternalId = BrokerId,
             ResultCode = ResultCode.GetPositionFailed,
             UniqueConnectionId = "",

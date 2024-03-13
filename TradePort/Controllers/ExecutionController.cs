@@ -18,6 +18,7 @@ using TradeDataCore.Instruments;
 using TradeLogicCore;
 using TradeLogicCore.Algorithms;
 using TradeLogicCore.Algorithms.Screening;
+using TradeLogicCore.Algorithms.Sizing;
 using TradeLogicCore.Maintenance;
 using TradeLogicCore.Services;
 using TradePort.Utils;
@@ -449,12 +450,12 @@ public class ExecutionController : Controller
                                          algoParams.TakeProfit);
         var algorithm = new MovingAverageCrossing(services.Context, ap, macParams.FastMa, macParams.SlowMa, algoParams.StopLoss, algoParams.TakeProfit);
         var screening = new SingleSecurityLogic(services.Context, security);
-        var sizing = new SimplePositionSizingLogic(algoParams.PositionSizingMethod);
-        algorithm.Screening = screening;
-        algorithm.Sizing = sizing;
+
+        SimplePositionSizingLogic sizing;
         switch (algoParams.PositionSizingMethod)
         {
             case PositionSizingMethod.PreserveFixed:
+                sizing = new SimplePositionSizingLogic(algoParams.PositionSizingMethod);
                 if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
                 {
                     // try to reconcilate first
@@ -467,9 +468,14 @@ public class ExecutionController : Controller
                 }
                 break;
             case PositionSizingMethod.Fixed:
+                sizing = new SimplePositionSizingLogic(algoParams.PositionSizingMethod, fixedAmount: algoParams.OpenPositionQuantityHint);
                 sizing.CalculateFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint);
                 break;
+            default:
+                sizing = new SimplePositionSizingLogic(algoParams.PositionSizingMethod);
+                break;
         }
+        algorithm.Sizing = sizing;
         var algoSession = await core.Run(ep, ap, algorithm);
         var result = new Dictionary<string, object>
         {

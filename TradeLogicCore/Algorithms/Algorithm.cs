@@ -3,6 +3,7 @@ using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -44,7 +45,7 @@ public abstract class Algorithm
     public virtual void AfterAlgoExecution() { }
     public virtual void BeforeProcessingSecurity(Security security) { }
     public virtual void AfterProcessingSecurity(Security security) { }
-    public abstract void AfterPositionChanged(AlgoEntry current);
+    public abstract void AfterAssetPositionChanged(AlgoEntry current);
     public abstract void AfterStoppedLoss(AlgoEntry entry);
     public abstract void AfterTookProfit(AlgoEntry entry);
 
@@ -104,15 +105,13 @@ public abstract class Algorithm
 
     public virtual async Task<ExternalQueryState> Close(AlgoEntry current, Security security, decimal triggerPrice, Side exitSide, DateTime time, OrderActionType actionType)
     {
-        var asset = _context.Services.Algo.GetAsset(current);
-        if (asset == null)
+        if (IsAssetMissing(current))
         {
-            _log.Warn($"Other logic has closed the position for security {security.Code} already OR it did not exist; algo-crossing close logic is skipped.");
-            return ExternalQueryStates.CloseConflict(security.Code);
+            return ExternalQueryStates.InvalidAsset(security.Code);
         }
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(security))
+
+        if (IsCurrentlyBeingClosed(current))
         {
-            _log.Warn($"Other logic is closing the position for security {security.Code} already; algo-crossing close logic is skipped.");
             return ExternalQueryStates.CloseConflict(security.Code);
         }
 
@@ -120,17 +119,73 @@ public abstract class Algorithm
         current.TheoreticExitTime = time;
 
         var state = await Exiting.Close(current, security, triggerPrice, exitSide, time, actionType);
-        if (state.Content is Order order)
+        if (state.ResultCode == ResultCode.SendOrderOk && state.Content is Order order)
         {
             current.LongCloseType = CloseType.None;
             current.ShortCloseType = CloseType.None;
         }
+        // clean the flag whether close action is successful or not
+        _closingPositionMonitor.MarkAsDone(current.SecurityId);
         return state;
     }
 
-    public abstract Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Security security, decimal triggerPrice);
+    public virtual async Task<ExternalQueryState> CloseByTickStopLoss(AlgoEntry current, Security security, decimal triggerPrice)
+    {
+        var state = await CloseByTick(current, security, OrderActionType.TickSignalStopLoss, triggerPrice);
+        return state;
+    }
 
-    public abstract Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Security security, decimal triggerPrice);
+    public virtual async Task<ExternalQueryState> CloseByTickTakeProfit(AlgoEntry current, Security security, decimal triggerPrice)
+    {
+        var state = await CloseByTick(current, security, OrderActionType.TickSignalTakeProfit, triggerPrice);
+        return state;
+    }
+
+    public virtual async Task<ExternalQueryState> CloseByTick(AlgoEntry current, Security security, OrderActionType actionType, decimal triggerPrice)
+    {
+        if (IsCurrentlyBeingClosed(current))
+        {
+            return ExternalQueryStates.CloseConflict(security.Code);
+        }
+        var state = await Exiting.Close(current, security, triggerPrice, current.CloseSide, DateTime.UtcNow, actionType);
+
+        if (state.ResultCode == ResultCode.SendOrderOk && state.Content is Order order)
+        {
+            current.LongCloseType = CloseType.None;
+            current.ShortCloseType = CloseType.None;
+            current.TheoreticExitPrice = order.Price;
+        }
+        // clean the flag whether close action is successful or not
+        _closingPositionMonitor.MarkAsDone(current.SecurityId);
+        return state;
+    }
 
     public abstract string PrintAlgorithmParameters();
+
+
+    protected bool IsAssetMissing(AlgoEntry current)
+    {
+        var asset = _context.Services.Algo.GetAsset(current);
+        if (asset == null)
+        {
+            _log.Warn($"Asset missing: {current.SecurityCode}, cannot close this position.");
+            return true;
+        }
+        return false;
+    }
+
+    protected bool IsCurrentlyBeingClosed(AlgoEntry current)
+    {
+        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(current.Security))
+        {
+            // get asset quantity again and see if it is really closed
+            var asset = _context.Services.Algo.GetAsset(current);
+            if (asset != null && !asset.IsClosed)
+            {
+                _log.Warn($"Other logic is closing the position for security {current.SecurityCode} already; algo-crossing close logic is skipped.");
+                return true;
+            }
+        }
+        return false;
+    }
 }

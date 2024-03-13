@@ -68,7 +68,7 @@ public class SimpleExitPositionAlgoLogic : IExitPositionAlgoLogic
         {
             var message = $"Algorithm logic mismatch: we expect current algo entry is associated with an open position but it was not found / already closed.";
             _log.Warn(message);
-            return ExternalQueryStates.InvalidPosition(message);
+            return ExternalQueryStates.InvalidAsset(message);
         }
         var quantity = Math.Abs(asset.Quantity);
         var residualQuantity = _context.Services.Portfolio.GetAssetPositionResidual(asset.SecurityId);

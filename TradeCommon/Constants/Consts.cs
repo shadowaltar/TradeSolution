@@ -13,6 +13,8 @@ public static class Consts
 
     public const int DefaultStrategyId = 0;
 
+    public const int DefaultOrderBookDepth = 5;
+
     public const int ManualTradingStrategyId = 1;
 
     public const int LookbackDayCount = 30;

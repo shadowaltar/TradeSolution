@@ -1,6 +1,6 @@
 ﻿using Common;
+using log4net;
 using System.Collections.Concurrent;
-using System.Dynamic;
 using System.Runtime.CompilerServices;
 using TradeCommon.Essentials;
 using TradeCommon.Essentials.Instruments;
@@ -10,6 +10,7 @@ using TradeCommon.Runtime;
 namespace TradeCommon.Database;
 public class Persistence : IDisposable
 {
+    private static readonly ILog _log = Logger.New();
     private readonly IStorage _storage;
     private readonly ConcurrentQueue<PersistenceTask> _tasks = new();
     private readonly CancellationTokenSource _cancellationTokenSource = new();
@@ -24,8 +25,7 @@ public class Persistence : IDisposable
     {
         Task.Factory.StartNew(async (t) =>
         {
-            _currentThreadId = Thread.CurrentThread.ManagedThreadId;
-
+            _currentThreadId = Environment.CurrentManagedThreadId;
             _isRunning = true;
             await Run();
         }, TaskCreationOptions.LongRunning, CancellationToken.None);
@@ -135,7 +135,14 @@ public class Persistence : IDisposable
             if (_tasks.TryDequeue(out var task))
             {
                 IsEmpty = false;
-                _ = await RunTask(task);
+                try
+                {
+                    _ = await RunTask(task);
+                }
+                catch (Exception e)
+                {
+                    _log.Error("Failed to persist.", e);
+                }
             }
             else
             {

@@ -261,7 +261,7 @@ public class AlgorithmEngine : IAlgorithmEngine
         {
             _log.Debug("Received an order not from algo execution but manual or auto position closing logic.");
         }
-        _log.Info($"\n\t[{order.UpdateTime:HH:mm:ss}] ORDER [{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}] ID[{order.Id}][{order.ExternalOrderId}] {orderTypeStr} P*Q:{orderPriceStr}*{order.FormattedQuantity}{filledQtyStr}");
+        _log.Info($"\t[{order.UpdateTime:HH:mm:ss}] ORDER [{order.SecurityCode}][{order.Type}][{order.Action}][{order.Status}][{order.Side}] ID[{order.Id}][{order.ExternalOrderId}] {orderTypeStr} P*Q:{orderPriceStr}*{order.FormattedQuantity}{filledQtyStr}");
     }
 
     private void OnTradeProcessed(Trade trade)
@@ -286,7 +286,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             _log.Error("Received a state object without content! ETID: " + trade.ExternalOrderId);
         }
 
-        _log.Info($"\n\t[{trade.Time:HH:mm:ss}] TRADE [{trade.SecurityCode}][{trade.Side}] ID[{trade.Id}][{trade.ExternalTradeId}] P*Q[{trade.Price}*{trade.Quantity}] OrderP*Q[{order.Price}*{order.FilledQuantity}]");
+        _log.Info($"\t[{trade.Time:HH:mm:ss}] TRADE [{trade.SecurityCode}][{trade.Side}] ID[{trade.Id}][{trade.ExternalTradeId}] P*Q[{trade.Price}*{trade.Quantity}] OrderP*Q[{order.Price}*{order.FilledQuantity}]");
     }
 
     private void OnAssetProcessed(Asset asset, Trade trade)
@@ -303,15 +303,15 @@ public class AlgorithmEngine : IAlgorithmEngine
             var initCashPosition = _services.Portfolio.InitialPortfolio.GetCashAssetBySecurityId(quoteSecurityId);
             var currentCashPosition = _services.Portfolio.Portfolio.GetCashAssetBySecurityId(quoteSecurityId);
 
-            _log.Info($"\n\t[{asset.UpdateTime:HHmmss}] ASSET SOLDOUT [{asset.SecurityCode}] PNL[{current.Notional:F4}] R[{current.EntryReturn:P4}]");
+            _log.Info($"\t[{asset.UpdateTime:HHmmss}] ASSET SOLDOUT [{asset.SecurityCode}] PNL[{current.Notional:F4}] R[{current.EntryReturn:P4}]");
 
             StopOrderBookRecording(current.SecurityId);
         }
         else
         {
-            _log.Info($"\n\t[{asset.UpdateTime:HHmmss}] ASSET CHANGED [{asset.SecurityCode}] Q[{asset.Quantity}] TRD-CNT[{current.TradeCount}]");
+            _log.Info($"\t[{asset.UpdateTime:HHmmss}] ASSET CHANGED [{asset.SecurityCode}] Q[{asset.Quantity}] TRD-CNT[{current.TradeCount}]");
         }
-        Algorithm.AfterPositionChanged(current);
+        Algorithm.AfterAssetPositionChanged(current);
     }
 
     public async Task Stop()
@@ -426,7 +426,7 @@ public class AlgorithmEngine : IAlgorithmEngine
             _pickedSecurities = securities;
 
         var security = _pickedSecurities?.GetOrDefault(securityId) ?? throw Exceptions.MissingSecurity();
-        _log.Info($"\n\t[{price.T:HH:mm:ss}] OHLC [{security.Code}] H/L/C[{security.RoundTickSize(price.H)}/{security.RoundTickSize(price.L)}/{security.RoundTickSize(price.C)}] V[{price.V}]");
+        _log.Info($"\t[{price.T:HH:mm:ss}] OHLC [{security.Code}] H/L/C[{security.RoundTickSize(price.H)}/{security.RoundTickSize(price.L)}/{security.RoundTickSize(price.C)}] V[{price.V}]");
 
         TotalPriceEventCount++;
         await Update(securityId, price);
@@ -467,6 +467,9 @@ public class AlgorithmEngine : IAlgorithmEngine
         {
             _services.Algo.CopyOver(current, last, price);
         }
+
+        // cancel the open order after one period of OHLC
+        await CancelOpenOrders(security);
 
         if (IsBackTesting)
         {
@@ -512,12 +515,55 @@ public class AlgorithmEngine : IAlgorithmEngine
         _services.Algo.MoveNext(current, ohlcPrice);
     }
 
+    private async Task CancelOpenOrders(Security security)
+    {
+        var openOrders = _services.Order.GetOpenOrders(security);
+        if (openOrders.IsNullOrEmpty())
+            return;
+
+        var limitOrders = openOrders.Where(o => o.Type == OrderType.Limit).ToList();
+        if (limitOrders.IsNullOrEmpty()) // may happen when only SL/TP orders are opened
+            return;
+
+        foreach (var order in limitOrders)
+        {
+            if (order.Quantity == 0)
+            {
+                // the limit order is never filled, cancel it, as well as SL TP
+                var relatedOrders = openOrders.Where(o => o.ParentOrderId == order.Id);
+
+                await Cancel(order);
+                foreach (var relatedOrder in relatedOrders)
+                {
+                    await Cancel(relatedOrder);
+                }
+            }
+            else
+            {
+                // the limit order is partially filled, cancel it only
+                await Cancel(order);
+            }
+        }
+
+        async Task Cancel(Order o)
+        {
+            if (await _services.Order.CancelOrder(o))
+            {
+                _log.Info($"Cancel open order after one period of OHLC, OID: {o.Id}; Type: {o.Type}.");
+            }
+            else
+            {
+                _log.Info($"Failed to cancel open orders after one period of OHLC, OID: {o.Id}; Type: {o.Type}.");
+            }
+        }
+    }
+
     private static void LogEntry(AlgoEntry current, OrderActionType? actionType, Side? side)
     {
         if (actionType == null)
-            _log.Info($"\n\t[{current.Time:HH:mm:ss}] ALGO NOACTION [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\t[{current.Time:HH:mm:ss}] ALGO NOACTION [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
         else
-            _log.Info($"\n\t[{current.Time:HH:mm:ss}] ALGO {actionType} {side} [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
+            _log.Info($"\t[{current.Time:HH:mm:ss}] ALGO {actionType} {side} [{current.SecurityCode}][{current.PositionId}] R:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(current.Security)}}}");
     }
 
     private async Task ClosePositionIfNeeded()
@@ -805,7 +851,7 @@ public class AlgorithmEngine : IAlgorithmEngine
     //    }
     //    else
     //    {
-    //        _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}][OpenShort]\n\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(security)}}}");
+    //        _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}][OpenShort]\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(security)}}}");
     //        await Algorithm.Open(current, last, price.C, enterSide, time);
     //    }
 
@@ -856,20 +902,12 @@ public class AlgorithmEngine : IAlgorithmEngine
             return false;
 
         var assetSecurity = current.Security;
-        // TODO base is always asset; quote is always cash
-        //var security = AlgoParameters!.SecurityPool.FirstOrDefault(s => s.FxInfo?.BaseCurrency == assetSecurity.Code && s.QuoteSecurity!.IsCash);
-        //if (security == null)
-        //{
-        //    _log.Error($"Failed to stop loss due to missing security, base: {current.SecurityCode}, in pool: {string.Join(',', AlgoParameters!.SecurityPool.Select(s => s.Code))}");
-        //    return false;
-        //}
-
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             _log.Info($"EVENT SL: [{DateTime.UtcNow:HH:mm:ss}][{assetSecurity.Code}][{current?.PositionId}] R:{current.EntryReturn:P4}");
             _persistence.Insert(current);
-            var state = await Algorithm.CloseByTickStopLoss(current, assetSecurity, triggerPrice);
+            var state = await Algorithm.CloseByTick(current, assetSecurity, OrderActionType.TickSignalStopLoss, triggerPrice);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterStoppedLoss(current!);
@@ -892,13 +930,12 @@ public class AlgorithmEngine : IAlgorithmEngine
             return false;
 
         var assetSecurity = current.Security;
-
         var asset = _context.Services.Algo.GetAsset(current);
         if (asset != null && !asset.IsEmpty)
         {
             _log.Info($"EVENT TP: [{DateTime.UtcNow:HHmmss}][{asset.SecurityCode}][{current?.PositionId}] R:{current.EntryReturn:P4}");
             _persistence.Insert(current);
-            var state = await Algorithm.CloseByTickTakeProfit(current, assetSecurity, triggerPrice);
+            var state = await Algorithm.CloseByTick(current, assetSecurity, OrderActionType.TickSignalTakeProfit, triggerPrice);
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterTookProfit(current);

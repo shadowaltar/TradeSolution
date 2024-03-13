@@ -98,6 +98,13 @@ public record AlgoEntry : SecurityRelatedEntry, ILongShortEntry
     /// </summary>
     public decimal? TheoreticExitPrice { get; set; }
 
+    /// <summary>
+    /// The algo target quantity.
+    /// It will sometimes be different from the order's filled quantity after the order is filled or cancelled.
+    /// </summary>
+    [DatabaseIgnore]
+    public decimal? TheoreticQuantity => LongQuantity > 0 ? LongQuantity : ShortQuantity > 0 ? ShortQuantity : 0;
+
     //public decimal? StopLossPrice { get; set; }
     //public decimal? TakeProfitPrice { get; set; }
 

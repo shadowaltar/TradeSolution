@@ -280,11 +280,23 @@ public class PortfolioService : IPortfolioService
                     return a != null && a.IsClosed;
                 }))
                 {
-                    _log.Info("Closed asset position: " + asset.SecurityCode);
+                    // double-check if really closed or just by time-out
+                    var assets2 = await _context.Services.Portfolio.GetExternalAssets();
+                    var asset2 = assets2.FirstOrDefault(a => a.SecurityId == asset.SecurityId);
+                    if (asset2 != null && !asset2.IsEmpty)
+                    {
+                        _log.Warn($"Failed to fully close asset position: {asset.SecurityCode}; cancel any open orders and retry later.");
+                        await _orderService.CancelAllOpenOrders();
+                    }
+                    else
+                    {
+                        _log.Info("Closed asset position: " + asset.SecurityCode);
+                    }
                     break;
                 }
                 else
                 {
+                    await _orderService.CancelAllOpenOrders();
                     _log.Error("Failed to close asset position (timed-out): " + asset.SecurityCode + "; will try next preferred quote currency.");
                 }
             }

@@ -1,10 +1,11 @@
 ﻿using Common;
+using TradeCommon.Constants;
 
 namespace TradeCommon.Essentials.Quotes;
 public record OrderBook
 {
-    public List<OrderBookLevel> Bids { get; set; } = [];
-    public List<OrderBookLevel> Asks { get; set; } = [];
+    public List<OrderBookLevel> Bids { get; set; } = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
+    public List<OrderBookLevel> Asks { get; set; } = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
     public decimal BestBid => Bids.Count == 0 ? 0 : Bids[0].Price;
     public decimal BestBidSize => Bids.Count == 0 ? 0 : Bids[0].Size;
     public decimal BestAsk => Asks.Count == 0 ? 0 : Asks[0].Price;
@@ -20,15 +21,29 @@ public record OrderBook
     public virtual OrderBook DeepClone()
     {
         var clone = this with { };
-        clone.Bids = [];
-        foreach (var bid in Bids)
+        clone.Bids = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
+        for (int i = 0; i < Consts.DefaultOrderBookDepth; i++)
         {
-            clone.Bids.Add(bid with { });
+            if (Bids.Count <= i)
+            {
+                clone.Bids.Add(OrderBookLevel.BidPlaceholder);
+            }
+            else
+            {
+                clone.Bids.Add(Bids[i] with { });
+            }
         }
-        clone.Asks = [];
-        foreach (var ask in Asks)
+        clone.Asks = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
+        for (int i = 0; i < Consts.DefaultOrderBookDepth; i++)
         {
-            clone.Asks.Add(ask with { });
+            if (Asks.Count <= i)
+            {
+                clone.Asks.Add(OrderBookLevel.AskPlaceholder);
+            }
+            else
+            {
+                clone.Asks.Add(Asks[i] with { });
+            }
         }
         return clone;
     }
@@ -47,15 +62,29 @@ public record ExtendedOrderBook : OrderBook
     public override ExtendedOrderBook DeepClone()
     {
         var clone = this with { };
-        clone.Bids = [];
-        foreach (var bid in Bids)
+        clone.Bids = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
+        for (int i = 0; i < Consts.DefaultOrderBookDepth; i++)
         {
-            clone.Bids.Add(bid with { });
+            if (Bids.Count <= i)
+            {
+                clone.Bids.Add(OrderBookLevel.BidPlaceholder);
+            }
+            else
+            {
+                clone.Bids.Add(Bids[i] with { });
+            }
         }
-        clone.Asks = [];
-        foreach (var ask in Asks)
+        clone.Asks = new List<OrderBookLevel>(Consts.DefaultOrderBookDepth);
+        for (int i = 0; i < Consts.DefaultOrderBookDepth; i++)
         {
-            clone.Asks.Add(ask with { });
+            if (Asks.Count <= i)
+            {
+                clone.Asks.Add(OrderBookLevel.AskPlaceholder);
+            }
+            else
+            {
+                clone.Asks.Add(Asks[i] with { });
+            }
         }
         return clone;
     }

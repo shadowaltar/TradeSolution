@@ -10,7 +10,7 @@ namespace TradeCommon.Algorithms;
 
 public record AlgorithmParameters(bool IsBackTesting,
                                   IntervalType Interval,
-                                  [property: DatabaseIgnore] List<Security> SecurityPool,
+                                  [property: DatabaseIgnore][field: DatabaseIgnore] List<Security> SecurityPool,
                                   List<string> SecurityCodes,
                                   AlgoEffectiveTimeRange TimeRange,
                                   bool RequiresTickData,

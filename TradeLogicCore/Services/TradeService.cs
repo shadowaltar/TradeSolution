@@ -75,7 +75,7 @@ public class TradeService : ITradeService
 
     private void OnTradeReceived(Trade trade)
     {
-        _log.Info($"\n\t[{trade.Time:HH:mm:ss}] TRADE RECEIVED [{trade.SecurityCode}] ID[{trade.Id}]");
+        _log.Info($"\t[{trade.Time:HH:mm:ss}] TRADE RECEIVED [{trade.SecurityCode}] ID[{trade.Id}]");
         InternalOnNextTrade(trade);
 
         _persistence.Insert(trade);
@@ -120,6 +120,7 @@ public class TradeService : ITradeService
         if (trade.AlgoEntryId == 0)
         {
             trade.AlgoEntryId = order.AlgoEntryId;
+            trade.AlgoSessionId = order.AlgoSessionId;
         }
         trade.SecurityId = order.SecurityId;
         trade.Security = order.Security;

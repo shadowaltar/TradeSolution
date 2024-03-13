@@ -14,4 +14,7 @@ public record OrderBookLevel : ICloneable
     {
         return this with { };
     }
+
+    public static OrderBookLevel BidPlaceholder { get; } = new OrderBookLevel { Price = 0, Size = 0 };
+    public static OrderBookLevel AskPlaceholder { get; } = new OrderBookLevel { Price = 0, Size = 0 };
 }
