@@ -1,7 +1,5 @@
 ﻿using Common;
 using log4net;
-using OfficeOpenXml.Style;
-using System.Diagnostics;
 using TradeCommon.Algorithms;
 using TradeCommon.Constants;
 using TradeCommon.Database;
@@ -14,7 +12,6 @@ using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
 using TradeCommon.Utils;
-using TradeDataCore.Essentials;
 using TradeLogicCore.Algorithms.EnterExit;
 using TradeLogicCore.Algorithms.Screening;
 using TradeLogicCore.Algorithms.Sizing;
@@ -793,107 +790,6 @@ public class AlgorithmEngine : IAlgorithmEngine
         return true;
     }
 
-    //private async Task<bool> TryOpenLong(AlgoEntry current, AlgoEntry last, OhlcPrice price)
-    //{
-    //    if (current == null) return false; // not yet started
-    //    if (Algorithm == null || EnterLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-    //    var security = current.Security;
-
-    //    if (!Algorithm.CanOpen(current, Side.Buy))
-    //        return false;
-
-    //    StartOrderBookRecording(current.SecurityId);
-
-    //    // cancel any partial filled, SL or TP orders
-    //    await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
-
-    //    var time = DateTime.UtcNow;
-    //    var enterSide = Side.Buy;
-
-    //    _services.Algo.RecordExecution(current);
-    //    if (IsBackTesting)
-    //    {
-    //        var sl = Algorithm.GetStopLossPrice(price.C, enterSide, security);
-    //        var tp = Algorithm.GetTakeProfitPrice(price.C, enterSide, security);
-    //        EnterLogic.BackTestOpen(current, last, price.C, enterSide, time, sl, tp);
-    //    }
-    //    else
-    //    {
-    //        await Algorithm.Open(current, last, price.C, enterSide, time);
-    //    }
-
-    //    current.PositionId = _algoEntryIdGen.NewInt;
-    //    return true;
-    //}
-
-    //private async Task<bool> TryOpenShort(AlgoEntry current, AlgoEntry last, OhlcPrice price)
-    //{
-    //    if (current == null) return false; // not yet started
-    //    if (Algorithm == null || EnterLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-    //    var security = current.Security;
-
-    //    if (!Algorithm.CanOpen(current, Side.Sell))
-    //        return false;
-
-    //    StartOrderBookRecording(current.SecurityId);
-
-    //    // cancel any partial filled, SL or TP orders
-    //    await _services.Order.CancelAllOpenOrders(current.Security, OrderActionType.CleanUpLive, false);
-
-    //    var time = DateTime.UtcNow;
-    //    var enterSide = Side.Sell;
-    //    _services.Algo.RecordExecution(current);
-    //    if (IsBackTesting)
-    //    {
-    //        var sl = Algorithm.GetStopLossPrice(price.C, enterSide, security);
-    //        var tp = Algorithm.GetTakeProfitPrice(price.C, enterSide, security);
-    //        EnterLogic.BackTestOpen(current, last, price.C, enterSide, time, sl, tp);
-    //    }
-    //    else
-    //    {
-    //        _log.Info($"\n\tEVT: [{current.Time:HHmmss}][{current.SecurityCode}][{current.PositionId}][OpenShort]\t\tR:{current.EntryReturn:P4}, STATES:{{{current.Variables.Format(security)}}}");
-    //        await Algorithm.Open(current, last, price.C, enterSide, time);
-    //    }
-
-    //    current.PositionId = _algoEntryIdGen.NewInt;
-    //    return true;
-    //}
-    //private async Task<bool> TryCloseLong(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
-    //{
-    //    if (current == null) return false; // not yet started
-    //    if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-
-    //    if (!Algorithm.CanCloseLong(current))
-    //        return false;
-
-    //    current.IsExecuting = true;
-    //    var endTime = GetOhlcEndTime(ohlcPrice, intervalType);
-    //    if (IsBackTesting)
-    //        ExitLogic.BackTestClose(current, ohlcPrice.C, endTime);
-    //    else
-    //        await Algorithm.Close(current, current.Security, ohlcPrice.C, Side.Sell, endTime, OrderActionType.AlgoClose);
-
-    //    return true;
-    //}
-
-    //private async Task<bool> TryCloseShort(AlgoEntry current, OhlcPrice ohlcPrice, IntervalType intervalType)
-    //{
-    //    if (current == null) return false; // not yet started
-    //    if (Algorithm == null || ExitLogic == null) throw Exceptions.InvalidAlgorithmEngineState();
-
-    //    if (!Algorithm.CanCloseShort(current))
-    //        return false;
-
-    //    current.IsExecuting = true;
-    //    var endTime = GetOhlcEndTime(ohlcPrice, intervalType);
-    //    if (IsBackTesting)
-    //        ExitLogic.BackTestClose(current, ohlcPrice.C, endTime);
-    //    else
-    //        await Algorithm.Close(current, current.Security, ohlcPrice.C, Side.Buy, endTime, OrderActionType.AlgoClose);
-
-    //    return true;
-    //}
-
     private async Task<bool> TryStopLoss(AlgoEntry current, Tick tick)
     {
         if (current == null) return false; // not yet started
@@ -911,6 +807,8 @@ public class AlgorithmEngine : IAlgorithmEngine
             if (state.ResultCode == ResultCode.SendOrderOk)
             {
                 Algorithm.AfterStoppedLoss(current!);
+
+                Algorithm.MonitorStopLimitOrder(current);
             }
             else
             {

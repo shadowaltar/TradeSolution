@@ -242,7 +242,7 @@ public class MovingAverageCrossing : Algorithm
     {
         triggerPrice = 0;
         var securityId = current.SecurityId;
-        if (_closingPositionMonitor.IsMonitoring(securityId))
+        if (_closeActionMonitor.IsMonitoring(securityId))
         {
             if (_log.IsDebugEnabled)
                 _log.Debug($"Already working on the position (with security Id {securityId}) so cannot run StopLoss.");
@@ -275,7 +275,7 @@ public class MovingAverageCrossing : Algorithm
     {
         triggerPrice = 0;
         var securityId = current.SecurityId;
-        if (_closingPositionMonitor.IsMonitoring(securityId))
+        if (_closeActionMonitor.IsMonitoring(securityId))
         {
             if (_log.IsDebugEnabled)
                 _log.Debug($"Already working on the position (with security Id {securityId}) so cannot run TakeProfit.");
@@ -322,7 +322,7 @@ public class MovingAverageCrossing : Algorithm
         {
             _log.Info($"\t[{exitTime:HH:mm:ss}] ALGO CLOSE [{current.SecurityCode}][{exitSide}] THEOPRX*Q[{triggerPrice}*{order.Quantity}]");
 
-            _closingPositionMonitor.MarkAsDone(current.SecurityId);
+            _closeActionMonitor.MarkAsDone(current.SecurityId);
         }
         return state;
     }
@@ -334,7 +334,7 @@ public class MovingAverageCrossing : Algorithm
         {
             ResetInheritedVariables(current);
 
-            if (_closingPositionMonitor.IsMonitoring(current.SecurityId))
+            if (_closeActionMonitor.IsMonitoring(current.SecurityId))
             {
                 _log.Error($"Security {current.SecurityCode} should have been marked as 'able-to-be-closed'.");
             }

@@ -4,24 +4,23 @@ using System.Text.Json.Nodes;
 using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Instruments;
+using TradeCommon.Runtime;
 
 namespace TradeDataCore.Importing.Binance;
 
-public class DefinitionReader
+public class SecurityDefinitionReader(IStorage storage)
 {
     private static readonly ILog _log = Logger.New();
-    private readonly IStorage _storage;
-
-    public DefinitionReader(IStorage storage)
-    {
-        _storage = storage;
-    }
+    private readonly IStorage _storage = storage;
+    private EnvironmentType _environment => _storage.Environment;
 
     public async Task<List<Security>?> ReadAndSave(SecurityType type)
     {
         const int assetPrecision = 8;
         const string exchange = ExternalNames.Binance;
-        const string url = "https://data-api.binance.vision/api/v3/exchangeInfo";
+        string url = _environment == EnvironmentType.Prod
+            ? "https://data-api.binance.vision/api/v3/exchangeInfo"
+            : "https://testnet.binance.vision/api/v3/exchangeInfo";
 
         var securities = new List<Security>();
         try
@@ -39,9 +38,9 @@ public class DefinitionReader
                 decimal? lotSize = null;
                 decimal? maxLotSize = null;
                 decimal? minNotional = null;
-                var priceFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "PRICE_FILTER")?.AsObject();
-                var lotSizeFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "LOT_SIZE")?.AsObject();
-                var notionalFilterObj = filterArray?.FirstOrDefault(a => a.GetString("filterType") == "NOTIONAL")?.AsObject();
+                var priceFilterObj = filterArray?.FirstOrDefault(a => a?.GetString("filterType") == "PRICE_FILTER")?.AsObject();
+                var lotSizeFilterObj = filterArray?.FirstOrDefault(a => a?.GetString("filterType") == "LOT_SIZE")?.AsObject();
+                var notionalFilterObj = filterArray?.FirstOrDefault(a => a?.GetString("filterType") == "NOTIONAL")?.AsObject();
                 lotSize = lotSizeFilterObj?.GetDecimal("minQty");
                 maxLotSize = lotSizeFilterObj?.GetDecimal("maxQty");
                 minNotional = notionalFilterObj?.GetDecimal("minNotional");
@@ -101,7 +100,7 @@ public class DefinitionReader
         }
         catch (Exception e)
         {
-            _log.Error("Failed to read and save securities with type: " + type,e );
+            _log.Error("Failed to read and save securities with type: " + type, e);
             return null;
         }
 

@@ -18,7 +18,7 @@ public class Core
 
     private readonly Dictionary<long, IAlgorithmEngine> _engines = [];
     private readonly IServices _services;
-    private Reconcilation? _reconciliation;
+    private Reconciliation? _reconciliation;
 
     public IReadOnlyDictionary<long, IAlgorithmEngine> Engines => _engines;
     public ExchangeType Exchange => Context.Exchange;
@@ -70,7 +70,7 @@ public class Core
         var refPrices = await _services.MarketData.GetPrices(algoParameters.SecurityPool);
         SetMinQuantities(refPrices);
 
-        _reconciliation = new Reconcilation(Context);
+        _reconciliation = new Reconciliation(Context);
 
         var reconcileStart = startTime.AddDays(-Consts.LookbackDayCount);
         await _reconciliation.RunAll(user, reconcileStart, algoParameters.SecurityPool);

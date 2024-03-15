@@ -459,7 +459,7 @@ public class ExecutionController : Controller
                 if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
                 {
                     // try to reconcilate first
-                    var recon = new Reconcilation(core.Context);
+                    var recon = new Reconciliation(core.Context);
                     await recon.ReconcileAssets();
                     if (!sizing.CalculatePreserveFixed(services.Security, services.Portfolio, quoteCode, algoParams.OpenPositionQuantityHint))
                     {
@@ -608,7 +608,7 @@ public class ExecutionController : Controller
             securities.Add(security);
         }
 
-        var _reconciliation = new Reconcilation(adminService.Context);
+        var _reconciliation = new Reconciliation(adminService.Context);
         DateTime reconcileStart = DateTime.UtcNow.AddDays(-Consts.LookbackDayCount);
         await _reconciliation.RunAll(adminService.CurrentUser!, reconcileStart, securities);
 

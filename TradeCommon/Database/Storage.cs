@@ -3,6 +3,7 @@ using Common;
 using Common.Database;
 using log4net;
 using Microsoft.Data.Sqlite;
+using System;
 using System.Data;
 using TradeCommon.Constants;
 using TradeCommon.Runtime;
@@ -16,7 +17,7 @@ public partial class Storage : IStorage
     private readonly SqlWriters _writers;
     private readonly Lazy<ApplicationContext> _lazyContext;
     private EnvironmentType _environment;
-    private string _environmentString;
+    private string _environmentString = Environments.ToString(EnvironmentType.Unknown);
     private SqliteConnection? _globalConnection;
     private SqliteTransaction? _globalTransaction;
 
@@ -34,14 +35,18 @@ public partial class Storage : IStorage
         _lazyContext = new Lazy<ApplicationContext>(_container.Resolve<ApplicationContext>);
     }
 
-    public void SetEnvironment(EnvironmentType environment)
+    public EnvironmentType Environment
     {
-        _environment = environment;
-        _environmentString = Environments.ToString(_environment);
-        var dir = Path.Combine(Consts.DatabaseFolder, _environmentString);
-        Directory.CreateDirectory(dir);
+        get => _environment;
+        set
+        {
+            _environment = value;
+            _environmentString = Environments.ToString(_environment);
+            var dir = Path.Combine(Consts.DatabaseFolder, _environmentString);
+            Directory.CreateDirectory(dir);
 
-        _writers.SetEnvironmentString(_environmentString);
+            _writers.SetEnvironmentString(_environmentString);
+        }
     }
 
     public async Task BeginGlobalTransaction(params string[] databaseNames)
@@ -215,7 +220,7 @@ public partial class Storage : IStorage
             transaction.Rollback();
         }
         if (_log.IsDebugEnabled)
-            _log.Debug($"Executed multiple commands in {database}. SQLs:{Environment.NewLine}{string.Join(Environment.NewLine, sqls)}");
+            _log.Debug($"Executed multiple commands in {database}. SQLs:{System.Environment.NewLine}{string.Join(System.Environment.NewLine, sqls)}");
         return count;
     }
 

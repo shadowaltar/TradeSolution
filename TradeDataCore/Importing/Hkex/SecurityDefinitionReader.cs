@@ -7,15 +7,10 @@ using TradeCommon.Importing;
 
 namespace TradeDataCore.Importing.Hkex;
 
-public class DefinitionReader
+public class SecurityDefinitionReader(IStorage storage)
 {
     private static readonly ILog _log = Logger.New();
-    private readonly IStorage _storage;
-
-    public DefinitionReader(IStorage storage)
-    {
-        _storage = storage;
-    }
+    private readonly IStorage _storage = storage;
 
     public async Task<List<Security>?> ReadAndSave(SecurityType type)
     {

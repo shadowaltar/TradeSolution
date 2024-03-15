@@ -1,17 +1,19 @@
 ﻿using Common;
 using log4net;
+using TradeCommon.Constants;
 using TradeCommon.Database;
 using TradeCommon.Essentials.Accounts;
 using TradeCommon.Essentials.Instruments;
 using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
+using TradeDataCore.Importing.Binance;
 using TradeDataCore.Instruments;
 using TradeLogicCore.Services;
 
 namespace TradeLogicCore.Maintenance;
 
-public class Reconcilation(Context context)
+public class Reconciliation(Context context)
 {
     private static readonly ILog _log = Logger.New();
     private readonly Context _context = context;
@@ -373,6 +375,12 @@ public class Reconcilation(Context context)
 
     public async Task RunAll(User user, DateTime start, List<Security> securityPool)
     {
+        if (_context.Broker == BrokerType.Binance)
+        {
+            var reader = new SecurityDefinitionReader(_storage);
+            await reader.ReadAndSave(SecurityType.Crypto);
+        }
+
         await ReconcileAccount(user);
         await ReconcileAssets();
 

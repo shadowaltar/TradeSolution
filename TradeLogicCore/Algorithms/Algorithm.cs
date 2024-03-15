@@ -3,7 +3,6 @@ using log4net;
 using TradeCommon.Algorithms;
 using TradeCommon.Essentials.Algorithms;
 using TradeCommon.Essentials.Instruments;
-using TradeCommon.Essentials.Portfolios;
 using TradeCommon.Essentials.Quotes;
 using TradeCommon.Essentials.Trading;
 using TradeCommon.Runtime;
@@ -18,7 +17,10 @@ public abstract class Algorithm
 {
     private static readonly ILog _log = Logger.New();
 
-    protected WorkingItemMonitor<Security> _closingPositionMonitor;
+    protected WorkingItemMonitor<Security> _closeActionMonitor;
+
+    protected HashSet<PendingStopLimit> _pendingStopLimits;
+
     private readonly Context _context;
 
     public virtual int Id { get; }
@@ -59,7 +61,7 @@ public abstract class Algorithm
 
     protected Algorithm(Context context)
     {
-        _closingPositionMonitor = new WorkingItemMonitor<Security>();
+        _closeActionMonitor = new WorkingItemMonitor<Security>();
         _context = context;
     }
 
@@ -125,7 +127,7 @@ public abstract class Algorithm
             current.ShortCloseType = CloseType.None;
         }
         // clean the flag whether close action is successful or not
-        _closingPositionMonitor.MarkAsDone(current.SecurityId);
+        _closeActionMonitor.MarkAsDone(current.SecurityId);
         return state;
     }
 
@@ -156,7 +158,7 @@ public abstract class Algorithm
             current.TheoreticExitPrice = order.Price;
         }
         // clean the flag whether close action is successful or not
-        _closingPositionMonitor.MarkAsDone(current.SecurityId);
+        _closeActionMonitor.MarkAsDone(current.SecurityId);
         return state;
     }
 
@@ -176,7 +178,7 @@ public abstract class Algorithm
 
     protected bool IsCurrentlyBeingClosed(AlgoEntry current)
     {
-        if (_closingPositionMonitor.MonitorAndPreventOtherActivity(current.Security))
+        if (_closeActionMonitor.MonitorAndPreventOtherActivity(current.Security))
         {
             // get asset quantity again and see if it is really closed
             var asset = _context.Services.Algo.GetAsset(current);

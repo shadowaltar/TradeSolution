@@ -109,7 +109,7 @@ public class StaticDataController : Controller
     {
         if (ControllerValidator.IsBadOrParse(secTypeStr, out SecurityType secType, out var br)) return br;
 
-        var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
+        var reader = new TradeDataCore.Importing.Binance.SecurityDefinitionReader(storage);
         var securities = await reader.ReadAndSave(secType);
         return Ok(securities?.Count);
     }
@@ -126,7 +126,7 @@ public class StaticDataController : Controller
         if (secType == SecurityType.Unknown)
             return BadRequest("Invalid sec-type string.");
 
-        var reader = new TradeDataCore.Importing.Hkex.DefinitionReader(storage);
+        var reader = new TradeDataCore.Importing.Hkex.SecurityDefinitionReader(storage);
         var securities = await reader.ReadAndSave(secType);
         return Ok(securities?.Count);
     }

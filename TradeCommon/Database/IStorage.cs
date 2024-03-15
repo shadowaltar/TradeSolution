@@ -14,7 +14,7 @@ using TradeDataCore.Essentials;
 namespace TradeCommon.Database;
 public interface IStorage : IDatabase
 {
-    void SetEnvironment(EnvironmentType environment);
+    EnvironmentType Environment { get; set; }
     Task<bool> IsTableExists(string tableName, string databaseName);
     Task CreateAccountTable();
     Task CreateAssetTable();

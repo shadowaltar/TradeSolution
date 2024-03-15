@@ -106,7 +106,7 @@ public class Program
     private static async Task ResetOrderTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateTable<Order>("stock_orders");
         await storage.CreateTable<Order>("error_stock_orders");
@@ -119,7 +119,7 @@ public class Program
     private static async Task ResetTradeTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateTable<Trade>("stock_trades");
         await storage.CreateTable<Trade>("error_stock_trades");
@@ -130,7 +130,7 @@ public class Program
     private static async Task ResetAssetTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateTable<Asset>();
         await storage.CreateTable<AssetState>();
@@ -139,7 +139,7 @@ public class Program
     private static async Task ResetAlgoTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateTable<AlgoEntry>();
         await storage.CreateTable<AlgoSession>();
@@ -148,11 +148,11 @@ public class Program
     private static async Task ResetSecurityDefinitionAndPriceTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateSecurityTable(SecurityType.Fx);
         await storage.CreateSecurityTable(SecurityType.Equity);
-        var reader = new TradeDataCore.Importing.Binance.DefinitionReader(storage);
+        var reader = new TradeDataCore.Importing.Binance.SecurityDefinitionReader(storage);
         await reader.ReadAndSave(SecurityType.Fx);
         await storage.CreatePriceTable(IntervalType.OneMinute, SecurityType.Fx);
         await storage.CreatePriceTable(IntervalType.OneHour, SecurityType.Fx);
@@ -164,7 +164,7 @@ public class Program
     private static async Task ResetAccountAndUserTables(EnvironmentType environment)
     {
         var storage = new Storage(Dependencies.ComponentContext);
-        storage.SetEnvironment(environment);
+        storage.Environment = environment;
 
         await storage.CreateTable<Account>();
         await storage.CreateTable<User>();
@@ -263,7 +263,7 @@ public class Program
         // in case the environment is new, read asset data from external, store and cache
         if (!services.Portfolio.HasAssetPosition)
         {
-            await new Reconcilation(context).ReconcileAssets();
+            await new Reconciliation(context).ReconcileAssets();
             services.Portfolio.Update(await services.Portfolio.GetStorageAssets(), true);
         }
 
